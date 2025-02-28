@@ -11685,6 +11685,9 @@ msgstr ""
 msgid "Clear my choice on the unsaved projects."
 msgstr ""
 
+msgid "Selected model not a system model; no system consumables"
+msgstr ""
+
 msgid "Automatically layout when importing or copying"
 msgstr ""
 

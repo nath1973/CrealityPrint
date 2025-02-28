@@ -50,19 +50,29 @@ TabCtrl::~TabCtrl()
 }
 
 int TabCtrl::GetSelection() const { return sel; }
-
+int TabCtrl::SelectItemByTitle(const wxString &title)
+{
+    for (size_t i = 0; i < btns.size(); ++i) {
+        if (btns[i]->GetLabel() == title) {
+            SelectItem(i);
+            return i;
+        }
+    }
+    SelectItem(-1);
+    return -1;
+}
 void TabCtrl::SelectItem(int item)
 {
     if (item == sel || !sendTabCtrlEvent(true))
         return;
-    if (sel >= 0) {
+    if (sel >= 0 && sel < btns.size()) {
         wxCommandEvent e(wxEVT_CHECKBOX);
         auto b = btns[sel];
         e.SetEventObject(b);
         b->GetEventHandler()->ProcessEvent(e);
     }
     sel = item;
-    if (sel >= 0) {
+    if (sel >= 0 && sel < btns.size()) {
         wxCommandEvent e(wxEVT_CHECKBOX);
         auto b = btns[sel];
         e.SetEventObject(b);

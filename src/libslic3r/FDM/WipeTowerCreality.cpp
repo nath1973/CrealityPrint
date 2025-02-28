@@ -490,7 +490,8 @@ WipeTowerCreality::WipeTowerCreality(const PrintConfig& config, const PrintRegio
     m_wipe_tower_cone_angle(float(config.wipe_tower_cone_angle)),
     m_extra_spacing(float(config.wipe_tower_extra_spacing/100.)),
     m_y_shift(0.f),
-    m_z_pos(0.f),
+    m_z_pos(0.f), 
+    m_z_offset(config.z_offset),
     m_bridging(float(config.wipe_tower_bridging)),
     m_no_sparse_layers(config.wipe_tower_no_sparse_layers),
     m_gcode_flavor(config.gcode_flavor),
@@ -725,7 +726,7 @@ void WipeTowerCreality::toolchange_Change(
     // These will be substituted by the actual gcodes when the gcode is generated.
     writer.append("[change_filament_gcode]\n");
  
-    writer.z_hop(0.4f, 1200.0f, "G0");//固件bug,临时抬升0.4,防止Z高度错误导致的移动到擦拭塔时产生剐蹭
+    writer.z_hop(0.4f+m_z_offset, 1200.0f, "G0");//固件bug,临时抬升0.4,防止Z高度错误导致的移动到擦拭塔时产生剐蹭
     // Travel to where we assume we are. Custom toolchange or some special T code handling (parking extruder etc)
     // gcode could have left the extruder somewhere, we cannot just start extruding. We should also inform the
     // postprocessor that we absolutely want to have this in the gcode, even if it thought it is the same as before.
@@ -735,7 +736,7 @@ void WipeTowerCreality::toolchange_Change(
           .append(std::string("G1 X") + Slic3r::float_to_string_decimal_point(current_pos.x())
                              +  " Y"  + Slic3r::float_to_string_decimal_point(current_pos.y())
                              + WipeTower::never_skip_tag() + "\n");
-    writer.z_hop(0.0f);
+    writer.z_hop(m_z_offset);
     writer.append("[deretraction_from_wipe_tower_generator]");
 
      // Orca TODO: handle multi extruders

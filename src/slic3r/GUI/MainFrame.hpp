@@ -33,7 +33,7 @@
 #include "PrinterWebView.hpp"
 #include "calib_dlg.hpp"
 #include "MultiMachinePage.hpp"
-#include "print_manage/PrinterMgrView.hpp"
+#include "print_manage/App/PrinterMgrView.hpp"
 
 #define ENABEL_PRINT_ALL 0
 

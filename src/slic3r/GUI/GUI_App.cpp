@@ -13,7 +13,7 @@
 #include <wx/event.h>
 #include <wx/bitmap.h>
 #include <wx/string.h>
-
+#include "CrealityrintDump.hpp"
 // Localization headers: include libslic3r version first so everything in this file
 // uses the slic3r/GUI version (the macros will take precedence over the functions).
 // Also, there is a check that the former is not included from slic3r module.
@@ -159,7 +159,8 @@
 #include "print_manage/UploadGcodeToCloud.hpp"
 #include "print_manage/Upload3mfToCloud.hpp"
 #include "libslic3r/GlobalConfig.hpp"
-
+#include "SyncUserPresets.hpp"
+#include "print_manage/AppMgr.hpp"
 
 
 using namespace std::literals;
@@ -901,12 +902,11 @@ std::vector<std::string> GUI_App::split_str(std::string src, std::string separat
     }
     return result;
 }
-void GUI_App::post_openlink_cmd()
+void GUI_App::post_openlink_cmd(std::string link)
 {
-    if (m_openlink_url.length() > 0)
+    if (link.length() > 0)
     {
-        std::string url = m_openlink_url;
-        m_openlink_url = "";
+        std::string url = link;
         json m_Res = json::object();
         m_Res["command"] = "url_scheme";
         m_Res["url"] = url;
@@ -939,9 +939,8 @@ void GUI_App::post_init()
 
     m_open_method = "double_click";
     bool switch_to_3d = false;
-
     if (!this->init_params->input_files.empty()) {
-
+        
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(", init with input files, size %1%, input_gcode %2%")
             %this->init_params->input_files.size() %this->init_params->input_gcode;
         const auto first_url = this->init_params->input_files.front();
@@ -953,21 +952,7 @@ void GUI_App::post_init()
             m_openlink_url = first_url;
             m_open_method = "url";
             
-            wxTimer *m_timer = new wxTimer(this, wxID_ANY);
-            int x= 0;
-            // ʹ�� lambda ����ʽ�󶨶�ʱ���¼���������
-            Bind(wxEVT_TIMER, [=](wxTimerEvent& event) mutable {
-                m_openlink_url = first_url;
-                //if (x >= 3) {
-					//m_timer->Stop();
-				//}
-                post_openlink_cmd();
-                wxLogMessage("Timer triggered!");
-                //x++;
-                }, m_timer->GetId());
-
-            // ������ʱ�������Ϊ 1000 ���루1 �룩
-            m_timer->Start(5000,true);
+            
             
         } else {
             switch_to_3d = true;
@@ -980,22 +965,6 @@ void GUI_App::post_init()
             } else {
                 mainframe->select_tab(size_t(MainFrame::tp3DEditor));
                 plater_->select_view_3D("3D");
-                wxArrayString input_files;
-                for (auto& file : this->init_params->input_files) {
-                    input_files.push_back(wxString::FromUTF8(file));
-                }
-                this->plater()->set_project_filename(_L("Untitled"));
-                this->plater()->load_files(input_files);
-                try {
-                    if (!input_files.empty()) {
-                        std::string           file_path = input_files.front().ToStdString();
-                        std::filesystem::path path(file_path);
-                        m_open_method = "file_" + path.extension().string();
-                    }
-                } catch (...) {
-                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ", file path exception!";
-                    m_open_method = "file";
-                }
             }
         }
     }
@@ -2435,8 +2404,35 @@ void GUI_App::init_single_instance_checker(const std::string &name, const std::s
 bool GUI_App::OnInit()
 {
     try {
+        if (!this->init_params->input_files.empty())
+        {
+            const auto url = this->init_params->input_files.front();
+            if(boost::starts_with(url, "minidump://file=")) {
+                const auto file = url.substr(16);
+                if (boost::filesystem::exists(file)) {
+                    // BBS: if the file exists, we will show a error dialog and create a default config file.
+                    ErrorReportDialog* err_report_dialog = new ErrorReportDialog(nullptr, _L("Error Report"));
+                    err_report_dialog->Centre(wxBOTH);
+                    err_report_dialog->setDumpFilePath(file);
+                    int result = err_report_dialog->ShowModal();
+                    if (result == wxID_OK) {
+                        err_report_dialog->sendReport();
+                        err_report_dialog->Destroy();
+                        return true;
+                    }else{
+                        err_report_dialog->Destroy();
+                        return false;
+                    }
+                }
+            }
+        }
+        //test code
+         //int* p = nullptr;
+         //*p = 0;
+        
         return on_init_inner();
-    } catch (const std::exception&) {
+    } catch (const std::exception &err) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__<<" got a generic exception, reason = " << err.what();
         generic_exception_handle();
         return false;
     }
@@ -2444,7 +2440,8 @@ bool GUI_App::OnInit()
 
 int GUI_App::OnExit()
 {
-    stop_sync_user_preset();
+    //stop_sync_user_preset();
+    SyncUserPresets::getInstance().shutdown();
 
     if (m_device_manager) {
         delete m_device_manager;
@@ -2970,8 +2967,10 @@ bool GUI_App::on_init_inner()
             update_publish_status();
         }
 
-        if (m_post_initialized && app_config->dirty())
+        if (m_post_initialized && app_config->dirty()) {
             app_config->save();
+            SyncUserPresets::getInstance().syncConfigToCXCloud();
+        }
 
     });
 
@@ -2992,17 +2991,8 @@ bool GUI_App::on_init_inner()
                        "configuration file.\nPlease note, application settings will be lost, but printer profiles will not be affected."));
     }
 
-    //  异步检测设备页是否已经准备好数据，如果已经准备好了，则选中准备页
-    std::shared_ptr<std::thread> spt = std::make_shared<std::thread>([&]() {
-        while (!mainframe->m_printer_mgr_view->hasFirstUpdateDevices()) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-        wxCommandEvent e = wxCommandEvent(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED);
-        e.SetId(1);
-
-        wxPostEvent(mainframe->m_topbar, e);
-    });
-    spt->detach();
+    //  启动同步预设线程
+    SyncUserPresets::getInstance().startup();
 
     return true;
 }
@@ -4269,35 +4259,59 @@ std::string GUI_App::handle_web_request(std::string cmd)
                         mainframe->m_webview->SendRecentList(INT_MAX);
                     }
                 }
-            }
-            else if (command_str.compare("update_account_info") == 0) {
-                pt::ptree data_node = root.get_child("account");
+            } else if (command_str.compare("update_account_info") == 0) {
+                pt::ptree                data_node = root.get_child("account");
                 std::vector<std::string> input;
                 for (auto& v : data_node) {
                     input.emplace_back(v.second.data());
                 }
-                
-                if(4 <= input.size()){
-                    m_user.token = input[0];
+                bool old_login = m_user.bLogin;
+                if (4 <= input.size()) {
+                    m_user.token    = input[0];
                     m_user.nickName = input[1];
-                    m_user.avatar = input[2];
-                    m_user.userId = input[3];
-                    m_user.bLogin = true;
-//#ifdef _DEBUG
-//                    m_user.token = "646cdf54baefd02364b91193f75a6e176db1b4738ebaf9a1349eed5b9fbbfd62";
-//                    m_user.userId = "4135518419";
-//#endif // _DEBUG
+                    m_user.avatar   = input[2];
+                    m_user.userId   = input[3];
+                    m_user.bLogin   = true;
+                    // #ifdef _DEBUG
+                    //                     m_user.token = "646cdf54baefd02364b91193f75a6e176db1b4738ebaf9a1349eed5b9fbbfd62";
+                    //                     m_user.userId = "4135518419";
+                    // #endif // _DEBUG
 
-                }
-                else
-                {
+                } else {
                     m_user.token.clear();
                     m_user.nickName.clear();
                     m_user.avatar.clear();
                     m_user.userId.clear();
                     m_user.bLogin = false;
                 }
-                 app_config->set("cloud", "user_id", m_user.userId);
+                static bool first_update_preset  = true;
+                auto        double_click_handler = [=]() {
+                    if (m_open_method == "double_click") {
+                        wxArrayString input_files;
+                        for (auto& file : this->init_params->input_files) {
+                            input_files.push_back(wxString::FromUTF8(file));
+                        }
+                        this->plater()->set_project_filename(_L("Untitled"));
+                        this->plater()->load_files(input_files);
+                        try {
+                            if (!input_files.empty()) {
+                                std::string           file_path = input_files.front().ToStdString();
+                                std::filesystem::path path(file_path);
+                                m_open_method = "file_" + path.extension().string();
+                            }
+                        } catch (...) {
+                            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ", file path exception!";
+                            m_open_method = "file";
+                        }
+                    }
+                };
+                if (first_update_preset && !m_user.bLogin) {
+                    first_update_preset = false;
+                    double_click_handler();
+                }
+                if (old_login == m_user.bLogin)
+                    return "";
+                app_config->set("cloud", "user_id", m_user.userId);
                 app_config->set("cloud", "token", m_user.token);
                 if (preset_bundle)
                     preset_bundle->remove_users_preset(*app_config);
@@ -4316,15 +4330,19 @@ std::string GUI_App::handle_web_request(std::string cmd)
                      stop_sync_user_preset();
                      enable_user_preset_folder(false);
                      if (preset_bundle) {
-                         preset_bundle->remove_users_preset(*app_config);
-                         preset_bundle->load_user_presets(DEFAULT_USER_FOLDER_NAME, ForwardCompatibilitySubstitutionRule::Enable);
+                         //preset_bundle->remove_users_preset(*app_config);
+                         //preset_bundle->load_user_presets(DEFAULT_USER_FOLDER_NAME, ForwardCompatibilitySubstitutionRule::Enable);
+                         preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
                      }
                      if (mainframe)
                          mainframe->update_side_preset_ui();
                  }
-                
-                if(mainframe->m_printer_mgr_view)
-                    mainframe->m_printer_mgr_view->PostUpdateUserInfo();
+
+                 DM::AppMgr::Ins().SystemUserChanged();
+                 if (first_update_preset) {
+                     first_update_preset = false;
+                     double_click_handler();
+                 }
             }
             // else if (command_str.compare("modelmall_model_advise_get") == 0) {
             //     if (mainframe && this->app_config->get("staff_pick_switch") == "true") {
@@ -4643,6 +4661,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 ss << j << std::endl;
                 return ss.str();
             } else if (command_str.compare("get_user_preset_params") == 0) {
+                SyncUserPresets::getInstance().syncUserPresetsToFrontPage();
+                return "";
+
                 if(!m_user_syncing)
                     m_user_query_type = 1;
                 return "";
@@ -4929,10 +4950,6 @@ std::string GUI_App::handle_web_request(std::string cmd)
                                             if(nozzles.find(nozzle) == std::string::npos){
                                                 nozzles = nozzles + ";" + nozzle;
                                                 json_in["nozzle_diameter"] = nozzles;
-                                                boost::nowide::ofstream c;
-                                                c.open(out_machine_model_json_file, std::ios::out | std::ios::trunc);
-                                                c << std::setw(4) << json_in << std::endl;
-                                                c.close();
                                             }
                                             std::vector<std::string> materials;
                                             boost::algorithm::split(materials, default_materials, boost::is_any_of(";"));
@@ -4941,6 +4958,11 @@ std::string GUI_App::handle_web_request(std::string cmd)
                                                     json_in["default_materials"] = json_in["default_materials"].get<std::string>() + ";" + default_material;
                                                 }
                                             }
+
+                                            boost::nowide::ofstream c;
+                                            c.open(out_machine_model_json_file, std::ios::out | std::ios::trunc);
+                                            c << std::setw(4) << json_in << std::endl;
+                                            c.close();
 
                                         }
                                         auto out_machine_json_file = fs::path(data_dir()).append("system")
@@ -5021,22 +5043,22 @@ std::string GUI_App::handle_web_request(std::string cmd)
                                         c << std::setw(4) << json_out << std::endl;
                                         c.close();
                                         //judge if the material is in the default materials list
-                                        auto* app_config = GUI::wxGetApp().app_config;
-                                        if(app_config->has_printer_settings(out_machine_name))
-                                        {
-                                            std::string section_name = AppConfig::SECTION_FILAMENTS;
-                                            if (app_config->has_section(section_name)) {
-                                                const std::map<std::string, std::string> &installed = app_config->get_section(section_name);
-                                                auto has = [&installed](const std::string &name) {
-                                                    auto it = installed.find(name);
-                                                    return it != installed.end() && ! it->second.empty();
-                                                };
-                                                bool is_visible = has(basename);
-                                                if (!is_visible) {
-                                                    app_config->set(section_name, basename, "true");
-                                                }
-                                            } 
-                                        }
+                                        //auto* app_config = GUI::wxGetApp().app_config;
+                                        //if(app_config->has_printer_settings(out_machine_name))
+                                        //{
+                                        //    std::string section_name = AppConfig::SECTION_FILAMENTS;
+                                        //    if (app_config->has_section(section_name)) {
+                                        //        const std::map<std::string, std::string> &installed = app_config->get_section(section_name);
+                                        //        auto has = [&installed](const std::string &name) {
+                                        //            auto it = installed.find(name);
+                                        //            return it != installed.end() && ! it->second.empty();
+                                        //        };
+                                        //        bool is_visible = has(basename);
+                                        //        if (!is_visible) {
+                                        //            app_config->set(section_name, basename, "true");
+                                        //        }
+                                        //    } 
+                                        //}
                                     } else if (boost::algorithm::istarts_with(name, "Processes")) {
                                         static std::set<std::string> array_keys = {"filament_colour",      "flush_multiplier",
                                                                                    "flush_volumes_matrix", "flush_volumes_vector",
@@ -5179,42 +5201,6 @@ std::string GUI_App::handle_web_request(std::string cmd)
 						c << std::setw(4) << cache_json << std::endl;
 						c.close();
                     }
-                }
-            }
-            else if (command_str.compare("forward_device_detail") == 0) {
-                try {
-                    std::string ipAddress = root.get_child("ip").data();
-                    std::string name      = root.get_child("name").data();
-                    if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                        wxGetApp().mainframe->get_printer_mgr_view()->handle_request_switch_device_details_page(ipAddress, name);
-                    }
-
-                } catch (...) {
-                    BOOST_LOG_TRIVIAL(trace) << "forward_device_detail, parse json cmd failed " << cmd;
-                }
-            }
-            else if (command_str.compare("sync_device_filament") == 0) {
-                std::string deviceMac = root.get_child("device_id").data();
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->handle_sync_device_filament_cmd_from_worlshop(deviceMac);
-                }
-
-            }
-            else if (command_str.compare("set_current_device") == 0) {
-                std::string deviceMac = root.get_child("device_id").data();
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->handle_set_current_device_cmd_from_workshop(deviceMac);
-                }
-            }
-            else if (command_str.compare("request_device_info") == 0) {
-                std::string deviceMac = root.get_child("device_id").data();
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->handle_request_current_device_info_from_workshop(deviceMac);
-                }
-            }
-            else if (command_str.compare("active_request_device_info") == 0) {
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->request_device_info_for_workshop();
                 }
             }
             else if(command_str.compare("refresh_all_device") == 0){
@@ -6539,15 +6525,25 @@ void GUI_App::sync_preset(Preset* preset)
 
 void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 {
-    if (!is_login())
+    if (!is_login()) {
+        BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset login is false";
         return;
-    if (app_config->get("stealth_mode") == "true")
+    }
+    if (app_config->get("stealth_mode") == "true") {
+        BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset stealth_mode is true";
         return;
+    }
 
     auto token = app_config->get("cloud", "token");
-    if (token.empty())
+    if (token.empty()) {
+        BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset token is empty";
         return;
+    }
     auto user_id = app_config->get("cloud", "user_id");
+
+    SyncUserPresets::getInstance().startSync();
+    SyncUserPresets::getInstance().syncUserPresetsToLocal();
+    return;
 
     // has already start sync
     if (m_user_sync_token) return;
@@ -6821,6 +6817,9 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 
 void GUI_App::stop_sync_user_preset()
 {
+    SyncUserPresets::getInstance().stopSync();
+    return;
+
     if (!m_user_sync_token)
         return;
 
@@ -8292,6 +8291,17 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     if (strFinish == "false" || strFinish.empty())
         pStyle = wxCAPTION | wxTAB_TRAVERSAL;
 
+
+    const Preset& preset = preset_bundle->printers.get_selected_preset();
+    if ((start_page == ConfigWizard::SP_FILAMENTS) && (preset.m_is_non_standard_printer))
+    {
+        MessageDialog msg(nullptr, _L("Selected model not a system model; no system consumables"), _L("Information"), wxOK);
+        if (msg.ShowModal())
+        {
+            return false;
+        }
+    }
+
     GuideFrame wizard(this, pStyle);
     auto page = start_page == ConfigWizard::SP_WELCOME ? GuideFrame::BBL_WELCOME :
                 start_page == ConfigWizard::SP_FILAMENTS ? GuideFrame::BBL_FILAMENT_ONLY :
@@ -8708,9 +8718,23 @@ void GUI_App::disassociate_url(std::wstring url_prefix)
 
 void GUI_App::start_download(std::string url)
 {
+    std::cout << "start_download: "<<url;
     if (!plater_) {
         BOOST_LOG_TRIVIAL(error) << "Could not start URL download: plater is nullptr.";
         return;
+    }
+    if(boost::starts_with(url, "crealityprintlink://open?code=")||boost::starts_with(url, "crealityprintlink://open/?code="))
+    {
+            wxTimer *m_timer = new wxTimer(this, wxID_ANY);
+           
+            Bind(wxEVT_TIMER, [=](wxTimerEvent& event) mutable {
+
+                post_openlink_cmd(url);
+
+                }, m_timer->GetId());
+
+            m_timer->Start(5000,true);
+            return;
     }
     //lets always init so if the download dest folder was changed, new dest is used
     boost::filesystem::path dest_folder(app_config->get("download_path"));

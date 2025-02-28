@@ -720,6 +720,12 @@ void copy_directory_recursively(const boost::filesystem::path &source, const boo
 void save_string_file(const boost::filesystem::path& p, const std::string& str);
 void load_string_file(const boost::filesystem::path& p, std::string& str);
 
+void stringReplace(std::string &strBase, const std::string strSrc, const std::string strDes);
+
+std::string trim(const std::string& s); 
+std::string toLower(const std::string& s); 
+bool isEqualAfterProcessing(const std::string& a, const std::string& b);
+
 } // namespace Slic3r
 
 #if WIN32

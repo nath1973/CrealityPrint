@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <boost/any.hpp>
+#include "I18N.hpp"
 
 #include <wx/colourdata.h>
 #include <wx/spinctrl.h>
@@ -224,6 +225,7 @@ public:
     virtual void		set_value(const boost::any& value, bool change_event) = 0;
     virtual void        set_last_meaningful_value() {}
     virtual void        set_na_value() {}
+    virtual void        update_na_value(const boost::any& value) {}
 
     /// Gets a boost::any representing this control.
     /// subclasses should overload with a specific version
@@ -282,7 +284,7 @@ protected:
     bool m_combine_side_text = false;
 
     bool    bEnterPressed = false;
-
+    wxString m_na_value    = _(L("N/A"));
     
 	friend class OptionsGroup;
 };
@@ -323,6 +325,7 @@ public:
 	void	set_value(const boost::any& value, bool change_event = false) override;
     void    set_last_meaningful_value() override;
     void	set_na_value() override;
+    void        update_na_value(const boost::any& value) override;
 
 	boost::any&		get_value() override;
 

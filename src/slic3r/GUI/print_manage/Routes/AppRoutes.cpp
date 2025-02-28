@@ -20,18 +20,17 @@ namespace DM{
             Apps apps;
             AppMgr::Ins().GetNeedToReceiveSysEventApp(command, apps);
 
-            for (const auto& app : apps) {
+            for (auto& app : apps) {
                 if (app.browser != browser) {
                     bSysEvent = true;
-                    
-                    break;
+                    AppUtils::PostMsg(app.browser, j);
                 }
             }
 
-            if (!bSysEvent) {
-                if(SysRoutes().Invoke(browser, data))return true;
-                if(SenderRoutes().Invoke(browser, data))return true;
-                if(DeviceMgrRoutes().Invoke(browser, data))return true;
+            if (1) {
+                if(SysRoutes().Invoke(browser, j, data))return true;
+                if(SenderRoutes().Invoke(browser, j, data))return true;
+                if(DeviceMgrRoutes().Invoke(browser, j, data))return true;
             }
         }
 

@@ -21,9 +21,11 @@ namespace GUI {
 
 struct SimpleSettingData
 {
-    std::string name;
-    std::string label;
+    wxString wname;
+    wxString wlabel;
     int priority;
+    std::string name  = wname.ToStdString();
+    std::string label = wlabel.ToStdString();
 };
 
 struct SettingsFactory

@@ -136,7 +136,27 @@ EmbossStyle WxFontUtils::create_emboss_style(const wxFont &font, const std::stri
     font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
 
     WxFontUtils::update_property(font_prop, font);
-    return { name_item, fontDesc, type, font_prop };
+
+    return {name_item, name_item, fontDesc, type, font_prop};
+}
+
+EmbossStyle WxFontUtils::create_emboss_style(const wxFont& font, const std::string& name, const std::string& actual_name)
+{
+    std::string       name_item = name.empty() ? get_human_readable_name(font) : name;
+    std::string       fontDesc  = store_wxFont(font);
+    EmbossStyle::Type type      = get_current_type();
+
+    // synchronize font property with actual font
+    FontProp font_prop;
+
+    // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm): it
+    // is approximately 0.0139 inch or 352.8 um. But it is too small, so I
+    // decide use point size as mm for emboss
+    font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
+
+    WxFontUtils::update_property(font_prop, font);
+
+    return {name_item, actual_name, fontDesc, type, font_prop};
 }
 
 // NOT working on linux GTK2

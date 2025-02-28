@@ -237,6 +237,7 @@ class ParamsPanel : public wxPanel
         void switch_to_object(bool with_tips = false);
         bool get_switch_of_object();
 
+        void refreshCurTreeItem(bool isDirty = true);
         void notify_object_config_changed();
         void notify_config_changed();
         void switch_to_object_if_has_object_configs();
@@ -262,7 +263,7 @@ class ParamsPanel : public wxPanel
         void ShowDetialView(bool show);
         void ShowDeleteButton(bool show);
 
-        void OnPanelShowInit();
+        void OnPanelShowInit(const std::string& printer = "");
         void OnPanelShowExit();
         void OnParentDialogOpen();
 
@@ -308,6 +309,7 @@ class ParamsPanel : public wxPanel
         wxString m_curVentor = wxString();
         wxString m_printerType = wxString();
         wxString m_curPreset = wxString();
+        wxDataViewItem m_curItem;
 
         wxColor m_normal_color = wxColor(110, 110, 115);
         wxColor m_hover_color = wxColor(23, 204, 95);
@@ -329,6 +331,7 @@ class ParamsPanel : public wxPanel
         std::vector<wxString> m_system_print_list;
         std::vector<wxString> m_user_print_list;
         std::vector<wxString> m_project_print_list;
+        std::string                   m_curNeedShowedPrinter = "";
 };
 
 class ProcessParamsPanel : public ParamsPanel

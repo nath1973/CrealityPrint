@@ -1891,8 +1891,9 @@ void DiffPresetDialog::create_presets_sizer()
 
 void DiffPresetDialog::create_show_all_presets_chb()
 {
-    m_show_all_presets = new wxCheckBox(this, wxID_ANY, _L("Show all presets (including incompatible)"));
-    m_show_all_presets->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+    m_show_all_presets = new ::CheckBox(this);
+    m_show_all_presets_text = new wxStaticText(this, wxID_ANY, _L("Show all presets (including incompatible)"));
+    m_show_all_presets->setItemClickedCb([this]() {
         bool show_all = m_show_all_presets->GetValue();
         for (auto preset_combos : m_preset_combos) {
             if (preset_combos.presets_left->get_type() == Preset::TYPE_PRINTER)
@@ -1906,6 +1907,7 @@ void DiffPresetDialog::create_show_all_presets_chb()
     wxFont basic_font = m_show_all_presets->GetFont();
     basic_font.SetPointSize(10);
     m_show_all_presets->SetFont(basic_font);
+    m_show_all_presets_text->SetFont(basic_font);
 }
 
 void DiffPresetDialog::create_info_lines()
@@ -2041,7 +2043,10 @@ void DiffPresetDialog::complete_dialog_creation()
     int border = 10;
     topSizer->Add(m_top_info_line,      0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, 2 * border);
     topSizer->Add(m_presets_sizer,      0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
-    topSizer->Add(m_show_all_presets,   0, wxEXPAND | wxALL, border);
+    wxBoxSizer* showAllPresetsSizer = new wxBoxSizer(wxHORIZONTAL);
+    topSizer->Add(showAllPresetsSizer);
+    showAllPresetsSizer->Add(m_show_all_presets,   0, wxEXPAND | wxALL, border);
+    showAllPresetsSizer->Add(m_show_all_presets_text, 0, wxEXPAND | wxTOP | wxBOTTOM, border);
     topSizer->Add(m_tree,               1, wxEXPAND | wxALL, border);
     topSizer->Add(m_bottom_info_line,   0, wxEXPAND | wxALL, 2 * border);
     topSizer->Add(m_edit_sizer,         0, wxEXPAND | wxLEFT | wxBOTTOM | wxRIGHT, 2 * border);

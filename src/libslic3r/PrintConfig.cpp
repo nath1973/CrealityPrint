@@ -5210,6 +5210,12 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = "";
     def->set_default_value(new ConfigOptionFloat(1.0));
 
+    def = this->add("flush_volumes_changed", coBool);
+    def->category = L("Flush Volumes Changed");
+    def->label = L("Flush Volumes Changed");
+    def->tooltip = L("Flush Volumes Changed");
+    def->set_default_value(new ConfigOptionBool(false));
+
     // BBS
     def = this->add("prime_volume", coFloat);
     def->label = L("Prime volume");
@@ -7121,7 +7127,7 @@ std::map<std::string, std::string> validate(const FullPrintConfig &cfg, bool und
         }
         if (out_of_range) {
             if (error_message.find(opt_key) == error_message.end())
-                error_message.emplace(opt_key, opt->serialize() + L(" not in range ") +"[" + std::to_string(optdef->min) + "," + std::to_string(optdef->max) + "]");
+                error_message.emplace(opt_key, opt->serialize() + _(" not in range ") +"[" + std::to_string(optdef->min) + "," + std::to_string(optdef->max) + "]");
             //return std::string("Value out of range: " + opt_key);
         }
     }

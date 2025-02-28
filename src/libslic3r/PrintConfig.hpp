@@ -238,7 +238,7 @@ enum BrimType {
     btOuterOnly,
     btInnerOnly,
     btOuterAndInner,
-    btNoBrim,
+    btNoBrim
 };
 
 enum TimelapseType : int {
@@ -1324,6 +1324,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              wipe_tower_bridging))
     ((ConfigOptionPercent,            wipe_tower_extra_flow))
     ((ConfigOptionFloats,             flush_volumes_matrix))
+    ((ConfigOptionBool,               flush_volumes_changed))
     ((ConfigOptionFloats,             flush_volumes_vector))
     ((ConfigOptionEnum<PrimeTowerEnhanceType>,             prime_tower_enhance_type))
 

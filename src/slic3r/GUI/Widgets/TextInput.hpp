@@ -40,6 +40,8 @@ public:
 
     void SetLabel(const wxString& label);
 
+    void SetMaxLength(int maxLength);
+
     void SetIcon(const wxBitmap & icon);
 
     void SetIcon(const wxString & icon);

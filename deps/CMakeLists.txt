@@ -342,6 +342,7 @@ endif()
 include(OCCT/OCCT.cmake)
 include(OpenCV/OpenCV.cmake)
 include(aliyun-oss-cpp-sdk/aliyun-oss-cpp-sdk.cmake)
+include(breakpad/breakpad.cmake)
 set(_dep_list
     dep_Boost
     dep_TBB
@@ -361,6 +362,7 @@ set(_dep_list
     ${ZLIB_PKG}
     ${EXPAT_PKG}
     dep_OSS
+    dep_BREAKPAD
     )
 
 if (MSVC)

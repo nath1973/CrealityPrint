@@ -1382,11 +1382,11 @@ public:
     bool deserialize(const std::string &str, bool append = false) override
     {
         UNUSED(append);
-        if (str == "1") {
+        if (str == "1" || boost::iequals(str, "true")) {
             this->value = true;
             return true;
         }
-        if (str == "0") {
+        if (str == "0" || boost::iequals(str, "false")) {
             this->value = false;
             return true;
         }

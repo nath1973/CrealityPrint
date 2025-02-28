@@ -95,6 +95,10 @@ void TextInput::SetLabel(const wxString& label)
     Refresh();
 }
 
+void TextInput::SetMaxLength(int maxLength)
+{
+    text_ctrl->SetMaxLength(maxLength);
+}
 void TextInput::SetIcon(const wxBitmap &icon)
 {
     this->icon = ScalableBitmap();

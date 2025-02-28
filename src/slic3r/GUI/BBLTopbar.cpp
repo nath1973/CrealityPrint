@@ -16,7 +16,7 @@
 #include "Notebook.hpp"
 
 #define TOPBAR_ICON_SIZE  17
-#define TOPBAR_TITLE_WIDTH  150
+#define TOPBAR_TITLE_WIDTH  300
 
 using namespace Slic3r;
 class ButtonsCtrl : public wxControl
@@ -517,7 +517,7 @@ void BBLTopbar::Init(wxFrame* parent)
     this->SetForegroundColour(is_dark ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColour(214, 214, 220));
 
     wxBitmap dropdown_bitmap = create_scaled_bitmap(is_dark ? "menu_down" : "menu_down_light", this, (8));
-    m_dropdown_menu_item = this->AddTool(ID_TOP_DROPDOWN_MENU, " ", dropdown_bitmap);
+    m_dropdown_menu_item = this->AddTool(ID_TOP_DROPDOWN_MENU, "", dropdown_bitmap);
  
     this->AddSpacer(FromDIP(5));
     this->AddSeparator();
@@ -866,9 +866,6 @@ void BBLTopbar::OnLogo(wxAuiToolBarEvent& evt)
         ButtonsCtrl* pCtr = dynamic_cast<ButtonsCtrl*>(m_tabCtrol);
         pCtr->SetSelection(-1);
     }
-
-    if(wxGetApp().mainframe->get_printer_mgr_view())
-        wxGetApp().mainframe->get_printer_mgr_view()->request_device_info_for_workshop();
 }
 
 void BBLTopbar::OnDownMgr(wxAuiToolBarEvent& evt) {}
@@ -903,7 +900,7 @@ wxMenu* BBLTopbar::GetCalibMenu()
 void BBLTopbar::SetTitle(wxString title)
 {
     wxGCDC dc(this);
-    title = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH));
+    title = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH - 30));
     if (m_title_item!=nullptr)
     {
         m_title_item->SetLabel(title);

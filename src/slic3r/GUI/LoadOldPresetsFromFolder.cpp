@@ -78,6 +78,13 @@ bool LoadOldPresetsFromFolder::loadPresets(const std::string& presetFolder)
             }
         }
 
+        if (m_override == -1) // -1表示界面点击了取消按钮
+        {
+            setLastError("-1", "cancel load");
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cancel load, not loading: " << file;
+            break;
+        }
+
         int errFileCout = 0;
         m_printerData   = PrinterData();
         //  导入打印机预设

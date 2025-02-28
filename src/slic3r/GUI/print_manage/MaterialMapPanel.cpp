@@ -1,10 +1,10 @@
 #include "MaterialMapPanel.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
 #include "slic3r/GUI/wxExtensions.hpp"
 #include <wx/event.h>
 #include <wx/gdicmn.h>
 #include <wx/colour.h>
+#include "data/DataCenter.hpp"
 
 namespace RemotePrint {
 
@@ -84,7 +84,7 @@ PrinterColorPopPanel::~PrinterColorPopPanel()
 {
 }
 
-void PrinterColorPopPanel::InitColorItems(const std::vector<RemotePrint::DeviceDB::DeviceBoxColorInfo>& boxColorInfos)
+void PrinterColorPopPanel::InitColorItems(const std::vector<DM::DeviceBoxColorInfo>& boxColorInfos)
 {
     for (const auto& colorInfo : boxColorInfos) {
         if(1 == colorInfo.boxType)  
@@ -157,7 +157,7 @@ PrinterColorItem::PrinterColorItem(wxWindow* parent, const wxSize& size, const w
 
 }
 
-PrinterColorItem::PrinterColorItem(wxWindow* parent, const wxSize& size, const RemotePrint::DeviceDB::DeviceBoxColorInfo& boxColorInfo)
+PrinterColorItem::PrinterColorItem(wxWindow* parent, const wxSize& size, const DM::DeviceBoxColorInfo& boxColorInfo)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, size)
 {
     m_boxColorInfo = boxColorInfo;
@@ -199,7 +199,7 @@ int PrinterColorItem::get_related_extruderId()
     return m_related_extruderId;
 }
 
-void PrinterColorItem::SetBoxColorInfo(const RemotePrint::DeviceDB::DeviceBoxColorInfo& boxColorInfo)
+void PrinterColorItem::SetBoxColorInfo(const DM::DeviceBoxColorInfo& boxColorInfo)
 {
     m_boxColorInfo = boxColorInfo;
     m_bk_color = RemotePrint::Utils::hex_string_to_wxcolour(m_boxColorInfo.color);
@@ -217,17 +217,17 @@ void PrinterColorItem::SetBoxColorInfo(const RemotePrint::DeviceDB::DeviceBoxCol
 
 }
 
-RemotePrint::DeviceDB::DeviceBoxColorInfo PrinterColorItem::GetBoxColorInfo()
+DM::DeviceBoxColorInfo PrinterColorItem::GetBoxColorInfo()
 {
     return m_boxColorInfo;
 }
 
 void PrinterColorItem::OnClick(wxMouseEvent& event)
 {
-    std::vector<RemotePrint::DeviceDB::DeviceBoxColorInfo> boxColorInfos;
+    std::vector<DM::DeviceBoxColorInfo> boxColorInfos;
 
     try {
-        RemotePrint::DeviceDB::Data printer_data = RemotePrint::DeviceDB::getInstance().get_printer_data(related_printer_ip);
+        DM::Device printer_data = DM::DataCenter::Ins().get_printer_data(related_printer_ip);
 
         boxColorInfos = printer_data.boxColorInfos;
 
@@ -373,7 +373,7 @@ std::vector<MaterialMapPanel::ColorMatchInfo> MaterialMapPanel::GetColorMatchInf
     return m_material_map_info;
 }
 
-void MaterialMapPanel::update_color_match_info(int extruderId, const RemotePrint::DeviceDB::DeviceBoxColorInfo& boxColorInfo)
+void MaterialMapPanel::update_color_match_info(int extruderId, const DM::DeviceBoxColorInfo& boxColorInfo)
 {
     for (auto& info : m_material_map_info) {
         if (info.extruderId == extruderId) {

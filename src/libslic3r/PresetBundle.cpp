@@ -34,6 +34,7 @@ namespace Slic3r {
 static std::vector<std::string> s_project_options {
     "flush_volumes_vector",
     "flush_volumes_matrix",
+    "flush_volumes_changed",
     // BBS
     "filament_colour",
     "wipe_tower_x",
@@ -256,6 +257,7 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     } else {
         load_user_presets(dir_user_presets, substitution_rule);
     }
+    this->load_user_printer_state(config);
 
     this->update_multi_material_filament_presets();
     this->update_compatible(PresetSelectCompatibleType::Never);
@@ -857,6 +859,10 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Preset already present, not loading: " << name;
             return false;
         }
+        if (overwrite == -1) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cancel load, not loading: " << name;
+            return false;
+        }
         /*
         if (bHasFoundPreset && overwrite == 4) {
             std::string new_name;
@@ -1022,6 +1028,11 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
 
     std::list<STOverrideConfirmFile*> lstOverrideConfirmFile;
     for (auto& file : files) {
+        for (auto item : lstOverrideConfirmFile) {
+            delete item;
+        }
+        lstOverrideConfirmFile.clear();
+
         STOverrideConfirmFile* pSTOverrideConfirmFile = new STOverrideConfirmFile;
         lstOverrideConfirmFile.push_back(pSTOverrideConfirmFile);
         boost::filesystem::path path     = boost::filesystem::path(file);
@@ -1146,6 +1157,10 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
 
                 if (hasSamePreset) {
                     override = override_confirm(lstOverrideConfirmFile);
+                    if (override == -1) {
+                        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cancel load, not loading: " << file;
+                        continue;
+                    }
                 }
             }
 
@@ -1804,6 +1819,13 @@ void PresetBundle::load_installed_printers(const AppConfig &config)
     for (auto &preset : printers)
     {
         preset.set_visible_from_appconfig(config);
+    }
+}
+
+void PresetBundle::load_user_printer_state(const AppConfig &config)
+{
+    for (auto &preset : printers)
+    {
         preset.set_user_presets_from_appconfig(config);
     }
 }

@@ -11,7 +11,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "PresetComboBoxes.hpp"
 #include "Widgets/Label.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
+#include "print_manage/data/DataType.hpp"
 
 namespace Slic3r { 
 
@@ -212,7 +212,7 @@ public:
     void msw_rescale();
     size_t size();
 	void on_re_sync_all_filaments(const std::string& selected_device_ip);
-	void on_auto_mapping_filament(const RemotePrint::DeviceDB::Data& deviceData);
+	void on_auto_mapping_filament(const DM::Device& deviceData);
 	void update_box_filament_sync_state(bool sync);
 	void reset_filament_sync_state();
 	void on_sync_one_filament(int filament_index, const std::string& new_filament_color, const std::string& new_filament_name, const wxString& sync_label);
@@ -225,7 +225,7 @@ private:
     bool LoadFile(std::string jPath, std::string& sContent);
     int LoadProfileFamily(std::string strVendor, std::string strFilePath);
     int GetFilamentInfo(std::string VendorDirectory, json& pFilaList, std::string filepath, std::string& sVendor, std::string& sType);
-    void SetFilamentProfile(std::vector<std::pair<int, RemotePrint::DeviceDB::Material>>& validMaterials);
+    void SetFilamentProfile(std::vector<std::pair<int, DM::Material>>& validMaterials);
 
 protected:
 	void paintEvent(wxPaintEvent& evt);
@@ -252,7 +252,7 @@ public:
     void SetColor(const wxColour& color);
     wxColour GetColor();
 
-    void update_item_info_by_material(int box_id, const RemotePrint::DeviceDB::Material& material_info);
+    void update_item_info_by_material(int box_id, const DM::Material& material_info);
     void set_sync_state(bool bSync);
 	bool get_sync_state();
     void set_is_ext(bool is_ext);
@@ -287,7 +287,7 @@ public:
 	~BoxColorPopPanel();
 
 	void set_filament_item_index(int index);
-	void init_by_device_data(const RemotePrint::DeviceDB::Data& device_data);
+	void init_by_device_data(const DM::Device& device_data);
 	void select_first_on_show();
 
 protected:
@@ -303,7 +303,7 @@ private:
     wxPanel* m_secondColumnPanel;
 
 	int m_filament_item_index = 0;
-	RemotePrint::DeviceDB::Data m_device_data;
+	DM::Device m_device_data;
 
     wxDECLARE_EVENT_TABLE();
 

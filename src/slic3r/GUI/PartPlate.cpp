@@ -1785,7 +1785,9 @@ void PartPlate::generate_plate_name_texture()
         poly.contour.append({scale_(p(0) + offset_x), scale_(p(1))});
         if (!init_model_from_poly(m_plate_name_icon, poly, GROUND_Z))
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "Unable to generate geometry buffers for icons\n";
-		prew  += w - offset_x + 1;
+
+        w  = int(factor * (m_name_texture.get_original_width() * 16) / m_name_texture.get_height());
+		prew  += w + 1;
 	}
 
 	prew = calc_vertex_for_plate_name_edit_icon(prew, m_action_icon[e_at_edit]);
@@ -3235,7 +3237,7 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
     } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Below) {
         if (points->size() > 3) {
             wt_x_opt = ConfigOptionFloat(points->get_at(1).x() - _tower_width->value - 10);
-            wt_y_opt = ConfigOptionFloat(points->get_at(1).y() - 20);
+            wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 20);
 
         }
     }	
@@ -3782,7 +3784,7 @@ void PartPlateList::update_all_plates_pos_and_size(bool adjust_position, bool wi
 
 		// set default wipe pos when switch plate
         if (switch_plate_type && m_plater && plate->get_used_extruders().size() <= 0) {
-			set_default_wipe_tower_pos_for_plate(i);
+			//set_default_wipe_tower_pos_for_plate(i);
 		}
 	}
 

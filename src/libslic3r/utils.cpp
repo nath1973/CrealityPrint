@@ -1584,4 +1584,39 @@ void load_string_file(const boost::filesystem::path& p, std::string& str)
     file.read(&str[0], sz);
 }
 
+std::string trim(const std::string& s) 
+{
+    size_t first = s.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos) return "";
+    size_t last = s.find_last_not_of(" \t\n\r");
+    return s.substr(first, (last - first + 1));
+}
+
+std::string toLower(const std::string& s) 
+{
+    std::string result;
+    for (unsigned char c : s) {
+        result += tolower(c);
+    }
+    return result;
+}
+
+bool isEqualAfterProcessing(const std::string& a, const std::string& b) {
+    std::string s1 = toLower(trim(a));
+    std::string s2 = toLower(trim(b));
+    return s1 == s2;
+}
+
+void stringReplace(std::string& strBase, const std::string strSrc, const std::string strDes)
+{
+    std::string::size_type pos    = 0;
+    std::string::size_type srcLen = strSrc.size();
+    std::string::size_type desLen = strDes.size();
+    pos                      = strBase.find(strSrc, pos);
+    while ((pos != std::string::npos)) {
+        strBase.replace(pos, srcLen, strDes);
+        pos = strBase.find(strSrc, (pos + desLen));
+    }
+}
+
 }; // namespace Slic3r

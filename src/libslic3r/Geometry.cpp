@@ -626,6 +626,23 @@ void Transformation::reset_skew()
     m_matrix = get_offset_matrix() * Transform3d(svd.u) * scale_transform(new_scale_factor(svd.s)) * Transform3d(svd.v.transpose()) * svd.mirror_matrix();
 }
 
+const Transform3d &Transformation::get_matrix(bool dont_translate, bool dont_rotate, bool dont_scale, bool dont_mirror) const
+{
+    if (dont_translate == false && dont_rotate == false && dont_scale == false && dont_mirror == false) {
+        return m_matrix;
+    }
+    Transformation refence_tran(m_matrix);
+    if (dont_translate)
+        refence_tran.reset_offset();
+    if (dont_rotate)
+        refence_tran.reset_rotation();
+    if (dont_scale)
+        refence_tran.reset_scaling_factor();
+    if (dont_mirror)
+        refence_tran.reset_mirror();
+    m_temp_matrix = refence_tran.get_matrix();
+    return m_temp_matrix;
+}
 Transform3d Transformation::get_matrix_no_offset() const
 {
     Transformation copy(*this);

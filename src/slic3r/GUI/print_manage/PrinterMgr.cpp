@@ -8,8 +8,7 @@
 namespace pt = boost::property_tree;
 using json = nlohmann::json;
 
-namespace Slic3r {
-namespace GUI {
+namespace DM {
 
     class DeviceLoaderV512
     {
@@ -48,13 +47,34 @@ namespace GUI {
                         sGroup = vtGroup[groupIndex];
                     }
 
-                    if(!mgr->IsPrinterExist(data.mac))
+                    if (!mgr->IsPrinterExist(data.mac))
                         mgr->AddDevice(sGroup, data);
                 }
             }
         }
     };
-    
+
+    class CurrentDeviceCfigV603{
+    public:
+        static std::string get_current_device_mac(){
+            std::string mac;
+            boost::filesystem::path device_file = boost::filesystem::path(Slic3r::data_dir()) / "current_device.json";
+            if (boost::filesystem::exists(device_file)){
+
+                boost::nowide::ifstream t(device_file.string());
+                std::stringstream buffer;
+                buffer << t.rdbuf();
+
+                json data = json::parse(buffer);
+                if(data.contains("current_device")&&data["current_device"].contains("mac")){
+                    mac = data["current_device"]["mac"];
+                }
+            }
+
+            return mac;
+        }
+    };
+
     struct DeviceMgr::priv
     {
         json data;
@@ -62,7 +82,7 @@ namespace GUI {
         std::vector<std::string> order;
     };
 
-    DeviceMgr::DeviceMgr():p(new priv)
+    DeviceMgr::DeviceMgr() :p(new priv)
     {
 
     }
@@ -93,16 +113,16 @@ namespace GUI {
             p->data = json::parse(buffer);
 
             std::vector<std::string> delIP;
-            if(p->data.contains("groups"))
+            if (p->data.contains("groups"))
             {
                 for (auto& group : p->data["groups"])
                 {
-                    if (group.contains("list"))
+                    if (group.contains("list") && !group["list"].is_null())
                     {
                         for (auto jt = group["list"].begin(); jt != group["list"].end(); jt++) {
                             std::vector<std::string> ips = this->GetSamePrinter(jt.value()["mac"].get<std::string>());
-                            if(!ips.empty()){
-                                for(auto& ip : ips)
+                            if (!ips.empty()) {
+                                for (auto& ip : ips)
                                     delIP.push_back(ip);
                             }
                         }
@@ -110,16 +130,66 @@ namespace GUI {
                 }
             }
 
-            for(auto&ip:delIP)
+            for (auto& ip : delIP)
             {
                 this->RemoveDevice(ip);
             }
         }
 
-        if(p->data.empty())
+        if (p->data.empty())
         {
-            this->AddGroup(_u8L("Default"));
+            this->AddGroup("Default");
         }
+
+        if(this->GetCurrentDevice().empty()){
+            std::string mac = CurrentDeviceCfigV603::get_current_device_mac();
+            if(!mac.empty())
+            {
+                this->SetCurrentDevice(mac);
+            }
+        }
+
+        //clear not use default group
+        std::vector<int> remove_group_ids;
+        int index = 0;
+        for (auto& group : p->data["groups"]){
+            std::string name = group["group"];
+            if(name == "Default" && group.contains("list") && group["list"].is_null()){
+                remove_group_ids.push_back(index);
+            }
+
+            index++;
+        }
+
+        for(int i =remove_group_ids.size()-1; i>=0 ;i-- ){
+             p->data["groups"].erase(remove_group_ids[i]);
+        }
+
+        remove_group_ids.clear();
+        index = 0;
+        int cnt = 0;
+        int null_cnt = 0;
+        for (auto& group : p->data["groups"]) {
+            std::string name = group["group"];
+            if (name == "Default") {
+                if(!group.contains("list")){
+                    null_cnt++;
+                    remove_group_ids.push_back(index);
+                }
+
+                cnt++;
+            }
+
+            index++;
+        }
+
+        int n = cnt==null_cnt?1:0;
+        for (int i = remove_group_ids.size()-1;  i >= n; i--) {//Just keep one
+            p->data["groups"].erase(remove_group_ids[i]);
+        }
+
+        this->Save();
+        //  CLEAR END
     }
 
     void DeviceMgr::Save()
@@ -134,27 +204,36 @@ namespace GUI {
 
     void DeviceMgr::AddDevice(std::string group, Data& data)
     {
-        json item;
+        nlohmann::json item;
         item["address"] = data.address;
         item["mac"] = data.mac;
         item["model"] = data.model;
         item["name"] = data.name;
         item["connectType"] = data.connectType;
- 
-        for(auto&g: p->data["groups"])
+
+        for (auto& g : p->data["groups"])
         {
             if (g["group"] == group)
             {
-                if(!g.contains("list"))
+                if (!g.contains("list"))
                 {
                     g["list"].push_back(item);
                 }
                 else
-                    g["list"].insert(g["list"].begin(), item);
+                {
+                    if(g["list"].is_null()){
+                        g["list"] = nlohmann::json::array();
+                        g["list"].push_back(item);
+                    }
+                    else
+                    {
+                        g["list"].insert(g["list"].begin(), item);
+                    }
+                }
 
                 this->Save();
                 break;
-             }
+            }
         }
     }
 
@@ -163,11 +242,16 @@ namespace GUI {
         for (auto& group : p->data["groups"])
         {
             int index = 0;
-            for(auto&item:group["list"])
+            for (auto& item : group["list"])
             {
                 std::string ip = item["address"];
-                if(ip == address)
+                if (ip == address)
                 {
+//                     std::string mac = item["mac"];
+//                     if(mac == this->GetCurrentDevice())
+//                     {
+//                         this->SetCurrentDevice("");
+//                     }
                     group["list"].erase(index);
                     this->Save();
                     return;
@@ -198,8 +282,8 @@ namespace GUI {
 
     void DeviceMgr::AddGroup(std::string name)
     {
-        auto &groups = p->data["groups"];
-        
+        auto& groups = p->data["groups"];
+
         json item;
         item["group"] = name;
         groups.push_back(item);
@@ -214,7 +298,18 @@ namespace GUI {
         {
             if (group["group"] == name)
             {
+                if(group.contains("list"))
+                {
+                    for (auto& device : group["list"]) {
+                        std::string mac = device["mac"];
+                        if(mac == this->GetCurrentDevice()){
+                            this->SetCurrentDevice("");
+                        }
+                    }
+                }
+
                 p->data["groups"].erase(index);
+                
                 this->Save();
                 return;
             }
@@ -228,13 +323,13 @@ namespace GUI {
         int index = 0;
         for (auto& group : p->data["groups"])
         {
-            if(group["group"] == name)
+            if (group["group"] == name)
             {
                 group["group"] = nameNew;
                 this->Save();
                 return;
             }
-            
+
             index++;
         }
     }
@@ -248,21 +343,16 @@ namespace GUI {
     bool DeviceMgr::IsMergeState()
     {
         bool mergeState = false;
-        if(p->data.contains("mergeState")){
+        if (p->data.contains("mergeState")) {
             mergeState = p->data["mergeState"].get<bool>();
         }
-        
-        return mergeState;
-    }
 
-    std::string DeviceMgr::ToString()
-    {
-        return p->data["groups"].dump(-1, ' ', true);
+        return mergeState;
     }
 
     nlohmann::json DeviceMgr::GetData()
     {
-        return p->data["groups"];
+        return p->data;
     }
 
     void DeviceMgr::Get(std::map<std::string, std::vector<DeviceMgr::Data>>& store, std::vector<std::string>& order)
@@ -286,8 +376,8 @@ namespace GUI {
                     store[name].push_back(data);
                 }
             }
-            
-            if(std::find(order.begin(), order.end(), name) == order.end())
+
+            if (std::find(order.begin(), order.end(), name) == order.end())
                 order.push_back(name);
         }
     }
@@ -296,7 +386,7 @@ namespace GUI {
     {
         for (auto& group : p->data["groups"])
         {
-            if(group["group"] == name)
+            if (group["group"] == name)
                 return true;
         }
 
@@ -305,7 +395,7 @@ namespace GUI {
 
     bool DeviceMgr::IsPrinterExist(std::string mac)
     {
-        if(p->data.contains("groups"))
+        if (p->data.contains("groups"))
         {
             for (auto& group : p->data["groups"])
             {
@@ -318,7 +408,7 @@ namespace GUI {
                 }
             }
         }
-        
+
         return false;
     }
 
@@ -335,7 +425,7 @@ namespace GUI {
                     for (auto jt = group["list"].begin(); jt != group["list"].end(); jt++) {
                         if (mac == jt.value()["mac"].get<std::string>())
                         {
-                            if(cnt!=0)
+                            if (cnt != 0)
                             {
                                 std::string ip = jt.value()["address"].get<std::string>();
                                 vt.push_back(ip);
@@ -349,11 +439,30 @@ namespace GUI {
         return vt;
     }
 
+    void DeviceMgr::SetCurrentDevice(std::string mac)
+    {
+        auto& node = p->data["current_device"];
+
+        json item;
+        item["mac"] = mac;
+
+        node = item;
+
+        this->Save();
+    }
+
+    std::string DeviceMgr::GetCurrentDevice()
+    {
+        if(p->data.contains("current_device") && p->data["current_device"].contains("mac"))
+            return p->data["current_device"]["mac"];
+
+        return std::string();
+    }
+
     DeviceMgr& DeviceMgr::Ins()
     {
         static DeviceMgr mgr;
         return mgr;
     }
 
-} // GUI
-} // Slic3r
+}

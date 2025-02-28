@@ -133,9 +133,9 @@ elseif(APPLE)
 set(PROJECT_DLL CrealityPrint)
 endif()
 if (WIN32)
-    add_library(${PROJECT_DLL} SHARED CrealityPrint.cpp CrealityPrint.hpp BaseException.cpp BaseException.h StackWalker.cpp StackWalker.h CxMiniDump.h CxMiniDump.cpp)
+    add_library(${PROJECT_DLL} SHARED CrealityPrint.cpp CrealityPrint.hpp BaseException.cpp BaseException.h StackWalker.cpp StackWalker.h CxMiniDump.h CxMiniDump.cpp CrealityrintDump.hpp CrealityrintDump.cpp)
 else ()
-    add_executable(${PROJECT_DLL} CrealityPrint.cpp CrealityPrint.hpp)
+    add_executable(${PROJECT_DLL} CrealityPrint.cpp CrealityPrint.hpp CrealityrintDump.hpp CrealityrintDump.cpp)
 endif ()
 
 if (MINGW)
@@ -149,8 +149,13 @@ if (NOT WIN32 AND NOT APPLE)
     set(SLIC3R_APP_CMD "${PROCESS_NAME}")
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/unix/BuildLinuxImage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/BuildLinuxImage.sh @ONLY)
 endif ()
-
-target_link_libraries(${PROJECT_DLL} libslic3r cereal::cereal)
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        find_library(LIB_BREAKPAD libbreakpad_clientd)
+else()
+        find_library(LIB_BREAKPAD libbreakpad_client)
+endif()
+message(STATUS "LIB_BREAKPAD=${LIB_BREAKPAD}")
+target_link_libraries(${PROJECT_DLL} libslic3r cereal::cereal ${LIB_BREAKPAD})
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
 #    add_definitions(-DBOOST_THREAD_DONT_USE_CHRONO -DBOOST_NO_CXX11_RVALUE_REFERENCES -DBOOST_THREAD_USES_MOVE)
@@ -187,6 +192,9 @@ endif ()
 
 # On Windows, a shim application is required to produce a console / non console version of the Slic3r application.
 # Also the shim may load the Mesa software OpenGL renderer if the default renderer does not support OpenGL 2.0 and higher.
+
+
+
 if (WIN32)
     if (MINGW)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -municode")
@@ -202,6 +210,7 @@ if (WIN32)
     set_target_properties(${STARTUP_PROJECT_NAME} PROPERTIES OUTPUT_NAME "${PROCESS_NAME}")
 #    target_link_libraries(${STARTUP_PROJECT_NAME} PRIVATE boost_headeronly)
 endif ()
+
 
 # Link the resources dir to where Slic3r GUI expects it
 set(output_dlls_Release "")
@@ -316,6 +325,8 @@ if (WIN32)
     install(FILES ${output_dlls_${build_type}} DESTINATION ".")
     install(FILES ${CMAKE_SOURCE_DIR}/package/runtime/MicrosoftEdgeWebView2RuntimeInstallerX64.exe DESTINATION ".")
     install(FILES ${CMAKE_SOURCE_DIR}/package/runtime/vcredist_x64.exe DESTINATION ".")
+    install(FILES ${CMAKE_SOURCE_DIR}/package/runtime/stl-thumb.exe DESTINATION ".")
+    install(FILES ${CMAKE_SOURCE_DIR}/package/runtime/STLThumbWinShellExtension.dll DESTINATION ".")
 else ()
     set(CMAKE_INSTALL_BINDIR "./")
     message(STATUS "CMAKE_INSTALL_BINDIR=${CMAKE_INSTALL_BINDIR}")

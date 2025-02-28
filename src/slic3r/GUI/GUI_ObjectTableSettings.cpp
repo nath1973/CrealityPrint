@@ -254,7 +254,7 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
             if (!opt.label.empty()) {
                 auto line = optgroup->get_line(opt.name);
                 if (line)
-                    line->label = GUI::from_u8(opt.label);
+                    line->label = _L(GUI::from_u8(opt.label));
             }
         }
         optgroup->activate();

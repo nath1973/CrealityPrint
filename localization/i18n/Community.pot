@@ -1,13 +1,10 @@
 msgid ""
 msgstr ""
-"Content-Type: text/plain; charset=UTF-8\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"Project-Id-Version: PACKAGE VERSION\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
-"Language: en_US\n"
-"MIME-Version: 1.0\n"
-"Content-Transfer-Encoding: 8bit\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Submit"
+msgstr "Submit"
 
 msgid "The file cannot be larger than 0.5M, please choose another SVG"
 msgstr "The file cannot be larger than 0.5M, please choose another SVG"
@@ -78,20 +75,23 @@ msgstr "Printing"
 msgid "Complete"
 msgstr "Complete"
 
-msgid "Failed"
-msgstr "Failed"
+msgid "Print complete"
+msgstr "Print complete"
 
-msgid "Termination"
-msgstr "Termination"
+msgid "Printing failed"
+msgstr "Printing failed"
 
-msgid "Paused"
-msgstr "Paused"
+msgid "Print termination"
+msgstr "Print termination"
+
+msgid "Printing paused"
+msgstr "Printing paused"
 
 msgid "Pause in progress"
 msgstr "Pause in progress"
 
-msgid "Stopping"
-msgstr "Stopping"
+msgid "STOPPING"
+msgstr "STOPPING"
 
 msgid "In recovery"
 msgstr "In recovery"
@@ -137,20 +137,22 @@ msgstr "No shelf data available"
 
 msgid ""
 "The number of printer presets cached in the cloud has reached the upper "
-"limit (20). Newly created user presets will not be synchronized to the cloud."
+"limit (20). Newly created user presets will not be synchronized to the "
+"cloud."
 msgstr ""
 "The number of printer presets cached in the cloud has reached the upper "
-"limit (20). Newly created user presets will not be synchronized to the cloud."
+"limit (20). Newly created user presets will not be synchronized to the "
+"cloud."
 
 msgid ""
-"The presets have not been synced to Creality Cloud yet. Click here to enable "
-"it."
+"The presets have not been synced to Creality Cloud yet. Click here to "
+"enable it."
 msgstr ""
-"The presets have not been synced to Creality Cloud yet. Click here to enable "
-"it."
+"The presets have not been synced to Creality Cloud yet. Click here to "
+"enable it."
 
-msgid "Please Input......"
-msgstr "Please Input......"
+msgid "Please Input"
+msgstr "Please Input"
 
 msgid "Consumables"
 msgstr "Consumables"
@@ -491,6 +493,9 @@ msgstr "Files"
 msgid "No Print Settings"
 msgstr "No Print Settings"
 
+msgid "No Print Models"
+msgstr "No Print Models"
+
 msgid "Download All"
 msgstr "Download All"
 
@@ -783,14 +788,14 @@ msgid ""
 "Creality Cloud adopts the internationally recognized Copyright License 4.0 "
 "to protect the rights and interests of model owners. The models of "
 "Chuangxiang Cloud platform are shared by a large number of enthusiasts in "
-"the community. If you find any violations of relevant laws and infringement, "
-"please contact us in a timely manner. "
+"the community. If you find any violations of relevant laws and "
+"infringement, please contact us in a timely manner. "
 msgstr ""
 "Creality Cloud adopts the internationally recognized Copyright License 4.0 "
 "to protect the rights and interests of model owners. The models of "
 "Chuangxiang Cloud platform are shared by a large number of enthusiasts in "
-"the community. If you find any violations of relevant laws and infringement, "
-"please contact us in a timely manner. "
+"the community. If you find any violations of relevant laws and "
+"infringement, please contact us in a timely manner. "
 
 msgid ""
 "Indicates that the original work is created by the creator, and users can "
@@ -874,9 +879,11 @@ msgid "You haven't collected the model yet, go collect the model~"
 msgstr "You haven't collected the model yet, go collect the model~"
 
 msgid ""
-"You haven't created a creative work yet, go ahead and create a creative work~"
+"You haven't created a creative work yet, go ahead and create a creative "
+"work~"
 msgstr ""
-"You haven't created a creative work yet, go ahead and create a creative work~"
+"You haven't created a creative work yet, go ahead and create a creative "
+"work~"
 
 msgid ""
 "You haven't uploaded the print configuration yet, go uploaded the print "
@@ -888,10 +895,8 @@ msgstr ""
 msgid "You haven't printed the model yet, go ahead and print it~"
 msgstr "You haven't printed the model yet, go ahead and print it~"
 
-msgid ""
-"You haven't uploaded the print file yet, go ahead and upload the print file~"
-msgstr ""
-"You haven't uploaded the print file yet, go ahead and upload the print file~"
+msgid "You haven't uploaded the print file yet, go ahead and upload the print file~"
+msgstr "You haven't uploaded the print file yet, go ahead and upload the print file~"
 
 msgid "You haven't download the model yet, go ahead and download it~"
 msgstr "You haven't download the model yet, go ahead and download it~"
@@ -921,10 +926,8 @@ msgstr "Purchased At"
 msgid "off"
 msgstr "off"
 
-msgid ""
-"Start downloading. Please go to \"Personal Center-My Downloads\" to view."
-msgstr ""
-"Start downloading. Please go to \"Personal Center-My Downloads\" to view."
+msgid "Start downloading. Please go to \"Personal Center-My Downloads\" to view."
+msgstr "Start downloading. Please go to \"Personal Center-My Downloads\" to view."
 
 msgid "System Preset Parameters"
 msgstr "System Preset Parameters"
@@ -1061,3 +1064,66 @@ msgid ""
 msgstr ""
 "You can select one as the current device on the 'My Devices' or 'Multiple "
 "Devices' pages"
+
+msgid "System"
+msgstr "System"
+
+msgid "User"
+msgstr "User"
+
+msgid "Diameter"
+msgstr "Diameter"
+
+msgid "Vender"
+msgstr "Vender"
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Configuration Name"
+msgstr "Configuration Name"
+
+msgid "Firmware Type"
+msgstr "Firmware Type"
+
+msgid "Search Results"
+msgstr "Search Results"
+
+msgid "The model you want is not found. Please search again."
+msgstr "The model you want is not found. Please search again."
+
+msgid "System Filaments"
+msgstr "System Filaments"
+
+msgid "Custom Filaments"
+msgstr "Custom Filaments"
+
+msgid "Material Type"
+msgstr "Material Type"
+
+msgid "Brand Supplier"
+msgstr "Brand Supplier"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "At least one material must be selected."
+msgstr "At least one material must be selected."
+
+msgid "Do you want to use the default material list?"
+msgstr "Do you want to use the default material list?"
+
+msgid "Create New"
+msgstr "Create New"
+
+msgid "AI Modeling"
+msgstr "AI Modeling"
+
+msgid "Vast"
+msgstr "Vast"
+
+msgid "Deemos"
+msgstr "Deemos"
+
+msgid "Record"
+msgstr "Record"

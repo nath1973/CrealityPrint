@@ -43,3 +43,9 @@ dep_Debug
 out
 .history/
 scripts/__pycache__
+web_sync_tag
+version.txt
+var.prop
+tagcmmid
+maxcmmid
+resources/i18n/*/*.*

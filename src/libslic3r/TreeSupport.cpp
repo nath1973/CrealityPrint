@@ -3321,7 +3321,7 @@ void TreeSupport::adjust_layer_heights(std::vector<std::vector<Node*>>& contact_
     const PrintObjectConfig& config = m_object->config();
     // don't merge layers for Vine support, or the branches will be unsmooth
     // TODO can we merge layers in a way that guaranttees smoothness?
-    if (!print_config.independent_support_layer_height || is_slim) {
+    if (!config.tree_support_adaptive_layer_height || is_slim) {
         for (int layer_nr = 0; layer_nr < contact_nodes.size(); layer_nr++) {
             std::vector<Node*>& curr_layer_nodes = contact_nodes[layer_nr];
             for (Node* node : curr_layer_nodes) {

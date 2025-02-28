@@ -108,6 +108,7 @@ enum FileType
     FT_CXPROJECT,
 
     FT_ONLY_GCODE,
+    FT_VIDEO,
 
     FT_SIZE,
 };
@@ -380,7 +381,7 @@ private:
     bool            init_opengl();
 
     void            init_download_path();
-    void            post_openlink_cmd();  //CP
+    void            post_openlink_cmd(std::string link);  //CP
 #if wxUSE_WEBVIEW_EDGE
     void            init_webview_runtime();
 #endif

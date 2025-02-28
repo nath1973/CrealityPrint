@@ -18,6 +18,12 @@
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "FixModelByWin10.hpp"
 
+#define RENDER_RESET_BUTTON_BEGIN(disabled) \
+    if (!(disabled)) {
+
+#define RENDER_RESET_BUTTON_END() \
+    } else m_imgui->text(""); 
+
 namespace Slic3r {
 namespace GUI {
 
@@ -2232,14 +2238,24 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors, flo
     ImGui::AlignTextToFramePadding();
     m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Connectors"]);
 
-    m_imgui->disabled_begin(connectors.empty());
-    ImGui::SameLine(m_label_width);
-    const std::string act_name = _u8L("Remove connectors");
-    if (render_reset_button("connectors", act_name)) {
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
-        reset_connectors();
+    if (!connectors.empty())
+    {
+        RENDER_RESET_BUTTON_BEGIN(connectors.empty())
+        //m_imgui->disabled_begin(connectors.empty());
+        ImGui::SameLine(m_label_width);
+        const std::string act_name = _u8L("Remove connectors");
+        if (render_reset_button("connectors", act_name)) {
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
+            reset_connectors();
+        }
+        //m_imgui->disabled_end();
+        RENDER_RESET_BUTTON_END()
     }
-    m_imgui->disabled_end();
+    else 
+    {
+        ImGui::SameLine(m_label_width);
+        m_imgui->text(_L("")); // occupy location
+    }
 
     render_flip_plane_button(m_connectors_editing && connectors.empty());
 
@@ -2490,15 +2506,23 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
 
     ImGui::SameLine();
 
-    m_imgui->disabled_begin(is_approx(in_val, init_val) && is_approx(in_tolerance, 0.1f));
-        const std::string act_name = _u8L("Reset");
-        if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
+    // calculate slider limit
+    const float f_mm_to_in = static_cast<float>(GizmoObjectManipulation::mm_to_in);
+    const float limit = float((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 9.0) *
+                             (m_imperial_units ? f_mm_to_in : 1.f);
+    float _init_val = init_val > limit ? limit : init_val;
+    bool  enabled   = is_approx(in_val, _init_val) && is_approx(in_tolerance, 0.1f);
+    RENDER_RESET_BUTTON_BEGIN(enabled)
+    // m_imgui->disabled_begin(is_approx(in_val, init_val) && is_approx(in_tolerance, 0.1f));
+    const std::string act_name = _u8L("Reset");
+    if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), GUI::format("%1%: %2%", act_name, label), UndoRedo::SnapshotType::GizmoAction);
-            in_val = init_val;
-            in_tolerance = 0.1f;
-            is_changed = true;
-        }
-    m_imgui->disabled_end();
+        in_val       = init_val;
+        in_tolerance = 0.1f;
+        is_changed   = true;
+    }
+    // m_imgui->disabled_end();
+    RENDER_RESET_BUTTON_END()
 
     if (is_changed) {
         update_plane_model();
@@ -2553,14 +2577,16 @@ bool GLGizmoCut3D::render_angle_input(const std::string& label, float& in_val, c
 
     ImGui::SameLine();
 
-    m_imgui->disabled_begin(is_approx(in_val, init_val));
+    RENDER_RESET_BUTTON_BEGIN(is_approx(in_val, init_val))
+    // m_imgui->disabled_begin(is_approx(in_val, init_val));
     const std::string act_name = _u8L("Reset");
     if (render_reset_button(("##angle_" + label + act_name).c_str(), act_name)) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), GUI::format("%1%: %2%", act_name, label), UndoRedo::SnapshotType::GizmoAction);
-        in_val = init_val;
+        in_val     = init_val;
         is_changed = true;
     }
-    m_imgui->disabled_end();
+    // m_imgui->disabled_end();
+    RENDER_RESET_BUTTON_END()
 
     return is_changed;
 }
@@ -2611,13 +2637,16 @@ void GLGizmoCut3D::render_snap_specific_input(const std::string& label, const wx
     
     ImGui::SameLine();
 
-    m_imgui->disabled_begin(is_approx(in_val, init_val));
-    const std::string act_name = _u8L("Reset");
-    if (render_reset_button(("##snap_" + label + act_name).c_str(), act_name)) {
-        in_val = init_val;
-        is_changed = true;
-    }
-    m_imgui->disabled_end();
+    RENDER_RESET_BUTTON_BEGIN(is_approx(in_val, init_val))
+        //m_imgui->disabled_begin(is_approx(in_val, init_val));
+        const std::string act_name = _u8L("Reset");
+        if (render_reset_button(("##snap_" + label + act_name).c_str(), act_name)) {
+            in_val = init_val;
+            is_changed = true;
+        }
+        //m_imgui->disabled_end();
+    RENDER_RESET_BUTTON_END()
+
 
     if (is_changed) {
         update_connector_shape();
@@ -2645,14 +2674,14 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors, floa
         render_move_center_input(Z);
         ImGui::SameLine();
 
-        const bool is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && m_bb_center.isApprox(m_plane_center);
-        m_imgui->disabled_begin(is_cut_plane_init);
-            std::string act_name = _u8L("Reset cutting plane");
-            if (render_reset_button("cut_plane", into_u8(act_name))) {
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
-                reset_cut_plane();
-            }
-        m_imgui->disabled_end();
+        const bool  is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && m_bb_center.isApprox(m_plane_center);
+        std::string act_name          = _u8L("Reset cutting plane");
+        RENDER_RESET_BUTTON_BEGIN(is_cut_plane_init)
+        if (render_reset_button("cut_plane", into_u8(act_name))) {
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
+            reset_cut_plane();
+        }
+        RENDER_RESET_BUTTON_END()
 
 //        render_flip_plane_button();
 

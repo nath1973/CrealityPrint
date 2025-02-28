@@ -3,7 +3,7 @@
 function OnInit()
 {
 	//let strInput=JSON.stringify(cData);
-	//HandleStudio(strInput);
+	//handleStudioCmd(strInput);
 	
 //	let tVal={};
 //	tVal['status']=3;
@@ -25,7 +25,7 @@ function SendDownloadCmd()
 }
 
 
-function HandleStudio( pVal )
+function handleStudioCmd( pVal )
 {
 	let strCmd=pVal['command'];
 	//alert(strCmd);

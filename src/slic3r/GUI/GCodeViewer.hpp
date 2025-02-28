@@ -696,6 +696,7 @@ private:
     ETools m_tools;
     ConfigOptionMode m_user_mode;
     bool m_fold = {false};
+    float m_contentWidth {-1.0f};
 
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;

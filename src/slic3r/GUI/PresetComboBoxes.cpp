@@ -1049,7 +1049,7 @@ void PlaterPresetComboBox::update()
         else
         {
 
-            if (preset.m_is_user_presets)
+            if (preset.m_is_user_printer_hidden)
             {
                 nonsys_presets.emplace(name, bmp);
                 if (is_selected)
@@ -1292,7 +1292,7 @@ void TabPresetComboBox::update()
         }
         else
         {
-            if (preset.m_is_user_presets)
+            if (preset.m_is_user_printer_hidden)
             {
                 std::pair<wxBitmap*, bool> pair(bmp, is_enabled);
                 nonsys_presets.emplace(name, std::pair<wxBitmap*, bool>(bmp, is_enabled));

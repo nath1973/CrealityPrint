@@ -359,9 +359,9 @@ void DropDown::messureSize()
     }
     rowSize = szContent;
     if (limit_max_content_width) {
-        wxSize parent_size = GetParent()->GetSize();
-        if (rowSize.x > parent_size.x * 2) {
-            rowSize.x = 2 * parent_size.x;
+        wxSize parent_size = GetParent()->GetParent()->GetSize();
+        if (rowSize.x > parent_size.x) {
+            rowSize.x = parent_size.x;
             szContent = rowSize;
         }
     }
@@ -377,6 +377,7 @@ void DropDown::messureSize()
 
 void DropDown::autoPosition()
 {
+    need_sync = true;
     messureSize();
     wxPoint pos = GetParent()->ClientToScreen(wxPoint(0, -6));
     wxPoint old = GetPosition();

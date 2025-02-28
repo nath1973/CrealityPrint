@@ -209,7 +209,8 @@ private:
 
 public:
     static const unsigned int PLATE_BASE_ID = 255 * 255 * 253;
-    static const unsigned int PLATE_NAME_HOVER_ID = 6;
+    //static const unsigned int PLATE_NAME_HOVER_ID = 6;
+    static const unsigned int PLATE_NAME_HOVER_ID = 0;
     static const unsigned int GRABBER_COUNT = 7;
 
     static ColorRGBA SELECT_COLOR;
@@ -568,14 +569,15 @@ class PartPlateList : public ObjectBase
     void generate_icon_textures();
     void release_icon_textures();
 
-    void set_default_wipe_tower_pos_for_plate(int plate_idx);
 
     friend class cereal::access;
     friend class UndoRedo::StackImpl;
     friend class PartPlate;
 
 public:
-    class BedTextureInfo {
+    void set_default_wipe_tower_pos_for_plate(int plate_idx);
+    class BedTextureInfo
+    {
     public:
         class TexturePart {
         public:

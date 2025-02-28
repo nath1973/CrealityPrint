@@ -404,6 +404,11 @@ void rotation_from_two_vectors(Vec3d from, Vec3d to, Vec3d &rotation_axis, doubl
 class Transformation
 {
     Transform3d m_matrix{ Transform3d::Identity() };
+    mutable Transform3d m_temp_matrix{Transform3d::Identity()}; // just for return
+    mutable Vec3d       m_temp_offset{Vec3d::Zero()};           // just for return
+    mutable Vec3d       m_temp_rotation{Vec3d::Zero()};         // just for return
+    mutable Vec3d       m_temp_scaling_factor{Vec3d::Ones()};   // just for return
+    mutable Vec3d       m_temp_mirror{Vec3d::Ones()};           // just for return
 
 public:
     Transformation() = default;
@@ -459,7 +464,7 @@ public:
     void reset_mirror() { set_mirror(Vec3d::Ones()); }
     void reset_skew();
 
-    const Transform3d& get_matrix() const { return m_matrix; }
+    const Transform3d& get_matrix(bool dont_translate = false, bool dont_rotate = false, bool dont_scale = false, bool dont_mirror = false) const;
     Transform3d get_matrix_no_offset() const;
     Transform3d get_matrix_no_scaling_factor() const;
 

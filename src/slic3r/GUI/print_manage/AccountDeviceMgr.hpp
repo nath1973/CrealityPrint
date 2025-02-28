@@ -47,6 +47,8 @@ public:
 
 public:
     void unbind_device(const std::string& device_id);
+    void unbind_device_by_address(const std::string& address);
+    void unbind_device_by_group(const std::string& group);
     void add_to_my_devices(const DeviceInfo& device_info);
     void load();
     std::string get_account_device_bind_json_info();

@@ -921,6 +921,13 @@ int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContex
                         else if (opt_value == "right_below")
                             opt_value = "Right Below";
                     }
+
+                    if (opt_key == "compatible_printers") {
+                        if (opt_value.find(",") != std::string::npos) {
+                            std::replace(opt_value.begin(), opt_value.end(), ',', ';');
+                        }
+                    }
+
                     this->set_deserialize(opt_key, opt_value, substitution_context);
                     //some logic for special values
                     if (opt_key == "support_type") {

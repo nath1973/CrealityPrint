@@ -32,7 +32,6 @@
 #include "slic3r/Utils/FixModelByWin10.hpp"
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
 
 #ifdef __WXMSW__
 #include "wx/uiaction.h"
@@ -47,6 +46,7 @@
 #endif
 #include <imgui/imgui_internal.h>
 #include "slic3r/Config/DispConfig.h"
+#include "print_manage/data/DataCenter.hpp"
 
 namespace Slic3r
 {
@@ -6077,6 +6077,8 @@ void ObjectList::render_plate_tree_by_ImGui()
     }
     float                  view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
 
+    //m_obj_list_window_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    
     static ImGuiTableFlags flags    = ImGuiTableFlags_None | ImGuiTableFlags_RowBg | ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY;
     
     // HelpMarker("See \"Columns flags\" section to configure how indentation is applied to individual columns.");
@@ -6102,6 +6104,9 @@ void ObjectList::render_plate_tree_by_ImGui()
         ImGui::EndTable();
     }
 
+    m_table_data.table_height   = ImGui::GetItemRectSize().y;
+    m_table_data.table_offset_y = ImGui::GetItemRectMin().y;
+    //ImGui::Text("Table Height: %.2f", table_size.y);
     //ImGui::PopStyleColor(1);
 }
 
@@ -6133,8 +6138,14 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
     ImGui::TableNextRow();
 
     if (plate_selected) {
-        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
-        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
+        bool focused = get_object_list_window_focus();
+        if (focused) {
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
+        } else {
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImVec4{0.090f, 0.80f, 0.373, 0.15f}));
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4{0.090f, 0.80f, 0.373, 0.15f}));
+        }
     } else {
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32_BLACK_TRANS);
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32_BLACK_TRANS);
@@ -6261,8 +6272,10 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
         ImGui::PopID();
     }
 
-
-
+    if (plate_selected) {
+        ensure_current_item_visible_imgui();
+    }
+    
     if (open) {
         for (int child_n = 0; child_n < objects.size(); child_n++)
             render_object(objects[child_n]);
@@ -6270,6 +6283,7 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
     }
 
     ImGui::PopStyleColor(3);
+    plate->set_open(open);
 }
 
 
@@ -6372,11 +6386,9 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             } else {
                 //selected_object(n); // avoid set wxwidget focus
                 select_item(wxDataViewItem(n));
-                ensure_current_item_visible();
+                //ensure_current_item_visible();
                 selection_changed();
             }
-
-            //ImGui::SetWindowFocus("##obj_tree");
         }
     };
 
@@ -6388,8 +6400,15 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
 
 
     if (node_selected) {
-        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
-        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
+        bool focused = get_object_list_window_focus();
+        if (focused) {
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY));
+        } else {
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImVec4{0.090f, 0.80f, 0.373, 0.15f}));
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImVec4{0.090f, 0.80f, 0.373, 0.15f}));
+        }
+        
     } else {
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32_BLACK_TRANS);
         ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32_BLACK_TRANS);
@@ -7046,6 +7065,11 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         ImGui::PopID();
     }
 
+
+    if (node_selected) {
+        ensure_current_item_visible_imgui();
+    }
+
     if (open) {
 
         auto type = node->GetType(); 
@@ -7060,13 +7084,16 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
     }
 
     ImGui::PopStyleColor(4);
+
+    node->set_open(open);
 }
 
 void GUI::ObjectList::render_current_device_name(const float max_right) {
-
-    std::string device_name = RemotePrint::DeviceDB::getInstance().get_current_device_name();
-    if (device_name.empty())
+    const DM::Device&current_device= DM::DataCenter::Ins().get_current_device_data();
+    if(!current_device.valid)
         return;
+    
+    std::string device_name = current_device.name;
 
     auto remake_text_to_fit_size = [max_right](const std::string& input_text) {
         const float device_label_max_right   = max_right;
@@ -7258,7 +7285,9 @@ void ObjectList::render_printer_preset_by_ImGui()
         return result;
     };
 
-    std::string model_name = RemotePrint::DeviceDB::getInstance().get_current_device_model_name();
+    const DM::Device&current_device= DM::DataCenter::Ins().get_current_device_data();
+    std::string model_name = current_device.modelName;
+
     std::string selected_preset_model = (&Slic3r::GUI::wxGetApp().preset_bundle->printers.get_selected_preset().config)->opt_string("printer_model");
 
     if (!model_name.empty() && !selected_preset_model.empty()) {
@@ -7474,11 +7503,24 @@ void ObjectList::render_unfold_button()
     }
 }
 
+bool ObjectList::get_object_list_window_focus() 
+{ 
+    return m_obj_list_window_focus;
+}
+
+void ObjectList::set_object_list_window_focus(bool f) 
+{
+    if (m_obj_list_window_focus != f)
+        m_obj_list_window_focus = f;
+}
 
 void ObjectList::on_char(wxKeyEvent& evt) {
 
     bool can_edit = wxGetApp().plater()->get_current_canvas3D()->get_canvas_type() != GLCanvas3D::CanvasAssembleView;
     if (!can_edit)
+        return;
+
+    if (!get_object_list_window_focus())
         return;
 
     int keyCode   = evt.GetKeyCode();
@@ -7499,6 +7541,201 @@ void ObjectList::on_char(wxKeyEvent& evt) {
                 rename_item();
             }
             break;
+        }
+    }
+}
+
+void ObjectList::on_key(wxKeyEvent& evt) 
+{
+    const int keyCode = evt.GetKeyCode();
+
+    bool node_selected    = false;
+    auto select_node_func = [this, node_selected, keyCode](ObjectDataViewModelNode* n) {
+        if (n != nullptr) {
+            m_last_selected_item = wxDataViewItem(n);
+#ifdef __WXMSW__
+            m_last_selected_column = -1;
+#endif //__WXMSW__
+
+            {
+                //selected_object(n); // will set wxwidget focus
+                select_item(wxDataViewItem(n));
+                //ensure_current_item_visible();
+                selection_changed();
+            }
+        }
+    };
+
+    auto select_plate_by_key = [this, keyCode](ObjectDataViewModelNode* plate) {
+        if (plate->GetType() & ItemType::itPlate) {
+            int     new_plate_idx = keyCode == WXK_UP ? plate->GetPlateIdx() - 1 : plate->GetPlateIdx() + 1;
+            Plater* the_plater    = wxGetApp().plater();
+            if (the_plater->is_preview_shown()) {
+                the_plater->select_sliced_plate(new_plate_idx);
+            } else {
+                the_plater->select_plate(new_plate_idx);
+            }
+
+            the_plater->deselect_all();
+        }
+    };
+
+
+    if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
+        // up or down to active item
+
+        wxDataViewItemArray sels;
+        GetSelections(sels);
+
+        if (sels.IsEmpty())
+            return;
+
+        wxDataViewItem&          the_item     = sels.Last();
+        ObjectDataViewModelNode* the_node = static_cast<ObjectDataViewModelNode*>(the_item.GetID());
+        
+        wxDataViewItemArray children;
+        m_objects_model->GetChildren(the_item, children);
+        wxDataViewItem parent = m_objects_model->GetParent(the_item);
+        ObjectDataViewModelNode* parent_node = nullptr;
+        if (parent != nullptr && parent.IsOk()) {
+            parent_node = static_cast<ObjectDataViewModelNode*>(parent.GetID());
+        }
+        int current_idx = -1;
+        if (parent_node) {
+            current_idx = parent_node->GetChildIndex(the_node);
+        }
+        
+        if (keyCode == WXK_DOWN) {
+            
+            // selecte first child 
+            if (!children.IsEmpty() && the_node->get_open()) {
+                wxDataViewItem&          front_item = children.front();
+                ObjectDataViewModelNode* node       = static_cast<ObjectDataViewModelNode*>(front_item.GetID());
+                select_node_func(node);
+                return;
+            }
+
+            
+            if (parent_node) {
+                size_t next_idx = current_idx + 1;
+                if (next_idx < parent_node->GetChildCount()) {
+                    // select next brother
+                    ObjectDataViewModelNode* new_node = parent_node->GetNthChild(next_idx);
+                    select_node_func(new_node);
+
+                } else {
+                    //select next parent
+                    ObjectDataViewModelNode* tmp_parent = parent_node;
+                    ObjectDataViewModelNode* tmp_child  = the_node;
+                    while (tmp_parent->GetParent() && next_idx >= tmp_parent->GetChildCount()) {
+
+                        tmp_child  = tmp_parent;
+                        tmp_parent = tmp_child->GetParent();
+                        next_idx   = tmp_parent->GetChildIndex(tmp_child) + 1;
+                    }
+
+                    if (next_idx < tmp_parent->GetChildCount()) {
+                        
+                        ObjectDataViewModelNode* node = tmp_parent->GetNthChild(next_idx);
+                        select_node_func(node);
+                    } else if (tmp_parent->GetType() & ItemType::itPlate) {
+                        select_plate_by_key(tmp_parent);
+                    }
+                }
+            } else {
+                select_plate_by_key(the_node);
+            }
+        } else {
+            
+            // WXK_UP
+            if (parent_node) {
+                int pre_idx = current_idx - 1;
+                if (pre_idx >= 0) {
+                    // select pre brother
+                    ObjectDataViewModelNode* new_node = parent_node->GetNthChild(pre_idx);
+                    int n = new_node->GetChildCount();
+                    if (n > 0 && new_node->get_open()) {
+                        
+                        ObjectDataViewModelNode* last_child = new_node->GetNthChild(n - 1);
+                        while (last_child->GetChildCount() > 0 && last_child->get_open()) {
+                            ObjectDataViewModelNode* new_last_node = last_child->GetNthChild(last_child->GetChildCount() - 1);
+                            last_child                             = new_last_node;
+                        }
+                        select_node_func(last_child);
+                    
+                    } else {
+                        select_node_func(new_node);
+                    }
+                } else {
+                    select_node_func(parent_node);
+                }
+            } else {
+
+                if (the_node->GetType() & ItemType::itPlate) {
+                    // pre plate
+                    wxDataViewItemArray all_plates;
+                    m_objects_model->GetChildren(wxDataViewItem(nullptr), all_plates);
+                    
+                    ObjectDataViewModelNode* pre_plate = nullptr;
+                    int pre_idx = the_node->GetPlateIdx() - 1;
+                    if (pre_idx >= 0 && pre_idx < all_plates.size()) {
+                        wxDataViewItem& p = all_plates[pre_idx];
+                        pre_plate = static_cast<ObjectDataViewModelNode*>(p.GetID());
+                        if (pre_plate->GetChildCount() == 0 || !pre_plate->get_open()) {
+                            select_plate_by_key(the_node);
+                        } else {
+                            // last item
+                            ObjectDataViewModelNode* last_node = pre_plate->GetNthChild(pre_plate->GetChildCount() - 1);
+                            while (last_node->GetChildCount() > 0 && last_node->get_open()) {
+                                ObjectDataViewModelNode* new_last_node = last_node->GetNthChild(last_node->GetChildCount() - 1);
+                                last_node                              = new_last_node;
+                            }
+                            select_node_func(last_node);
+                        }
+                    }
+                    
+                }
+                
+            }
+        }
+        
+    }
+}
+
+
+void ObjectList::ensure_current_item_visible_imgui() 
+{
+    //if (wxGetKeyState(WXK_DOWN) || wxGetKeyState(WXK_UP)) {
+    if (ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_UpArrow)) || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) {
+    } else {
+        return;
+    }
+
+    if (!m_table_data.valid())
+        return;
+
+    const float table_start_y = m_table_data.table_offset_y;
+    const float table_height  = m_table_data.table_height;
+    const float table_endy    = table_start_y + table_height;
+    {
+        ImVec2 min = ImGui::GetItemRectMin();
+        ImVec2 max = ImGui::GetItemRectMax();
+
+        float scroll_y   = ImGui::GetScrollY();
+        float maxy = ImGui::GetScrollMaxY();
+
+        float table_content_height = maxy + table_height;
+        float item_content_off = min.y + scroll_y - table_start_y;
+
+        if (min.y < table_start_y) {
+                
+            ImGui::SetScrollY(table_start_y + item_content_off - table_start_y);
+            
+        } else if (max.y > table_endy) {
+            
+            const float k = table_start_y + table_height - (max.y - min.y);
+            ImGui::SetScrollY(table_start_y + item_content_off - k);
+            
         }
     }
 }

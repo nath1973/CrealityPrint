@@ -757,3 +757,9 @@ msgstr "No consumables detected, do you want to continue printing?"
 
 msgid "There is no consumables in the current rack"
 msgstr "There is no consumables in the current rack"
+
+msgid "Axis movement exceeded limit"
+msgstr "Axis movement exceeded limit"
+
+msgid "Cannot contain special characters"
+msgstr "Cannot contain special characters"

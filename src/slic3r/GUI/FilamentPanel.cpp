@@ -19,10 +19,10 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "MainFrame.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
 #include "slic3r/GUI/print_manage/PrinterBoxFilamentPanel.hpp"
 #include <cstdint> 
+#include "print_manage/data/DataCenter.hpp"
 
 
 static bool ShouldDark(const wxColour& bgColor)
@@ -1382,7 +1382,7 @@ int FilamentPanel::LoadFilamentProfile()
     return 1;
 }
 
-void FilamentPanel::SetFilamentProfile(std::vector<std::pair<int, RemotePrint::DeviceDB::Material>>& validMaterials)
+void FilamentPanel::SetFilamentProfile(std::vector<std::pair<int, DM::Material>>& validMaterials)
 {
 
     std::map<std::string,std::string> section_new;
@@ -1429,11 +1429,11 @@ void FilamentPanel::SetFilamentProfile(std::vector<std::pair<int, RemotePrint::D
     Slic3r::GUI::wxGetApp().app_config->save();
 }
 
-void FilamentPanel::on_auto_mapping_filament(const RemotePrint::DeviceDB::Data& deviceData)
+void FilamentPanel::on_auto_mapping_filament(const DM::Device& deviceData)
 {
     // 计算 materialBoxes 数组中 box_type == 0 的 Material 项，并且 Material 里 color 的值不为空的项
-    std::vector<std::pair<int, RemotePrint::DeviceDB::Material>> validMaterials;
-    for (const auto& materialBox : deviceData.materialBoxes)
+    std::vector<std::pair<int, DM::Material>> validMaterials;
+    for (const auto materialBox : deviceData.materialBoxes)
     {
         if (materialBox.box_type == 0)
         {
@@ -1548,9 +1548,7 @@ void FilamentPanel::on_sync_one_filament(int filament_index, const std::string& 
 
 void FilamentPanel::on_re_sync_all_filaments(const std::string& selected_device_ip)
 {
-	auto& deviceDB = RemotePrint::DeviceDB::getInstance();
-
-	auto device = deviceDB.get_printer_data(selected_device_ip);
+	auto device = DM::DataCenter::Ins().get_printer_data(selected_device_ip);
 
 	if(m_vt_filament.size() != device.boxColorInfos.size())
 	{
@@ -1806,7 +1804,7 @@ void BoxColorPopPanel::OnFirstColumnButtonClicked(wxCommandEvent& event)
         // 使用 std::intptr_t 来存储指针值
         std::intptr_t boxId = reinterpret_cast<std::intptr_t>(button->GetClientData());
 
-        const RemotePrint::DeviceDB::MaterialBox* material_box_info = nullptr;
+        const DM::MaterialBox* material_box_info = nullptr;
         for (const auto& box_info : m_device_data.materialBoxes) {
             if (box_info.box_id == boxId) {
                 material_box_info = &box_info;
@@ -1840,7 +1838,7 @@ void BoxColorPopPanel::OnFirstColumnButtonClicked(wxCommandEvent& event)
                 }
 
                 if (!has_exact_material) {
-                    RemotePrint::DeviceDB::Material tmp_material;
+                    DM::Material tmp_material;
                     tmp_material.material_id = material_id;
                     tmp_material.color      = "#808080"; // grey
                     filament_item->set_sync_state(false);
@@ -1908,7 +1906,7 @@ void BoxColorPopPanel::OnSecondColumnItemClicked(wxCommandEvent& event)
 	}
 }
 
-void BoxColorPopPanel::init_by_device_data(const RemotePrint::DeviceDB::Data& device_data)
+void BoxColorPopPanel::init_by_device_data(const DM::Device& device_data)
 {
 	m_device_data = device_data;
 
@@ -2010,7 +2008,7 @@ wxString FilamentColorSelectionItem::get_material_index_info()
 	return m_material_index_info;
 }
 
-void FilamentColorSelectionItem::update_item_info_by_material(int box_id, const RemotePrint::DeviceDB::Material& material_info)
+void FilamentColorSelectionItem::update_item_info_by_material(int box_id, const DM::Material& material_info)
 {
     m_box_id  = box_id;
 	m_filament_type_label = material_info.type;

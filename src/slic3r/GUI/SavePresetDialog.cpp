@@ -125,6 +125,7 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string &suffix, wxBox
     m_input_ctrl->Bind(wxEVT_TEXT, [this](wxCommandEvent &) { update(); });
     m_input_ctrl->SetMinSize(wxSize(SAVE_PRESET_DIALOG_INPUT_SIZE));
     m_input_ctrl->SetMaxSize(wxSize(SAVE_PRESET_DIALOG_INPUT_SIZE));
+    m_input_ctrl->SetMaxLength(100);
 
 
     input_sizer_v->Add(m_input_ctrl, 1, wxEXPAND, 0);
@@ -334,22 +335,6 @@ void SavePresetDialog::Item::update_valid_bmp()
 
 void SavePresetDialog::Item::accept()
 {
-    Preset* new_preset = m_presets->find_preset(m_preset_name, false);
-    if (new_preset) {
-        new_preset->sync_info = "update";
-        BOOST_LOG_TRIVIAL(info) << "sync_preset: update preset = " << new_preset->name;
-    }
-    else {
-        m_presets->save_current_preset(m_preset_name, m_parent->m_suffix == "Detached", save_to_project());
-        new_preset = m_presets->find_preset(m_preset_name, false);
-
-        new_preset->sync_info = "create";
-        if (wxGetApp().is_user_login())
-            new_preset->user_id = wxGetApp().getAgent()->get_user_id();
-        BOOST_LOG_TRIVIAL(info) << "sync_preset: create preset = " << new_preset->name;
-    }
-    new_preset->save_info();
-
     if (m_valid_type == Warning) {
         // BBS add sync info
         auto    it               = m_presets->find_preset(m_preset_name, false);

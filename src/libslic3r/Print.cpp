@@ -1442,7 +1442,7 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
             };
             std::string warning_key;
             // check flush flush_multiplier
-            if (warning_key.empty() && m_config.flush_multiplier > 0) {
+            if (this->has_wipe_tower() && warning_key.empty() && m_config.flush_multiplier > 0) {
                 const auto flush_multiplier = m_config.flush_multiplier;
                 bool is_cx_vendor = getCrealityCFS();
                 float mini_flush_multiplier = is_cx_vendor ? 1.3 : 1.0;
@@ -1454,8 +1454,8 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                 warning->opt_key = warning_key;
             }
             // check jerk
-             //todo 临时设置不检查
-            /*
+           
+            
             if (m_default_object_config.default_jerk == 1 || m_default_object_config.outer_wall_jerk == 1 ||
                 m_default_object_config.inner_wall_jerk == 1) {
                warning->string = L("Setting the jerk speed too low could lead to artifacts on curved surfaces");
@@ -1484,10 +1484,10 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                     warning->opt_key = warning_key;
                }
             }
-            */
+            
             // check acceleration
-            // todo 临时设置不检查
-            /*
+       
+            
             const auto max_accel = m_config.machine_max_acceleration_extruding.values[0];
             if (warning_key.empty() && m_default_object_config.default_acceleration > 0 && max_accel > 0) {
                const bool support_travel_acc = (m_config.gcode_flavor == gcfRepetier || m_config.gcode_flavor == gcfMarlinFirmware ||
@@ -1545,7 +1545,7 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                     }
                }
             }
-            */
+            
             // check speed
             // Orca: disable the speed check for now as we don't cap the speed
             // if (warning_key.empty()) {
@@ -2284,6 +2284,7 @@ void Print::_make_skirt()
                 break;
             layer->support_fills.collect_points(object_points);
         }
+        
 
         object_convex_hulls.insert({ object, Slic3r::Geometry::convex_hull(object_points) });
 
@@ -2384,7 +2385,8 @@ void Print::_make_skirt()
                 // The skirt lenght is not limited, extrude the skirt with the 1st extruder only.
             }
         }
-    } else {
+    }
+    else {
         m_skirt.clear();
     }
     // Brims were generated inside out, reverse to print the outmost contour first.
@@ -2398,21 +2400,31 @@ void Print::_make_skirt()
         // BBS
         for (auto obj_cvx_hull : object_convex_hulls) {
             double       object_skirt_distance = float(scale_(m_config.skirt_distance.value - spacing / 2.));
+            
+            //double       object_skirt_distance = scale_(1.0);
             PrintObject* object                = obj_cvx_hull.first;
+            if (has_skirt() && !(config().draft_shield != dsDisabled)) {
+                object_skirt_distance += scale_(object->config().brim_width.value);
+            }
+
+
             object->m_skirt.clear();
             extruded_length.assign(extruded_length.size(), 0.);
             for (size_t i = m_config.skirt_loops.value, extruder_idx = 0; i > 0; --i) {
                 object_skirt_distance += float(scale_(spacing));
+
+                  
                 Polygon loop;
-                {
+                //{
                     // BBS. skirt_distance is defined as the gap between skirt and outer most brim, so no need to add max_brim_width
                     Polygons loops = offset(obj_cvx_hull.second, object_skirt_distance, ClipperLib::jtRound, float(scale_(0.1)));
                     Geometry::simplify_polygons(loops, scale_(0.05), &loops);
                     if (loops.empty())
                         break;
                     loop = loops.front();
-                }
-
+                //}
+               
+                
                 // Extrude the skirt loop.
                 ExtrusionLoop eloop(elrSkirt);
                 eloop.paths.emplace_back(

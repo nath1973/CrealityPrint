@@ -685,6 +685,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
     int preheat_steps = config->opt_int("preheat_steps");
     toggle_line("preheat_steps", have_ooze_prevention && (preheat_steps > 0));
 
+    toggle_line("flush_into_infill", bSEMM);
+    toggle_line("flush_into_objects", bSEMM);
+    toggle_line("flush_into_support", bSEMM);
+
     bool have_prime_tower = config->opt_bool("enable_prime_tower");
     for (auto el : { "prime_tower_width", "prime_tower_brim_width"})
         toggle_line(el, have_prime_tower);

@@ -16,7 +16,7 @@
                 "BBL_RELEASE_TO_PUBLIC": "1",
                 "CMAKE_INSTALL_PREFIX": "./OrcaSlicer",
                 "CMAKE_PREFIX_PATH": "${sourceDir}/deps/build-dbg/OrcaSlicer_dep/usr/local/",
-                "WIN10SDK_PATH": "C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0",
+                "WIN10SDK_PATH": "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0",
                 "GENERATE_ORCA_HEADER": "OFF"
             },
             "condition": {

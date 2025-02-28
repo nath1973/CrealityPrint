@@ -14,8 +14,8 @@
 #include <wx/gauge.h>
 #include <wx/timer.h>
 #include "slic3r/GUI/Widgets/PopupWindow.hpp" 
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
 #include "slic3r/GUI/wxExtensions.hpp"
+#include "data/DataType.hpp"
 
 class BoxColorPopPanel;
 
@@ -32,10 +32,10 @@ public:
     void SetColor(const wxColour& color);
     wxColour GetColor();
 
-    void update_item_info_by_material(int box_id, const RemotePrint::DeviceDB::Material& material_info);
+    void update_item_info_by_material(int box_id, const DM::Material& material_info);
     void set_sync_state(bool bSync);
     void set_is_ext(bool is_ext);
-    void setOriginMaterial(const RemotePrint::DeviceDB::Material& material_info);
+    void setOriginMaterial(const DM::Material& material_info);
 
 protected:
     void OnPaint(wxPaintEvent& event);
@@ -51,7 +51,7 @@ private:
     bool m_is_ext = false;
     bool m_bMaterialNoColour = false;
     ScalableBitmap m_bmpNoColour;
-    RemotePrint::DeviceDB::Material m_originMaterial;
+    DM::Material m_originMaterial;
 };
 
 /// @brief Box filament color item: draw 4(or less) OneFilamentColorItem, and in the front, draw a text : CFS1, or CFS2, or CFS3, or CFS4
@@ -62,7 +62,7 @@ public:
     OneBoxFilamentColorItem(wxWindow* parent, const wxSize& size);
     ~OneBoxFilamentColorItem();
 
-    void update_ui_item_info_by_material_box_info(const RemotePrint::DeviceDB::MaterialBox& material_box_info);
+    void update_ui_item_info_by_material_box_info(const DM::MaterialBox& material_box_info);
 
     std::vector<OneFilamentColorItem*> m_filament_color_items;
 
@@ -73,9 +73,10 @@ protected:
 
 private:
     wxBoxSizer* m_box_sizer;
+    wxStaticText* m_cfs_label = nullptr;
     wxColour m_bk_color;
     int m_box_id = 0;
-    RemotePrint::DeviceDB::Data m_device_data;
+    DM::Device m_device_data;
     wxString m_cfs_index_info;  // CFS1, CFS2, CFS3, CFS4
     int m_radius = 8;
     int m_border_width = 0;
@@ -89,7 +90,7 @@ public:
     PrinterBoxFilamentPanel(wxWindow* parent, wxWindowID winid = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
     ~PrinterBoxFilamentPanel();
 
-    void update_device_data(const RemotePrint::DeviceDB::Data& device_data);
+    void update_device_data(const DM::Device& device_data);
     void on_auto_device_filament_mapping();
     void on_show_box_color_selection(wxPoint popup_pos, int sync_filament_item_index);
 
@@ -112,7 +113,7 @@ private:
 	int m_max_count = { 4 };
     int m_small_count = { 4 };
 
-    RemotePrint::DeviceDB::Data m_device_data;
+    DM::Device m_device_data;
     std::vector<OneBoxFilamentColorItem*> m_filament_box_items;
     BoxColorPopPanel* m_box_color_pop_panel {nullptr};
 

@@ -897,3 +897,6 @@ msgstr "未檢測到線材，是否要繼續列印？"
 
 msgid "There is no consumables in the current rack"
 msgstr "當前料架沒有材料"
+
+msgid "Axis movement exceeded limit"
+msgstr "Axis movement exceeded limit"

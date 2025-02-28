@@ -17285,6 +17285,9 @@ msgstr ""
 "Compared with the default profile of a 0.8 mm nozzle, it has a smaller layer height. This results in less but still "
 "apparent layer lines and slightly higher print quality, but longer print time in some cases."
 
+msgid "Custom supports and color painting were removed before simplified."
+msgstr "Custom supports and color painting were removed before simplified."
+
 #~ msgid "CFS filament backup is not enabled, please enable it in the CFS settings."
 #~ msgstr "CFS filament backup is not enabled; please enable it in the CFS settings."
 

@@ -569,7 +569,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
         if (evt.CmdDown() && evt.GetKeyCode() == 'J') { m_printhost_queue_dlg->Show(); return; }    
         if (evt.CmdDown() && evt.GetKeyCode() == 'N') { m_plater->new_project(); return;}
         if (evt.CmdDown() && evt.GetKeyCode() == 'O') { m_plater->load_project(); return;}
-        if (evt.CmdDown() && evt.ShiftDown() && evt.GetKeyCode() == 'S') { if (can_save_as()) m_plater->save_project(true); return;}
+        if (evt.CmdDown() && evt.ShiftDown() && evt.GetKeyCode() == 'S') { if (can_save_as()) m_plater->save_project(true, FT_PROJECT); return;}
         else if (evt.CmdDown() && evt.GetKeyCode() == 'S') { if (can_save()) m_plater->save_project(false, FT_PROJECT); return;}
         if (evt.CmdDown() && evt.GetKeyCode() == 'F') { 
             if (m_plater && (m_tabpanel->GetSelection() == TabPosition::tp3DEditor || m_tabpanel->GetSelection() == TabPosition::tpPreview)) {
@@ -773,10 +773,6 @@ void MainFrame::update_layout()
 
                 if (!preview_only_hint())
                     return;
-
-                if (m_printer_mgr_view) {
-                    m_printer_mgr_view->update_which_device_is_current();
-                }
             }
             else if (evt.GetId() == tpDeviceMgr){ 
                 if (m_printer_mgr_view) {
@@ -1186,7 +1182,8 @@ bool MainFrame::preview_only_hint()
         if (preview_only_to_editor) {
             m_plater->new_project();
             preview_only_to_editor = false;
-
+            
+            return true;
         }
         else{//Event cannot be directly passed to TopBar object
             this->m_topbar->SetSelection(tpPreview);
@@ -1521,7 +1518,11 @@ bool MainFrame::can_reslice() const
 }
 
 void  MainFrame::slice_plate(SliceSelectType type){
-    if (!get_enable_slice_status() && type!=SliceSelectType::eSliceAll)
+    if (type != SliceSelectType::eSliceAll) {
+        if(!get_enable_slice_status())
+        return;
+    }
+    else if (m_plater->only_gcode_mode())
         return;
     // this->m_plater->select_view_3D("Preview");
     m_plater->exit_gizmo();
@@ -2040,7 +2041,7 @@ bool MainFrame::get_enable_print_status(bool is_all_or_any_of_them)
         enable = enable && !is_all_plates;
     }
 
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": m_print_select %1%, enable= %2% ")%m_print_select %enable;
+    //BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": m_print_select %1%, enable= %2% ")%m_print_select %enable;
 
     return enable;
 }
@@ -2486,7 +2487,7 @@ void MainFrame::init_menubar_as_editor()
             [this](){return can_add_models(); }, this);
 #else
         append_menu_item(import_menu, wxID_ANY, _L("Import 3MF/STL/STEP/SVG/OBJ/AMF") + dots + "\t" + ctrl + "I", _L("Load a model"),
-            [this](wxCommandEvent&) { if (m_plater) { m_plater->add_model(); } }, "", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) { m_plater->add_model(); } }, "menu_import", nullptr,
             [this](){return can_add_models(); }, this);
 #endif
         // append_menu_item(import_menu, wxID_ANY, _L("Import Zip Archive") + dots, _L("Load models contained within a zip archive"),
@@ -3677,7 +3678,9 @@ public:
                 m_scrolledWindowSizer->Add(boxSizer);
             }
         }
-        this->ShowModal();
+        if (this->ShowModal() == wxID_CANCEL) {
+            m_nClickedButtonValue = -1;
+        }
     }
 
     int getClickedButtonValue() { return m_nClickedButtonValue; }
@@ -3800,9 +3803,15 @@ void MainFrame::load_config_file()
         dlg.showMiltiFile(lstOverrideConfirm);
         return dlg.getClickedButtonValue();
     });
-    for (auto item : cfiles) {
-        if (!spLoadOldPresets->loadPresets(item)) {
-            vtNewDataFile.push_back(item);
+    for (auto iter = cfiles.begin(); iter != cfiles.end();) {
+        if (!spLoadOldPresets->loadPresets(*iter)){
+            if (spLoadOldPresets->getLastError().code == "-1") {
+            } else {
+                vtNewDataFile.push_back(*iter);
+            }
+            iter = cfiles.erase(iter);
+        } else {
+            iter++;
         }
     }
     
@@ -3838,6 +3847,7 @@ void MainFrame::load_config_file()
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " user is: " << agent->get_user_id();
         }
     }
+    cfiles.insert(cfiles.begin(), vtNewDataFile.begin(), vtNewDataFile.end());
     wxGetApp().preset_bundle->update_compatible(PresetSelectCompatibleType::Always);
     update_side_preset_ui();
     auto msg = wxString::Format(_L_PLURAL("There is %d config imported. (Only non-system and compatible configs)",

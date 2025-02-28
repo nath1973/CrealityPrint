@@ -80,14 +80,19 @@ else
     export BUILD_DIR_CONFIG_SUBDIR=""
 fi
 
-DEPS_PATH="/Users/creality/Orca_work/c3d_6.0/C3DSlicer/deps/build_x86_64/dep_x86_64"
-if [ -d "$DEPS_PATH" ]; then 
+# 读取环境变量 MY_DIR
+DEPS_PATH=$DEPS_ENV_DIR
+if [ -z "${DEPS_PATH}" ]; then
+    echo "env ${DEPS_PATH} is empty."
+    export BUILD_TARGET="all"
+else
     DEPS=$DEPS_PATH
     export BUILD_TARGET="slicer"
-else 
-    echo "deps file is not exist" 
-    export BUILD_TARGET="all"
 fi
+echo "=====DEPS=====: $DEPS"
+
+#DEPS_PATH="/Users/creality/Orca_work/c3d_6.0/C3DSlicer/deps/build_x86_64/dep_x86_64"
+
 
 function build_deps() {
     echo "Building deps..."

@@ -360,6 +360,7 @@ public:
 
 private:
     void init_font(bool compress);
+    void init_font_all(bool compress);
     void init_input();
     void init_style();
     void render_draw_data(ImDrawData *draw_data);

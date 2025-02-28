@@ -1936,7 +1936,8 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
         }
     }
 
-    m_processor.finalize(true);
+    m_processor.finalize(true, print->m_print_statistics.total_used_filament, print->config().creality_flush_time);
+    //file.write_md5(path_tmp);
     //    DoExport::update_print_estimated_times_stats(m_processor, print->m_print_statistics);
     DoExport::update_print_estimated_stats(m_processor, m_writer.extruders(), print->m_print_statistics, print->config());
     if (result != nullptr) {
@@ -2283,6 +2284,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     if (m_config.small_area_infill_flow_compensation.value && !print.config().small_area_infill_flow_compensation_model.empty())
         m_small_area_infill_flow_compensator = make_unique<SmallAreaInfillFlowCompensator>(print.config());
+
+    if (!is_bbl_printers && print.config().gcode_flavor == gcfMarlinFirmware) {
+        file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Time_Filament_Used).c_str());
+        file.write_format(";Layer height:%.3f\n", print.config().initial_layer_print_height.value);
+    }
 
     file.write_format("; HEADER_BLOCK_START\n");
     // Write information on the generator.
@@ -2789,9 +2795,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Orca: set chamber temperature at the beginning of gcode file
     if (activate_chamber_temp_control && max_chamber_temp > 0)
     {
-        if (print.is_CX_printer())
-            file.write(m_writer.set_chamber_temperature(max_chamber_temp, false)); // for creality 
-        else
+       // if (print.is_CX_printer())
+      //      file.write(m_writer.set_chamber_temperature(max_chamber_temp, false)); // for creality 
+      //  else
             file.write(m_writer.set_chamber_temperature(max_chamber_temp, true)); // set chamber_temperature
     }
     // Write the custom start G-code
@@ -3964,6 +3970,13 @@ namespace Skirt {
                 assert(!skirt_done.empty());
                 skirt_done.emplace_back(layer_tools.print_z);
             }
+
+            if (!valid && print.config().draft_shield == DraftShield::dsEnabled && print.config().skirt_type == SkirtType::stPerObject) {
+                // Prime all extruders planned for this layer, see
+                skirt_loops_per_extruder_all_printing(print, skirt, layer_tools, skirt_loops_per_extruder_out, extruder_id);
+                assert(!skirt_done.empty());
+                // skirt_done.emplace_back(layer_tools.print_z);
+            }
         }
         return skirt_loops_per_extruder_out;
     }
@@ -4057,9 +4070,9 @@ std::string GCode::generate_skirt(const Print&                     print,
                 path.mm3_per_mm = mm3_per_mm;
             }
 
-            // set skirt start point location
-            if (first_layer && i == loops.first)
-                this->set_last_pos(Skirt::find_start_point(loop, 0/*layer.object()->config().skirt_start_angle*/));
+            //// set skirt start point location
+            //if (first_layer && i == loops.first)
+            //    this->set_last_pos(Skirt::find_start_point(loop, layer.object()->config().skirt_start_angle));
 
             // FIXME using the support_speed of the 1st object printed.
             gcode += this->extrude_loop(loop, "skirt", m_config.support_speed.value);

@@ -698,8 +698,10 @@ void ParamsPanel::create_layout_printerAndFilament()
         m_preset_listBox->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& event) {
             wxDataViewItem item = event.GetItem();
             if (item.IsOk()) {
+                refreshCurTreeItem(false);
                 std::string itemString = m_preset_listBox->GetItemText(item).ToUTF8().data();;
                 m_curPreset = m_preset_listBox->GetItemText(item);
+                m_curItem = item;
                 if (itemString == _L("User presets") || itemString == _L("System presets") || itemString == _L("Project presets"))
                 {
                     return;
@@ -760,7 +762,7 @@ void ParamsPanel::create_layout_printerAndFilament()
         int em = em_unit(this);
         StateColor text_color = StateColor(std::pair{ is_dark ? wxColour(254, 254, 254) : wxColour(0,0,0), (int)StateColor::Normal });
         StateColor bg_color = StateColor(std::pair{ wxColour(21, 191, 89), (int)StateColor::Hovered },
-            std::pair{ is_dark ? wxColour(1, 1, 1) : wxColour(214, 214, 220), (int)StateColor::Normal });
+            std::pair{ is_dark ? wxColour(1, 1, 1) : wxColour(142, 142, 159), (int)StateColor::Normal });
 
 
         wxFont font(12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("微软雅黑"));
@@ -785,7 +787,7 @@ void ParamsPanel::create_layout_printerAndFilament()
             bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
             if (*sys_Value)
                 return;
-            m_btn_system->SetBackgroundColour(wxColour(214, 214, 220));
+            m_btn_system->SetBackgroundColour(wxColour(142, 142, 159));
             });
 
         m_btn_system->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
@@ -800,7 +802,7 @@ void ParamsPanel::create_layout_printerAndFilament()
 
         buttons_sizer->Add(m_btn_user);
         m_btn_user->SetMinSize({ FromDIP(100), FromDIP(30)});
-        m_btn_user->SetBackgroundColour(wxColour(214, 214, 220));
+        m_btn_user->SetBackgroundColour(wxColour(142, 142, 159));
         m_btn_user->SetClientData(new bool(false));
         m_btn_user->SetFont(font);
         m_btn_user->Bind(wxEVT_ENTER_WINDOW, [this](auto& event) {
@@ -813,7 +815,7 @@ void ParamsPanel::create_layout_printerAndFilament()
             bool* sys_Value = static_cast<bool*>(m_btn_user->GetClientData());
             if (*sys_Value)
                 return;
-            m_btn_user->SetBackgroundColour(wxColour(214, 214, 220));
+            m_btn_user->SetBackgroundColour(wxColour(142, 142, 159));
             });
         m_btn_user->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
             //bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
@@ -1575,6 +1577,61 @@ bool ParamsPanel::get_switch_of_object()
     return false;
 }
 
+void ParamsPanel::refreshCurTreeItem(bool isDirty)
+{
+    // 获取前两个字符
+    wxString str = m_curPreset.Mid(0, 2);
+    wxString str1 = str == "* " ? m_curPreset.Mid(2, -1) : m_curPreset;
+    std::string presetName = std::string(str1.ToUTF8().data());
+    // 查找 Preset
+    Preset* p = nullptr;
+    if (m_ws == WS_PRINTER) {
+        p = wxGetApp().preset_bundle->printers.find_preset(presetName);
+    }
+    else {
+        p = wxGetApp().preset_bundle->filaments.find_preset(presetName);
+    }
+
+    // 检查 Preset 是否有效
+    if (!p) {
+        return;
+    }
+
+    // 获取 Preset 的标签
+    wxString itemName = from_u8(p->label(true));
+
+    // 更新 itemName 根据 isDirty 状态
+    if (isDirty) {
+        if (itemName.Mid(0, 2) != "* ") {
+            itemName = "* " + itemName;
+        }
+    }
+    else {
+        if (itemName.Mid(0, 2) == "* ") {
+            itemName = itemName.Mid(2, -1);
+        }
+    }
+
+    // 检查 itemName 是否为空
+    if (itemName.IsEmpty()) {
+        return;
+    }
+
+    // 更新 m_curPreset
+    m_curPreset = itemName;
+
+    // 检查 m_preset_listBox 和 m_curItem 是否有效
+    if (m_preset_listBox && m_curItem.IsOk()) {
+        m_preset_listBox->SetItemText(m_curItem, itemName);
+        m_preset_listBox->Refresh();
+        m_preset_listBox->Update();
+        m_preset_listBox->UpdateWindowUI();
+    }
+
+    // 刷新当前窗口
+    Refresh();
+}
+
 void ParamsPanel::notify_object_config_changed()
 {
     this->notify_config_changed();
@@ -1648,7 +1705,8 @@ void ParamsPanel::notify_config_changed()
             }
         }
     }
-
+    refreshCurTreeItem(is_dirt);
+    
     // m_btn_reset->Enable(is_dirt);  // no need this reset button
 }
 
@@ -1939,7 +1997,7 @@ void ParamsPanel::ShowDeleteButton(bool show)
     //Layout();
 }
 
-void ParamsPanel::OnPanelShowInit()
+void ParamsPanel::OnPanelShowInit(const std::string& printer /* = "" */)
 {
     Tab* tab = dynamic_cast<Tab*>(get_current_tab());
     if (!tab)
@@ -1971,6 +2029,7 @@ void ParamsPanel::OnPanelShowInit()
 
     if (m_tabbar_ctrl)
         m_tabbar_ctrl->OnInit(preset);
+    m_curNeedShowedPrinter = printer;
 
     OnParentDialogOpen();
 
@@ -1989,6 +2048,7 @@ void ParamsPanel::OnPanelShowExit()
         m_tabbar_ctrl->OnExit();
 
     m_tabbar_ctrl = nullptr;
+    m_curNeedShowedPrinter = "";
 }
 
 void ParamsPanel::OnParentDialogOpen()
@@ -2099,7 +2159,7 @@ void ParamsPanel::updateItemState()
         *sys_Value = true;
         bool* user_Value = static_cast<bool*>(m_btn_user->GetClientData());
         *user_Value = false;
-        m_btn_user->SetBackgroundColour(wxColour(214, 214, 220));
+        m_btn_user->SetBackgroundColour(wxColour(142, 142, 159));
         m_btn_system->SetBackgroundColour(wxColour(21, 191, 89));
     };
 
@@ -2111,7 +2171,7 @@ void ParamsPanel::updateItemState()
         *sys_Value = false;
         bool* user_Value = static_cast<bool*>(m_btn_user->GetClientData());
         *user_Value = true;
-        m_btn_system->SetBackgroundColour(wxColour(214, 214, 220));
+        m_btn_system->SetBackgroundColour(wxColour(142, 142, 159));
         m_btn_user->SetBackgroundColour(wxColour(21, 191, 89));
     };
 
@@ -2387,8 +2447,20 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
     for (size_t i = presets.front().is_visible ? 0 : count; i < presets.size(); ++i)
     {
         Preset preset = presets[i];
-        if (!preset.is_visible || (!preset.is_compatible && i != idx_selected) || !preset.m_is_user_presets)
-            continue;
+
+        if (!m_curNeedShowedPrinter.empty()) {
+            std::vector<std::string> vtPrinter = preset.compatibles();
+            if (std::find(vtPrinter.begin(), vtPrinter.end(), m_curNeedShowedPrinter) == vtPrinter.end()) {
+                continue;
+            } else {
+                if (!preset.is_visible || !preset.m_is_user_printer_hidden)
+                    continue;
+            }
+        } else {
+            if (!preset.is_visible || (!preset.is_compatible && i != idx_selected) || !preset.m_is_user_printer_hidden)
+                continue;
+        }
+
         //Preset preset = presets[i];
 
         wxString ventor = getVendor(preset);
@@ -2523,8 +2595,12 @@ void ParamsPanel::updatePrinters(const std::unordered_set<wxString>& printers)
 void ParamsPanel::updatePresetsList(const std::vector<wxString>& systemList, const std::vector<wxString>& userList,
     const std::vector<wxString>& projectList)
 {
+    if (!m_preset_listBox)
+        return;
     m_preset_listBox->DeleteAllItems();
     m_preset_listBox->SetIndent(0);
+    //m_curPreset = wxString();
+    m_curItem = wxDataViewItem();
 
     wxDataViewItemAttr attr;
     attr.SetBackgroundColour(wxColor(255, 0, 0));
@@ -2640,7 +2716,9 @@ bool ParamsPanel::SelectRowRecursive(const wxDataViewItem& item, const wxString&
     wxString itemText = m_preset_listBox->GetItemText(item);
     if (itemText == text)
     {
+        m_curItem = item;
         m_preset_listBox->Select(item);
+        m_preset_listBox->SetCurrentItem(item);
         return true;
     }
 

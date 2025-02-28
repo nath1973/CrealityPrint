@@ -2900,30 +2900,31 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 coordf_t plate_bbox_y_max_local_coord = plate_bbox.max(1) - plate_origin(1);
                 bool need_update = false;
                 if (x + margin + wipe_tower_size(0) > plate_bbox_x_max_local_coord) {
-                    x = plate_bbox_x_max_local_coord - wipe_tower_size(0) - margin;
+                    //x = plate_bbox_x_max_local_coord - wipe_tower_size(0) - margin;
                     need_update = true;
                 }
                 else if (x < margin) {
-                    x = margin;
+                    //x = margin;
                     need_update = true;
                 }
-                if (need_update) {
-                    ConfigOptionFloat wt_x_opt(x);
-                    dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
-                    need_update = false;
-                }
+                //if (need_update) {
+                //    ConfigOptionFloat wt_x_opt(x);
+                //    dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
+                //    need_update = false;
+                //}
 
                 if (y + margin + wipe_tower_size(1) > plate_bbox_y_max_local_coord) {
-                    y = plate_bbox_y_max_local_coord - wipe_tower_size(1) - margin;
+                    //y = plate_bbox_y_max_local_coord - wipe_tower_size(1) - margin;
                     need_update = true;
                 }
                 else if (y < margin) {
-                    y = margin;
+                    //y = margin;
                     need_update = true;
                 }
                 if (need_update) {
-                    ConfigOptionFloat wt_y_opt(y);
-                    dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
+                    //ConfigOptionFloat wt_y_opt(y);
+                    //dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
+                    ppl.set_default_wipe_tower_pos_for_plate(plate_id);
                 }
 
                 int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
@@ -3556,7 +3557,7 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         //    break;
         //}
         default:  {
-            //obj_list->on_char(evt);
+            obj_list->on_char(evt);
             evt.Skip(); break; }
         }
     }
@@ -3820,7 +3821,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                 }
                 else if (keyCode == WXK_CONTROL)
                     m_dirty = true;
-                else if (m_gizmos.is_enabled() && !m_selection.is_empty() && m_canvas_type != CanvasAssembleView) {
+                else if (m_gizmos.is_enabled() && !m_selection.is_empty() && m_canvas_type != CanvasAssembleView && !wxGetApp().obj_list()->get_object_list_window_focus()) {
                     auto _do_rotate = [this](double angle_z_rad) {
                         m_selection.setup_cache();
                         m_selection.rotate(Vec3d(0.0, 0.0, angle_z_rad), TransformationType(TransformationType::World_Relative_Joint));
@@ -3842,7 +3843,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         IMSlider *m_layers_slider = get_gcode_viewer().get_layers_slider();
                         IMSlider *m_moves_slider  = get_gcode_viewer().get_moves_slider();
                         int increment = (evt.CmdDown() || evt.ShiftDown()) ? 5 : 1;
-                        if ((evt.CmdDown() || evt.ShiftDown()) && evt.GetKeyCode() == 'G') {
+                        if (wxGetApp().obj_list()->get_object_list_window_focus()) {
+                            wxGetApp().obj_list()->on_key(evt);
+                        }
+                        else if((evt.CmdDown() || evt.ShiftDown()) && evt.GetKeyCode() == 'G') {
                             m_layers_slider->show_go_to_layer(true);
                         }
                         else if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
@@ -3881,13 +3885,20 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 
                         m_dirty = true;
                     }
-                } else if (m_gizmos.is_enabled() && m_selection.is_empty() && m_canvas_type == CanvasView3D) {
-                    if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
-                        IMSlider* cliper_slide = get_gcode_viewer().get_cliper_slider();
-                        int    higher       = cliper_slide->GetHigherValue();
-                        higher += ((keyCode == WXK_UP) ? 1 : -1);
-                        cliper_slide->SetHigherValue(higher);
-                        m_dirty = true;
+                } else if (m_gizmos.is_enabled() && m_canvas_type == CanvasView3D) {
+                    
+                    if (wxGetApp().obj_list()->get_object_list_window_focus()) {
+                        
+                        wxGetApp().obj_list()->on_key(evt);
+                        
+                    } else if (m_selection.is_empty()) {
+                        if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
+                            IMSlider* cliper_slide = get_gcode_viewer().get_cliper_slider();
+                            int       higher       = cliper_slide->GetHigherValue();
+                            higher += ((keyCode == WXK_UP) ? 1 : -1);
+                            cliper_slide->SetHigherValue(higher);
+                            m_dirty = true;
+                        }
                     }
                 }
             }
@@ -4164,9 +4175,15 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // ignore left up events coming from imgui windows and not processed by them
         m_mouse.ignore_left_up = true;
     m_tooltip.set_in_imgui(false);
+    if (evt.LeftDown()) {
+        wxGetApp().obj_list()->set_object_list_window_focus(false);
+    }
     if (imgui->update_mouse_data(evt)) {
         if ((evt.LeftDown() || (evt.Moving() && (evt.AltDown() || evt.ShiftDown()))) && m_canvas != nullptr)
+        {
             m_canvas->SetFocus();
+            wxGetApp().obj_list()->set_object_list_window_focus(true);
+        }
         m_mouse.position = evt.Leaving() ? Vec2d(-1.0, -1.0) : pos.cast<double>();
         m_tooltip.set_in_imgui(true);
         render();
@@ -4575,8 +4592,15 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                             else {
                                 if (!m_selection.is_empty())
                                     rotate_target = m_selection.get_bounding_box().center();
-                                else 
-                                    rotate_target = volumes_bounding_box(true).center();
+                                else
+                                    //rotate_target = volumes_bounding_box(true).center();
+                                {
+                                    PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_curr_plate();
+                                    if (plate)
+                                        rotate_target = plate->get_bounding_box().center();
+                                    else
+                                        rotate_target = volumes_bounding_box().center();
+                                }
                             }
 
                             if (!rotate_target.isZero())
@@ -8401,7 +8425,7 @@ void GLCanvas3D::_render_slice_control() const
     config.prepareWindow(DispConfig::e_wt_slice, windows, scale);
     config.processWindows("Slice", [&]() {
         static int s_sst = MainFrame::eSlicePlate;
-        std::vector<wxString> s_slice_string{ _L("Slice plate"),_L("Slice all")};
+            std::vector<std::string> s_slice_string{_u8L("Slice plate"), _u8L("Slice all")};
         bool                         enslice = wxGetApp().mainframe->m_slice_btn->IsEnabled();        
         if (config.normalButton(s_slice_string[s_sst], bigcfg,
                                 s_sst == MainFrame::eSliceAll && !wxGetApp().mainframe->plater()->only_gcode_mode() ? 2 :
@@ -8421,8 +8445,10 @@ void GLCanvas3D::_render_slice_control() const
     config.prepareWindow(DispConfig::e_wt_print, windows, scale);
     config.processWindows("Print", [&]() {
         static int s_pst = 0;
-        std::vector<wxString> s_print_string{_L("Send print"),
-            _L("Export plate sliced file"), _L("Export all sliced file"), _L("Upload to CrealityCloud")};
+            std::vector<std::string> s_print_string{_u8L("Send print"), 
+                                                    _u8L("Export plate sliced file"), 
+                                                    _u8L("Export all sliced file"),
+                                                    _u8L("Upload to CrealityCloud")};
 
         bool enprint = wxGetApp().mainframe->get_enable_print_status(false);
         if (config.normalButton(s_print_string[s_pst], bigcfg, enprint ? 2 : 1)) {
@@ -8444,20 +8470,20 @@ void GLCanvas3D::_render_slice_control() const
         if (ret >= 0)
         {
             s_pst = ret;
-            if(s_print_string[s_pst] == _L("Send print"))
+            if(s_print_string[s_pst] == _u8L("Send print"))
                 wxGetApp().mainframe->m_print_select = MainFrame::eSendToLocalNetPrinter;
             //else if (s_print_string[s_pst] == _L("Export to Local")) {
             //    wxGetApp().mainframe->m_print_select = MainFrame::eExportGcode;
             //}
-            else if (s_print_string[s_pst] == _L("Export plate sliced file"))
+            else if (s_print_string[s_pst] == _u8L("Export plate sliced file"))
             {
                 wxGetApp().mainframe->m_print_select = MainFrame::eExportSlicedFile;
             }
-            else if (s_print_string[s_pst] == _L("Export all sliced file"))
+            else if (s_print_string[s_pst] == _u8L("Export all sliced file"))
             {
                 wxGetApp().mainframe->m_print_select = MainFrame::eExportAllSlicedFile;
             }
-            else if (s_print_string[s_pst] == _L("Upload to CrealityCloud")) {
+            else if (s_print_string[s_pst] == _u8L("Upload to CrealityCloud")) {
                 wxGetApp().mainframe->m_print_select = MainFrame::eUploadGcode;
             }
             if (wxGetApp().mainframe) {
@@ -9712,7 +9738,7 @@ void GLCanvas3D::_render_assemble_control() const
 
     {
         ImGui::SameLine(window_padding.x + text_size_x + slider_width + item_spacing * 6 + value_size);
-        imgui->text(_L("Explosion Ratio"));
+        imgui->text(_u8L("Explosion Ratio"));
 
         ImGui::SameLine(window_padding.x + 2 * text_size_x + slider_width + item_spacing * 7 + value_size);
         ImGui::PushItemWidth(slider_width);

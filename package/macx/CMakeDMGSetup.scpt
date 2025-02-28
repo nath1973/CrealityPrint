@@ -1,9 +1,10 @@
 on run argv
   set image_name to item 1 of argv
-
+  delay 2
+  log "image_name " & image_name
   tell application "Finder"
   tell disk image_name
-
+  delay 2
     -- wait for the image to finish mounting
     set open_attempts to 0
     repeat while open_attempts < 4
@@ -14,7 +15,7 @@ on run argv
         close
       on error errStr number errorNumber
         set open_attempts to open_attempts + 1
-        delay 10
+        delay 15
       end try
     end repeat
     delay 5

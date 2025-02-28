@@ -1,7 +1,16 @@
 msgid ""
 msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: zh\n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Poedit 3.5\n"
 
 msgid "All"
 msgstr "所有的"
@@ -1187,3 +1196,12 @@ msgstr "未检测到耗材,是否继续打印"
 
 msgid "There is no consumables in the current rack"
 msgstr "当前料架不存在耗材"
+
+msgid "No matching automatic refill filaments"
+msgstr "无匹配的自动续料耗材"
+
+msgid "Axis movement exceeded limit"
+msgstr "轴移动超限"
+
+msgid "Default"
+msgstr "缺省"

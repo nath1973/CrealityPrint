@@ -316,7 +316,8 @@ void Tab::create_preset_tab()
          Freeze();
         if (m_presets_choice) m_presets_choice->Show();
         m_btn_save_preset->Show();
-	    m_btn_delete_preset->Show(); // ORCA: fixes delete preset button visible while search box focused
+        update_btns_enabling();
+	    //m_btn_delete_preset->Show(); // ORCA: fixes delete preset button visible while search box focused
         m_undo_btn->Show();          // ORCA: fixes revert preset button visible while search box focused
         m_btn_search->Show();
         m_search_item->Hide();
@@ -346,8 +347,8 @@ void Tab::create_preset_tab()
              m_presets_choice->Hide();
 
          m_btn_save_preset->Hide();
-	 m_btn_delete_preset->Hide(); // ORCA: fixes delete preset button visible while search box focused
-         m_undo_btn->Hide();          // ORCA: fixes revert preset button visible while search box focused
+	     m_btn_delete_preset->Hide(); 
+         m_undo_btn->Hide();          
          m_btn_search->Hide();
          m_search_item->Show();
 
@@ -541,7 +542,21 @@ void Tab::create_preset_tab()
     m_hsizer->Add(m_page_view, 1, wxEXPAND | wxLEFT, 5);*/
 
     //m_btn_compare_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { compare_preset(); }));
-    m_btn_save_preset->Bind(wxEVT_LEFT_DOWN, ([this](auto &e) { save_preset(); 
+    m_btn_save_preset->Bind(wxEVT_LEFT_DOWN, ([this](auto &e) { 
+            const Preset&     sel_preset = m_presets->get_selected_preset();
+            PresetCollection* collection = &GUI::wxGetApp().preset_bundle->prints;
+            Preset*           p          = collection->find_preset(sel_preset.name, false);
+            if (p) {
+                if (p->is_default || p->is_system) {
+                    save_preset();
+                } else {
+                    set_just_edit(true);
+                    save_preset(std::string(), false, false, false, std::string(), true);
+                    set_just_edit(false);
+                }
+            } else {
+                save_preset();
+            }
     update_btns_enabling();
     update();
         }));
@@ -1084,6 +1099,7 @@ void Tab::update_undo_buttons()
     m_undo_btn->Enable(m_presets->get_edited_preset().is_dirty);
 
     wxGetApp().params_panel()->notify_config_changed();
+    dynamic_cast<ParamsPanel*>(GetParent())->notify_config_changed();
 }
 
 void Tab::on_roll_back_value(const bool to_sys /*= true*/)
@@ -1165,7 +1181,7 @@ void Tab::update_dirty()
 
     if (m_presets_choice) {
         m_presets_choice->update_dirty();
-        //on_presets_changed();
+        on_presets_changed();
     } else {
         m_presets->update_dirty();
     }
@@ -2372,13 +2388,13 @@ void TabPrint::build()
         optgroup->append_single_option_line("wipe_tower_no_sparse_layers");
         //optgroup->append_single_option_line("single_extruder_multi_material_priming");
 
-        optgroup = page->new_optgroup(L("Filament for Features"));
+        optgroup = page->new_optgroup(L("Filament for Features"), L"param_features_filament");
         optgroup->append_single_option_line("wall_filament");
         optgroup->append_single_option_line("sparse_infill_filament");
         optgroup->append_single_option_line("solid_infill_filament");
         optgroup->append_single_option_line("wipe_tower_filament");
 
-        optgroup = page->new_optgroup(L("Ooze prevention"));
+        optgroup = page->new_optgroup(L("Ooze prevention"), L"param_ooze_prevention");
         optgroup->append_single_option_line("ooze_prevention");
         optgroup->append_single_option_line("standby_temperature_delta");
         optgroup->append_single_option_line("preheat_time");
@@ -3361,18 +3377,29 @@ void TabFilament::add_filament_overrides_page()
         line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
             wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
 
-            check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
-                const bool is_checked = evt.IsChecked();
-                if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
-                    if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
-                        field->toggle(is_checked);
-                        if (is_checked)
-                            field->set_last_meaningful_value();
-                        else
-                            field->set_na_value();
+            check_box->Bind(
+                wxEVT_CHECKBOX,
+                [this, optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
+                    const bool is_checked = evt.IsChecked();
+                    if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                        if (Field* field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
+                            field->toggle(is_checked);
+
+                            if (is_checked) {
+                                field->update_na_value(_(L("N/A")));
+                                field->set_last_meaningful_value();
+                            } else {
+                                const std::string printer_opt_key      = opt_key.substr(strlen("filament_"));
+                                const auto        printer_config       = m_preset_bundle->printers.get_edited_preset().config;
+                                const boost::any  printer_config_value = optgroup_sh->get_config_value(printer_config, printer_opt_key,
+                                                                                                       opt_index);
+                                field->update_na_value(printer_config_value);
+                                field->set_na_value();
+                            }
+                        }
                     }
-                }
-            }, check_box->GetId());
+                },
+                check_box->GetId());
 
             m_overrides_options[opt_key] = check_box;
             return check_box;
@@ -3406,7 +3433,7 @@ void TabFilament::add_filament_overrides_page()
         append_single_option_line(opt_key, extruder_idx);
 }
 
-void TabFilament::update_filament_overrides_page()
+void TabFilament::update_filament_overrides_page(const DynamicPrintConfig* printers_config)
 {
     if (!m_active_page || m_active_page->title() != "Setting Overrides")
         return;
@@ -3448,31 +3475,37 @@ void TabFilament::update_filament_overrides_page()
     const bool have_retract_length = m_config->option("filament_retraction_length")->is_nil() ||
                                      m_config->opt_float("filament_retraction_length", extruder_idx) > 0;
 
-    for (const std::string& opt_key : opt_keys)
-    {
-        bool is_checked = opt_key=="filament_retraction_length" ? true : have_retract_length;
+    for (const std::string& opt_key : opt_keys) {
+        bool is_checked = opt_key == "filament_retraction_length" ? true : have_retract_length;
         m_overrides_options[opt_key]->Enable(is_checked);
 
         is_checked &= !m_config->option(opt_key)->is_nil();
         m_overrides_options[opt_key]->SetValue(is_checked);
 
         Field* field = optgroup->get_fieldc(opt_key, extruder_idx);
-        if (field != nullptr) {
-            if (opt_key == "filament_long_retractions_when_cut") {
-                int machine_enabled_level = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionInt>("enable_long_retraction_when_cut")->value;
-                bool machine_enabled = machine_enabled_level == LongRectrationLevel::EnableFilament;
-                toggle_line(opt_key, machine_enabled);
-                field->toggle(is_checked && machine_enabled);
+        if (field == nullptr)
+            continue;
+
+        if (opt_key == "filament_long_retractions_when_cut") {
+            int  machine_enabled_level = printers_config->option<ConfigOptionInt>("enable_long_retraction_when_cut")->value;
+            bool machine_enabled       = machine_enabled_level == LongRectrationLevel::EnableFilament;
+            toggle_line(opt_key, machine_enabled);
+            field->toggle(is_checked && machine_enabled);
+        } else if (opt_key == "filament_retraction_distances_when_cut") {
+            int  machine_enabled_level = printers_config->option<ConfigOptionInt>("enable_long_retraction_when_cut")->value;
+            bool machine_enabled       = machine_enabled_level == LongRectrationLevel::EnableFilament;
+            bool filament_enabled = m_config->option<ConfigOptionBools>("filament_long_retractions_when_cut")->values[extruder_idx] == 1;
+            toggle_line(opt_key, filament_enabled && machine_enabled);
+            field->toggle(is_checked && filament_enabled && machine_enabled);
+        } else {
+            if (!is_checked) {
+                const std::string printer_opt_key      = opt_key.substr(strlen("filament_"));
+                boost::any        printer_config_value = optgroup->get_config_value(*printers_config, printer_opt_key, extruder_idx);
+                field->update_na_value(printer_config_value);
+                field->set_value(printer_config_value, false);
             }
-            else if (opt_key == "filament_retraction_distances_when_cut") {
-                int machine_enabled_level = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionInt>("enable_long_retraction_when_cut")->value;
-                bool machine_enabled = machine_enabled_level == LongRectrationLevel::EnableFilament;
-                bool filament_enabled = m_config->option<ConfigOptionBools>("filament_long_retractions_when_cut")->values[extruder_idx] == 1;
-                toggle_line(opt_key, filament_enabled && machine_enabled);
-                field->toggle(is_checked && filament_enabled && machine_enabled);
-            }
-            else
-                field->toggle(is_checked);
+
+            field->toggle(is_checked);
         }
     }
 }
@@ -3849,7 +3882,7 @@ void TabFilament::toggle_options()
         toggle_option("material_flow_temp_graph", _bmaterial_flow_dependent_temperature);
     }
     if (m_active_page->title() == L("Setting Overrides"))
-        update_filament_overrides_page();
+        update_filament_overrides_page(&cfg);
 
     if (m_active_page->title() == L("Multimaterial")) {
         // Orca: hide specific settings for BBL printers
@@ -4426,7 +4459,6 @@ void TabPrinter::build_fff()
         optgroup = page->new_optgroup(L("Advanced"), L"param_advanced");
         optgroup->append_single_option_line("printer_structure");
         optgroup->append_single_option_line("gcode_flavor");
-        optgroup->append_single_option_line("prime_tower_position_type");
         optgroup->append_single_option_line("pellet_modded_printer", "pellet-flow-coefficient");
         optgroup->append_single_option_line("bbl_use_printhost");
         optgroup->append_single_option_line("disable_m73");
@@ -4923,6 +4955,7 @@ if (is_marlin_flavor)
         optgroup = page->new_optgroup(L("Wipe tower"), "param_tower");
         optgroup->append_single_option_line("purge_in_prime_tower", "semm");
         optgroup->append_single_option_line("enable_filament_ramming", "semm");
+        optgroup->append_single_option_line("prime_tower_position_type", "semm");
 
 
         optgroup = page->new_optgroup(L("Single extruder multimaterial parameters"), "param_settings");
@@ -5086,13 +5119,10 @@ if (is_marlin_flavor)
 // this gets executed after preset is loaded and before GUI fields are updated
 void TabPrinter::on_preset_loaded()
 {
-    //add test Orca
-    // update the extruders count field
-    auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
+    auto*  nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
     size_t extruders_count = nozzle_diameter->values.size();
-    // update the GUI field according to the number of nozzle diameters supplied
     extruders_count_changed(extruders_count);
-    build_unregular_pages();
+    //build_unregular_pages();
 }
 
 void TabPrinter::update_pages()
@@ -7767,8 +7797,8 @@ void Tab::select_item(wxString item)
 		wxString txt = m_pages[i]->title();
 		if(txt == item)
         {
-            m_tabctrl->SelectItem(index);
-            m_last_select_item = index;
+            m_last_select_item = m_tabctrl->SelectItemByTitle(translate_category(txt, m_type));
+            //m_last_select_item = index;
             break;
         }
 

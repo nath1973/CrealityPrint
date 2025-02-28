@@ -121,9 +121,9 @@ namespace GUI {
          * @param type[in]    button enable
          *                    0    enable ,1   disable ,2   always enable
          */
-        bool normalButton(const wxString& name, ButtonConfig, int type = 0);
-        int popupButton(const wxString& name, ButtonConfig bcfg,const std::vector< wxString>& list,ButtonConfig pcfg);
-        bool checkBox(const wxString& name, bool check,ButtonConfig = {});
+        bool normalButton(const std::string& name, ButtonConfig, int type = 0);
+        int  popupButton(const std::string& name, ButtonConfig bcfg, const std::vector<std::string>& list, ButtonConfig pcfg);
+        bool checkBox(const std::string& name, bool check, ButtonConfig = {});
 
         struct ComboConfig
         {

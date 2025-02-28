@@ -40,7 +40,6 @@
 #include "slic3r/GUI/Widgets/StaticBox.hpp"
 #include <wx/simplebook.h>
 #include <wx/hashmap.h>
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
 #include "slic3r/GUI/wxExtensions.hpp"
 
 namespace RemotePrint {
@@ -149,7 +148,6 @@ public:
 	Upload3mfToCloudDialog(Plater* plater = nullptr);
     ~Upload3mfToCloudDialog();
 
-    void init_device_list_from_db();
 	bool Show(bool show);
 	bool is_timeout();
     void on_rename_click(wxCommandEvent& event);
@@ -195,9 +193,6 @@ private:
     void on_progress_update(wxThreadEvent& event);
     std::vector<std::string> get_all_filament_types();
     std::string get_selected_printer_ip();
-
-    void handle_receive_color_match_info(const nlohmann::json& json_data);
-    void handle_receive_device_list(const nlohmann::json& json_data);
 
     void on_checkbox_open_cfs(wxCommandEvent& event);
 

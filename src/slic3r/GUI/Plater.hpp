@@ -31,7 +31,6 @@
 #include "libslic3r/FlushVolCalc.hpp"
 #include "GLToolbarCollapse.h"
 #include "GLToolbarProcess.h"
-#include "print_manage/DeviceDB.hpp"
 
 #define FILAMENT_SYSTEM_COLORS_NUM      16
 
@@ -114,8 +113,8 @@ wxDECLARE_EVENT(EVT_ADD_CUSTOM_FILAMENT, ColorEvent);
 wxDECLARE_EVENT(EVT_RE_SYNC_ALL, wxCommandEvent);
 wxDECLARE_EVENT(EVT_DEVICE_LIST_UPDATED, wxCommandEvent);
 wxDECLARE_EVENT(EVT_NOTIFY_PLATE_THUMBNAIL_UPDATE, wxCommandEvent);
-wxDECLARE_EVENT(EVT_CURRENT_DEVICE_CHANGED, Slic3r::GUI::DeviceDataEvent);
-wxDECLARE_EVENT(EVT_AUTO_SYNC_CURRENT_DEVICE_FILAMENT, Slic3r::GUI::DeviceDataEvent);
+wxDECLARE_EVENT(EVT_CURRENT_DEVICE_CHANGED, wxCommandEvent);
+wxDECLARE_EVENT(EVT_AUTO_SYNC_CURRENT_DEVICE_FILAMENT, wxCommandEvent);
 wxDECLARE_EVENT(EVT_ON_MAPPING_DEVICE_FILAMENT, wxCommandEvent);
 wxDECLARE_EVENT(EVT_ON_SHOW_BOX_COLOR_SELECTION, wxCommandEvent);
 
@@ -206,8 +205,8 @@ public:
     Search::OptionsSearcher&        get_searcher();
     std::string&                    get_search_line();
     void on_re_sync_all_filaments(const std::string& selected_device_ip);
-    void on_current_device_changed(Slic3r::GUI::DeviceDataEvent& event);
-    void on_auto_sync_current_device_filament(Slic3r::GUI::DeviceDataEvent& event);
+    void on_current_device_changed(wxCommandEvent& event);
+    void on_auto_sync_current_device_filament(wxCommandEvent& event);
     void show_box_filament_content(bool bShow);
     void on_mapping_device_filament(wxCommandEvent& event);
     void on_show_box_color_selection(wxCommandEvent& event);
@@ -462,7 +461,7 @@ public:
     void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
-    void clear_before_change_mesh(int obj_idx);
+    void clear_before_change_mesh(int obj_idx,bool simplify=false);
     void changed_mesh(int obj_idx);
 
     void changed_object(ModelObject &object);

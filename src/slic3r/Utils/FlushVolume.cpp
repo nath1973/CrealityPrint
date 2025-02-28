@@ -20,6 +20,9 @@ void calc_flushing_volumes()
 {
     auto&                      project_config   = wxGetApp().preset_bundle->project_config;
     //
+    if (project_config.option<ConfigOptionBool>("flush_volumes_changed")->value)
+        return;
+        
     std::vector<double> m_matrix  = (project_config.option<ConfigOptionFloats>("flush_volumes_matrix"))->values;
     const std::vector<double>& init_extruders   = (project_config.option<ConfigOptionFloats>("flush_volumes_vector"))->values;
     ConfigOptionFloat*         flush_multi_opt  = project_config.option<ConfigOptionFloat>("flush_multiplier");

@@ -689,3 +689,9 @@ msgstr "未检测到耗材,是否继续打印"
 
 msgid "There is no consumables in the current rack"
 msgstr "当前料架不存在耗材"
+
+msgid "Axis movement exceeded limit"
+msgstr "轴移动超限"
+
+msgid "Cannot contain special characters"
+msgstr "文件名不能包含特殊字符"

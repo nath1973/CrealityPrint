@@ -117,6 +117,9 @@ struct EmbossStyle
     // Human readable name of style it is shown in GUI
     std::string name;
 
+    // Creality: store name
+    std::string actual_name;
+
     // Define how to open font
     // Meaning depend on type
     std::string path;

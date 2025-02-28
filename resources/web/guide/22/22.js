@@ -32,7 +32,7 @@ function RequestProfile()
 //	SendWXMessage( JSON.stringify(tSend) );
 //}
 
-function HandleStudio(pVal)
+function handleStudioCmd(pVal)
 {
 	let strCmd=pVal['command'];
 	//alert(strCmd);

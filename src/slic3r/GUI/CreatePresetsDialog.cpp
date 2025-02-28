@@ -7203,7 +7203,7 @@ void EditFilamentPresetDialog::edit_preset()
     }
     
     wxGetApp().params_dialog()->set_editing_filament_id(m_filament_id);
-    wxGetApp().params_dialog()->panel()->OnPanelShowInit();
+    wxGetApp().params_dialog()->panel()->OnPanelShowInit(m_selected_printer);
 
 
     EndModal(wxID_EDIT);

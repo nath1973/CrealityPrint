@@ -18,6 +18,9 @@
 #include <numeric>
 
 #include <GL/glew.h>
+
+#include "FixModelByWin10.hpp"
+
 #define MAX_SIZE std::string_view { "9999.99" }
 
 namespace Slic3r {
@@ -211,6 +214,42 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     temp_tool_mesh.transform(feature_matrix);
     Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "A_NOT_B");
     if (temp_mesh_resuls.size() != 0) {
+#ifdef HAS_WIN10SDK
+        bool b_mesh_change = (temp_src_mesh.its.indices.size() != temp_mesh_resuls.front().its.indices.size());
+        // fix_non_manifold_edges
+        if (!b_mesh_change && is_windows10()) {
+                ModelObject* model_obj = m_c->selection_info()->model_object();
+
+                std::vector<std::string> succes_models;
+                // model_name     failing reason
+                std::vector<std::pair<std::string, std::string>> failed_models;
+                auto                                             plater = wxGetApp().plater();
+                auto fix_and_update_progress = [this, plater](ModelObject* model_object, const int vol_idx, const string& model_name,
+                                                                ProgressDialog& progress_dlg, std::vector<std::string>& succes_models,
+                                                                std::vector<std::pair<std::string, std::string>>& failed_models) {
+                    wxString msg = _L("Repairing model object");
+                    msg += ": " + from_u8(model_name) + "\n";
+                    std::string res;
+                    if (!fix_model_by_win10_sdk_gui(*model_object, vol_idx, progress_dlg, msg, res))
+                        return false;
+                    return true;
+                };
+                ProgressDialog progress_dlg(_L("Repairing model object"), "", 100, find_toplevel_parent(plater),
+                                            wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT, true);
+
+                auto model_name = model_obj->name;
+                if (!fix_and_update_progress(model_obj, m_src.volume_idx, model_name, progress_dlg, succes_models, failed_models)) {
+                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "run fix_and_update_progress error";
+                };
+ 
+                TriangleMesh temp_src_mesh{selected_volumes->mesh().its};
+                TriangleMesh              temp_tool_mesh(get_drill_mesh());
+                temp_src_mesh.transform(selected_volumes_matrix);
+                temp_tool_mesh.transform(feature_matrix);
+                temp_mesh_resuls.clear();
+                Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "A_NOT_B");
+        }
+#endif
         int active_inst = m_c->selection_info()->get_active_instance();
         const Transform3d instance_matrix = mo->instances[active_inst]->get_transformation().get_matrix_no_offset();
         temp_mesh_resuls.front().transform(instance_matrix.inverse());

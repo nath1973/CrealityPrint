@@ -5,11 +5,11 @@
 #include "string"
 
 namespace DM{
-    //
-    constexpr const char* EVENT_SET_ACTIVE_DEVICE = "set_active_device";
-    
-    // system event
+    //system event
+    constexpr const char* EVENT_SET_CURRENT_DEVICE = "set_current_device";
     constexpr const char* EVENT_SET_SYS_THEME = "is_dark_theme";
     constexpr const char* EVENT_SET_USER_THEME = "get_user";
+    constexpr const char* EVENT_FORWARD_DEVICE_DETAIL = "forward_device_detail";
+    
 }
 #endif

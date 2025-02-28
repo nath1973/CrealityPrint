@@ -51,6 +51,9 @@ bool LoadOldPresets::loadPresets(const std::string& fileName)
         PresetBundle::STOverrideConfirmFile stOverrideConfirmFile;
         stOverrideConfirmFile.fileName = filePath.filename().stem().string();
         for (auto item : vtFileName) {
+            if (item.type == Filament && getCompatiblePrinters(item).empty()) {
+                setCompatiblePrinters(vtFileName);
+            }
             if (isPresetExist(item) == 1) {
                 if (item.type == DefJson) {
                     if (item.isSystemPreset)
@@ -71,6 +74,12 @@ bool LoadOldPresets::loadPresets(const std::string& fileName)
                 lstOverrideConfirmFile.push_back(&stOverrideConfirmFile);
                 m_override = m_overrideConfirmCb(lstOverrideConfirmFile);
             }
+        }
+        if (m_override == -1) // -1表示界面点击了取消按钮
+        {
+            setLastError("-1", "cancel load");
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cancel load, not loading: " << file;
+            break;
         }
 
         int errFileCout = 0;
@@ -982,4 +991,59 @@ std::string LoadOldPresets::getTmpOutputName(const std::string& fileName) {
     return fileName + ".tmp";
 }
 std::string LoadOldPresets::getCompatiblePrinters(const FileData& fileData) { return m_printerData.printerInherits; }
+void        LoadOldPresets::setCompatiblePrinters(const std::vector<FileData>& vtFileName) {
+
+    for (auto item : vtFileName) {
+        if (item.type == DefJson) {
+            if (item.isSystemPreset) {
+                m_printerData.printerInherits = item.inheritsName;
+                break;
+            }
+            json jsonIn  = json();
+            json jsonOut = json();
+            try {
+                std::ifstream file(from_u8(item.name).ToStdString());
+                file.imbue(std::locale("en_US.UTF-8"));
+                if (!file.is_open()) {
+                    // 获取错误码
+                    std::error_code error_code = std::make_error_code(std::errc::no_such_file_or_directory);
+                    setLastError(std::to_string(error_code.value()), error_code.message());
+                    break;
+                }
+                // file >> json;
+                file >> jsonIn;
+                file.close();
+
+            } catch (...) {
+                setLastError("10", "open json crach");
+                break;
+            }
+            if (jsonIn.contains("printer")) {
+                jsonIn["printer"].erase("inherits");
+            }
+            fs::path    path(item.name);
+            std::string outputName = path.filename().string();
+            outputName.erase(outputName.find(".def.json"), 9);
+            std::string printerName = "";
+            std::string nozzle      = "";
+            splitPrinterPresetFileName(outputName, printerName, nozzle);
+            std::string inherits = "";
+            if (jsonIn.contains("metadata") && jsonIn["metadata"].contains("inherits_from")) {
+                inherits = getInherits(jsonIn["metadata"]["inherits_from"]);
+
+                if (!item.inheritsName.empty()) {
+                    outputName = item.inheritsName;
+                } else {
+                    int dotpos = outputName.rfind("-");
+                    if (dotpos != std::string::npos) {
+                        outputName = outputName.substr(0, dotpos);
+                    }
+                }
+                m_printerData.printerInherits = inherits;
+            }
+            break;
+        }
+    }
+
+}
 }} // namespace Slic3r::GUI

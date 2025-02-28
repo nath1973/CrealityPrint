@@ -1262,8 +1262,17 @@ msgstr "FS2862: CFS right RFID board abnormal."
 msgid "The file where the last unexpected stop was detected"
 msgstr "The file where the last unexpected stop was detected"
 
-msgid "No consumables detected, do you want to continue printing?"
-msgstr "No consumables detected, do you want to continue printing?"
+msgid "No filaments detected, do you want to continue printing?"
+msgstr "No filaments detected, do you want to continue printing?"
 
-msgid "There is no consumables in the current rack"
-msgstr "There is no consumables in the current rack"
+msgid "There is no filaments in the current rack"
+msgstr "There is no filaments in the current rack"
+
+msgid "No matching automatic refill filaments"
+msgstr "No matching automatic refill filaments"
+
+msgid "Axis movement exceeded limit"
+msgstr "Axis movement exceeded limit"
+
+msgid "Default"
+msgstr "Default"

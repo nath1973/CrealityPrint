@@ -69,6 +69,80 @@ void AccountDeviceMgr::unbind_device(const std::string& device_id)
     }
 }
 
+void AccountDeviceMgr::unbind_device_by_address(const std::string& address)
+{
+    if (!Slic3r::GUI::wxGetApp().is_login()) {
+        return;
+    }
+
+    Slic3r::GUI::UserInfo user = Slic3r::GUI::wxGetApp().get_user();
+    std::string account_id = user.userId;
+
+    // 删除所有不是当前登录 account_id 的数据
+    for (auto it = accountDeviceInfos.account_infos.begin(); it != accountDeviceInfos.account_infos.end();) {
+        if (it->first != account_id) {
+            it = accountDeviceInfos.account_infos.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+
+
+    auto account_it = accountDeviceInfos.account_infos.find(account_id);
+    if (account_it == accountDeviceInfos.account_infos.end()) {
+        return;
+    }
+
+    auto& devices = account_it->second.my_devices;
+    auto device_it = std::remove_if(devices.begin(), devices.end(),
+        [&address](const DeviceInfo& device) {
+            return device.address == address;
+        });
+
+    if (device_it != devices.end()) {
+        devices.erase(device_it, devices.end());
+        save_to_file();
+    }
+}
+
+void AccountDeviceMgr::unbind_device_by_group(const std::string& group)
+{
+    if (!Slic3r::GUI::wxGetApp().is_login()) {
+        return;
+    }
+
+    Slic3r::GUI::UserInfo user = Slic3r::GUI::wxGetApp().get_user();
+    std::string account_id = user.userId;
+
+    // 删除所有不是当前登录 account_id 的数据
+    for (auto it = accountDeviceInfos.account_infos.begin(); it != accountDeviceInfos.account_infos.end();) {
+        if (it->first != account_id) {
+            it = accountDeviceInfos.account_infos.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+
+
+    auto account_it = accountDeviceInfos.account_infos.find(account_id);
+    if (account_it == accountDeviceInfos.account_infos.end()) {
+        return;
+    }
+
+    auto& devices = account_it->second.my_devices;
+    auto device_it = std::remove_if(devices.begin(), devices.end(),
+        [&group](const DeviceInfo& device) {
+            return device.group == group;
+        });
+
+    if (device_it != devices.end()) {
+        devices.erase(device_it, devices.end());
+        save_to_file();
+    }
+}
+
 void AccountDeviceMgr::clear_all_account_info()
 {
     // 清空当前数据

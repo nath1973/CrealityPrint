@@ -12,7 +12,7 @@
 #include <wx/combobox.h>
 #include <wx/gauge.h>
 #include "slic3r/GUI/Widgets/PopupWindow.hpp" 
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
+#include "data/DataType.hpp"
 
 namespace RemotePrint {
 
@@ -44,12 +44,12 @@ class PrinterColorItem : public wxPanel
 public:
     PrinterColorItem(wxWindow* parent, const wxSize& size, const wxColour& color, int materialId, const std::string& matchFilamentType, int related_extruderId, const std::string& related_printer_ip);
 
-    PrinterColorItem(wxWindow* parent, const wxSize& size, const RemotePrint::DeviceDB::DeviceBoxColorInfo& boxColorInfo);
+    PrinterColorItem(wxWindow* parent, const wxSize& size, const DM::DeviceBoxColorInfo& boxColorInfo);
 
     void SetColor(const wxColour& color);
     wxColour GetColor();
-    void SetBoxColorInfo(const RemotePrint::DeviceDB::DeviceBoxColorInfo& boxColorInfo);
-    RemotePrint::DeviceDB::DeviceBoxColorInfo GetBoxColorInfo();
+    void SetBoxColorInfo(const DM::DeviceBoxColorInfo& boxColorInfo);
+    DM::DeviceBoxColorInfo GetBoxColorInfo();
 
     void SetHover(bool hover);
     wxString get_filament_type();
@@ -73,7 +73,7 @@ private:
     bool m_hover;
 
     PrinterColorPopPanel* m_popPanel {nullptr};
-    RemotePrint::DeviceDB::DeviceBoxColorInfo m_boxColorInfo;
+    DM::DeviceBoxColorInfo m_boxColorInfo;
 };
 
 
@@ -86,7 +86,7 @@ public:
 	PrinterColorPopPanel(wxWindow* parent, int index, PrinterColorItem* targetItem);
 	~PrinterColorPopPanel();
 
-    void InitColorItems(const std::vector<RemotePrint::DeviceDB::DeviceBoxColorInfo>& boxColorInfos);
+    void InitColorItems(const std::vector<DM::DeviceBoxColorInfo>& boxColorInfos);
 
 protected:
     void OnMouseEnter(wxMouseEvent& event);
@@ -126,7 +126,7 @@ public:
     void SetMaterialMapInfo(const std::vector<ColorMatchInfo>& materialMapInfo);
 
     std::vector<ColorMatchInfo> GetColorMatchInfo();
-    void update_color_match_info(int extruderId, const RemotePrint::DeviceDB::DeviceBoxColorInfo& boxColorInfo);
+    void update_color_match_info(int extruderId, const DM::DeviceBoxColorInfo& boxColorInfo);
 
 private:
     wxButton* m_helpButton;

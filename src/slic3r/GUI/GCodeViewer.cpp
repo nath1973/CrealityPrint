@@ -1164,8 +1164,10 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     bool only_gcode_3mf = false;
     PartPlate* current_plate = wxGetApp().plater()->get_partplate_list().get_curr_plate();
     bool current_has_print_instances = current_plate->has_printable_instances();
-    if (current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances)
+    if (current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances) {
         only_gcode_3mf = true;
+        wxGetApp().plater()->set_only_gcode(true);
+    }
     m_layers_slider->set_menu_enable(!(only_gcode || only_gcode_3mf));
     m_layers_slider->set_as_dirty();
     m_moves_slider->set_as_dirty();
@@ -4192,7 +4194,7 @@ void GCodeViewer::render_all_plates_stats(const std::vector<const GCodeProcessor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(340.f * m_scale * imgui.scaled(1.0f / 15.0f), 0));
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), 0, ImVec2(0.5f, 0.5f));
-    ImGui::Begin(_L("Statistics of All Plates").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin(_u8L("Statistics of All Plates").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
     std::vector<float> filament_diameters = gcode_result_list.front()->filament_diameters;
@@ -4536,7 +4538,7 @@ public:
              koef = imperial_units ? GizmoObjectManipulation::in_to_mm : 1000.0;
     }
 
-    DispConfig::WindowConfig prepare(bool fold) {
+    DispConfig::WindowConfig prepare(bool fold, float contentWidth) {
         std::string btn_name = fold ? ">>" : "<<";
         auto btnsz = ImGui::CalcTextSize(">>");
         auto wsz = config.getWindowSize(DispConfig::e_wt_gcode, wxGetApp().plater()->get_current_canvas3D()->get_scale());
@@ -4552,7 +4554,16 @@ public:
         ImVec2 bias = ImVec2(pos.x, pos.y + size.y + 8);
 
         ImGui::SetNextWindowPos(bias, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(wsz);
+
+        if (fold || contentWidth < (wsz.x - 2 * window_padding))
+        {
+            ImGui::SetNextWindowSize(wsz);
+        }
+        else
+        {
+            float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+            ImGui::SetNextWindowSize(ImVec2(400 * scale, -1));
+        }
 
         DispConfig::WindowConfig wcfg;
         wcfg.padding = { window_padding,window_padding };
@@ -4701,14 +4712,14 @@ public:
         cfg.boldScale = 1.2;
         cfg.size      = {100 * view_scale, 30 * view_scale};
         ImGui::Dummy(ImVec2(0, 5));
-        if (config.normalButton(_L("Color Show"), cfg, showcolor ? 2 : 0))
+        if (config.normalButton(_u8L("Color Show"), cfg, showcolor ? 2 : 0))
             showcolor = true;
         ImGui::SameLine();
-        if (config.normalButton(_L("G-code"), cfg, showcolor ? 0 : 2))
+        if (config.normalButton(_u8L("G-code"), cfg, showcolor ? 0 : 2))
             showcolor = false;
     }
 
-    void showColorHeader( GCodeViewer::EViewType m_view_type) {
+    void showColorHeader( GCodeViewer::EViewType m_view_type,float& contentWidth) {
         initColorData();
         ImGui::Dummy({ window_padding, window_padding });
         ImGui::SameLine();
@@ -4806,7 +4817,8 @@ public:
 
             std::vector<std::pair<std::string, std::vector<::string>>> title_columns;
             if (displayed_columns & ColumnData::Model) {
-                title_columns.push_back({ _u8L("Filament"), {""} });
+                //title_columns.push_back({ _u8L("Filament"), {""} });
+                title_columns.push_back({ _u8L("Filament"), total_filaments });
                 title_columns.push_back({ _u8L("Model"), total_filaments });
             }
             if (displayed_columns & ColumnData::Support) {
@@ -4821,6 +4833,10 @@ public:
             if ((displayed_columns & ~ColumnData::Model) > 0) {
                 title_columns.push_back({ _u8L("Total"), total_filaments });
             }
+
+            //checkbox 占位
+            title_columns.push_back({ _u8L(""), total_filaments });
+
             auto offsets_ = calculate_offsets(title_columns, icon_size);
             std::vector<std::pair<std::string, float>> title_offsets;
             for (int i = 0; i < offsets_.size(); i++) {
@@ -4828,6 +4844,8 @@ public:
                 color_print_offsets[title_columns[i].first] = offsets_[i];
             }
             append_headers(title_offsets);
+
+            contentWidth = offsets_.empty() ? 0.0f : offsets_.back();
 
             break;
         }
@@ -5303,7 +5321,7 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
             ,m_print_statistics,m_extruder_ids
             ,m_filament_diameters,m_filament_densities);
 
-        auto wcfg = helper.prepare(m_fold);
+        auto wcfg = helper.prepare(m_fold,m_contentWidth);
         //wcfg.bgalpha = 5/100.f;
         DispConfig().processWindows("gcode_legend", [&]() {
             bool old = m_fold;
@@ -5326,7 +5344,8 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                 }
 
-                helper.showColorHeader(m_view_type);
+                m_contentWidth = -1.0f;
+                helper.showColorHeader(m_view_type,m_contentWidth);
                 if (m_user_mode != wxGetApp().get_mode()) {
                     update_by_mode(wxGetApp().get_mode());
                     m_user_mode = wxGetApp().get_mode();

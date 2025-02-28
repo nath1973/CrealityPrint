@@ -72,6 +72,7 @@ const std::vector<std::string> GCodeProcessor::Reserved_Tags = {
     "_GP_FIRST_LINE_M73_PLACEHOLDER",
     "_GP_LAST_LINE_M73_PLACEHOLDER",
     "_GP_ESTIMATED_PRINTING_TIME_PLACEHOLDER",
+    "_GP_TIME_FILAMENT_USED",
     "_GP_TOTAL_LAYER_NUMBER_PLACEHOLDER",
     " MANUAL_TOOL_CHANGE ",
     "_DURING_PRINT_EXHAUST_FAN",
@@ -92,6 +93,7 @@ const std::vector<std::string> GCodeProcessor::Reserved_Tags_compatible = {
     "_GP_FIRST_LINE_M73_PLACEHOLDER",
     "_GP_LAST_LINE_M73_PLACEHOLDER",
     "_GP_ESTIMATED_PRINTING_TIME_PLACEHOLDER",
+    "_GP_TIME_FILAMENT_USED",
     "_GP_TOTAL_LAYER_NUMBER_PLACEHOLDER",
     " MANUAL_TOOL_CHANGE ",
     "_DURING_PRINT_EXHAUST_FAN",
@@ -407,7 +409,7 @@ void GCodeProcessor::TimeProcessor::reset()
     machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].enabled = true;
 }
 
-void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, std::vector<GCodeProcessorResult::MoveVertex>& moves, std::vector<size_t>& lines_ends, size_t total_layer_num, float flush_times)
+void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, std::vector<GCodeProcessorResult::MoveVertex>& moves, std::vector<size_t>& lines_ends, size_t total_layer_num,float filament_used, float flush_times)
 {
     FilePtr in{ boost::nowide::fopen(filename.c_str(), "rb") };
     if (in.f == nullptr)
@@ -543,6 +545,17 @@ void GCodeProcessor::TimeProcessor::post_process(const std::string& filename, st
                         ret += buf;
                     }
                 }
+            } 
+            else if (line == reserved_tag(ETags::Time_Filament_Used)) {
+                double totaltime = 0;
+                for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+                    const TimeMachine& machine = machines[i];
+                    totaltime += machine.time;
+                }
+
+                char buf[128];
+                sprintf(buf, ";TIME:%0.2f\n;Filament used:%0.5fm\n", totaltime, filament_used * 0.001);
+                ret += buf;
             }
             //BBS: write total layer number
             else if (line == reserved_tag(ETags::Total_Layer_Number_Placeholder)) {
@@ -1778,7 +1791,7 @@ void GCodeProcessor::calculateVolume()
     }
 };
 
-void GCodeProcessor::finalize(bool post_process)
+void GCodeProcessor::finalize(bool post_process,float filament_used, float flush_time)
 {
     // update width/height of wipe moves
     for (GCodeProcessorResult::MoveVertex& move : m_result.moves) {
@@ -1826,7 +1839,7 @@ void GCodeProcessor::finalize(bool post_process)
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
     if (post_process){
         float flush_times = s_creality_flush_time * m_result.print_statistics.total_filamentchanges;
-        m_time_processor.post_process(m_result.filename, m_result.moves, m_result.lines_ends, m_layer_id, flush_times);
+        m_time_processor.post_process(m_result.filename, m_result.moves, m_result.lines_ends, m_layer_id, filament_used, flush_times);
     }
 #if ENABLE_GCODE_VIEWER_STATISTICS
     m_result.time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - m_start_time).count();

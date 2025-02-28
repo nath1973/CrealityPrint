@@ -824,7 +824,7 @@ public:
         const std::deque<Preset>& tpresets = m_technologies->get_presets();
 
         for (auto& preset : tpresets) {
-            if (preset.is_project_embedded)
+            if (preset.is_project_embedded || preset.is_default)
                 continue;
 
             auto compatibles = preset.compatibles();
@@ -1099,7 +1099,7 @@ public:
             const Preset& preset  = ppresets[i];
             Preset        _preset = preset;
 
-            if (!preset.is_visible || !preset.m_is_user_presets)
+            if (!preset.is_visible || !preset.m_is_user_printer_hidden)
                 continue;
 
             if (preset.is_project_embedded)
@@ -1213,12 +1213,11 @@ public:
         pp.set_dirty();
 
         std::string newName = pp.name;
-        m_filaments->save_current_preset(newName, false, false, &pp);
-        auto new_preset       = m_filaments->find_preset(newName, false, true);
-        new_preset->sync_info = "update";
+        pp.sync_info        = "update";
+        pp.save_info();
         if (wxGetApp().is_user_login())
-            new_preset->user_id = wxGetApp().getAgent()->get_user_id();
-        new_preset->save_info();
+            pp.user_id = wxGetApp().getAgent()->get_user_id();
+        m_filaments->save_current_preset(newName, false, false, &pp);
 
         m_preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
 
@@ -1274,8 +1273,9 @@ public:
             return;
 
         std::string newName = pp->name + "(" + std::to_string(id) + ")";
-        m_filaments->save_current_preset(newName, false, false, pp);
-        auto new_preset = m_filaments->find_preset(newName, false, true);
+
+        auto new_preset_obj = *pp;
+        auto new_preset     = &new_preset_obj;
 
         const ConfigOptionVectorBase* vec    = static_cast<const ConfigOptionVectorBase*>(pp->config.option("compatible_printers"));
         auto                          result = vec->vserialize();
@@ -1293,11 +1293,10 @@ public:
         ConfigSubstitutionContext context(ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
         new_preset->config.set_deserialize("compatible_printers", value_str, context);
         new_preset->set_dirty();
-        m_filaments->save_current_preset(newName, false, false, new_preset);
-        new_preset->sync_info = "update";
+        new_preset->sync_info = "create";
         if (wxGetApp().is_user_login())
             new_preset->user_id = wxGetApp().getAgent()->get_user_id();
-        new_preset->save_info();
+        m_filaments->save_current_preset(newName, false, false, new_preset);
 
         m_preset_bundle->update_compatible(PresetSelectCompatibleType::Never);
 
@@ -1364,22 +1363,20 @@ public:
                 id = nameSet.size();
 
             newName       = filamentName + "(" + std::to_string(id) + ")";
-            Preset preset = presets[targetIndex];
-            collection->save_current_preset(newName, false, false, &preset);
+            //Preset preset = presets[targetIndex];
+            //collection->save_current_preset(newName, false, false, &preset);
             // m_filaments->save_current_preset(newName, false, false);
-            auto new_preset       = collection->find_preset(newName, false, true);
+            //auto new_preset       = collection->find_preset(newName, false, true);
+            auto        new_preset = presets[targetIndex];
             std::string                   value_str;
             value_str += "\"";
             value_str += newPrinter;
             value_str += "\"";
             ConfigSubstitutionContext context(ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
-            new_preset->config.set_deserialize("compatible_printers", value_str, context);
-            new_preset->set_dirty();
-            collection->save_current_preset(newName, false, false, new_preset);
-            new_preset->sync_info = "update";
-            if (wxGetApp().is_user_login())
-                new_preset->user_id = wxGetApp().getAgent()->get_user_id();
-            new_preset->save_info();
+            new_preset.config.set_deserialize("compatible_printers", value_str, context);
+            new_preset.set_dirty();
+            new_preset.sync_info = "create";
+            collection->save_current_preset(newName, false, false, &new_preset);
         };
 
 

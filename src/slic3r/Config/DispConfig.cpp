@@ -151,7 +151,7 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
     return tex;
 }
 
-bool DispConfig::checkBox(const wxString& name, bool check,ButtonConfig cfg) {
+bool DispConfig::checkBox(const std::string& name, bool check,ButtonConfig cfg) {
     auto bg = getColor(check? cfg.fg:cfg.bg);
     auto fg = getColor(cfg.fg);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
@@ -172,7 +172,7 @@ bool DispConfig::checkBox(const wxString& name, bool check,ButtonConfig cfg) {
     return check;
 }
 
-bool DispConfig::normalButton(const wxString& name, ButtonConfig cfg,int en) {
+bool DispConfig::normalButton(const std::string& name, ButtonConfig cfg,int en) {
     auto bg = getColor(en == 2 ? cfg.fg : cfg.bg);
     auto fg = getColor(en == 1 ? cfg.bg : cfg.fg);
 
@@ -185,7 +185,7 @@ bool DispConfig::normalButton(const wxString& name, ButtonConfig cfg,int en) {
         ImGui::PushStyleColor(ImGuiCol_BorderActive, fg);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, cfg.border);
     Loc_pushBoldStyle(cfg.boldScale);
-    bool active = ImGui::BBLButton(name.ToUTF8(), cfg.size);
+    bool active = ImGui::BBLButton(name.c_str(), cfg.size);
     Loc_popBoldStyle(cfg.boldScale);
     ImGui::PopStyleVar(1);
     ImGui::PopStyleColor(4);
@@ -252,7 +252,7 @@ ImVec2 DispConfig::getWindowSize(WindowType tp, float scale) {
         winsize = { 215, 55 };
         break;
     case DispConfig::e_wt_msg:
-        winsize = { 255, 85 };
+        winsize = { 300, 85 };
         break;
     case DispConfig::e_wt_error:
         winsize = { 405, 85 };
@@ -376,12 +376,12 @@ void DispConfig::processWindows(const wxString& name,CreateFn fn, WindowConfig s
     ImGui::PopStyleVar(varnum);
 }
 
-int DispConfig::popupButton(const wxString& name, ButtonConfig bcfg
-    , const std::vector< wxString>& list, ButtonConfig cfg) {
+int DispConfig::popupButton(const std::string& name, ButtonConfig bcfg
+    , const std::vector< std::string>& list, ButtonConfig cfg) {
     if (normalButton(name,bcfg))
-        ImGui::OpenPopup(name.ToUTF8());
+        ImGui::OpenPopup(name.c_str());
     int ret = -1;
-    if (ImGui::BeginPopup(name.ToUTF8()))
+    if (ImGui::BeginPopup(name.c_str()))
     {
         auto bg = getColor(cfg.bg);
         auto fg = getColor(cfg.fg);
@@ -390,7 +390,7 @@ int DispConfig::popupButton(const wxString& name, ButtonConfig bcfg
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, fg);
         for (int i=0;i<list.size();++i)
         {
-            if (ImGui::Button(list[i].ToUTF8(), cfg.size))
+            if (ImGui::Button(list[i].c_str(), cfg.size))
                 ret = i;    
         }
         if (ret>=0)

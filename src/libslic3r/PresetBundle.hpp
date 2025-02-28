@@ -271,6 +271,8 @@ public:
     // If the "vendor" section is missing, enable all models and variants of the particular vendor.
     void                        load_installed_printers(const AppConfig &config);
 
+    void load_user_printer_state(const AppConfig &config);
+
     const std::string&          get_preset_name_by_alias(const Preset::Type& preset_type, const std::string& alias) const;
 
     const int                   get_required_hrc_by_filament_type(const std::string& filament_type) const;
@@ -303,6 +305,11 @@ public:
         return false;
     }
 
+public:
+    std::string m_curPrinterPresetName  = "";
+    std::string m_curFilamentPresetName = "";
+    std::string m_curProcessPresetName  = "";
+
 private:
     //std::pair<PresetsConfigSubstitutions, std::string> load_system_presets(ForwardCompatibilitySubstitutionRule compatibility_rule);
     //BBS: add json related logic
@@ -331,9 +338,6 @@ private:
     bool validation_mode = false;
     std::string vendor_to_validate = ""; 
     int m_errors = 0;
-    std::string m_curPrinterPresetName = "";    //  ������Creality.conf�ļ���presets/machine��ֵ
-    std::string m_curFilamentPresetName = "";   //  ������Creality.conf�ļ���presets/filaments��ֵ
-    std::string m_curProcessPresetName  = "";   //  ������Creality.conf�ļ���presets/filaments��ֵ
 };
 
 ENABLE_ENUM_BITMASK_OPERATORS(PresetBundle::LoadConfigBundleAttribute)
