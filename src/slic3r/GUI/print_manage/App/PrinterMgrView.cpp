@@ -30,6 +30,9 @@
 #include "../AppMgr.hpp"
 #include "../PrinterMgr.hpp"
 #include "../TypeDefine.hpp"
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 
 namespace pt = boost::property_tree;
@@ -70,14 +73,16 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
     RegisterHandler("request_update_device_relate_to_account", [this](const nlohmann::json& json_data) {
         this->handle_request_update_device_relate_to_account(json_data);
     });
-
+    std::string version = std::string(CREALITYPRINT_VERSION);
 //#define _DEBUG1
 #ifdef _DEBUG1
-        this->load_url(wxString("http://localhost:5173/"), wxString());
+        wxString url = wxString::Format("http://localhost:5174/?version=%s", version);
+        this->load_url(url, wxString());
          m_browser->EnableAccessToDevTools();
      #else
         //wxString url = wxString::Format("http://localhost:%d/deviceMgr/index.html", wxGetApp().get_server_port());
-        wxString url = wxString::Format("%s/web/deviceMgr/index.html", from_u8(resources_dir()));
+        
+        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s", from_u8(resources_dir()), version);
         url.Replace(wxT("\\"), wxT("/"));
         url.Replace(wxT("#"), wxT("%23"));
         wxURI uri(url);
@@ -86,7 +91,7 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
         this->load_url(encodedUrl, wxString());
 
         // this->load_url(wxString("http://localhost:5173/"), wxString());
-        // m_browser->EnableAccessToDevTools();
+        m_browser->EnableAccessToDevTools();
 
      #endif
     DM::AppMgr::Ins().Register(m_browser);
@@ -200,7 +205,6 @@ void PrinterMgrView::OnLoaded(wxWebViewEvent &evt)
 
     DM::DeviceMgr::Ins().Load();
     AccountDeviceMgr::getInstance().load();
-
 }
 
 void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
@@ -283,17 +287,25 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
         else if(strCmd == "req_device_move_direction")
         {
             std::string presetName = j["preset_name"];
+            std::string address = j["address"];
             Preset*     preset = Slic3r::GUI::wxGetApp().preset_bundle->printers.find_preset(presetName);
             if (preset != nullptr && preset->config.has("machine_platform_motion_enable")) {
                 const ConfigOption* option = preset->config.option("machine_platform_motion_enable");
                 bool b = option->getBool();
                 int                 i      = b ? 1 : 0;
                 nlohmann::json commandJson;
+                nlohmann::json  dataJson;
                 commandJson["command"] = "req_device_move_direction";
-                commandJson["data"]    = i;
+                dataJson["direction"]  = i;
+                dataJson["address"]    = address;
+                commandJson["data"]    = dataJson;
                 wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump());
                 run_script(strJS.ToStdString());
             }
+        }
+        else if(strCmd == "get_machine_list")
+        {
+            load_machine_preset_data();
         }
         else {
             BOOST_LOG_TRIVIAL(trace) << "PrinterMgrView::OnScriptMessage;Unknown Command:" << strCmd;
@@ -477,16 +489,8 @@ void PrinterMgrView::down_file(std::string download_info, std::string filename, 
 
     wxString download_url(download_info.c_str());
 
-    bool download_ok = false;
-    int retry_count = 0;
-    const int max_retries = 3;
-
-    bool cont = true;
-    bool cancel = false;
-
-    int percent = 0;
     boost::filesystem::path target_path = output_path;
-    boost::thread import_thread = Slic3r::create_thread([&percent, &cont, &cancel, &retry_count, max_retries, &extension, &target_path, &download_ok, download_url, this] {
+    boost::thread import_thread = Slic3r::create_thread([extension, target_path, download_url, this] {
 
         fs::path tmp_path = target_path;
         tmp_path += wxSecretString::Format("%s", ".download");
@@ -495,66 +499,32 @@ void PrinterMgrView::down_file(std::string download_info, std::string filename, 
         bool size_limit = false;
         auto http = Http::get(download_url.ToStdString());
 
-        while (cont && retry_count < max_retries) {
-            retry_count++;
-            http.on_progress([&percent, &cont, &filesize, &size_limit, this](Http::Progress progress, bool& cancel) {
-
-                if (!cont) cancel = true;
+        http.on_progress([filesize, size_limit, this](Http::Progress progress, bool& cancel) {
                 if (progress.dltotal != 0) {
-
-                    if (filesize == 0) {
-                        filesize = progress.dltotal;
-                        double megabytes = static_cast<double>(progress.dltotal) / (1024 * 1024);
-                        //The maximum size of a 3mf file is 500mb
-                        if (megabytes > 500) {
-                            cont = false;
-                            size_limit = true;
-                        }
-                    }
-                    percent = progress.dlnow * 100 / progress.dltotal;
+                    int percent = progress.dlnow * 100 / progress.dltotal;
 
                     nlohmann::json commandJson;
                     commandJson["command"] = "update_download_progress";
-                    commandJson["data"] = percent;
+                    commandJson["data"]    = percent;
 
                     wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump()));
                     wxGetApp().CallAfter([this, strJS] { run_script(strJS.ToStdString()); });
                 }
-                })
-                .on_error([&cont, &retry_count, max_retries](std::string body, std::string error, unsigned http_status) {
-                    (void)body;
-                    BOOST_LOG_TRIVIAL(error) << wxSecretString::Format("Error getting: `%1%`: HTTP %2%, %3%",
-                        body,
-                        http_status,
-                        error);
+            })
+            .on_error([](std::string body, std::string error, unsigned http_status) {
+                (void) body;
+                BOOST_LOG_TRIVIAL(error) << wxSecretString::Format("Error getting: `%1%`: HTTP %2%, %3%", body, http_status, error);
+            })
+            .on_complete([tmp_path, target_path, extension](std::string body, unsigned /* http_status */) {
+                fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
+                file.write(body.c_str(), body.size());
+                file.close();
 
-                    if (retry_count == max_retries) {
-                       
-                        cont = false;
-                    }
-                    })
-                    .on_complete([&cont, &download_ok, tmp_path, &target_path, extension](std::string body, unsigned /* http_status */) {
-                        fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
-                        file.write(body.c_str(), body.size());
-                        file.close();
-                        
-                        fs::rename(tmp_path, target_path);
-            
-                        cont = false;
-                        download_ok = true;
-                        }).perform_sync();
-        }
+                fs::rename(tmp_path, target_path);
+            })
+            .perform_sync();
 
         });
-
-    while (cont) {
-        wxEventLoopBase::GetActive()->YieldFor(wxEVT_CATEGORY_UI | wxEVT_CATEGORY_USER_INPUT);
-        if (download_ok)
-            break;
-    }
-
-    if (import_thread.joinable())
-        import_thread.join();
 
 }
 
@@ -723,6 +693,102 @@ void PrinterMgrView::forward_init_device_cmd_to_printer_list()
         std::cout << "forward_init_device_cmd_to_printer_list failed" << std::endl;
     }
 
+}
+
+bool PrinterMgrView::LoadFile(std::string jPath, std::string &sContent)
+{
+    try {
+        boost::nowide::ifstream t(jPath);
+        std::stringstream buffer;
+        buffer << t.rdbuf();
+        sContent=buffer.str();
+        BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << boost::format(", load %1% into buffer")% jPath;
+    }
+    catch (std::exception &e)
+    {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ",  got exception: "<<e.what();
+        return false;
+    }
+
+    return true;
+}
+
+int PrinterMgrView::load_machine_preset_data()
+{
+    boost::filesystem::path vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / PRESET_SYSTEM_DIR ).make_preferred();
+    if (boost::filesystem::exists((vendor_dir /"Creality"/"machineList").replace_extension(".json")))
+    {
+        std::string vendor_preset_path = vendor_dir.string() + "/Creality/machineList.json";
+        boost::filesystem::path file_path(vendor_preset_path);
+
+        boost::filesystem::path vendor_dir = boost::filesystem::absolute(file_path.parent_path() / "machineList").make_preferred();
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",  vendor path %1%.") % vendor_dir.string();
+        try{
+            std::string contents;
+            LoadFile(vendor_preset_path, contents);
+            json jLocal = json::parse(contents);
+            json pmodels = jLocal["printerList"];
+
+            nlohmann::json commandJson;
+            commandJson["command"] = "get_machine_list";
+            commandJson["data"]    = pmodels;
+            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+            run_script(strJS.ToStdString());
+        }catch (nlohmann::detail::parse_error &err) {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": parse " << vendor_preset_path
+                                     << " got a nlohmann::detail::parse_error, reason = " << err.what();
+            return -1;
+        } catch (std::exception &e) {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": parse " << vendor_preset_path << " got exception: " << e.what();
+            return -1;
+        }
+    }else{
+        auto printer_list_file = fs::path(data_dir()).append("system").append("Creality").append("machineList.json").string();
+        std::string base_url   = get_cloud_api_url();
+        auto preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";
+        Http::set_extra_headers(Slic3r::GUI::wxGetApp().get_extra_header());
+                            Http http = Http::post(base_url + preupload_profile_url);
+                            json        j;
+                            j["engineVersion"]  = "3.0.0";
+                            boost::uuids::uuid uuid = boost::uuids::random_generator()();
+                                http.header("Content-Type", "application/json")
+                                    .header("__CXY_REQUESTID_", to_string(uuid))
+                                    .set_post_body(j.dump())
+                                    .on_complete([&](std::string body, unsigned status) {
+                                        if(status!=200){
+                                            return -1;
+                                        }
+                                        try{
+                                            json j = json::parse(body);
+                                            json printer_list = j["result"];
+                                            json list = printer_list["printerList"];
+
+                                            nlohmann::json commandJson;
+                                            commandJson["command"] = "get_machine_list";
+                                            commandJson["data"] =  list;
+                                            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+                                            run_script(strJS.ToStdString());
+
+                                            if(list.empty()){
+                                                return -1;
+                                            }
+
+                                            auto out_printer_list_file = fs::path(data_dir()).append("system")
+                                                                            .append("Creality")
+                                                                            .append("machineList.json")
+                                                                            .string();
+                                            boost::nowide::ofstream c;
+                                            c.open(out_printer_list_file, std::ios::out | std::ios::trunc);
+                                            c << std::setw(4) << printer_list << std::endl;
+                                            
+                                        }catch(...){
+                                            return -1;
+                                        }
+                                        return 0;
+                                    }).perform_sync();
+    }
+
+    return 0;
 }
 
 } // GUI

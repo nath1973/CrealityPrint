@@ -793,8 +793,8 @@ void ParamsPanel::create_layout_printerAndFilament()
         m_btn_system->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
 
             m_ps = ParamsPanel::PS_SYSTEM;
-            m_curVentor = _L("ALL").ToStdString();
-            m_printerType = _L("ALL").ToStdString();
+            m_curVentor = _L("ALL");
+            m_printerType = _L("ALL");
             filteredData(m_curVentor, m_printerType);
             updateItemState();
             });
@@ -2074,8 +2074,8 @@ void ParamsPanel::OnParentDialogOpen()
         m_ps = PS_USER;
     }
 
-    m_printerType = _L("ALL").ToStdString();
-    m_curVentor = _L("ALL").ToStdString(); //getVendor(preset);
+    m_printerType = _L("ALL");
+    m_curVentor = _L("ALL"); //getVendor(preset);
     m_curPreset = from_u8(preset.label(true));
     
     filteredData(m_curVentor, m_printerType);
@@ -2484,7 +2484,7 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
                 
                 m_curVentor = m_curVentor == "" ? firstValue : m_curVentor;
 
-                if (presetType != "" && ventor == m_curVentor || m_curVentor == _L("ALL").ToStdString())
+                if (presetType != "" && ventor == m_curVentor || m_curVentor == _L("ALL"))
                     printList.insert(presetType);
 
                 wxString firstType;
@@ -2495,9 +2495,9 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
                 }
                 m_printerType = m_printerType == "" ? firstType : m_printerType;
 
-                if (ventor == m_curVentor || m_curVentor == _L("ALL").ToStdString() || res == "0")
+                if (ventor == m_curVentor || m_curVentor == _L("ALL") || res == "0")
                 {
-                    if (presetType == m_printerType || m_printerType == _L("ALL").ToStdString())
+                    if (presetType == m_printerType || m_printerType == _L("ALL"))
                     {
                         systemPrintList.push_back(itemName);
                     }
@@ -2519,7 +2519,7 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
 
                 m_curVentor = m_curVentor == "" ? firstValue : m_curVentor;
 
-                if (presetType != "" && ventor == m_curVentor || m_curVentor == _L("ALL").ToStdString())
+                if (presetType != "" && ventor == m_curVentor || m_curVentor == _L("ALL"))
                     printList.insert(presetType);
                 
                 std::string firstType;
@@ -2531,9 +2531,9 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
 
                 m_printerType = m_printerType == "" ? firstValue : m_printerType;
 
-                if (ventor == m_curVentor || m_curVentor == _L("ALL").ToStdString() || res == "0")
+                if (ventor == m_curVentor || m_curVentor == _L("ALL") || res == "0")
                 {
-                    if (presetType == m_printerType || m_printerType == _L("ALL").ToStdString())
+                    if (presetType == m_printerType || m_printerType == _L("ALL"))
                     {
                         if (preset.is_project_embedded)
                         {
@@ -2545,7 +2545,7 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
                        
                     }
                 }
-                /*if (((presetType == m_printerType && ventor == m_curVentor )|| res == "0" || m_printerType == _L("ALL").ToStdString()))
+                /*if (((presetType == m_printerType && ventor == m_curVentor )|| res == "0" || m_printerType == _L("ALL")))
                     userPrintList.push_back(itemName);*/
             }
         }
@@ -2559,7 +2559,7 @@ void ParamsPanel::updateVentors(const std::unordered_set<wxString>& ventors)
         TabPrinter* tp = dynamic_cast<TabPrinter*>(m_tab_printer);
         if (tp)
         {
-            tp->updateVentorList(ventors, _L("ALL").ToStdString());
+            tp->updateVentorList(ventors, _L("ALL"));
         }
     }
     else 
@@ -2567,7 +2567,7 @@ void ParamsPanel::updateVentors(const std::unordered_set<wxString>& ventors)
         TabFilament* tf = dynamic_cast<TabFilament*>(m_tab_filament);
         if (tf)
         {
-            tf->updateVentorList(ventors, _L("ALL").ToStdString());
+            tf->updateVentorList(ventors, _L("ALL"));
         }
     }
 }
@@ -2579,7 +2579,7 @@ void ParamsPanel::updatePrinters(const std::unordered_set<wxString>& printers)
         TabPrinter* tp = dynamic_cast<TabPrinter*>(m_tab_printer);
         if (tp)
         {
-            tp->updatePrintList(printers, _L("ALL").ToStdString());
+            tp->updatePrintList(printers, _L("ALL"));
         }
     }
     else
@@ -2587,7 +2587,7 @@ void ParamsPanel::updatePrinters(const std::unordered_set<wxString>& printers)
         TabFilament* tf = dynamic_cast<TabFilament*>(m_tab_filament);
         if (tf)
         {
-            tf->updatePrintList(printers, _L("ALL").ToStdString());
+            tf->updatePrintList(printers, _L("ALL"));
         }
     }
 }
@@ -2648,7 +2648,7 @@ void ParamsPanel::setCurVentor(const std::string& curVentor)
     if (m_curVentor == curVentor)
         return;
     m_curVentor = curVentor;
-    m_printerType = _L("ALL").ToStdString();
+    m_printerType = _L("ALL");
     filteredData(m_curVentor, m_printerType, 1);
 }
 

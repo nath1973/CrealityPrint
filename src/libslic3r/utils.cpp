@@ -287,6 +287,11 @@ void set_data_dir(const std::string &dir)
 {
 	//A.0
 	std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
+	std::string version = std::string(PROJECT_VERSION_EXTRA);
+	bool        is_alpha = boost::algorithm::icontains(version, "alpha");
+	if (is_alpha) {
+		version_dir = version_dir + std::string(" Alpha");
+	}
     if(dir.empty())
     {
         g_data_dir = dir;

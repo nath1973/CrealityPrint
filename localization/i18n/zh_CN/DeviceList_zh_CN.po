@@ -1191,11 +1191,11 @@ msgstr "CFS 右侧RFID读写器异常"
 msgid "The file where the last unexpected stop was detected"
 msgstr "检测到上次意外停止的文件"
 
-msgid "No consumables detected, do you want to continue printing?"
-msgstr "未检测到耗材,是否继续打印"
+msgid "No filaments detected, do you want to continue printing?"
+msgstr "No filaments detected, do you want to continue printing?"
 
-msgid "There is no consumables in the current rack"
-msgstr "当前料架不存在耗材"
+msgid "There is no filaments in the current rack"
+msgstr "There is no filaments in the current rack"
 
 msgid "No matching automatic refill filaments"
 msgstr "无匹配的自动续料耗材"
@@ -1205,3 +1205,27 @@ msgstr "轴移动超限"
 
 msgid "Default"
 msgstr "缺省"
+
+msgid ""
+"Using Creality Filament System (CFS) for easy filament management, including "
+"automatic refilling, multi-color printing, and support printing."
+msgstr ""
+"使用创想耗材系统(CFS)可轻松管理耗材,进行自动续料、多色打印和支撑打印等功能。"
+
+msgid "Creality Cloud devices currently do not support displaying preview PNG"
+msgstr "创想云设备暂不支持显示预览图信息"
+
+msgid "Invalid hostname"
+msgstr "非法的设备名"
+
+msgid "Printing preparation in progress..."
+msgstr "打印准备中..."
+
+#~ msgid "No consumables detected, do you want to continue printing?"
+#~ msgstr "未检测到耗材,是否继续打印"
+
+#~ msgid "There is no consumables in the current rack"
+#~ msgstr "当前料架不存在耗材"
+
+#~ msgid "Filament Weight"
+#~ msgstr "耗材重量"

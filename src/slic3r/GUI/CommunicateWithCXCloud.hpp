@@ -38,6 +38,13 @@ namespace GUI {
         std::string settingId = "";
     };
 
+    struct CXCloudLoginInfo
+    {
+        std::string token = "";
+        std::string userId = "";
+        bool tokenValid = false;
+    };
+
     enum class ENDownloadConfigState {
         ENDCS_NOT_DOWNLOAD,         //  未开始下载
         ENDCS_DOWNLOAD_SUCCESS,     //  下载成功
@@ -52,6 +59,7 @@ namespace GUI {
 
         const std::map<std::string, std::map<std::string, std::string>>& getUserCloudPresets();
         void setUserCloudPresets(const std::string& presetName, const std::string& settingID, const std::map<std::string, std::string>& mapPresetValue);
+        void cleanUserCloudPresets();
         void updateUserCloudPresets(const std::string& presetName, const std::map<std::string, std::string>& mapPresetValue);
         int                                                              deleteUserPresetBySettingID(const std::string& settingID);
 
@@ -65,6 +73,9 @@ namespace GUI {
         const PreUpdateProfileRetInfo& getConfigFileRetInfo();
         void                           setSyncData(const json& j) { m_jsonCXCloudSyncData = j; }
         const json&                    getSyncData() { return m_jsonCXCloudSyncData; };
+        void                           updateCXCloutLoginInfo(const std::string& userId, const std::string& token);
+        void                           setTokenInvalid();
+        bool                           isTokenValid();
 
     private:
         CXCloudDataCenter() = default;
@@ -77,6 +88,8 @@ namespace GUI {
         long long m_llUpdateConfigFileTimestamp = 0;
         PreUpdateProfileRetInfo                                   m_configFileRetInfo;
         json                                                      m_jsonCXCloudSyncData = json();
+        CXCloudLoginInfo                                          m_cxCloudLoginInfo;
+        std::mutex                                                m_cxCloudLoginInfoMutex;
     };
 
     struct UserInfo;

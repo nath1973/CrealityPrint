@@ -57,6 +57,20 @@ LIST(APPEND CPACK_NSIS_EXTRA_INSTALL_COMMANDS "WriteRegStr HKCR 'cxprj_cxsw' '' 
 LIST(APPEND CPACK_NSIS_EXTRA_INSTALL_COMMANDS "WriteRegStr HKCR 'cxprj_cxsw\\\\DefaultIcon' '' '$INSTDIR\\\\${PROJECT_NAME}.exe,4'")
 # LIST(APPEND CPACK_NSIS_EXTRA_INSTALL_COMMANDS "WriteRegStr HKCR 'cxprj_cxsw\\\\shell\\\\open\\\\command' '' '${PROGRAM_CMD}'")
 
+# 方法 2：通过 PowerShell 获取
+execute_process(
+  COMMAND powershell -Command "[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)"
+  OUTPUT_VARIABLE LOCAL_APPDATA
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE RESULT
+)
+if(RESULT EQUAL 0)
+  message(STATUS " LocalAppData : ${LOCAL_APPDATA}")
+else()
+  message(FATAL_ERROR "not found LocalAppData ")
+endif()
+
+set(CPACK_LOCAL_APPDATA ${LOCAL_APPDATA})
 set (CPACK_PACKAGE_NAME "${PROCESS_NAME}")
 set (CPACK_PACKAGE_VENDOR "${VENDOR_NAME}")
 set (CPACK_PACKAGE_VERSION_MAJOR "${CREALITYPRINT_VERSION_MAJOR}")

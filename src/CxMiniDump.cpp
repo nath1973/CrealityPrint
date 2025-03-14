@@ -84,6 +84,11 @@ std::string MiniDump::dumpDir()
 	}
 	//A.0
 	std::string versionDir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
+	std::string version = std::string(PROJECT_VERSION_EXTRA);
+	bool        is_alpha = boost::algorithm::icontains(version, "alpha");
+	if (is_alpha) {
+		versionDir = versionDir + std::string(" Alpha");
+	}
 	//save to log folder
 	const std::string dumpDir = PWSTRToString(path) + "\\Creality\\" + SLIC3R_APP_USE_FORDER + "\\" + versionDir + "\\log";
 	if (!dumpDir.empty() && !boost::filesystem::exists(dumpDir)) {

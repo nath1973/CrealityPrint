@@ -75,6 +75,7 @@ private:
     void handle_receive_color_match_info(const nlohmann::json& json_data);
     void handle_send_start_print_cmd(const nlohmann::json& json_data);
     void handle_request_update_plate_thumbnail(const nlohmann::json& json_data);
+    void handle_get_webrtc_local_param(const nlohmann::json& json_data);
     double get_gcode_total_weight();
     void get_gcode_display_info(wxString& total_weight_str, wxString& print_time, Slic3r::GUI::PartPlate* plate);
     void notify_update_plate_thumbnail_data(const nlohmann::json& json_data);

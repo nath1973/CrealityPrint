@@ -56,6 +56,8 @@ namespace Slic3r {
             void on_switch_to_device_page();
             void forward_init_device_cmd_to_printer_list();
             void request_refresh_all_device();
+            int load_machine_preset_data();
+            bool LoadFile(std::string jPath, std::string & sContent);
 
         private:
             void SendAPIKey();

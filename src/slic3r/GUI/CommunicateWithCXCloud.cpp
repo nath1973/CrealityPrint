@@ -28,14 +28,56 @@ const std::map<std::string, std::map<std::string, std::string>>& CXCloudDataCent
     return m_mapUserCloudPresets;
 }
 
+static std::string getPresetValue(const std::map<std::string, std::string>& mapPresetValue) { 
+    std::string value;
+    auto        iter = mapPresetValue.find("name");
+    value += "[name=";
+    if (iter != mapPresetValue.end()) {
+        value += iter->second;
+    }
+    iter = mapPresetValue.find("type");
+    value += ",type=";
+    if (iter != mapPresetValue.end()) {
+        value += iter->second;
+    }
+    iter = mapPresetValue.find("user_id");
+    value += ",user_id=";
+    if (iter != mapPresetValue.end()) {
+        value += iter->second;
+    }
+    iter = mapPresetValue.find("setting_id");
+    value += ",setting_id=";
+    if (iter != mapPresetValue.end()) {
+        value += iter->second;
+    }
+    iter = mapPresetValue.find("updated_time");
+    value += ",updated_time=";
+    if (iter != mapPresetValue.end()) {
+        value += iter->second;
+    }
+    value += "]";
+    return value;
+}
+
 void CXCloudDataCenter::setUserCloudPresets(const std::string&                        presetName,
                                             const std::string&                        settingID,
                                             const std::map<std::string, std::string>& mapPresetValue)
 {
-    if (m_mapUserCloudPresets.count(presetName) == 0) {
+    auto iter = m_mapUserCloudPresets.find(presetName);
+    if (iter == m_mapUserCloudPresets.end()){
         m_mapUserCloudPresets[presetName] = mapPresetValue;
         m_mapSettingID2PresetName[settingID] = presetName;
+    } else {
+        BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets CXCloudDataCenter setUserCloudPresets has same preset data.oldData="
+                                   << getPresetValue(iter->second) << ",newData=" << getPresetValue(mapPresetValue);
+        m_mapUserCloudPresets[presetName]    = mapPresetValue;
+        m_mapSettingID2PresetName[settingID] = presetName;
     }
+}
+
+void CXCloudDataCenter::cleanUserCloudPresets() { 
+    m_mapUserCloudPresets.clear();
+    m_mapSettingID2PresetName.clear();
 }
 
 void CXCloudDataCenter::updateUserCloudPresets(const std::string& presetName, const std::map<std::string, std::string>& mapPresetValue) {
@@ -72,6 +114,31 @@ void CXCloudDataCenter::resetUpdateConfigFileTime() { m_llUpdateConfigFileTimest
 void CXCloudDataCenter::setConfigFileRetInfo(const PreUpdateProfileRetInfo& retInfo) { m_configFileRetInfo = retInfo; }
 const PreUpdateProfileRetInfo& CXCloudDataCenter::getConfigFileRetInfo() { return m_configFileRetInfo; }
 
+void CXCloudDataCenter::updateCXCloutLoginInfo(const std::string& userId, const std::string& token)
+{
+    BOOST_LOG_TRIVIAL(warning) << "CXCloudDataCenter updateCXCloutLoginInfo token=" << token << ",userId=" << userId;
+    m_cxCloudLoginInfoMutex.lock();
+    m_cxCloudLoginInfo.token  = token;
+    m_cxCloudLoginInfo.userId = userId;
+    m_cxCloudLoginInfo.tokenValid = true;
+    m_cxCloudLoginInfoMutex.unlock();
+}
+void CXCloudDataCenter::setTokenInvalid()
+{
+    BOOST_LOG_TRIVIAL(warning) << "CXCloudDataCenter setTokenInvalid";
+    m_cxCloudLoginInfoMutex.lock();
+    m_cxCloudLoginInfo.tokenValid = false;
+    m_cxCloudLoginInfoMutex.unlock();
+}
+
+bool CXCloudDataCenter::isTokenValid() { 
+    bool tokenValid = false;
+    m_cxCloudLoginInfoMutex.lock();
+    tokenValid = m_cxCloudLoginInfo.tokenValid;
+    m_cxCloudLoginInfoMutex.unlock();
+    return tokenValid; 
+}
+
 CommunicateWithCXCloud::CommunicateWithCXCloud(){
 
 }
@@ -102,8 +169,12 @@ int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>&
             }
             json j = json::parse(body);
             if (j["code"] != 0) {
+                if (j["code"].get<int>() == 4) {
+                    CXCloudDataCenter::getInstance().setTokenInvalid();
+                }
                 nRet = 1;       // «Î«Û ß∞‹
                 setLastError(std::to_string(j["code"].get<int>()), "");
+                BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud getUserProfileList fail.code=" << j["code"];
                 return;
             }
             int total_count = 0;
@@ -336,6 +407,10 @@ int CommunicateWithCXCloud::preUpdateProfile_create(const UploadFileInfo& fileIn
         .on_complete([&](std::string body, unsigned status) {
             json j = json::parse(body);
             if (j["code"] != 0) {
+                if (j["code"].get<int>() == 4) {
+                    CXCloudDataCenter::getInstance().setTokenInvalid();
+                    BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_create fail.code=" << j["code"];
+                }
                 return;
             }
             new_setting_id             = j["result"]["id"];
@@ -403,6 +478,10 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
         .on_complete([&](std::string body, unsigned status) {
             json j = json::parse(body);
             if (j["code"] != 0) {
+                if (j["code"].get<int>() == 4) {
+                    CXCloudDataCenter::getInstance().setTokenInvalid();
+                    BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_update fail.code=" << j["code"];
+                }
                 return;
             }
             std::string setting_id     = j["result"]["id"];
@@ -471,6 +550,10 @@ int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
 
                 BOOST_LOG_TRIVIAL(trace) << "sync_preset: sync operation: delete success! setting id = " << del_setting_id;
             } else {
+                if (j["code"].get<int>() == 4) {
+                    CXCloudDataCenter::getInstance().setTokenInvalid();
+                    BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud deleteProfile fail.code=" << j["code"];
+                }
                 BOOST_LOG_TRIVIAL(info) << "delete setting = " << del_setting_id << " failed";
             }
         })

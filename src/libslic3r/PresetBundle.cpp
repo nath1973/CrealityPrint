@@ -1039,9 +1039,12 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
         pSTOverrideConfirmFile->fileName = path.filename().string();
         if (Slic3r::is_json_file(file)) {
             STGetJsonFileInfo stJsonFileInfo;
-            bool              b = getJsonFileInfo(file, stJsonFileInfo);
-            if (!b)
-                return substitutions;
+            int              n = getJsonFileInfo(file, stJsonFileInfo);
+            if (n < 0) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " getJsonFileInfo failed.ret=" << n;
+                continue;
+                //return substitutions;
+            }
             if (stJsonFileInfo.type == 1) {
                 pSTOverrideConfirmFile->lstPrinterPreset.push_back(stJsonFileInfo.name);
             } else if (stJsonFileInfo.type == 2) {
@@ -1049,7 +1052,9 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
             } else if (stJsonFileInfo.type == 3) {
                 pSTOverrideConfirmFile->lstProcessPreset.push_back(stJsonFileInfo.name);
             } else {
-                return substitutions;
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " getJsonFileInfo failed.type=" << stJsonFileInfo.type;
+                continue;
+                //return substitutions;
             }
             import_json_presets(substitutions, file, [&](std::string const& name) { 
                 return override_confirm(lstOverrideConfirmFile);
@@ -1135,9 +1140,13 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
                             STGetJsonFileInfo stJsonFileInfo;
                             int nRet = getJsonFileInfo(target_file_path, stJsonFileInfo);
                             if (nRet == -2) {
+                                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to getJsonFileInfo ret=" << nRet << ",file=" << target_file_path;
                                 continue;
-                            } else if (nRet != 0 && nRet != 1)
-                                return substitutions;
+                            } else if (nRet != 0 && nRet != 1) {
+                                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to getJsonFileInfo ret=" << nRet << ",file=" << target_file_path;
+                                continue;
+                            }
+                                //return substitutions;
                             if (stJsonFileInfo.hasSamePreset) {
                                 hasSamePreset = true;
                                 if (stJsonFileInfo.type == 1) {
@@ -1147,7 +1156,9 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
                                 } else if (stJsonFileInfo.type == 3) {
                                     pSTOverrideConfirmFile->lstProcessPreset.push_back(stJsonFileInfo.name);
                                 } else {
-                                    return substitutions;
+                                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to getJsonFileInfo ret=" << nRet << ",type=" << stJsonFileInfo.type <<",file=" << target_file_path;
+                                    continue;
+                                    //return substitutions;
                                 }
                             }
                         }
@@ -1178,8 +1189,9 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
             FILE* zipFile = boost::nowide::fopen(file.c_str(), "rb");
             status        = mz_zip_reader_init_cfile(&zip_archive, zipFile, 0, MZ_ZIP_FLAG_CASE_SENSITIVE | MZ_ZIP_FLAG_IGNORE_PATH);
             if (MZ_FALSE == status) {
-                BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Failed to initialize reader ZIP archive";
-                return substitutions;
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to initialize reader ZIP archive,file=" << file;
+                continue;
+                //return substitutions;
             } else {
                 BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Success to initialize reader ZIP archive";
             }

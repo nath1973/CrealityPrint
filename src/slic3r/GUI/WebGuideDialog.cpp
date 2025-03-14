@@ -462,11 +462,15 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
             {
               Preset selectPreset = presetCollect->get_selected_preset();
               string strPrintName = selectPreset.name;
-              double opt_nozzle_diameters = selectPreset.config.option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
               string printer_model = selectPreset.config.option<ConfigOptionString>("printer_model", true)->value;
               m_Res["printName"] = strPrintName;
-              m_Res["nozzleSelect"] = std::to_string(opt_nozzle_diameters);
               m_Res["modelName"] = printer_model;
+
+              ConfigOptionFloats* option = selectPreset.config.option<ConfigOptionFloats>("nozzle_diameter");
+              if (option && (option->size() > 0))
+              {
+                  m_Res["nozzleSelect"] = option->get_at(0);
+              }
             }
 
             //wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));

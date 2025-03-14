@@ -420,6 +420,11 @@ void FilamentButton::doRender(wxDC& dc)
 	this->SetBackgroundColour(m_bg_color);
 
 	this->SetSize(wxSize(400 * em, 28 * em));
+    
+   #ifdef __APPLE__
+    Bind(wxEVT_LEAVE_WINDOW, &FilamentPopPanel::OnMouseLeave, this);
+   #endif
+
 	m_sizer_main = new wxBoxSizer(wxHORIZONTAL);
 	{
         m_filamentCombox = new Slic3r::GUI::PlaterPresetComboBox(this, Slic3r::Preset::TYPE_FILAMENT);
@@ -509,37 +514,27 @@ void FilamentButton::doRender(wxDC& dc)
 
 FilamentPopPanel::~FilamentPopPanel() {}
 
+#ifdef __APPLE__
+void FilamentPopPanel::OnMouseLeave(wxMouseEvent& event)
+{
+    // 如果鼠标离开窗口，则关闭弹窗
+    Dismiss();
+    event.Skip();
+}
+#endif
+
 void FilamentPopPanel::Popup(wxPoint position /*= wxDefaultPosition*/)
 {
-#ifdef __APPLE__
-    wxSize wSize = GetParent()->GetSize();
-     int height = wSize.GetHeight();
-     if (height <= FromDIP(41))
-     {
-         wSize.SetHeight(wSize.GetHeight() + FromDIP(26));
-         GetParent()->SetMinSize(wSize);
-         GetParent()->GetSizer()->Layout();
-         GetParent()->GetParent()->GetSizer()->Layout();
-     }
-#endif
 	SetPosition(position);
+#ifdef __APPLE__
+    PopupWindow::Show();
+#else
 	PopupWindow::Popup();
+#endif
 }
 
 void FilamentPopPanel::Dismiss()
 {
-#ifdef __APPLE__
-    wxSize wSize = GetParent()->GetSize();
-    int height = wSize.GetHeight();
-    
-    if (height >= FromDIP(41))
-    {
-        wSize.SetHeight(wSize.GetHeight() - FromDIP(26));
-        GetParent()->SetMinSize(wSize);
-        GetParent()->GetSizer()->Layout();
-        GetParent()->GetParent()->GetSizer()->Layout();
-    }
-#endif
     auto focus_window = this->GetParent()->HasFocus();
     if (!focus_window)
         PopupWindow::Dismiss();

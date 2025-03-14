@@ -333,6 +333,7 @@ private:
     std::string     get_local_models_path();
     bool            OnInit() override;
     int             OnExit() override;
+    void            track_event(const std::string& event, const std::string& data);
     bool            initialized() const { return m_initialized; }
     inline bool     is_enable_multi_machine() { return this->app_config&& this->app_config->get("enable_multi_machine") == "true"; }
     int             get_server_port() { return m_http_server.get_port(); }

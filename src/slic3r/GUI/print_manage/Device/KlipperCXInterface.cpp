@@ -34,6 +34,10 @@ std::future<void> KlipperCXInterface::sendFileToDevice(const std::string& server
             }
 
             std::string target_name = uploadFileName;
+            if (boost::iends_with(uploadFileName, ".gcode")) {
+                target_name = uploadFileName.substr(0, uploadFileName.size() - 6);
+            }
+                ;
             std::string local_target_path = wxString(localFilePath).utf8_str().data();
             std::string target_path = "model/slice/" + Slic3r::GUI::get_file_md5(local_target_path) + ".gcode.gz";
             nRet                    = m_upload_file.uploadFileToAliyun(local_target_path, target_path, target_name);

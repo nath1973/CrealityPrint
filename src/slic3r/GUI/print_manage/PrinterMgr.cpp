@@ -204,6 +204,10 @@ namespace DM {
 
     void DeviceMgr::AddDevice(std::string group, Data& data)
     {
+        if (!this->IsGroupExist(group)) {
+            this->AddGroup(group, false);
+        }
+
         nlohmann::json item;
         item["address"] = data.address;
         item["mac"] = data.mac;
@@ -280,7 +284,7 @@ namespace DM {
         }
     }
 
-    void DeviceMgr::AddGroup(std::string name)
+    void DeviceMgr::AddGroup(std::string name,  bool is_save)
     {
         auto& groups = p->data["groups"];
 
@@ -288,7 +292,9 @@ namespace DM {
         item["group"] = name;
         groups.push_back(item);
 
-        this->Save();
+        if (is_save){
+            this->Save();
+        }
     }
 
     void DeviceMgr::RemoveGroup(std::string name)

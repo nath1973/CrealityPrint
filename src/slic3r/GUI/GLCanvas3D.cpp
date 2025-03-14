@@ -2860,8 +2860,16 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         const DynamicPrintConfig &dconfig           = wxGetApp().preset_bundle->prints.get_edited_preset().config;
         auto timelapse_type = dconfig.option<ConfigOptionEnum<TimelapseType>>("timelapse_type");
         bool timelapse_enabled = timelapse_type ? (timelapse_type->value == TimelapseType::tlSmooth) : false;
-
-        if (wt && (timelapse_enabled || filaments_count > 1)) {
+        if (filaments_count == 1) {
+            DynamicPrintConfig& proj_cfg = wxGetApp().preset_bundle->project_config;
+            ConfigOptionFloat wt_x_opt(0);
+            ConfigOptionFloat wt_y_opt(0);
+            for (int plate_id = 0; plate_id < n_plates; plate_id++) {
+                dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
+                dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
+            }
+        }
+        else if (wt && (timelapse_enabled || filaments_count > 1)) {
             for (int plate_id = 0; plate_id < n_plates; plate_id++) {
                 // If print ByObject and there is only one object in the plate, the wipe tower is allowed to be generated.
                 PartPlate* part_plate = ppl.get_plate(plate_id);
@@ -4612,10 +4620,16 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
 
                 m_dirty = true;
+                m_mouse.ignore_right_up = true;
+            }
+            else
+            {
+                //only use right click
+                m_mouse.ignore_right_up = false;
             }
             m_camera_movement = true;
             m_mouse.drag.start_position_3D = Vec3d((double)pos(0), (double)pos(1), 0.0);
-            m_mouse.ignore_right_up = true;
+            
         }
         else if (is_camera_pan(evt)) {
             // If dragging over blank area with right button, pan.

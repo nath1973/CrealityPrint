@@ -42,6 +42,8 @@ void SyncUserPresets::shutdown()
 void SyncUserPresets::startSync() //  同步工作的启动
 {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets startSync";
+    CXCloudDataCenter::getInstance().updateCXCloutLoginInfo(GUI::wxGetApp().app_config->get("cloud", "user_id"),
+                                                            GUI::wxGetApp().app_config->get("cloud", "token"));
     m_bSync.store(true);
 }
 void SyncUserPresets::stopSync() //  同步工作的不启动
@@ -103,6 +105,12 @@ void SyncUserPresets::onRun()
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
+        
+        if (!CXCloudDataCenter::getInstance().isTokenValid()) 
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
 
         lstSyncCmd.clear();
         m_mutexLstSyncCmd.lock();
@@ -143,7 +151,9 @@ void SyncUserPresets::onRun()
         }
 
         //  检测是否有数据需要同步到创想云
-        doCheckNeedSyncToCXCloud();
+        if (CXCloudDataCenter::getInstance().isTokenValid()) {
+            doCheckNeedSyncToCXCloud();
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -178,6 +188,7 @@ void SyncUserPresets::reloadPresetsInUiThread()
 
 int SyncUserPresets::doSyncToLocal() {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doSyncToLocal start...";
+    CXCloudDataCenter::getInstance().cleanUserCloudPresets();
     int                              nRet = 0;
     std::vector<UserProfileListItem> vtUserProfileListItem;
     nRet = m_commWithCXCloud.getUserProfileList(vtUserProfileListItem);

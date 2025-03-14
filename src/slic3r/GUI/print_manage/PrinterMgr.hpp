@@ -23,7 +23,7 @@ namespace DM {
         void AddDevice(std::string group, Data& data);
         void RemoveDevice(std::string name);
         void EditDeiveName(std::string name, std::string nameNew);
-        void AddGroup(std::string name);
+        void AddGroup(std::string name, bool is_save=true);
         void RemoveGroup(std::string name);
         void EditGroupName(std::string name, std::string nameNew);
         void SetMergeState(bool state);

@@ -902,8 +902,8 @@ wxBoxSizer* PreferencesDialog ::create_item_downloads(wxWindow* parent)
     download_title->SetFont(::Label::Body_13);
     download_title->Wrap(-1);
 
-    wxString download_path = wxString::FromUTF8(app_config->get("download_path"));
-
+     wxString download_path = wxString::FromUTF8(app_config->get("download_path"));
+    //wxString download_path = wxString::FromUTF8(fs::path(data_dir()).append("cloud_download_data").string());
     item_panel->Bind(wxEVT_LEFT_DOWN, [this, item_panel](auto& e) {
         wxString defaultPath = item_panel->GetLabel();
         wxDirDialog dialog(this, _L("Choose Download Directory"), defaultPath, wxDD_NEW_DIR_BUTTON);

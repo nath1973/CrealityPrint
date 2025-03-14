@@ -66,7 +66,7 @@
 #include "DailyTips.hpp"
 #include "LoadOldPresets.hpp"
 #include "LoadOldPresetsFromFolder.hpp"
-
+#include "slic3r/GUI/print_manage/Utils.hpp"
 #ifdef _WIN32
 #include <dbt.h>
 #include <shlobj.h>
@@ -945,7 +945,21 @@ void MainFrame::show_option(bool show)
         }
     }
 }
-
+void  MainFrame::trackEvent(const std::string& event, const std::string& data)
+{
+    try{
+       nlohmann::json commandJson;
+        commandJson["command"] = "track";
+        commandJson["event"] = event;
+        commandJson["data"] = json::parse(data);
+        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+        if(m_printer_mgr_view)
+            m_printer_mgr_view->run_script(strJS.ToStdString());
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << "MainFrame::trackEvent: " << e.what();
+    }
+    
+}
 void MainFrame::init_tabpanel() {
     // wxNB_NOPAGETHEME: Disable Windows Vista theme for the Notebook background. The theme performance is terrible on
     // Windows 10 with multiple high resolution displays connected.
@@ -2332,6 +2346,11 @@ static wxMenu* generate_help_menu()
         std::string data_dir = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
         //A.0
         std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
+        std::string version = std::string(PROJECT_VERSION_EXTRA);
+        bool        is_alpha = boost::algorithm::icontains(version, "alpha");
+        if (is_alpha) {
+            version_dir = version_dir + std::string(" Alpha");
+        }
 #ifdef _WIN32
         std::string LogFilePath  = data_dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir + "\\" + "log";
 #else

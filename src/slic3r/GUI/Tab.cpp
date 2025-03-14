@@ -543,7 +543,7 @@ void Tab::create_preset_tab()
 
     //m_btn_compare_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { compare_preset(); }));
     m_btn_save_preset->Bind(wxEVT_LEFT_DOWN, ([this](auto &e) { 
-            const Preset&     sel_preset = m_presets->get_selected_preset();
+            /* const Preset&  sel_preset = m_presets->get_selected_preset();
             PresetCollection* collection = &GUI::wxGetApp().preset_bundle->prints;
             Preset*           p          = collection->find_preset(sel_preset.name, false);
             if (p) {
@@ -554,9 +554,9 @@ void Tab::create_preset_tab()
                     save_preset(std::string(), false, false, false, std::string(), true);
                     set_just_edit(false);
                 }
-            } else {
+            } else {*/
                 save_preset();
-            }
+            //}
     update_btns_enabling();
     update();
         }));
@@ -3340,7 +3340,7 @@ void TabFilament::set_custom_gcode(const t_config_option_key& opt_key, const std
 void TabFilament::updateVentorList(const std::unordered_set<wxString>& ventorList, const wxString& curPreset)
 {
     m_wcb_choiceVendor->Clear();
-    m_wcb_choiceVendor->Append(_L("ALL").ToStdString());
+    m_wcb_choiceVendor->Append(_L("ALL"));
     for (auto& ventor : ventorList)
     {
         m_wcb_choiceVendor->Append(ventor);
@@ -3353,7 +3353,7 @@ void TabFilament::updateVentorList(const std::unordered_set<wxString>& ventorLis
 void TabFilament::updatePrintList(const std::unordered_set<wxString>& printerList, const wxString& curPreset)
 {
     m_wcb_choicePrintType->Clear();
-    m_wcb_choicePrintType->Append(_L("ALL").ToStdString());
+    m_wcb_choicePrintType->Append(_L("ALL"));
     for (auto& ventor : printerList)
     {
         m_wcb_choicePrintType->Append(ventor);
@@ -7140,7 +7140,7 @@ void TabPrinter::create_preset_tab()
 void TabPrinter::updateVentorList(const std::unordered_set<wxString>& ventorList, const wxString& curPreset)
 {
     m_wcb_choiceVendor->Clear();
-    m_wcb_choiceVendor->Append(_L("ALL").ToStdString());
+    m_wcb_choiceVendor->Append(_L("ALL"));
     for (auto& ventor : ventorList)
     {
         m_wcb_choiceVendor->Append(ventor);
@@ -7153,7 +7153,7 @@ void TabPrinter::updateVentorList(const std::unordered_set<wxString>& ventorList
 void TabPrinter::updatePrintList(const std::unordered_set<wxString>& printerList, const wxString& curPreset)
 {
     m_wcb_choicePrintType->Clear();
-    m_wcb_choicePrintType->Append(_L("ALL").ToStdString());
+    m_wcb_choicePrintType->Append(_L("ALL"));
     for (auto& ventor : printerList)
     {
         m_wcb_choicePrintType->Append(ventor);

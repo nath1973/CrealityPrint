@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-15 15:51+0800\n"
+"POT-Creation-Date: 2025-03-13 21:07+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -449,6 +449,37 @@ msgstr ""
 
 #, possible-c-format, possible-boost-format
 msgid "The flush multiplier setting is too low, value is %.2f"
+msgstr ""
+
+msgid ""
+"Setting the jerk speed too low could lead to artifacts on curved surfaces"
+msgstr ""
+
+msgid ""
+"The jerk setting exceeds the printer's maximum jerk (machine_max_jerk_x/"
+"machine_max_jerk_y).\n"
+"CrealityPrint will automatically cap the jerk speed to ensure it doesn't "
+"surpass the printer's capabilities.\n"
+"You can adjust the maximum jerk setting in your printer's configuration to "
+"get higher speeds."
+msgstr ""
+
+msgid ""
+"The acceleration setting exceeds the printer's maximum acceleration "
+"(machine_max_acceleration_extruding).\n"
+"CrealityPrint will automatically cap the acceleration speed to ensure it "
+"doesn't surpass the printer's capabilities.\n"
+"You can adjust the machine_max_acceleration_extruding value in your "
+"printer's configuration to get higher speeds."
+msgstr ""
+
+msgid ""
+"The travel acceleration setting exceeds the printer's maximum travel "
+"acceleration (machine_max_acceleration_travel).\n"
+"CrealityPrint will automatically cap the travel acceleration speed to ensure "
+"it doesn't surpass the printer's capabilities.\n"
+"You can adjust the machine_max_acceleration_travel value in your printer's "
+"configuration to get higher speeds."
 msgstr ""
 
 msgid ""
@@ -4251,6 +4282,9 @@ msgid ""
 "the flushing volumes in the table."
 msgstr ""
 
+msgid "Flush Volumes Changed"
+msgstr ""
+
 msgid "Prime volume"
 msgstr ""
 
@@ -4577,9 +4611,6 @@ msgid "Invalid value when spiral vase mode is enabled: "
 msgstr ""
 
 msgid "too large line width "
-msgstr ""
-
-msgid " not in range "
 msgstr ""
 
 msgid "Minimum save"
@@ -4941,6 +4972,12 @@ msgid ""
 msgstr ""
 
 msgid "Optimizing toolpath"
+msgstr ""
+
+msgid "Empty layers around bottom are replaced by nearest normal layers."
+msgstr ""
+
+msgid "The model has too many empty layers."
 msgstr ""
 
 msgid "Slicing mesh"
@@ -8554,9 +8591,6 @@ msgstr ""
 msgid "Creality3DSlicer got an unhandled exception: %1%"
 msgstr ""
 
-msgid "Untitled"
-msgstr ""
-
 msgid "Downloading Bambu Network Plug-in"
 msgstr ""
 
@@ -8577,6 +8611,9 @@ msgid ""
 msgstr ""
 
 msgid "WebView2 Runtime"
+msgstr ""
+
+msgid "Error Report"
 msgstr ""
 
 #, possible-c-format, possible-boost-format
@@ -8643,6 +8680,9 @@ msgstr ""
 msgid "User logged out"
 msgstr ""
 
+msgid "Untitled"
+msgstr ""
+
 msgid "new or open project file is not allowed during the slicing process!"
 msgstr ""
 
@@ -8684,6 +8724,12 @@ msgid "Stop them and continue anyway?"
 msgstr ""
 
 msgid "Ongoing uploads"
+msgstr ""
+
+msgid "Selected model not a system model; no system consumables"
+msgstr ""
+
+msgid "Information"
 msgstr ""
 
 msgid "Select a G-code file:"
@@ -10412,9 +10458,6 @@ msgstr ""
 msgid "Virtual camera initialize failed (%s)!"
 msgstr ""
 
-msgid "Information"
-msgstr ""
-
 msgid "Playing..."
 msgstr ""
 
@@ -11345,7 +11388,7 @@ msgstr ""
 msgid "Save project"
 msgstr ""
 
-msgid "Succeeded to save the project."
+msgid "Saved successfully. Open Local Folder"
 msgstr ""
 
 msgid "Importing Model"
@@ -11443,9 +11486,6 @@ msgstr ""
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr ""
 
-msgid "Saved successfully. Open Local Folder"
-msgstr ""
-
 msgid "Save Sliced file as:"
 msgstr ""
 
@@ -11503,6 +11543,9 @@ msgid "Send G-code"
 msgstr ""
 
 msgid "Send to printer"
+msgstr ""
+
+msgid "Custom supports and color painting were removed before simplified."
 msgstr ""
 
 msgid "Custom supports and color painting were removed before repairing."
@@ -11683,9 +11726,6 @@ msgid "Clear"
 msgstr ""
 
 msgid "Clear my choice on the unsaved projects."
-msgstr ""
-
-msgid "Selected model not a system model; no system consumables"
 msgstr ""
 
 msgid "Automatically layout when importing or copying"
@@ -15092,39 +15132,6 @@ msgstr ""
 msgid "EXT"
 msgstr ""
 
-msgid "Ready"
-msgstr ""
-
-msgid "Send to LocalNet Printer"
-msgstr ""
-
-msgid "Enable Calibration"
-msgstr ""
-
-msgid "Open CFS"
-msgstr ""
-
-msgid "Printer Details"
-msgstr ""
-
-msgid "Send gcode and print"
-msgstr ""
-
-msgid "Printer is offline"
-msgstr ""
-
-msgid "Filament can not match"
-msgstr ""
-
-msgid "Printer is busy, can send gcode only"
-msgstr ""
-
-msgid "Send to Lan Printer"
-msgstr ""
-
-msgid "Unknown model"
-msgstr ""
-
 msgid "Upload type"
 msgstr ""
 
@@ -15146,6 +15153,12 @@ msgstr ""
 msgid "Sliced"
 msgstr ""
 
+msgid "Printer is offline"
+msgstr ""
+
+msgid "Printer is busy, can send gcode only"
+msgstr ""
+
 msgid "Upload fail"
 msgstr ""
 
@@ -15157,6 +15170,12 @@ msgstr ""
 
 #, possible-c-format, possible-boost-format
 msgid "Upload failed(%s): %s"
+msgstr ""
+
+msgid "Send to Lan Printer"
+msgstr ""
+
+msgid "Unknown model"
 msgstr ""
 
 msgid "?"

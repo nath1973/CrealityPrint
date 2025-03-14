@@ -2423,6 +2423,7 @@ bool GUI_App::OnInit()
                         err_report_dialog->Destroy();
                         return false;
                     }
+                    
                 }
             }
         }
@@ -2996,7 +2997,13 @@ bool GUI_App::on_init_inner()
 
     return true;
 }
-
+void  GUI_App::track_event(const std::string& event, const std::string& data)
+{
+    if(mainframe)
+    {
+        mainframe->trackEvent(event, data);
+    }
+}
 void GUI_App::copy_network_if_available()
 {
     if (app_config->get("update_network_plugin") != "true")
@@ -4286,7 +4293,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 }
                 static bool first_update_preset  = true;
                 auto        double_click_handler = [=]() {
-                    if (m_open_method == "double_click") {
+                    if (!this->init_params->input_gcode && m_open_method == "double_click") {
                         wxArrayString input_files;
                         for (auto& file : this->init_params->input_files) {
                             input_files.push_back(wxString::FromUTF8(file));

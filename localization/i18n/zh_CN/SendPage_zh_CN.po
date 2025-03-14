@@ -1,5 +1,6 @@
 msgid ""
 msgstr ""
+"POT-Creation-Date: \n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
@@ -695,3 +696,16 @@ msgstr "轴移动超限"
 
 msgid "Cannot contain special characters"
 msgstr "文件名不能包含特殊字符"
+
+msgid "Please add the device to the device list"
+msgstr "请在设备列表添加设备"
+
+#~ msgid "Reconnecting"
+#~ msgstr "正在重连..."
+
+#~ msgid ""
+#~ "Creality Print camera function does not currently support devices that "
+#~ "are only bound to Creality Cloud"
+#~ msgstr ""
+#~ "Creality Print camera function does not currently support devices that "
+#~ "are only bound to Creality Cloud"

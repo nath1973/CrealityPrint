@@ -984,3 +984,9 @@ msgstr "Nella attuale struttura non ci sono consumabili."
 
 msgid "Axis movement exceeded limit"
 msgstr "Axis movement exceeded limit"
+
+msgid "Cannot contain special characters"
+msgstr "Cannot contain special characters"
+
+msgid "Please add the device to the device list"
+msgstr "Please add the device to the device list"

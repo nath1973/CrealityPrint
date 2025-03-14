@@ -417,7 +417,7 @@ msgid "File Size"
 msgstr "File Size"
 
 msgid "Storey"
-msgstr "Storey"
+msgstr "Layer"
 
 msgid "Create Time"
 msgstr "Create Time"
@@ -1276,3 +1276,22 @@ msgstr "Axis movement exceeded limit"
 
 msgid "Default"
 msgstr "Default"
+
+msgid ""
+"Using Creality Filament System (CFS) for easy filament management, including "
+"automatic refilling, multi-color printing, and support printing."
+msgstr ""
+"Using Creality Filament System (CFS) for easy filament management, including "
+"automatic refilling, multi-color printing, and support printing."
+
+msgid "Creality Cloud devices currently do not support displaying preview PNG"
+msgstr "Creality Cloud devices currently do not support displaying preview PNG"
+
+msgid "Invalid hostname"
+msgstr "Invalid hostname"
+
+msgid "Printing preparation in progress..."
+msgstr "Printing preparation in progress..."
+
+#~ msgid "Filament Weight"
+#~ msgstr "Filament Weight"

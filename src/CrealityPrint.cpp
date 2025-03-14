@@ -6314,6 +6314,11 @@ extern "C" {
                 std::string data_dir = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
                 //A.0
                 std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
+                std::string version = std::string(PROJECT_VERSION_EXTRA);
+                bool        is_alpha = boost::algorithm::icontains(version, "alpha");
+                if (is_alpha) {
+					version_dir = version_dir + std::string(" Alpha");
+				}
 #ifdef _WIN32
                 std::string LogFilePath = data_dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir + "\\" + "log";
 #else
@@ -6335,10 +6340,10 @@ extern "C" {
                 ss << now;
 
                 std::string timeStr = ss.str();
-                std::string processNameStr = timeStr + std::string("_") +  SLIC3R_PROCESS_NAME + std::string("_") + CREALITYPRINT_VERSION + std::string("_") + PROJECT_VERSION_EXTRA;
+                std::string processNameStr = timeStr + std::string("_") +  SLIC3R_PROCESS_NAME + std::string("_") + CREALITYPRINT_VERSION + std::string("_") + PROJECT_VERSION_EXTRA + std::string(".dmp");
                 //boost::filesystem::path newPath(dump_path);
                 //newPath.append(processNameStr).replace_extension(".dmp");
-                logPath.append(processNameStr).replace_extension(".dmp");
+                logPath.append(processNameStr);
                 //MessageBox(NULL, logPath.wstring().c_str(), minidump_id, MB_OK | MB_ICONINFORMATION);
 
                 if (boost::filesystem::exists(oldPath))

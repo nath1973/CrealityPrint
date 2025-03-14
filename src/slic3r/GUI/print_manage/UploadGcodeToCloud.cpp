@@ -1500,12 +1500,12 @@ void UploadGcodeToCloudDialog::set_plate_info(int plate_idx)
 
  if (m_plater->only_gcode_mode()) 
  {
-    
-    m_ssGCodeFilePath = m_plater->get_last_loaded_gcode().ToUTF8().data();
+    GCodeProcessorResult* current_result = m_plater->get_partplate_list().get_current_slice_result();
+    m_ssGCodeFilePath = current_result->filename;
     auto  plate_print_statistics = plate->get_slice_result()->print_statistics;
     m_printTime = wxString::Format("%s", short_time(get_time_dhms(plate_print_statistics.modes[0].time))).ToStdString();
     
-    GCodeProcessorResult* current_result = m_plater->get_partplate_list().get_current_slice_result();
+    
     double total_weight = 0.0;
     if (current_result) {
         auto&  ps         = current_result->print_statistics;
@@ -1524,7 +1524,7 @@ void UploadGcodeToCloudDialog::set_plate_info(int plate_idx)
         ::sprintf(weight, "%.2f g", total_weight);
     }
     m_printWeight = weight;
-    fs::path default_output_file = fs::path(std::string(m_plater->get_last_loaded_gcode().utf8_str()));// fs::path(m_plater->get_last_loaded_gcode().ToStdString());
+    fs::path default_output_file = fs::path(std::string(m_ssGCodeFilePath));// fs::path(m_plater->get_last_loaded_gcode().ToStdString());
     m_rename_text->SetLabelText(from_u8(default_output_file.filename().string()));
     return ;
 }

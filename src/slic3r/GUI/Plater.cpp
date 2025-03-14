@@ -7693,6 +7693,11 @@ void Plater::priv::on_action_slice_plate(SimpleEvent&)
         m_slice_all = false;
         q->reslice();
         q->select_view_3D("Preview");
+        json js;
+        js["category"]       = "app_actions";
+        js["action"]         = "slice_plate";
+        js["label"]          = "slice";
+        wxGetApp().track_event("click", js.dump());
     }
 }
 
@@ -7722,6 +7727,11 @@ void Plater::priv::on_action_slice_all(SimpleEvent&)
             q->select_view_3D("Preview");
         //BBS: wish to select all plates stats item
         preview->get_canvas3d()->_update_select_plate_toolbar_stats_item(true);
+        json js;
+        js["category"]       = "app_actions";
+        js["action"]         = "slice_all";
+        js["label"]          = "slice";
+        wxGetApp().track_event("click", js.dump());
     }
 }
 
@@ -13232,6 +13242,12 @@ int GUI::Plater::close_with_confirm(std::function<bool(bool)> second_check)
     else {
         if (dlg.get_checkbox_state())
             wxGetApp().app_config->set("save_project_choise", result == wxID_YES ? "yes" : "no");
+
+        json js;
+        js["category"] = "app_actions";
+        js["action"]   = "last_operation_type";
+        js["label"]    = result == wxID_YES ? "yes" : "no";
+        wxGetApp().track_event("click", js.dump());
         if (result == wxID_YES) {
             result = save_project();
             if (result == wxID_CANCEL) {

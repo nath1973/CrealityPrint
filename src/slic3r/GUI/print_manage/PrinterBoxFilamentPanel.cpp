@@ -74,7 +74,11 @@ void OneFilamentColorItem::update_item_info_by_material(int box_id, const DM::Ma
         else 
         {
             if (m_originMaterial.state == 1)
-                m_material_index_info = "?";
+                if (m_originMaterial.editStatus == 0) {
+                    m_material_index_info = "/";
+                } else {
+                    m_material_index_info = "?";
+                }
             else
                 m_material_index_info = "/";
         }
@@ -462,11 +466,15 @@ void PrinterBoxFilamentPanel::OnTimer(wxTimerEvent& event)
             // 比较 device_data 的 materialBoxes 与 m_device_data 的 materialBoxes
             bool materialBoxesEqual = true;
             try {
-                for (const auto& box : device_data.materialBoxes) {
-                    if (!DM::MaterialBox::findAndCompareMaterialBoxes(m_device_data.materialBoxes, box)) {
-                        materialBoxesEqual = false;
-                        break;
+                if (device_data.materialBoxes.size() == m_device_data.materialBoxes.size()) {
+                    for (const auto& box : device_data.materialBoxes) {
+                        if (!DM::MaterialBox::findAndCompareMaterialBoxes(m_device_data.materialBoxes, box)) {
+                            materialBoxesEqual = false;
+                            break;
+                        }
                     }
+                } else {
+                    materialBoxesEqual = false;
                 }
             } catch (std::exception& e) {
                 materialBoxesEqual = true;

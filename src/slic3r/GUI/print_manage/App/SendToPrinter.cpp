@@ -30,7 +30,9 @@
 #include <wx/datstrm.h>
 #include "../data/DataCenter.hpp"
 #include "../AppMgr.hpp"
+#include "../AppUtils.hpp"
 #include "slic3r/GUI/Notebook.hpp"
+#include "cereal/external/base64.hpp"
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -149,6 +151,7 @@ CxSentToPrinterDialog::~CxSentToPrinterDialog()
     UnregisterHandler("is_dark_theme");
     UnregisterHandler("get_threeMF");
     UnregisterHandler("get_machine_list");
+    UnregisterHandler("get_webrtc_local_param");
 
 }
 void CxSentToPrinterDialog::OnCloseWindow(wxCloseEvent& event)
@@ -216,7 +219,7 @@ void CxSentToPrinterDialog::bind_events()
         commandJson["command"] = "get_devices";
         commandJson["data"] = DM::DataCenter::Ins().GetData();
 
-        std::string commandStr = commandJson.dump();
+        std::string commandStr = commandJson.dump(-1,' ',true);
         // wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandStr));
         wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandStr);
         run_script(strJS.ToUTF8().data());
@@ -272,6 +275,10 @@ run_script(strJS.ToStdString());
 
     RegisterHandler("get_machine_list", [this](const nlohmann::json& json_data) {
         load_machine_preset_data();
+    });
+
+    RegisterHandler("get_webrtc_local_param", [this](const nlohmann::json& json_data) {
+        this->handle_get_webrtc_local_param(json_data);
     });
 }
 
@@ -423,6 +430,98 @@ void CxSentToPrinterDialog::handle_request_update_plate_thumbnail(const nlohmann
 
 
     post_notify_event(plate_extruders, extruder_match_colors);
+}
+
+void CxSentToPrinterDialog::handle_get_webrtc_local_param(const nlohmann::json& json_data){
+    std::string url = json_data["url"].get<std::string>();
+    std::string  sdp = json_data["sdp"].get<std::string>();
+    Slic3r::Http http = Slic3r::Http::post(url);
+
+    std::string localip = "";
+    try {
+        // 提取域名部分
+        std::string domain = DM::AppUtils::extractDomain(url);
+        // 创建一个 Boost.Asio 的 io_context 对象
+        boost::asio::io_context io_context;
+        // 创建一个 UDP 套接字
+        boost::asio::ip::udp::socket socket(io_context);
+        // 连接到一个公共的 UDP 地址和端口（Google 的公共 DNS 服务器）
+        socket.connect(boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(domain), 80));
+        // 获取本地端点信息
+        boost::asio::ip::udp::endpoint local_endpoint = socket.local_endpoint();
+        // 关闭套接字
+        socket.close();
+        // 返回本地 IP 地址的字符串表示
+        localip = local_endpoint.address().to_string();
+    }
+    catch (const std::exception& e) {
+        // 若出现异常，输出错误信息并返回空字符串
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
+    if (!localip.empty())
+    {
+        std::string mdns_addr = "";
+        std::vector<std::string> tokens;
+        boost::split(tokens, sdp, boost::is_any_of("\n"));
+        for (const auto& token : tokens) {
+            if (token.find("a=candidate") != std::string::npos) {
+                std::vector<std::string> sub_tokens;
+                boost::split(sub_tokens, token, boost::is_any_of(" "));
+                mdns_addr = sub_tokens[4];
+                break;
+                //sdp = sdp.replace("a=candidate", "a=candidate" + " " + "raddr=" + localip);
+            }
+        }
+        if (!mdns_addr.empty())
+        {
+            boost::algorithm::replace_first(sdp, mdns_addr, localip);
+        }
+
+        //sdp = sdp.replace("
+    }
+
+    nlohmann::json j;
+    j["type"] = "offer";
+    j["sdp"] = sdp;
+
+    std::string d = j.dump();
+    std::string e = cereal::base64::encode((unsigned char const*)d.c_str(), d.length());
+
+    http.header("Content-Type", "application/json")
+        .set_post_body(e)
+        .on_complete([&](std::string body, unsigned status) {
+        if (status != 200) {
+            return;
+        }
+
+        nlohmann::json data;
+        data["body"] = body;
+        data["ret"] = true;
+
+        nlohmann::json commandJson;
+        commandJson["command"] = "get_webrtc_local_param";
+        commandJson["data"] = data;
+
+        // AppUtils::PostMsg(browse, wxString::Format("window.handleStudioCmd('%s');", commandJson.dump(-1, ' ', true)).ToStdString());
+        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump(-1, ' ', true));
+        run_script(strJS.ToStdString());
+
+        })
+        .on_error([&](std::string body, std::string error, unsigned status) {
+                nlohmann::json data;
+                data["body"] = body;
+                data["ret"] = false;
+
+                nlohmann::json commandJson;
+                commandJson["command"] = "get_webrtc_local_param";
+                commandJson["data"] = data;
+                // AppUtils::PostMsg(browse,
+                //     wxString::Format("window.handleStudioCmd('%s');", commandJson.dump(-1, ' ', true)).ToStdString());
+                wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump(-1, ' ', true));
+                run_script(strJS.ToStdString());
+            })
+                .perform_sync();
+
 }
 
 std::string CxSentToPrinterDialog::build_match_color_cmd_info(int plateIndex, const std::string& ipAddress)
@@ -904,8 +1003,8 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
 
     json_data["image"]              = "data:image/png;base64," + std::move(img_base64_data);
     json_data["plate_index"]        = current_plate->get_index();
-
-    std::filesystem::path gcode_path(current_result->filename);
+    fs::path gcode_path = fs::path(std::string(current_result->filename));
+    //std::filesystem::path gcode_path(std::string(current_result->filename));
     json_data["upload_gcode__name"] = gcode_path.filename().string();
     
 
@@ -1307,7 +1406,7 @@ int CxSentToPrinterDialog::load_machine_preset_data()
             nlohmann::json commandJson;
             commandJson["command"] = "get_machine_list";
             commandJson["data"]    = pmodels;
-            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump()));
+            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
             run_script(strJS.ToStdString());
         }catch (nlohmann::detail::parse_error &err) {
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": parse " << vendor_preset_path
@@ -1341,7 +1440,7 @@ int CxSentToPrinterDialog::load_machine_preset_data()
                                             nlohmann::json commandJson;
                                             commandJson["command"] = "get_machine_list";
                                             commandJson["data"] =  list;
-                                            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump()));
+                                            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
                                             run_script(strJS.ToStdString());
 
                                             if(list.empty()){
