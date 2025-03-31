@@ -185,7 +185,7 @@ msgid "Please select the CFS slot corresponding to the consumables"
 msgstr "Please select the CFS slot corresponding to the filaments"
 
 msgid "There are consumables without mapping, only support sending"
-msgstr "There are consumables without mapping, only support sending"
+msgstr "There are filaments without mapping, only support sending"
 
 msgid "Model color/consumables"
 msgstr "Model color/filaments"
@@ -197,7 +197,7 @@ msgid "Printing will be done using rack colors"
 msgstr "Printing will be done using Spool Holder colors"
 
 msgid "The slot has no consumables and cannot be mapped"
-msgstr "The slot has no consumables and cannot be mapped"
+msgstr "The slot has no filament and cannot be mapped"
 
 msgid "Consumables exist, but have not been edited"
 msgstr "filaments exist, but have not been edited"
@@ -215,7 +215,7 @@ msgid "Enable material rack"
 msgstr "Enable filament rack"
 
 msgid "Printing with consumables attached to the back of the machine"
-msgstr "Printing with consumables attached to the back of the machine"
+msgstr "Printing with filament attached to the back of the machine"
 
 msgid ""
 "The current printer does not match the preset settings of the selected "
@@ -258,7 +258,7 @@ msgid ""
 "The current printer's material rack consumables do not exist. Do you want to "
 "continue printing"
 msgstr ""
-"The current printer's filament rack consumables do not exist. Do you want to "
+"The current printer's filament rack filament do not exist. Do you want to "
 "continue printing?"
 
 msgid "Login information is invalid, please log in again"
@@ -753,10 +753,10 @@ msgid "The file where the last unexpected stop was detected"
 msgstr "The file where the last unexpected stop was detected"
 
 msgid "No consumables detected, do you want to continue printing?"
-msgstr "No consumables detected, do you want to continue printing?"
+msgstr "No filament detected, do you want to continue printing?"
 
 msgid "There is no consumables in the current rack"
-msgstr "There is no consumables in the current rack"
+msgstr "There is no filament in the current rack"
 
 msgid "Axis movement exceeded limit"
 msgstr "Axis movement exceeded limit"
@@ -766,3 +766,18 @@ msgstr "Cannot contain special characters"
 
 msgid "Please add the device to the device list"
 msgstr "Please add the device to the device list"
+
+msgid "Reconnecting"
+msgstr "Reconnecting"
+
+msgid "Creality Print camera function does not currently support devices that are only bound to Creality Cloud"
+msgstr "Creality Print摄像头功能暂不支持仅绑定创想云的设备"
+
+msgid "Feed issue, filament failed to exit extruder.Please resolve and click "Retry" button."
+msgstr "Feed issue, filament failed to exit extruder.Please resolve and click "Retry" button."
+
+msgid "During device self-test, printing and sending files are not supported"
+msgstr "During device self-test, printing and sending files are not supported"
+
+msgid "The current printer's material rack consumables do not exist. Do you want to continue printing"
+msgstr "The current printer's material rack consumables do not exist. Do you want to continue printing"

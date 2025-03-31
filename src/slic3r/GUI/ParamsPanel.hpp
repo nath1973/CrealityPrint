@@ -104,6 +104,32 @@ protected:
 ///////////////////////////////////////////////////////////////////////////////
 /// Class ParamsPanel
 ///////////////////////////////////////////////////////////////////////////////
+class MyTreeItemData : public wxTreeItemData
+{
+public:
+    MyTreeItemData(const wxString& data) : m_data(data) {}
+    wxString GetData() const { return m_data; }
+
+private:
+    wxString m_data = wxString();
+};
+
+class CustomTreeCtrl : public wxTreeCtrl
+{
+public:
+    CustomTreeCtrl(wxWindow*      parent,
+                   wxWindowID     id,
+                   const wxPoint& pos   = wxDefaultPosition,
+                   const wxSize&  size  = wxDefaultSize,
+                   long           style = wxTR_HIDE_ROOT | wxTR_NO_LINES);
+
+private:
+    void         OnPaint(wxPaintEvent& event);
+
+private:
+    wxTreeItemId m_lastHoverItem; // 记录上一次的悬停项
+};
+
 class ParamsPanel : public wxPanel
 {
 #if __WXOSX__
@@ -286,7 +312,7 @@ class ParamsPanel : public wxPanel
         void setCurType(const std::string& curType);
         std::string getPresetType(Preset reset);
         void SelectRowByString(const wxString& text);
-        bool SelectRowRecursive(const wxDataViewItem& item, const wxString& text);
+        bool SelectRowRecursive(const wxTreeItemId& item, const wxString& text);
         std::vector<std::string> filterVentor();
         std::vector<std::string> filterPresetType(const std::string& vector);
 
@@ -309,7 +335,7 @@ class ParamsPanel : public wxPanel
         wxString m_curVentor = wxString();
         wxString m_printerType = wxString();
         wxString m_curPreset = wxString();
-        wxDataViewItem m_curItem;
+        wxTreeItemId                                                   m_curItem;
 
         wxColor m_normal_color = wxColor(110, 110, 115);
         wxColor m_hover_color = wxColor(23, 204, 95);
@@ -324,7 +350,7 @@ class ParamsPanel : public wxPanel
         wxButton* m_btn_system = nullptr;
         wxButton* m_btn_user = nullptr;
         wxPanel* m_bottomBtnsPanel = nullptr;
-        wxDataViewTreeCtrl* m_preset_listBox = nullptr;
+        CustomTreeCtrl* m_preset_listBox  = nullptr;
         
         std::unordered_set<wxString>  m_print_list;
         std::unordered_set<wxString>  m_ventor_list;

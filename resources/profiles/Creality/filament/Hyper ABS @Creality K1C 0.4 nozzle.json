@@ -65,7 +65,7 @@
     "filament_shrink": "100%",
     "filament_soluble": "0",
     "filament_start_gcode": [
-        "; Filament gcode\n"
+        "; filament start gcode\n{if (position[2] > first_layer_height) }\nM104 S[nozzle_temperature]\n{else} \nM104 S[first_layer_temperature]\n{endif}"
     ],
     "filament_toolchange_delay": "0",
     "filament_type": [

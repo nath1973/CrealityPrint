@@ -108,6 +108,8 @@ enum FileType
     FT_CXPROJECT,
 
     FT_ONLY_GCODE,
+    FT_MESH_FILE,
+    FT_CAD_FILE,
     FT_VIDEO,
 
     FT_SIZE,
@@ -338,7 +340,7 @@ private:
     inline bool     is_enable_multi_machine() { return this->app_config&& this->app_config->get("enable_multi_machine") == "true"; }
     int             get_server_port() { return m_http_server.get_port(); }
     std::map<std::string, bool> test_url_state;
-
+    void            reinit_downloader();
     //BBS: remove GCodeViewer as seperate APP logic
     explicit GUI_App();
     //explicit GUI_App(EAppMode mode = EAppMode::Editor);
@@ -383,6 +385,7 @@ private:
 
     void            init_download_path();
     void            post_openlink_cmd(std::string link);  //CP
+    void            swith_community_sub_page(const std::string& pageName);
 #if wxUSE_WEBVIEW_EDGE
     void            init_webview_runtime();
 #endif
@@ -441,6 +444,7 @@ private:
     int             em_unit() const         { return m_em_unit; }
     bool            tabs_as_menu() const;
     wxSize          get_min_size() const;
+    wxSize          get_min_size_ex(wxWindow* display_win) const;
     float           toolbar_icon_scale(const bool is_limited = false) const;
     void            set_auto_toolbar_icon_scale(float scale) const;
     void            check_printer_presets();
@@ -449,7 +453,7 @@ private:
     void            system_info();
     void            keyboard_shortcuts();
     void            load_project(wxWindow *parent, wxString& input_file) const;
-    void            import_model(wxWindow *parent, wxArrayString& input_files) const;
+    void            import_model(wxWindow *parent, wxArrayString& input_files, bool Category_or_not = false) const;
     void            import_zip(wxWindow* parent, wxString& input_file) const;
     void            load_gcode(wxWindow* parent, wxString& input_file) const;
 
@@ -518,6 +522,7 @@ private:
     void            remove_user_presets();
     void            sync_preset(Preset* preset);
     void            start_sync_user_preset(bool with_progress_dlg = false);
+    bool            wait_cloud_token();
     void            stop_sync_user_preset();
     void            start_http_server();
     void            stop_http_server();

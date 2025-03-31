@@ -45,7 +45,7 @@ private:
 protected:
     void onRun();
     void reloadPresetsInUiThread();
-    int  doSyncToLocal();
+    int  doSyncToLocal(SyncToLocalRetInfo& syncToLocalRetInfo);
     int  doCheckNeedSyncToCXCloud();
     int  doCheckNeedSyncPrinterToCXCloud();
     int  doCheckNeedSyncFilamentToCXCloud();
@@ -55,6 +55,8 @@ protected:
     int  doCheckNeedSyncConfigToCXCloud();
     int  getSyncDataToFile(std::string& outJsonFile);
     int  copyOldPresetToBackup();
+    int  getLocalUserPresets(std::vector<LocalUserPreset>& vtLocalUserPreset);
+    int  delLocalUserPresetsInUiThread(const SyncToLocalRetInfo& syncToLocalRetInfo);
 
 protected:
     std::thread m_thread;

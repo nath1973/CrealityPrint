@@ -9173,7 +9173,7 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     EmbossStyle::Type type = bimap_cvt(type_to_name, std::string_view{type_str}, EmbossStyle::Type::undefined);
 
     std::string text = bbs_get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
-    EmbossStyle es{style_name, style_name, std::move(font_descriptor), type, std::move(fp)};
+    EmbossStyle es{style_name, std::move(font_descriptor), type, std::move(fp)};
     return TextConfiguration{std::move(es), std::move(text)};
 }
 

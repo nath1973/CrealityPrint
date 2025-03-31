@@ -139,6 +139,54 @@ bool CXCloudDataCenter::isTokenValid() {
     return tokenValid; 
 }
 
+CLocalDataCenter& CLocalDataCenter::getInstance()
+{
+    static CLocalDataCenter instance;
+    return instance;
+}
+
+bool CLocalDataCenter::isPrinterPresetExisted(const std::string& presetName)
+{
+    bool bRet = false;
+
+    PresetCollection* collection = nullptr;
+    collection                   = &GUI::wxGetApp().preset_bundle->printers;
+    Preset* inherit_preset       = collection->find_preset(presetName, false, true);
+    if (inherit_preset) {
+        bRet = true;
+    }
+
+    return bRet;
+}
+
+bool CLocalDataCenter::isFilamentPresetExisted(const std::string& presetName)
+{
+    bool bRet = false;
+
+    PresetCollection* collection = nullptr;
+    collection                   = &GUI::wxGetApp().preset_bundle->filaments;
+    Preset* inherit_preset       = collection->find_preset(presetName, false, true);
+    if (inherit_preset) {
+        bRet = true;
+    }
+
+    return bRet;
+}
+
+bool CLocalDataCenter::isProcessPresetExisted(const std::string& presetName)
+{
+    bool bRet = false;
+
+    PresetCollection* collection = nullptr;
+    collection                   = &GUI::wxGetApp().preset_bundle->prints;
+    Preset* inherit_preset       = collection->find_preset(presetName, false, true);
+    if (inherit_preset) {
+        bRet = true;
+    }
+
+    return bRet;
+}
+
 CommunicateWithCXCloud::CommunicateWithCXCloud(){
 
 }
@@ -206,7 +254,7 @@ int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>&
     return nRet; 
 }
 
-int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userProfileListItem)
+int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userProfileListItem, std::string& saveJsonFile)
 {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset start...";
     BOOST_LOG_TRIVIAL(warning) << "CommunicateWithCXCloud downloadUserPreset id=" << userProfileListItem.id
@@ -255,13 +303,13 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
             try {
                 if (userProfileListItem.type == "sync_data") {
                     if (userInfo.bLogin) {
-                        saveSyncDataToLocal(userInfo, userProfileListItem, body);
+                        saveSyncDataToLocal(userInfo, userProfileListItem, body, saveJsonFile);
                         nRet = 0;
                     }
                     return;
                 } else if (userProfileListItem.type == "local_device") {
                     if (userInfo.bLogin) {
-                        saveLocalDeviceToLocal(userInfo, userProfileListItem, body);
+                        saveLocalDeviceToLocal(userInfo, userProfileListItem, body, saveJsonFile);
                         nRet = 0;
                     }
                     return;
@@ -357,6 +405,7 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
                 c.open(outJsonFile, std::ios::out | std::ios::trunc);
                 c << std::setw(4) << jsonOut << std::endl;
                 c.close();
+                saveJsonFile = outJsonFile;
 
                 //  保存info文件
                 if (userInfo.bLogin) {
@@ -575,7 +624,8 @@ void CommunicateWithCXCloud::setLastError(const std::string& code, const std::st
 
 int CommunicateWithCXCloud::saveSyncDataToLocal(const UserInfo&            userInfo,
                                                 const UserProfileListItem& userProfileListItem,
-                                                const std::string&         body)
+                                                const std::string&         body,
+                                                std::string&               saveJsonFile)
 { 
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets saveSyncDataToLocal start...";
     std::string outJsonFile;
@@ -605,6 +655,7 @@ int CommunicateWithCXCloud::saveSyncDataToLocal(const UserInfo&            userI
             c << std::setw(4) << body << std::endl;
             c.close();
         }
+        saveJsonFile = outJsonFile;
 
         //  保存info文件
         {
@@ -632,7 +683,8 @@ int CommunicateWithCXCloud::saveSyncDataToLocal(const UserInfo&            userI
 
 int CommunicateWithCXCloud::saveLocalDeviceToLocal(const UserInfo&            userInfo,
                                                    const UserProfileListItem& userProfileListItem,
-                                                   const std::string&         body)
+                                                   const std::string&         body,
+                                                   std::string&               saveJsonFile)
 {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets  saveLocalDeviceToLocal start...";
     int         nRet = 0;
@@ -671,6 +723,7 @@ int CommunicateWithCXCloud::saveLocalDeviceToLocal(const UserInfo&            us
                     }
                     temp_file << std::setw(4) << j;
                     temp_file.close();
+                    saveJsonFile = outJsonFile;
                 }
                 AccountDeviceMgr::getInstance().load();
                 AccountDeviceMgr::getInstance().reset_account_device_file_id(userProfileListItem.id);
@@ -926,6 +979,15 @@ int CommunicateWithFrontPage::getFilamentPresetParams(const std::map<std::string
         printer_name  = printer_names[i];
         if (printer_name.empty())
             continue;
+
+        std::string inherits = getMapValue(mapFilamentPreset, "inherits");
+        if (!inherits.empty()) {
+            if (!CLocalDataCenter::getInstance().isFilamentPresetExisted(inherits)) {
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets CommunicateWithFrontPage getFilamentPresetParams." << inherits
+                                           << " not existed";
+                continue;
+            }
+        }
 
         printer_model = printer_models[i];
         nozzle        = nozzles[i];

@@ -1,6 +1,5 @@
 msgid ""
 msgstr ""
-"POT-Creation-Date: \n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
@@ -700,12 +699,17 @@ msgstr "文件名不能包含特殊字符"
 msgid "Please add the device to the device list"
 msgstr "请在设备列表添加设备"
 
-#~ msgid "Reconnecting"
-#~ msgstr "正在重连..."
+msgid "Reconnecting"
+msgstr "正在重连..."
 
-#~ msgid ""
-#~ "Creality Print camera function does not currently support devices that "
-#~ "are only bound to Creality Cloud"
-#~ msgstr ""
-#~ "Creality Print camera function does not currently support devices that "
-#~ "are only bound to Creality Cloud"
+msgid "Creality Print camera function does not currently support devices that are only bound to Creality Cloud"
+msgstr "Creality Print camera function does not currently support devices that are only bound to Creality Cloud"
+
+msgid "Feed issue, filament failed to exit extruder.Please resolve and click 'Retry' button."
+msgstr "退料异常,耗材退出挤出机失败,请排除异常后点击'重试'按钮"
+
+msgid "During device self-test, printing and sending files are not supported"
+msgstr "设备自检中，不能发送和打印文件"
+
+msgid "Self checking"
+msgstr "自检中"

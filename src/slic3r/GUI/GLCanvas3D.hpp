@@ -532,6 +532,7 @@ private:
     mutable GLToolbar m_separator_toolbar;
     mutable IMToolbar m_sel_plate_toolbar;
     mutable GLToolbar m_assemble_view_toolbar;
+    mutable GLToolbar m_assemble_view_internal_toolbar;
     mutable IMReturnToolbar m_return_toolbar;
     mutable float m_paint_toolbar_width;
 

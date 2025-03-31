@@ -128,6 +128,10 @@ private:
 
     friend class PartPlateList;
 
+    BoundingBoxf3 m_color_bed_exclude_area;
+
+    BoundingBoxf3 m_gcode_paths_bounding_box;
+
     Pointfs m_raw_shape;
     Pointfs m_shape;
     Pointfs m_exclude_area;
@@ -230,6 +234,10 @@ public:
 
     bool operator<(PartPlate&) const;
 
+    const BoundingBoxf3& color_bed_exclude_area(bool* valid = NULL);
+
+    void check_gcode_path_contain_in_bed();
+
     //clear alll the instances in plate
     void clear(bool clear_sliced_result = true);
 
@@ -305,6 +313,7 @@ public:
     ModelObjectPtrs get_objects_on_this_plate();
     ModelInstance* get_instance(int obj_id, int instance_id);
     BoundingBoxf3 get_objects_bounding_box();
+    BoundingBoxf3 get_gcode_path_bounding_box();
 
     Vec3d get_origin() { return m_origin; }
     Vec3d estimate_wipe_tower_size(const DynamicPrintConfig & config, const double w, const double d, int plate_extruder_size = 0, bool use_global_objects = false) const;
@@ -434,8 +443,14 @@ public:
     bool is_slice_result_ready_for_print() const
     {
         bool result = m_slice_result_valid;
+
+        // check m_print warning first, because if slice all plates,  only the selected plate (or the last if no selected) gcode_result is loaded
+        if(result)
+            result = m_print ? (!m_print->has_critical_warning_status()) : false;
+
         if (result)
             result = m_gcode_result ? (!m_gcode_result->toolpath_outside) : false;// && !m_gcode_result->conflict_result.has_value()  gcode conflict can also print
+
         return result;
     }
 
@@ -728,6 +743,8 @@ public:
 
     //add instance to special plate, need to remove from the original plate
     int add_to_plate(int obj_id, int instance_id, int plate_id);
+
+    void determine_model_position(bool isClear = false);
 
     //reload all objects
     int reload_all_objects(bool except_locked = false, int plate_index = -1);

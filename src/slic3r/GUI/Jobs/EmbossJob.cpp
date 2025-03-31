@@ -1578,7 +1578,9 @@ bool start_create_volume_on_surface_job(CreateVolumeParams &input, DataBasePtr d
 }
 
 void create_message(const std::string &message) {
+#ifdef __WINDOWS__ || __linux__
     show_error(nullptr, message.c_str());
+#endif
 }
 
 } // namespace

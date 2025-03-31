@@ -16,7 +16,9 @@
 #include "Notebook.hpp"
 
 #define TOPBAR_ICON_SIZE  17
-#define TOPBAR_TITLE_WIDTH  300
+
+// original is 300, in some screen scale setting case(for example 175%), make the topbar too long
+#define TOPBAR_TITLE_WIDTH  172
 
 using namespace Slic3r;
 class ButtonsCtrl : public wxControl
@@ -276,7 +278,8 @@ void BBLTopbarArt::DrawLabel(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& it
 {
     dc.SetFont(m_font);
 #ifdef __WINDOWS__
-
+    dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
+#elif __linux__
     dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
 #else
     dc.SetTextForeground(*wxWHITE);
@@ -425,6 +428,8 @@ void BBLTopbarArt::DrawButton(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& i
 
     // set the item's text color based on if it is disabled
 #ifdef __WINDOWS__
+    dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
+#elif __linux__
     dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
 #else
     dc.SetTextForeground(*wxWHITE);
@@ -662,6 +667,7 @@ void BBLTopbar::Init(wxFrame* parent)
     wxAuiToolBarItem* close_btn    = this->AddTool(wxID_CLOSE_FRAME, "", close_bitmap, wxString("Models"));
     this->AddSpacer(FromDIP(5));
 #endif
+
     Realize();
     // m_toolbar_h = this->GetSize().GetHeight();
     m_toolbar_h = FromDIP(40);
@@ -810,11 +816,21 @@ void BBLTopbar::update_mode(int mode)
 {
     if (mode == 0) 
     {
+#ifdef __APPLE__
+        this->EnableTool(ID_CONFIG_RELATE, false);
+        this->GetParent()->Layout();
+        return;
+#endif
         m_top_menu.Remove(ID_CONFIG_RELATE);
         m_relationsItem = NULL;
     } 
     else if (mode == 1) 
     {
+#ifdef __APPLE__
+        this->EnableTool(ID_CONFIG_RELATE, true);
+        this->GetParent()->Layout();
+        return;
+#endif
         if (m_relationsItem)
             return;
 
@@ -900,7 +916,7 @@ wxMenu* BBLTopbar::GetCalibMenu()
 void BBLTopbar::SetTitle(wxString title)
 {
     wxGCDC dc(this);
-    title = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH - 30));
+    title = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH) - FromDIP(30));
     if (m_title_item!=nullptr)
     {
         m_title_item->SetLabel(title);

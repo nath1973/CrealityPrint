@@ -249,12 +249,12 @@ bool GLGizmosManager::init_icon_textures()
     else
         return false;
 
-    if (IMTexture::load_from_svg_file(Slic3r::resources_dir() + "/images/toolbar_tooltip.svg", 25, 25, texture_id)) // ORCA: Use same resolution with gizmos to prevent blur on icon
+    if (IMTexture::load_from_svg_file(Slic3r::resources_dir() + "/images/toolbar_tooltip_6.svg", 25, 25, texture_id)) // ORCA: Use same resolution with gizmos to prevent blur on icon
         icon_list.insert(std::make_pair((int)IC_TOOLBAR_TOOLTIP, texture_id));
     else
         return false;
 
-    if (IMTexture::load_from_svg_file(Slic3r::resources_dir() + "/images/toolbar_tooltip_hover.svg", 25, 25, texture_id)) // ORCA: Use same resolution with gizmos to prevent blur on icon
+    if (IMTexture::load_from_svg_file(Slic3r::resources_dir() + "/images/toolbar_tooltip_hover_6.svg", 25, 25, texture_id)) // ORCA: Use same resolution with gizmos to prevent blur on icon
         icon_list.insert(std::make_pair((int)IC_TOOLBAR_TOOLTIP_HOVER, texture_id));
     else
         return false;
@@ -1198,8 +1198,14 @@ void GLGizmosManager::do_render_overlay() const
     const Size  cnv_size = m_parent.get_canvas_size();
     const float cnv_w = (float) cnv_size.get_width();
     const float cnv_h = (float) cnv_size.get_height();
+    
     if (m_current != Undefined) {
-        m_gizmos[m_current]->render_input_window(m_parent.get_input_window_render_left_pos(), m_parent.get_main_toolbar_height(), cnv_h);
+        auto type = m_parent.get_canvas_type();
+        if (type == GLCanvas3D::ECanvasType::CanvasView3D) {
+            m_gizmos[m_current]->render_input_window(m_parent.get_input_window_render_left_pos(), m_parent.get_main_toolbar_height(), cnv_h);
+        } else if (type == GLCanvas3D::ECanvasType::CanvasAssembleView) {
+            m_gizmos[m_current]->render_input_window((cnv_w + m_parent.get_assembly_paint_toolbar_width()) / 2.0, m_parent.get_main_toolbar_height() + 5, cnv_h);
+        }
     }
 }
 

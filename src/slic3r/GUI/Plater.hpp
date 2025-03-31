@@ -303,6 +303,7 @@ public:
     bool only_gcode_mode() { return m_only_gcode; }
     void set_only_gcode(bool only_gcode) { m_only_gcode = only_gcode; }
     std::vector<int> get_gcode_extruders_in_only_gcode_mode();
+    void check_sidebar_state_in_only_gcode_mode();
 
     //BBS: add only gcode mode
     bool using_exported_file() { return m_exported_file; }
@@ -330,6 +331,7 @@ public:
     bool load_files(const wxArrayString& filenames);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
+    const fs::path& get_last_loaded_3mf() const { return m_last_loaded_3mf; }
 
     void update(bool conside_update_flag = false, bool force_background_processing_update = false);
     //BBS
@@ -857,6 +859,9 @@ private:
     std::string m_preview_only_filename;
     int m_valid_plates_count { 0 };
 
+    fs::path m_last_loaded_3mf;
+    void     reset_last_loaded_3mf();
+
     void suppress_snapshots();
     void allow_snapshots();
     // BBS: single snapshot
@@ -874,6 +879,7 @@ private:
 
     friend class SuppressBackgroundProcessingUpdate;
     friend class PlaterDropTarget;
+    std::time_t m_startTime;
 };
 
 class SuppressBackgroundProcessingUpdate

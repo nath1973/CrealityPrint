@@ -324,8 +324,9 @@ nlohmann::json ModelDownloader::get_cache_json()
 }
 
 void ModelDownloader::load_cache_from_storage() {
-    dest_folder_ = fs::path(data_dir());
-    dest_folder_.append("cloud_download_data").append(user_id_);
+    std::string down_path = wxGetApp().app_config->get("download_path");
+    dest_folder_ = fs::path(down_path);
+    dest_folder_.append(user_id_);
 
     cache_file_ = dest_folder_;
     boost::filesystem::path cache_id_file_ = dest_folder_;

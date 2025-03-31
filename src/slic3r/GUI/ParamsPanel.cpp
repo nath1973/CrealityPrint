@@ -332,6 +332,43 @@ void TipsDialog::on_ok(wxMouseEvent &event)
     EndModal(wxID_OK);
 }
 
+ CustomTreeCtrl::CustomTreeCtrl(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
+    : wxTreeCtrl(parent, id, pos, size, style)
+{
+    // 绑定绘制事件
+    Bind(wxEVT_PAINT, &CustomTreeCtrl::OnPaint, this);
+}
+
+void CustomTreeCtrl::OnPaint(wxPaintEvent& event)
+{
+    //wxPaintDC    dc(this);
+    //wxTreeItemId item      = GetFirstVisibleItem();
+    //wxPoint      mousePos  = ScreenToClient(wxGetMousePosition());
+    //wxTreeItemId hoverItem = HitTest(mousePos);
+
+    //while (item.IsOk()) {
+    //    wxRect rect;
+    //    if (GetBoundingRect(item, rect, true)) {
+    //        // 绘制悬停状态
+    //        if (item == hoverItem) {
+    //            dc.SetPen(*wxTRANSPARENT_PEN);
+    //            dc.SetBrush(wxBrush(wxColour(200, 200, 200))); // 设置悬停背景色
+    //            dc.DrawRectangle(rect);
+    //        }
+
+    //        // 绘制选中状态
+    //        if (IsSelected(item)) {
+    //            dc.SetPen(*wxTRANSPARENT_PEN);
+    //            dc.SetBrush(wxBrush(wxColour(21, 191, 89))); // 设置选中背景色
+    //            dc.DrawRectangle(rect);
+    //        }
+    //    }
+    //    item = GetNextVisible(item);
+    //}
+
+    event.Skip(); // 继续默认绘制
+}
+
 void ParamsPanel::Highlighter::set_timer_owner(wxEvtHandler *owner, int timerid /* = wxID_ANY*/)
 {
     m_timer.SetOwner(owner, timerid);
@@ -687,30 +724,53 @@ void ParamsPanel::create_layout_printerAndFilament()
         size_t count = wxGetApp().preset_bundle->printers.num_default_presets();
         const Preset* pt = wxGetApp().preset_bundle->printers.find_system_preset_by_model_and_variant("1", "3");
 
-        //m_preset_listBox = new wxTreeCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxBORDER_NONE);
-        m_preset_listBox = new wxDataViewTreeCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxDV_NO_HEADER | wxBORDER_NONE);
+        m_preset_listBox  = new CustomTreeCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                               wxTR_HIDE_ROOT | wxTR_FULL_ROW_HIGHLIGHT | wxTR_HAS_BUTTONS | wxTR_NO_LINES | wxBORDER_NONE);
 
-        //// 创建列
-        //m_preset_listBox->AppendTextColumn("Name", 0, wxDATAVIEW_CELL_INERT, 200);
-        //wxDataViewColumn* col = new wxDataViewColumn("Value", new MyRenderer("string"), 1, 200);
-        //m_preset_listBox->AppendColumn(col);
+        // 添加根节点
+        wxTreeItemId rootId = m_preset_listBox->AddRoot("Root");
 
-        m_preset_listBox->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& event) {
-            wxDataViewItem item = event.GetItem();
+        // 绑定 ToolTip 事件
+        m_preset_listBox->Bind(wxEVT_TREE_ITEM_GETTOOLTIP, [this](wxTreeEvent& event) {
+            wxTreeItemId item = event.GetItem();
+            if (item.IsOk()) {
+                MyTreeItemData* data     = dynamic_cast<MyTreeItemData*>(m_preset_listBox->GetItemData(item));
+                if (!data)
+                    return;
+                wxString        itemText = data->GetData();
+                event.SetToolTip(itemText); // 设置 ToolTip 为节点的完整内容
+            }
+        });
+
+        m_preset_listBox->Bind(wxEVT_TREE_SEL_CHANGED, [this](wxTreeEvent& event) {
+            wxTreeItemId item = event.GetItem();
+
             if (item.IsOk()) {
                 refreshCurTreeItem(false);
-                std::string itemString = m_preset_listBox->GetItemText(item).ToUTF8().data();;
-                m_curPreset = m_preset_listBox->GetItemText(item);
+                MyTreeItemData* data       = dynamic_cast<MyTreeItemData*>(m_preset_listBox->GetItemData(item));
+                if (!data)
+                {
+                    return;
+                }
+                wxString        itemString = data->GetData();
+
+                wxString    str        = itemString.Mid(0, 2);
+                wxString    str1       = str == "* " ? itemString.Mid(2, -1) : itemString;
+                std::string presetName = std::string(str1.ToUTF8().data());
+                if (presetName == m_curPreset)
+                    return;
+
+                m_curPreset = itemString;
                 m_curItem = item;
                 if (itemString == _L("User presets") || itemString == _L("System presets") || itemString == _L("Project presets"))
                 {
                     return;
                 }
-                //dynamic_cast<TabPrinter*>(m_tab_printer)->changedSelectPrint(itemString);
+                
                 if (m_ws == WS_PRINTER)
-                    dynamic_cast<TabPrinter*>(m_tab_printer)->changedSelectPrint(itemString);
+                    dynamic_cast<TabPrinter*>(m_tab_printer)->changedSelectPrint(into_u8(itemString));
                 else
-                    dynamic_cast<TabFilament*>(m_tab_filament)->changedSelectFilament(itemString);
+                    dynamic_cast<TabFilament*>(m_tab_filament)->changedSelectFilament(into_u8(itemString));
 
             }
             updateItemState();
@@ -853,6 +913,7 @@ void ParamsPanel::create_layout_printerAndFilament()
         m_bottomBtnsPanel = new wxPanel(this);
         wxBoxSizer* buttons_sizer_bt = new wxBoxSizer(wxHORIZONTAL);
         m_bottomBtnsPanel->SetSizer(buttons_sizer_bt);
+        m_bottomBtnsPanel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
 
         //m_btn_save = new Button(this, _L("Save"));
         m_btn_save = new wxButton(m_bottomBtnsPanel, wxID_ANY, _L("Save"), wxDefaultPosition, wxDefaultSize,
@@ -1622,7 +1683,8 @@ void ParamsPanel::refreshCurTreeItem(bool isDirty)
 
     // 检查 m_preset_listBox 和 m_curItem 是否有效
     if (m_preset_listBox && m_curItem.IsOk()) {
-        m_preset_listBox->SetItemText(m_curItem, itemName);
+        wxString ellipsizedText = wxControl::Ellipsize(itemName, wxClientDC(this), wxELLIPSIZE_MIDDLE, FromDIP(200));
+        m_preset_listBox->SetItemText(m_curItem, ellipsizedText);
         m_preset_listBox->Refresh();
         m_preset_listBox->Update();
         m_preset_listBox->UpdateWindowUI();
@@ -2463,8 +2525,8 @@ void ParamsPanel::getDatas(std::vector<wxString>& systemPrintList, std::vector<w
 
         //Preset preset = presets[i];
 
-        wxString ventor = getVendor(preset);
-        wxString presetType = getPresetType(preset);
+        wxString ventor = from_u8(getVendor(preset));
+        wxString presetType = from_u8(getPresetType(preset));
         wxString itemName = from_u8(preset.label(true));
 
 
@@ -2599,44 +2661,40 @@ void ParamsPanel::updatePresetsList(const std::vector<wxString>& systemList, con
         return;
     m_preset_listBox->DeleteAllItems();
     m_preset_listBox->SetIndent(0);
-    //m_curPreset = wxString();
-    m_curItem = wxDataViewItem();
-
-    wxDataViewItemAttr attr;
-    attr.SetBackgroundColour(wxColor(255, 0, 0));
+    m_curItem = wxTreeItemId();
+    wxTreeItemId rootId = m_preset_listBox->AddRoot("Root");
 
     if (projectList.size()) {
-        wxDataViewItem child1 = m_preset_listBox->AppendContainer(wxDataViewItem(), _L("Project presets"));
+        wxTreeItemId child1 = m_preset_listBox->AppendItem(m_preset_listBox->GetRootItem(), _L("Project presets"), -1, -1,
+                                                           new MyTreeItemData(_L("Project presets")));
         for (auto& projectName : projectList) {
-            m_preset_listBox->AppendItem(child1, projectName);
+            // 添加节点时处理文本
+            wxString ellipsizedText = wxControl::Ellipsize(projectName, wxClientDC(this), wxELLIPSIZE_MIDDLE, FromDIP(200));
+            m_preset_listBox->AppendItem(child1, ellipsizedText, -1, -1, new MyTreeItemData(projectName));
         }
         m_preset_listBox->Expand(child1);
     }
 
     if (userList.size()) {
-        wxDataViewItem child1 = m_preset_listBox->AppendContainer(wxDataViewItem(), _L("User presets"));
+        wxTreeItemId child1 = m_preset_listBox->AppendItem(m_preset_listBox->GetRootItem(), _L("User presets"), -1, -1,
+                                                           new MyTreeItemData(_L("User presets")));
         for (auto& printName : userList) {
-            m_preset_listBox->AppendItem(child1, printName);
+            wxString ellipsizedText = wxControl::Ellipsize(printName, wxClientDC(this), wxELLIPSIZE_MIDDLE, FromDIP(200));
+            m_preset_listBox->AppendItem(child1, ellipsizedText, -1, -1, new MyTreeItemData(printName));
         }
         m_preset_listBox->Expand(child1);
     }    
 
     if (systemList.size()) {
-        wxDataViewItem child2 = m_preset_listBox->AppendContainer(wxDataViewItem(), _L("System presets"));
+        wxTreeItemId child2 = m_preset_listBox->AppendItem(m_preset_listBox->GetRootItem(), _L("System presets"), -1, -1,
+                                                           new MyTreeItemData(_L("System presets")));
         for (auto& printName : systemList) {
-            m_preset_listBox->AppendItem(child2, printName);
+            wxString ellipsizedText = wxControl::Ellipsize(printName, wxClientDC(this), wxELLIPSIZE_MIDDLE, FromDIP(200));
+            m_preset_listBox->AppendItem(child2, ellipsizedText, -1, -1, new MyTreeItemData(printName));
         }
         m_preset_listBox->Expand(child2);
     }
     
-    m_preset_listBox->Bind(wxEVT_DATAVIEW_ITEM_EDITING_STARTED, [=](wxDataViewEvent& e) {
-        wxDataViewColumn* c2 = m_preset_listBox->GetCurrentColumn();
-        if (c2) {
-            wxDataViewRenderer* renderer = c2->GetRenderer();
-            renderer->SetMode(wxDATAVIEW_CELL_INERT);
-            renderer->CancelEditing();
-        }
-        });
     wxFont treeFont = m_preset_listBox->GetFont();
     treeFont.SetPointSize(10);
     m_preset_listBox->SetFont(treeFont);
@@ -2697,41 +2755,41 @@ std::string ParamsPanel::getPresetType(Preset preset)
 void ParamsPanel::SelectRowByString(const wxString& text)
 {
     // 从根节点开始遍历
-    wxDataViewItem rootItem;
-    wxDataViewItemArray children;
-    m_preset_listBox->GetStore()->GetChildren(rootItem, children);
+    wxTreeItemId      rootItem = m_preset_listBox->GetRootItem();
+    wxTreeItemIdValue cookie;
+    wxTreeItemId      child = m_preset_listBox->GetFirstChild(rootItem, cookie);
 
-    for (auto& item : children)
-    {
-        if (SelectRowRecursive(item, text))
-        {
+    while (child.IsOk()) {
+        if (SelectRowRecursive(child, text)) {
             break;
         }
+        child = m_preset_listBox->GetNextChild(rootItem, cookie);
     }
 }
 
-bool ParamsPanel::SelectRowRecursive(const wxDataViewItem& item, const wxString& text)
+bool ParamsPanel::SelectRowRecursive(const wxTreeItemId& item, const wxString& text)
 {
-    wxVariant value;
-    wxString itemText = m_preset_listBox->GetItemText(item);
-    if (itemText == text)
-    {
-        m_curItem = item;
-        m_preset_listBox->Select(item);
-        m_preset_listBox->SetCurrentItem(item);
+    // 获取当前节点的文本
+    MyTreeItemData* data     = dynamic_cast<MyTreeItemData*>(m_preset_listBox->GetItemData(item));
+    if (!data)
+        return false;
+    wxString        itemText = data->GetData();
+
+    if (itemText == text) {
+        m_preset_listBox->SelectItem(item);    // 选中节点
+        m_preset_listBox->EnsureVisible(item); // 确保节点可见
         return true;
     }
 
     // 遍历子节点
-    wxDataViewItemArray children;
-    m_preset_listBox->GetStore()->GetChildren(item, children);
+    wxTreeItemIdValue cookie;
+    wxTreeItemId      child = m_preset_listBox->GetFirstChild(item, cookie);
 
-    for (auto& child : children)
-    {
-        if (SelectRowRecursive(child, text))
-        {
+    while (child.IsOk()) {
+        if (SelectRowRecursive(child, text)) {
             return true;
         }
+        child = m_preset_listBox->GetNextChild(item, cookie);
     }
 
     return false;
@@ -2944,8 +3002,8 @@ void ParamsPanel::layoutOther()
     //m_export_to_file->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { wxGetApp().mainframe->export_config(); });
     //m_import_from_file->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { wxGetApp().mainframe->load_config_file(); });
 
-    m_h_tabbar_printer = new HTabbarPrinter(this, Preset::Type::TYPE_PRINTER, wxGetApp().preset_bundle);
-    m_v_tabbar_printer = new VTabbarPrinter(this, Preset::Type::TYPE_PRINTER, wxGetApp().preset_bundle);
+    m_h_tabbar_printer = nullptr;//new HTabbarPrinter(this, Preset::Type::TYPE_PRINTER, wxGetApp().preset_bundle);
+    m_v_tabbar_printer = nullptr;//new VTabbarPrinter(this, Preset::Type::TYPE_PRINTER, wxGetApp().preset_bundle);
 
     m_tabbar_printer = new TabbarCtrlPrinter(this, m_h_tabbar_printer, m_v_tabbar_printer, wxGetApp().preset_bundle);
     m_tabbar_filament = new TabbarCtrlFilament(this, m_h_tabbar_printer, m_v_tabbar_printer, wxGetApp().preset_bundle);

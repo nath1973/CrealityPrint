@@ -994,11 +994,11 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     // https://docs.wxwidgets.org/3.0/classwx_font.html
     // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
     EmbossStyles styles = {
-        WxFontUtils::create_emboss_style(wx_font_normal, _u8L("NORMAL"), "NORMAL"), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
-        WxFontUtils::create_emboss_style(*wxSMALL_FONT, _u8L("SMALL"), "SMALL"),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
-        WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC"), "ITALIC"), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
-        WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS"), "SWISS"),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
-        WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN"), "MODERN"),        
+        WxFontUtils::create_emboss_style(wx_font_normal, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
+        WxFontUtils::create_emboss_style(*wxSMALL_FONT, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
+        WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
+        WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
+        WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN")),        
     };
 
     // Not all predefined font for wx must be valid TTF, but at least one style must be loadable
@@ -1039,7 +1039,7 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
         // On current OS is not installed any correct TTF font
         // use font packed with Slic3r
         std::string font_path = Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf";
-        styles.push_back(EmbossStyle{_u8L("Default font"), "Default font", font_path, EmbossStyle::Type::file_path});
+        styles.push_back(EmbossStyle{_u8L("Default font"), font_path, EmbossStyle::Type::file_path});
     }
     return styles;
 }
@@ -1473,9 +1473,12 @@ void GLGizmoEmboss::draw_text_input()
         imgui_font->IsLoaded() &&
         imgui_font->Scale > 0.f &&
         imgui_font->ContainerAtlas != nullptr;
+    
+    bool exist_all_char = exist_font  && !m_text_contain_unknown_glyph;
     // NOTE: Symbol fonts doesn't have atlas 
     // when their glyph range is out of language character range
-    if (exist_font) ImGui::PushFont(imgui_font);
+    if (exist_all_char) 
+        ImGui::PushFont(imgui_font);
 
     // show warning about incorrectness view of font
     std::string warning_tool_tip;
@@ -1490,8 +1493,9 @@ void GLGizmoEmboss::draw_text_input()
         if (is_text_empty(m_text)) 
             append_warning(_u8L("Embossed text cannot contain only white spaces."));
         if (m_text_contain_unknown_glyph)
-            append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
-
+             append_warning(_u8L("The text includes unknown character glyphs(which have been replaced)."));
+            //append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
+        
         const FontProp &prop = m_style_manager.get_font_prop();
         if (prop.skew.has_value())     append_warning(_u8L("Text input doesn't show font skew."));
         if (prop.boldness.has_value()) append_warning(_u8L("Text input doesn't show font boldness."));
@@ -1523,7 +1527,8 @@ void GLGizmoEmboss::draw_text_input()
         range_text = create_range_text_prep();
     }
 
-    if (exist_font) ImGui::PopFont();
+    if (exist_all_char)
+        ImGui::PopFont();
 
     // warning tooltip has to be with default font
     if (!warning_tool_tip.empty()) {
@@ -1871,7 +1876,7 @@ void GLGizmoEmboss::draw_model_type()
     }
 
     // In simple mode are not modifiers
-    if (wxGetApp().plater()->printer_technology() != ptSLA && wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+    if (wxGetApp().plater()->printer_technology() != ptSLA) {
         ImGui::SameLine();
         if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
             new_type = modifier;

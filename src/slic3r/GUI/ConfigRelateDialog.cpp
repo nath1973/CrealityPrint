@@ -242,26 +242,78 @@ namespace ConfigRelateGUI {
 
     };
 
+    class _Panel : public wxPanel
+    {
+    public:
+        _Panel(wxWindow*      parent,
+               wxWindowID     winId = -1,
+               const wxPoint& pos   = wxDefaultPosition,
+               const wxSize&  size  = wxDefaultSize,
+               long           style = 2621440L)
+            : wxPanel(parent, winId, pos, size, style)
+        {
+            bool is_dark = wxGetApp().dark_mode();
+            SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
+        }
+    };
+
+    class _Book : public wxToolbook
+    {
+    public:
+        _Book(wxWindow*      parent,
+              wxWindowID     winId = -1,
+              const wxPoint& pos   = wxDefaultPosition,
+              const wxSize&  size  = wxDefaultSize,
+              long           style = 2621440L)
+            : wxToolbook(parent, winId, pos, size, style)
+        {
+            bool is_dark = wxGetApp().dark_mode();
+            SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
+        }
+    };
+
     class _ListView : public wxListCtrl
     {
     public:
-        _ListView(wxWindow*      parent) : wxListCtrl(parent, wxID_ANY, wxDefaultPosition, listSize, wxLC_REPORT | wxLC_NO_HEADER)
+        
+        //_ListView(wxWindow*      parent) : wxListCtrl(parent, wxID_ANY, wxDefaultPosition, listSize, wxLC_REPORT | wxLC_NO_HEADER) 
+         _ListView(wxWindow * parent, wxWindow* mirror_window)
+             : wxListCtrl(parent, wxID_ANY, wxDefaultPosition, listSize, wxLC_REPORT | wxLC_HRULES | wxLC_VRULES | wxLC_NO_HEADER | wxNO_BORDER)
         {
             //SetWindowStyleFlag(GetWindowStyleFlag() & ~(wxLC_HRULES | wxLC_VRULES));
-            // 绑定重绘事件处理函数
+
+            long style = GetWindowStyle();
+            style &= ~wxHSCROLL;
+            SetWindowStyle(style);
+
+#ifndef __linux__
             Bind(wxEVT_PAINT, &_ListView::OnPaint, this);
+#endif
             Bind(wxEVT_MOTION, &_ListView::OnMouseMove, this);
 
             Bind(wxEVT_LEAVE_WINDOW, &_ListView::OnMouseLeave, this);
-            
+
+            //mirror_window->Bind(wxEVT_MOVE, &_ListView::onParentMove, this);
+            mirror_window->Bind(wxEVT_SIZE, &_ListView::onParentResize, this);
+
         }
+
+         void onParentResize(wxSizeEvent& event) 
+         { 
+             auto size   = event.GetSize();
+             int  width  = size.GetWidth();
+             int  height = size.GetHeight();
+
+             SetSize(width, height + 26);
+             Refresh();
+         }
 
     private:
         int m_hoverRow = -1;
         wxColour m_hoverBgColour    = green; 
         bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
         wxColour m_normalBGColour = is_dark ? wxColour("#4E4E52") : wxColour("#FFFFFF");//wxColour("#4E4E52");
-        wxColour m_singleBGColour   = is_dark ?  wxColour("#474749") : wxColour("#FFFFFF");
+        wxColour m_singleBGColour   = is_dark ?  wxColour("#474749") : wxColour("#F4F4F4");
         wxColour m_userTextColour = green;
         wxColour m_systemTextColour = is_dark ? white : wxColour("#000000");
 
@@ -272,25 +324,25 @@ namespace ConfigRelateGUI {
         void OnPaint(wxPaintEvent& event)
         {
             wxPaintDC dc(this);
-            wxRect    clientRect = GetClientRect();
+            //wxCoord   x, y, w, h;
+            ////dc.GetClippingBox(&x, &y, &w, &h);
+            wxRect clientRect = GetClientRect();
+            //dc.SetClippingRegion(clientRect);
+            //dc.GetClippingBox(&x, &y, &w, &h);
            
-             //先绘制整个列表的常规背景（比如默认白色等）
             dc.SetBrush(wxBrush(m_normalBGColour));
             dc.SetPen(wxPen(m_normalBGColour));
             dc.DrawRectangle(clientRect);
 
             bool firstLine = true;
-            // 绘制列表项
             for (int row = 0; row < m_nameItems.size(); row++) {
                 _ListItem nameItem = m_nameItems[row];
                 _ListItem typeItem = m_typeItems[row];
                 //GetItem(item);
                 wxRect itemRect;
                 GetItemRect(row, itemRect);
-                itemRect.SetWidth(GetSize().GetWidth());
                 bool isHovered = row == m_hoverRow;
                 if (isHovered) {
-                    // 如果是悬停行，设置悬停背景颜色绘制
                     dc.SetBrush(wxBrush(m_hoverBgColour));
                     dc.SetPen(wxPen(m_hoverBgColour));
                     dc.DrawRectangle(itemRect);
@@ -337,6 +389,7 @@ namespace ConfigRelateGUI {
             event.GetPosition(&x, &y);
             int  flag;
             long itemIndex = HitTest(wxPoint(x, y), flag);
+            int  origin_hover_row = m_hoverRow;
             if (itemIndex != -1) {
                 if (GetItemState(itemIndex, wxLIST_STATE_SELECTED) == 0) {
                     _ListItem item = m_nameItems[itemIndex];
@@ -347,18 +400,64 @@ namespace ConfigRelateGUI {
             } else {
                 m_hoverRow = -1;
             }
+
+            if (m_hoverRow != origin_hover_row)
+            {
+                auto size = GetSize();
+                if (m_hoverRow != -1) 
+                {
+                    wxRect itemRect;
+                    GetItemRect(m_hoverRow, itemRect);
+                    itemRect.SetWidth(size.GetWidth());
+                    Refresh(true, &itemRect);
+                } 
+                if (origin_hover_row != -1) 
+                {
+                    wxRect itemRect;
+                    GetItemRect(origin_hover_row, itemRect);
+                    itemRect.SetWidth(size.GetWidth());
+                    Refresh(true, &itemRect);
+                }
+            }
+
             event.Skip();
         }
 
-        virtual int GetColumnWidth(int col) const override { return 0; }
+        virtual int GetColumnWidth(int col) const override { return this->GetRect().GetWidth(); }
 
     public:
-        void insertNameItem(_ListItem item) { 
-            InsertItem(item);
+        void insertNameItem(_ListItem item)
+        {
+#ifdef __linux__
+            item.SetColumn(0);
+            if (item.isSystem)
+                item.SetTextColour(m_systemTextColour);
+            else 
+                item.SetTextColour(m_userTextColour);
+
+            if (item.isSingle)
+                item.SetBackgroundColour(m_singleBGColour);
+            else 
+                item.SetBackgroundColour(m_normalBGColour);
+#endif 
+            int col = InsertItem(item);
             m_nameItems.insert(m_nameItems.begin(), item); 
         }
 
-        void insertTypeItem(_ListItem item) {
+        void insertTypeItem(_ListItem item)
+        {
+#ifdef __linux__
+            item.SetColumn(1);
+            if (item.isSystem)
+                item.SetTextColour(m_systemTextColour);
+            else 
+                item.SetTextColour(m_userTextColour);
+
+            if (item.isSingle)
+                item.SetBackgroundColour(m_singleBGColour);
+            else 
+                item.SetBackgroundColour(m_normalBGColour);
+#endif 
             SetItem(item);
             m_typeItems.insert(m_typeItems.begin(), item); 
         }
@@ -368,8 +467,10 @@ namespace ConfigRelateGUI {
             ClearAll();
             InsertColumn(0, title1);
             InsertColumn(1, title2);
-            SetColumnWidth(0, 570);
-            SetColumnWidth(1, GetSize().GetWidth() - 580);
+            SetColumnWidth(0, 2000);
+            SetColumnWidth(1, 2000);
+            //SetColumnWidth(0, 570);
+            //SetColumnWidth(1, GetSize().GetWidth() - 580);
 
             m_nameItems.clear();
             m_typeItems.clear();
@@ -419,33 +520,55 @@ namespace ConfigRelateGUI {
     public:
         _ListWidget(wxWindow* parent) : DrawBorderBox(parent) 
         { 
-            //SetBorderColor(wxColour("#68686B"));
-            //SetBorderColor(wxColour("#FF0000"));
-            //SetBorderWidth(3);
             bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
             SetBackgroundColor(is_dark ? wxColour("#474749") : wxColour("#ffffff"));
-            //SetBackgroundColor(wxColour("#FF0000"));
 
-            m_listView = new _ListView(this);
-            m_listView->SetPosition(wxPoint(-2, 36));
+            wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
-            StaticBox* header = new StaticBox(this, wxID_ANY, wxPoint(1, 1), wxSize(798, 37));
-            header->SetBackgroundColour(is_dark ? wxColour("#474749") : wxColour("#ffffff"));
-            //header->SetBackgroundColor(wxColour("#6E6E72"));
-            header->SetBorderWidth(0);
-            header->SetCornerRadius(0);
-            m_header1         = new wxStaticText(header, wxID_ANY, "", wxPoint(85, 12));
-            m_header1->SetFont(::Label::Body_14);
-            m_header2 = new wxStaticText(header, wxID_ANY, "", wxPoint(572, 12));
-            m_header2->SetFont(::Label::Body_14);
-            //header->Hide();
-      
-            
-            DrawBorderBox* footer = new DrawBorderBox(this, wxID_ANY,
-                                                  wxPoint(0, m_listView->GetPosition().y + m_listView->GetSize().GetHeight() - 2),
-                                                  wxSize(800, 2));
-            //footer->topEnable     = false;
-            footer->SetBackgroundColor(wxColour("#6E6E72"));
+            { /* header */
+                StaticBox* header = new StaticBox(this, wxID_ANY, wxPoint(1, 1), wxSize(798, 37));
+                header->SetBackgroundColour(is_dark ? wxColour("#474749") : wxColour("#ffffff"));
+                header->SetBorderWidth(0);
+                header->SetCornerRadius(0);
+
+                wxBoxSizer* header_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+                bool is_dark = wxGetApp().dark_mode();
+                m_header1 = new wxStaticText(header, wxID_ANY, "");
+                m_header1->SetFont(::Label::Body_14);
+                m_header1->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
+
+                m_header2 = new wxStaticText(header, wxID_ANY, "");
+                m_header2->SetFont(::Label::Body_14);
+                m_header2->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
+
+                header_sizer->AddStretchSpacer();
+                header_sizer->Add(m_header1, 1, wxALL | wxALIGN_CENTER, 5);
+                header_sizer->AddStretchSpacer();
+                header_sizer->Add(m_header2, 1, wxALL | wxALIGN_CENTER, 5);
+                header_sizer->AddStretchSpacer();
+                header->SetSizer(header_sizer);
+
+                main_sizer->Add(header, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 1);
+            }
+
+            {   /* body */
+                ConfigRelateGUI::_Panel* list_panel = new ConfigRelateGUI::_Panel(this); 
+                main_sizer->Add(list_panel, 1, wxEXPAND | wxTOP);
+
+                m_listView = new _ListView(list_panel, list_panel);
+            }
+
+            {    /* footer */
+                DrawBorderBox* footer = new DrawBorderBox(this, wxID_ANY,
+                                                          wxPoint(0, m_listView->GetPosition().y + m_listView->GetSize().GetHeight() - 2),
+                                                          wxSize(800, 2));
+                //DrawBorderBox* footer = new DrawBorderBox(this, wxID_ANY);
+                // footer->topEnable     = false;
+                footer->SetBackgroundColor(wxColour("#6E6E72"));
+                main_sizer->Add(footer, 0, wxEXPAND | wxALL, 0);
+            }
+            SetSizer(main_sizer);
         }
 
         void insertNameItem(_ListItem item) { 
@@ -462,7 +585,6 @@ namespace ConfigRelateGUI {
             m_header2->SetLabelText(title2);
         }
 
-
     private:
         wxStaticText* m_header1;
         wxStaticText* m_header2;
@@ -478,12 +600,10 @@ namespace ConfigRelateGUI {
 
     static void initListItem(_ListItem& item, wxString text, bool isSingle, bool isSystem, int col)
     {
-        item.SetBackgroundColour(isSingle ? wxColour("#4E4E52") : wxColour("#474749"));
         item.m_mask = wxLIST_MASK_TEXT;
-        item.SetTextColour(isSystem ? white : green);
         item.SetText(text);
         item.SetColumn(col);
-        item.SetId(0);
+        item.SetId(isSystem ? 1 : 0);
         item.isSingle = isSingle;
         item.isSystem = isSystem;
     }
@@ -548,6 +668,19 @@ public:
         std::string vendor2 = getVendor(*preset2);
         if (vendor1 != vendor2)
             return false;
+
+        return true;
+    }
+    bool isSameVendorPrinter(const std::vector<std::string>& vtPrinter1, const std::vector<std::string>& vtPrinter2)
+    {
+        if (vtPrinter1.size() == 0 || vtPrinter2.size() == 0)
+            return false;
+        for (auto printer1 : vtPrinter1) {
+            for (auto printer2 : vtPrinter2) {
+                if (!isSameVendorPrinter(printer1, printer2))
+                    return false;
+            }
+        }
 
         return true;
     }
@@ -1426,6 +1559,16 @@ public:
 
     }
 
+    std::vector<std::string> getFilamentPrinter(const std::string& filament)
+    {
+        Preset* preset = wxGetApp().preset_bundle->filaments.find_preset(filament, false);
+        if (preset == nullptr)
+            return std::vector<std::string>();
+
+        const ConfigOptionVectorBase* vec    = static_cast<const ConfigOptionVectorBase*>(preset->config.option("compatible_printers"));
+        return vec->vserialize();
+    }
+
     PresetBundle* m_preset_bundle{NULL};
     PresetCollection* m_filaments{NULL};
     PresetCollection* m_technologies{NULL};
@@ -1957,22 +2100,20 @@ public:
     PrinterRelatePanel(wxWindow* parent) : wxPanel(parent)
     {
         SetBackgroundColour(*wxWHITE);
-        // SetBackgroundColour(*wxRED);
 
         wxBoxSizer* sizer       = new wxBoxSizer(wxVERTICAL);
 
-        wxPanel* filterPanel = new wxPanel(this);
+        ConfigRelateGUI::_Panel* filterPanel = new ConfigRelateGUI::_Panel(this);
         initFilterPanel(filterPanel);
-        sizer->Add(filterPanel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+        sizer->Add(filterPanel, 0, wxLEFT | wxBOTTOM | wxTOP, 10);
 
-        wxPanel* middle_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(windowSize.x, 1),
-                                         wxTAB_TRAVERSAL);
+        wxPanel* middle_line = new wxPanel(this, wxID_ANY, wxDefaultPosition);
         middle_line->SetBackgroundColour(DESIGN_GRAY400_COLOR);
-        sizer->Add(middle_line, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
-
-        wxPanel* relatePanel = new wxPanel(this);
+        sizer->Add(middle_line, 0, wxLEFT | wxRIGHT | wxEXPAND, 10);
+        
+        ConfigRelateGUI::_Panel* relatePanel = new ConfigRelateGUI::_Panel(this);
         initRelatePanel(relatePanel, parent);
-        sizer->Add(relatePanel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+        sizer->Add(relatePanel, 1,  wxALL | wxEXPAND, 10);
 
         SetSizer(sizer);
     }
@@ -2363,19 +2504,10 @@ public:
                                     std::pair<wxColour, int>(*wxWHITE, StateColor::Enabled));
                 m_printerSearch->SetBackgroundColor(input_bg);
 
-
-                ////m_printerSearch            = new TextInputCtrl(parent, wxID_ANY, wxEmptyString);
-                //m_printerSearch->SetBorderColor(StateColor(std::make_pair(0x00FF00, (int) StateColor::Focused),
-                //                                               std::make_pair(0x30BF40, (int) StateColor::Hovered),
-                //                                               std::make_pair(0xEEEEEE, (int) StateColor::Normal)));
-                //m_printerSearch->SetFont(::Label::Body_14);
-
-                //m_printerSearch->SetLabelColor(AMS_MATERIALS_SETTING_GREY800);
                 m_printerSearch->GetTextCtrl()->Bind(wxEVT_TEXT, [=](wxCommandEvent& e) {
                     _updateTree();
                     });
-                //m_printerSearch->GetTextCtrl()->Hide();
-
+ 
                 m_printerSearch->Bind(wxEVT_COMBOBOX, [=](auto& e) { _updateTree(); });
                 sizer->Add(printerLabel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
                 sizer->Add(m_printerSearch, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
@@ -2398,13 +2530,19 @@ public:
             m_treeCtrl = new _TreeView(parent);
             m_treeCtrl->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxCommandEvent& e) { _sync(); });
 
-            wxPanel*       tabView  = new wxPanel(parent, wxID_ANY, wxDefaultPosition, rightTabSize);
-            wxToolbook*    notebook = new wxToolbook(tabView, wxID_ANY);
+            ConfigRelateGUI::_Panel* tabView  = new ConfigRelateGUI::_Panel(parent, wxID_ANY, wxDefaultPosition, rightTabSize);
+            ConfigRelateGUI::_Book*  notebook = new ConfigRelateGUI::_Book(tabView, wxID_ANY);
             m_toolbook              = notebook;
             wxToolBarBase* toolBar  = notebook->GetToolBar();
             toolBar->Hide();
-            _Tab* tab = new _Tab(tabView);
+            _Tab* tab = new _Tab(tabView, wxSize(FromDIP(100), FromDIP(26)));
             m_tab     = tab;
+
+            wxBoxSizer* tabSizer = new wxBoxSizer(wxVERTICAL);
+            tabSizer->Add(tab, 0, wxLEFT | wxTOP);
+            tabSizer->Add(notebook, 1, wxTOP | wxEXPAND);
+            tabView->SetSizer(tabSizer);
+
             tab->appendTab(_L("Related Filament"));
             tab->appendTab(_L("Related Process"));
             SelectedChangedFunc func = [notebook](int index) {
@@ -2412,13 +2550,11 @@ public:
             };
             tab->bind(func);
             {
-                wxPanel* relateMaterialPage = new wxPanel(notebook, wxID_ANY, wxDefaultPosition, rightTabContentSize);
+                ConfigRelateGUI::_Panel* relateMaterialPage = new ConfigRelateGUI::_Panel(notebook, wxID_ANY, wxDefaultPosition,
+                                                                                                     rightTabContentSize);
                 notebook->AddPage(relateMaterialPage, _L("Related Filament"));
 
-                //m_materialListCtrl = new _ListView(relateMaterialPage, wxID_ANY, wxDefaultPosition, wxSize(460, 300), wxLC_REPORT);
                 m_materialListCtrl = new _ListWidget(relateMaterialPage);
-                //m_materialListCtrl->SetBackgroundColour(wxColour(*wxWHITE));
-
                 m_addMaterialButton = new _Button(relateMaterialPage, _L("Add Related Filament"), wxSize(FromDIP(160),FromDIP(24)));
                 m_addMaterialButton->Bind(wxEVT_LEFT_DOWN, [=](wxMouseEvent& e) {
                     std::string       targetPrinter;
@@ -2457,24 +2593,18 @@ public:
                     }
                 });
 
-                wxBoxSizer* amSizer = new wxBoxSizer(wxHORIZONTAL);
-                //amSizer->AddSpacer(FromDIP(140));
-                amSizer->Add(m_addMaterialButton, 0, wxALIGN_CENTER);
-                //amSizer->AddSpacer(FromDIP(140));
-
                 wxBoxSizer* rmSizer = new wxBoxSizer(wxVERTICAL);  
-                rmSizer->Add(m_materialListCtrl, 0, wxEXPAND);
-                rmSizer->AddSpacer(FromDIP(5));
-                rmSizer->Add(amSizer, 0, wxALIGN_CENTER | wxTOP, 21);
+
+                rmSizer->Add(m_materialListCtrl, 1, wxEXPAND | wxBOTTOM, 21);
+                rmSizer->Add(m_addMaterialButton, 0, wxALIGN_CENTER | wxBOTTOM, 21);
                 relateMaterialPage->SetSizer(rmSizer);
 
             }
             {
-                wxPanel* relateTechniquePage = new wxPanel(notebook);
+                ConfigRelateGUI::_Panel* relateTechniquePage = new ConfigRelateGUI::_Panel(notebook);
                 notebook->AddPage(relateTechniquePage, _L("Related Print")); 
-                m_technologiesListCtrl = new _ListWidget(relateTechniquePage);
-                //m_technologiesListCtrl->SetBackgroundColour(wxColour(*wxWHITE));
 
+                m_technologiesListCtrl = new _ListWidget(relateTechniquePage);
                 m_addProcessButton = new _Button(relateTechniquePage, _L("Add Related Process"), wxSize(FromDIP(160), FromDIP(24)));
                 m_addProcessButton->Bind(wxEVT_LEFT_DOWN, [=](wxMouseEvent& e) {
                     std::string              targetPrinter;
@@ -2509,11 +2639,9 @@ public:
                 amSizer->Add(m_addProcessButton, 0, wxALIGN_CENTER);
 
                 wxBoxSizer* rmSizer = new wxBoxSizer(wxVERTICAL);
-                rmSizer->Add(m_technologiesListCtrl, 0, wxEXPAND);
-                rmSizer->AddSpacer(FromDIP(5));
-                rmSizer->Add(amSizer, 0, wxALIGN_CENTER | wxTOP, 21);
+                rmSizer->Add(m_technologiesListCtrl, 1, wxEXPAND | wxBOTTOM, 21);
+                rmSizer->Add(m_addProcessButton, 0, wxALIGN_CENTER | wxBOTTOM, 21);
                 relateTechniquePage->SetSizer(rmSizer);
-
             }
 
             wxBoxSizer* pSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -2521,10 +2649,6 @@ public:
 
             //tabView
             tab->SetPosition(wxPoint(0, 0));
-            wxBoxSizer* tabSizer = new wxBoxSizer(wxVERTICAL);
-            //tabSizer->Add(tab, 0, wxEXPAND);
-            tabSizer->Add(notebook, 0, wxTOP, 22);
-            tabView->SetSizer(tabSizer);
 
             pSizer->Add(tabView, 5, wxEXPAND | wxLEFT, 20);
             parent->SetSizer(pSizer);
@@ -2551,7 +2675,7 @@ public:
 
         _ListWidget* m_materialListCtrl;
         _ListWidget* m_technologiesListCtrl;
-        wxToolbook*  m_toolbook;
+        ConfigRelateGUI::_Book* m_toolbook;
 
         _Button* m_addMaterialButton;
         _Button* m_addProcessButton;
@@ -2564,21 +2688,19 @@ public:
     MaterialRelatePanel(wxWindow* parent) : wxPanel(parent)
     {
         SetBackgroundColour(*wxWHITE);
-        // SetBackgroundColour(*wxBLUE);
-
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
-        wxPanel* filterPanel = new wxPanel(this);
+        ConfigRelateGUI::_Panel* filterPanel = new ConfigRelateGUI::_Panel(this);
         initFilterPanel(filterPanel);
-        sizer->Add(filterPanel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+        sizer->Add(filterPanel, 0, wxLEFT | wxBOTTOM | wxTOP, 10);
 
-        wxPanel* middle_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(windowSize.x, 1), wxTAB_TRAVERSAL);
+        wxPanel* middle_line = new wxPanel(this, wxID_ANY, wxDefaultPosition);
         middle_line->SetBackgroundColour(DESIGN_GRAY400_COLOR);
-        sizer->Add(middle_line, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+        sizer->Add(middle_line, 0, wxLEFT | wxRIGHT | wxEXPAND, 10);
 
-        wxPanel* relatePanel = new wxPanel(this);
+        ConfigRelateGUI::_Panel* relatePanel = new ConfigRelateGUI::_Panel(this);
         initRelatePanel(relatePanel, parent);
-        sizer->Add(relatePanel, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+        sizer->Add(relatePanel, 1, wxALL | wxEXPAND, 10);
 
         SetSizer(sizer);
     }
@@ -2938,21 +3060,27 @@ public:
                 _sync(); 
             });
 
-        wxPanel* tabView = new wxPanel(parent, wxID_ANY, wxDefaultPosition, rightTabSize);
+        ConfigRelateGUI::_Panel* tabView = new ConfigRelateGUI::_Panel(parent, wxID_ANY, wxDefaultPosition, rightTabSize);
         tabView->SetBackgroundColour(wxColour(*wxWHITE));
-        wxToolbook*    notebook = new wxToolbook(tabView, wxID_ANY);
+        ConfigRelateGUI::_Book* notebook = new ConfigRelateGUI::_Book(tabView, wxID_ANY);
         m_toolbook             = notebook;
         wxToolBarBase* toolBar  = notebook->GetToolBar();
         toolBar->Hide();
-        _Tab* tab = new _Tab(tabView);
+        _Tab* tab = new _Tab(tabView, wxSize(FromDIP(100), FromDIP(26)));
         m_tab     = tab;
         tab->appendTab(_L("Related Printer"));
+
+        wxBoxSizer* tabSizer = new wxBoxSizer(wxVERTICAL);
+        tabSizer->Add(tab, 0, wxLEFT | wxTOP);
+        tabSizer->Add(notebook, 1, wxTOP | wxEXPAND);
+        tabView->SetSizer(tabSizer);
+
         SelectedChangedFunc func = [notebook](int index) {
             notebook->SetSelection(index);
         };
         tab->bind(func);
         {
-            wxPanel* relatePrinterPage = new wxPanel(notebook);
+            ConfigRelateGUI::_Panel* relatePrinterPage = new ConfigRelateGUI::_Panel(notebook);
             {
                 m_printerListCtrl = new _ListWidget(relatePrinterPage);
                 m_printerListCtrl->SetBackgroundColour(wxColour(*wxWHITE));
@@ -2967,10 +3095,13 @@ public:
                         dlg.ShowModal();
 
                         if (dlg.isOk()) {
-                            auto&                    printers = dlg.selected();
+                            const std::vector<std::string>& printers = dlg.selected();
                             std::vector<std::string> filaments;
                             filaments.push_back(targetFilament);
-                            bool done = m_bundle->isSameVendorFilament(printers, filaments);
+                            std::vector<std::string> vtTargetPrinter;
+                            vtTargetPrinter = m_bundle->getFilamentPrinter(targetFilament);
+                            //bool done = m_bundle->isSameVendorFilament(printers, filaments);
+                            bool done = m_bundle->isSameVendorPrinter(vtTargetPrinter, printers);
                             if (!done) {
                                 _WarningTipsDialog wdlg(parentWindow, _L("The printers are from different vendors. Please check the parameters to avoid printing failure."));
                                 wdlg.ShowModal();
@@ -3005,17 +3136,17 @@ public:
                     btSizer->Add(m_addPrinterButton, 0, wxLEFT, 20);
                 }
                 wxBoxSizer* rmSizer = new wxBoxSizer(wxVERTICAL);
-                rmSizer->Add(m_printerListCtrl, 0, wxEXPAND | wxALL, 0);
-                rmSizer->Add(btSizer, 0, wxALIGN_CENTER | wxTOP, 21);
+                rmSizer->Add(m_printerListCtrl, 1, wxEXPAND | wxBOTTOM, 21);
+                rmSizer->Add(btSizer, 0, wxALIGN_CENTER | wxBOTTOM, 21);
                 relatePrinterPage->SetSizer(rmSizer);
             }
             notebook->AddPage(relatePrinterPage, _L("Related Printer"));
         }
 
-        tab->SetPosition(wxPoint(0, 0));
-        wxBoxSizer* tabSizer = new wxBoxSizer(wxVERTICAL);
-        tabSizer->Add(notebook, 0, wxTOP, 22);
-        tabView->SetSizer(tabSizer);
+        //tab->SetPosition(wxPoint(0, 0));
+        //wxBoxSizer* tabSizer = new wxBoxSizer(wxVERTICAL);
+        //tabSizer->Add(notebook, 0, wxTOP, 22);
+        //tabView->SetSizer(tabSizer);
 
         wxBoxSizer* pSizer = new wxBoxSizer(wxHORIZONTAL);
         pSizer->Add(m_treeCtrl, 3, wxEXPAND | wxALL, 0);
@@ -3040,7 +3171,7 @@ private:
     _Tab*                       m_tab;
 
     _ListWidget* m_printerListCtrl;
-    wxToolbook* m_toolbook;
+    ConfigRelateGUI::_Book* m_toolbook;
 };
 
 class _MyscrolledWindow : public wxScrolledWindow {
@@ -3102,21 +3233,16 @@ void ConfigRelateDialog::create()
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
     SetSizeHints(wxDefaultSize, wxDefaultSize);
 
-    auto main_sizer = new wxBoxSizer(wxVERTICAL);
+    auto main_sizer = new wxBoxSizer(wxBOTH);
 
-    m_scrolledWindow = new _MyscrolledWindow(this, wxID_ANY, wxDefaultPosition, windowSize, wxVSCROLL);
-    m_scrolledWindow->SetScrollRate(5, 5);
-
-    m_sizer_body = new wxBoxSizer(wxVERTICAL);
-
-    auto m_top_line = new wxPanel(m_scrolledWindow, wxID_ANY, wxDefaultPosition, wxSize(windowSize.x, 1), wxTAB_TRAVERSAL);
+    auto m_top_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(windowSize.x, 1), wxTAB_TRAVERSAL);
      m_top_line->SetBackgroundColour(DESIGN_GRAY400_COLOR);
-    //m_top_line->SetBackgroundColour(wxColour(255, 0, 0));
+    main_sizer->Add(m_top_line, 0, wxEXPAND, 0);
 
-    m_sizer_body->Add(m_top_line, 0, wxEXPAND, 0);
+    ConfigRelateGUI::_Panel* tabView = new ConfigRelateGUI::_Panel(this, wxID_ANY, wxDefaultPosition, contentSize);
+    main_sizer->Add(tabView, 1, wxEXPAND);
 
-    wxPanel*       tabView  = new wxPanel(m_scrolledWindow, wxID_ANY, wxDefaultPosition, contentSize);
-    wxToolbook*    notebook = new wxToolbook(tabView, wxID_ANY);
+    ConfigRelateGUI::_Book* notebook = new ConfigRelateGUI::_Book(tabView, wxID_ANY);
     wxToolBarBase* toolBar = notebook->GetToolBar();
     toolBar->Hide();
     _Tab* tab = new _Tab(tabView, wxSize(FromDIP(100), FromDIP(30)));
@@ -3132,32 +3258,17 @@ void ConfigRelateDialog::create()
         printerRelatePanel->loadBundle(m_relateBundle);
         materialRelatePanel->loadBundle(m_relateBundle);
     //}
-    tab->SetPosition(wxPoint(456, 0));
+    //tab->SetPosition(wxPoint(456, 0));
     wxBoxSizer* tabSizer = new wxBoxSizer(wxVERTICAL);
-    tabSizer->Add(notebook, 0, wxTOP | wxEXPAND, FromDIP(26));
+    tabSizer->Add(tab, 0, wxALIGN_CENTRE_HORIZONTAL | wxTOP, 10);
+    //tabSizer->Add(notebook, 0, wxTOP | wxEXPAND, FromDIP(26));
+    tabSizer->Add(notebook, 1, wxTOP | wxEXPAND, -5);
     tabView->SetSizer(tabSizer);
 
     SelectedChangedFunc func = [=](int index) {
        notebook->SetSelection(index);
     };
     tab->bind(func);
-
-#if !BBL_RELEASE_TO_PUBLIC
-    auto debug_page   = create_debug_page();
-#endif
-
-    m_sizer_body->Add(0, 0, 0, wxTOP, FromDIP(10));
-    m_sizer_body->Add(tabView, 0, wxALL, FromDIP(10));
-
-
-
-#if !BBL_RELEASE_TO_PUBLIC
-    m_sizer_body->Add(debug_page, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(38));
-#endif
-    m_sizer_body->Add(0, 0, 0, wxBOTTOM, FromDIP(10));
-    m_scrolledWindow->SetSizerAndFit(m_sizer_body);
-
-    main_sizer->Add(m_scrolledWindow, 1, wxEXPAND);
 
     SetSizer(main_sizer);
     Layout();
@@ -3184,7 +3295,10 @@ void ConfigRelateDialog::create()
     materialRelatePanel->selectTab(1);
     materialRelatePanel->selectTab(0);
     Refresh();
-    Update();
+    //Update();
+
+    //Bind(wxEVT_SIZE, [=](wxSizeEvent& evt) { Refresh(); });
+
 }
 
 void ConfigRelateDialog::resetLayout()

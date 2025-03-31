@@ -1613,7 +1613,7 @@ static inline ExPolygons detect_overhangs(
                 !(bbox_size.x() > length_thresh_well_supported && bbox_size.y() > length_thresh_well_supported))
             {
                 layer.sharp_tails.push_back(slice);
-                layer.sharp_tails_height.insert({ &slice, layer.height });
+                layer.sharp_tails_height.push_back(layer.height);
             }
         }
     }
@@ -1695,7 +1695,7 @@ static inline ExPolygons detect_overhangs(
                         if (is_sharp_tail) {
                             ExPolygons overhang = diff_ex({ expoly }, lower_layer_expolys);
                             layer.sharp_tails.push_back(expoly);
-                            layer.sharp_tails_height.insert({ &expoly, accum_height });
+                            layer.sharp_tails_height.push_back({accum_height});
                             overhang = offset_ex(overhang, 0.05 * fw);
                             polygons_append(diff_polygons, to_polygons(overhang));
                         }
@@ -2356,9 +2356,9 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::top_contact_
                     }
 
                     // 2.3 check whether sharp tail exceed the max height
-                    for (const auto& lower_sharp_tail_height : lower_layer_sharptails_height) {
-                        if (lower_sharp_tail_height.first->overlaps(expoly)) {
-                            accum_height += lower_sharp_tail_height.second;
+                    for (size_t i = 0; i < lower_layer_sharptails_height.size(); i++) {
+                        if (lower_layer_sharptails[i].overlaps(expoly)) {
+                            accum_height += lower_layer_sharptails_height[i];
                             break;
                         }
                     }
@@ -2383,7 +2383,7 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::top_contact_
                 if (is_sharp_tail) {
                     ExPolygons overhang = diff_ex({ expoly }, lower_layer->lslices);
                     layer->sharp_tails.push_back(expoly);
-                    layer->sharp_tails_height.insert({ &expoly, accum_height });
+                    layer->sharp_tails_height.push_back(accum_height);
                     append(overhangs_per_layers[layer_nr], overhang);
 #ifdef SUPPORT_TREE_DEBUG_TO_SVG
                     SVG svg(get_svg_filename(std::to_string(layer->print_z), "sharp_tail"), object.bounding_box());

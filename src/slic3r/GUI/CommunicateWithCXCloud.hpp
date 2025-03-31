@@ -45,6 +45,24 @@ namespace GUI {
         bool tokenValid = false;
     };
 
+    struct LocalUserPreset
+    {
+        std::string file     = "";
+        std::string infoFile = "";
+        std::string name     = "";
+        std::string type     = "";
+        bool        isJson   = false;
+        bool        needDel  = true;
+    };
+    struct SyncToLocalRetInfo
+    {
+        std::vector<LocalUserPreset> vtLocalUserPreset;
+        bool                         bPrinterAllOk  = true;
+        bool                         bFilamentAllOk = true;
+        bool                         bProcessAllOk  = true;
+    };
+
+
     enum class ENDownloadConfigState {
         ENDCS_NOT_DOWNLOAD,         //  未开始下载
         ENDCS_DOWNLOAD_SUCCESS,     //  下载成功
@@ -92,6 +110,20 @@ namespace GUI {
         std::mutex                                                m_cxCloudLoginInfoMutex;
     };
 
+    class CLocalDataCenter
+    {
+    public:
+        static CLocalDataCenter& getInstance();
+
+        bool isPrinterPresetExisted(const std::string& presetName);
+        bool isFilamentPresetExisted(const std::string& presetName);
+        bool isProcessPresetExisted(const std::string& presetName);
+
+    private:
+        CLocalDataCenter()   = default;
+        ~CLocalDataCenter() = default;
+    };
+
     struct UserInfo;
     class CommunicateWithCXCloud
     {
@@ -107,7 +139,7 @@ namespace GUI {
         //  用户参数包列表
         int getUserProfileList(std::vector<UserProfileListItem>& vtUserProfileListItem);
         //  下载用户预设
-        int downloadUserPreset(const UserProfileListItem& userProfileListItem);
+        int downloadUserPreset(const UserProfileListItem& userProfileListItem, std::string& saveJsonFile);
         //  请求上传用户参数包
         int preUpdateProfile_create(const UploadFileInfo& fileInfo, PreUpdateProfileRetInfo& retInfo);
         int preUpdateProfile_update(const UploadFileInfo& fileInfo, PreUpdateProfileRetInfo& retInfo);
@@ -117,8 +149,14 @@ namespace GUI {
 
     private:
         void setLastError(const std::string& code, const std::string& msg);
-        int  saveSyncDataToLocal(const UserInfo& userInfo, const UserProfileListItem& userProfileListItem, const std::string& body);
-        int  saveLocalDeviceToLocal(const UserInfo& userInfo, const UserProfileListItem& userProfileListItem, const std::string& body);
+        int  saveSyncDataToLocal(const UserInfo&            userInfo,
+                                 const UserProfileListItem& userProfileListItem,
+                                 const std::string&         body,
+                                 std::string&               saveJsonFile);
+        int  saveLocalDeviceToLocal(const UserInfo&            userInfo,
+                                    const UserProfileListItem& userProfileListItem,
+                                    const std::string&         body,
+                                    std::string&               saveJsonFile);
 
     private:
         LastError m_lastError;

@@ -3,6 +3,7 @@
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "libslic3r/Time.hpp"
+#include "MsgDialog.hpp"
 
 namespace Slic3r { 
 namespace GUI {
@@ -122,10 +123,12 @@ void SyncUserPresets::onRun()
             m_syncThreadState = ENSyncThreadState::ENTS_IDEL_CHECK;
             if (cmd == ENSyncCmd::ENSC_SYNC_TO_LOCAL) {
                 m_syncThreadState = ENSyncThreadState::ENTS_SYNC_TO_LOCAL;
-                if (doSyncToLocal() != 0) {
+                SyncToLocalRetInfo syncToLocalRetInfo;
+                if (doSyncToLocal(syncToLocalRetInfo) != 0) {
                     continue;
                 }
                 wxGetApp().CallAfter([=] { 
+                    //delLocalUserPresetsInUiThread(syncToLocalRetInfo);
                     reloadPresetsInUiThread();
                 });
                 syncConfigToCXCloud();
@@ -186,7 +189,8 @@ void SyncUserPresets::reloadPresetsInUiThread()
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets reloadPresetsInUiThread end";
 }
 
-int SyncUserPresets::doSyncToLocal() {
+int SyncUserPresets::doSyncToLocal(SyncToLocalRetInfo& syncToLocalRetInfo)
+{
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doSyncToLocal start...";
     CXCloudDataCenter::getInstance().cleanUserCloudPresets();
     int                              nRet = 0;
@@ -200,16 +204,34 @@ int SyncUserPresets::doSyncToLocal() {
 
 //    copyOldPresetToBackup();
 
+    getLocalUserPresets(syncToLocalRetInfo.vtLocalUserPreset);
+
     CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_CXCLOUD_NO_CONFIG);
     int i = 0;
     for (auto item : vtUserProfileListItem) {
         BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset " << i++;
-        nRet = m_commWithCXCloud.downloadUserPreset(item);
+        std::string saveJsonFile = "";
+        nRet = m_commWithCXCloud.downloadUserPreset(item, saveJsonFile);
         if (item.type == "sync_data") { //  ÅäÖÃÎÄ¼þ
             if (nRet == 0) {
                 CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_DOWNLOAD_SUCCESS);
             } else {
                 CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_DOWNLOAD_FAIL);
+            }
+        }
+        if (nRet != 0) {
+            if (item.type == "printer") {
+                syncToLocalRetInfo.bPrinterAllOk = false;
+            } else if (item.type == "filament" || item.type == "materia") {
+                syncToLocalRetInfo.bFilamentAllOk = false;
+            } else if (item.type == "process") {
+                syncToLocalRetInfo.bProcessAllOk = false;
+            }
+        } else {
+            auto iter = std::find_if(syncToLocalRetInfo.vtLocalUserPreset.begin(), syncToLocalRetInfo.vtLocalUserPreset.end(),
+                                     [saveJsonFile](const LocalUserPreset& preset) { return preset.file == saveJsonFile; });
+            if (iter != syncToLocalRetInfo.vtLocalUserPreset.end()) {
+                iter->needDel = false;
             }
         }
     }
@@ -707,6 +729,185 @@ int SyncUserPresets::copyOldPresetToBackup()
         BOOST_LOG_TRIVIAL(error) << "SyncUserPresets copyOldPresetToBackup catch." << e.what();
     }
     return nRet;
+}
+
+int SyncUserPresets::getLocalUserPresets(std::vector<LocalUserPreset>& vtLocalUserPreset)
+{
+    const UserInfo& userInfo    = wxGetApp().get_user();
+    std::string     user        = userInfo.userId;
+    fs::path        user_folder = fs::path(data_dir()).append(PRESET_USER_DIR).append(userInfo.userId);
+    std::vector     vtFolder    = {"machine", "filament", "process"};
+    for (auto folder : vtFolder) {
+        for (const auto& entry : fs::directory_iterator(fs::path(user_folder).append(folder))) {
+            if (entry.is_directory()) {
+                for (const auto& baseEntry : fs::directory_iterator(fs::path(user_folder).append(folder).append(entry.path().filename()))) {
+                    if (!baseEntry.is_directory()) {
+                        LocalUserPreset localUserPreset;
+                        localUserPreset.file = fs::path(baseEntry.path()).make_preferred().string();
+                        localUserPreset.name = baseEntry.path().filename().string();
+                        localUserPreset.type = folder;
+                        if (entry.path().extension().string() == ".json") {
+                            localUserPreset.isJson   = true;
+                            localUserPreset.infoFile = fs::path(entry.path().parent_path()).append(localUserPreset.name + ".info").string();
+                            if (!fs::exists(localUserPreset.infoFile)) {
+                                localUserPreset.infoFile = "";
+                            }
+                            vtLocalUserPreset.push_back(localUserPreset);
+                        } else {
+                            localUserPreset.isJson = false;
+                        }
+                    }
+                }
+            } else {
+                LocalUserPreset localUserPreset;
+                localUserPreset.file = fs::path(entry.path()).make_preferred().string();
+                localUserPreset.name = entry.path().filename().stem().string();
+                localUserPreset.type = folder;
+                if (entry.path().extension().string() == ".json") {
+                    localUserPreset.isJson   = true;
+                    localUserPreset.infoFile = fs::path(entry.path().parent_path()).append(localUserPreset.name + ".info").string();
+                    if (!fs::exists(localUserPreset.infoFile)) {
+                        localUserPreset.infoFile = "";
+                    }
+                    vtLocalUserPreset.push_back(localUserPreset);
+                } else {
+                    localUserPreset.isJson = false;
+                }
+            }
+        }
+        if (!fs::exists(fs::path(user_folder).append(folder).append("base"))) {
+            continue;
+        }
+        for (const auto& entry : fs::directory_iterator(fs::path(user_folder).append(folder).append("base"))) {
+            if (entry.is_directory()) {
+                for (const auto& baseEntry :
+                        fs::directory_iterator(fs::path(user_folder).append(folder).append(entry.path().filename()))) {
+                    if (!baseEntry.is_directory()) {
+                        LocalUserPreset localUserPreset;
+                        localUserPreset.file = fs::path(baseEntry.path()).make_preferred().string();
+                        localUserPreset.name = baseEntry.path().filename().string();
+                        localUserPreset.type = folder;
+                        if (entry.path().extension().string() == ".json") {
+                            localUserPreset.isJson = true;
+                            localUserPreset.infoFile =
+                                fs::path(entry.path().parent_path()).append(localUserPreset.name + ".info").string();
+                            if (!fs::exists(localUserPreset.infoFile)) {
+                                localUserPreset.infoFile = "";
+                            }
+                            vtLocalUserPreset.push_back(localUserPreset);
+                        } else {
+                            localUserPreset.isJson = false;
+                        }
+                    }
+                }
+            } else {
+                LocalUserPreset localUserPreset;
+                localUserPreset.file = fs::path(entry.path()).make_preferred().string();
+                localUserPreset.name = entry.path().filename().stem().string();
+                localUserPreset.type = folder;
+                if (entry.path().extension().string() == ".json") {
+                    localUserPreset.isJson   = true;
+                    localUserPreset.infoFile = fs::path(entry.path().parent_path()).append(localUserPreset.name + ".info").string();
+                    if (!fs::exists(localUserPreset.infoFile)) {
+                        localUserPreset.infoFile = "";
+                    }
+                    vtLocalUserPreset.push_back(localUserPreset);
+                } else {
+                    localUserPreset.isJson = false;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int SyncUserPresets::delLocalUserPresetsInUiThread(const SyncToLocalRetInfo& syncToLocalRetInfo)
+{
+    std::vector<LocalUserPreset> vtNeedDel;
+    for (auto item : syncToLocalRetInfo.vtLocalUserPreset) {
+        if (item.isJson && item.needDel) {
+            if (item.type == "machine" && syncToLocalRetInfo.bPrinterAllOk) {
+                vtNeedDel.push_back(item);
+            } else if (item.type == "filament" && syncToLocalRetInfo.bFilamentAllOk) {
+                vtNeedDel.push_back(item);
+            } else if (item.type == "process" && syncToLocalRetInfo.bProcessAllOk) {
+                vtNeedDel.push_back(item);
+            }
+        }
+    }
+
+    for (auto item : vtNeedDel) {
+        // continue;
+        if (item.isJson && item.needDel) {
+            PresetCollection* collection = nullptr;
+            wxString          strTip     = "";
+            if (item.type == "machine" && syncToLocalRetInfo.bPrinterAllOk) {
+                collection = &wxGetApp().preset_bundle->printers;
+                strTip     = wxString::Format(
+                    _L("The cloud printer preset [%s] has been deleted. \nDo you want to delete the local printer preset?"),
+                    from_u8(item.name));
+            } else if (item.type == "filament" && syncToLocalRetInfo.bFilamentAllOk) {
+                collection = &wxGetApp().preset_bundle->filaments;
+                strTip     = wxString::Format(
+                    _L("The cloud filament preset [%s] has been deleted. \nDo you want to delete the local filament preset?"),
+                    from_u8(item.name));
+            } else if (item.type == "process" && syncToLocalRetInfo.bProcessAllOk) {
+                collection = &wxGetApp().preset_bundle->prints;
+                strTip     = wxString::Format(
+                    _L("The cloud process preset [%s] has been deleted. \nDo you want to delete the local process preset?"),
+                    from_u8(item.name));
+            }
+            if (collection != nullptr) {
+                Preset* preset = collection->find_preset(item.name);
+                if (preset != nullptr) {
+                    if ((preset->setting_id.empty() && preset->sync_info.empty()) || preset->sync_info.compare("create") == 0) {
+                        BOOST_LOG_TRIVIAL(warning)
+                            << "SyncUserPresets delLocalUserPresetsInUiThread preset[" << item.name << "] need update to cxcloud";
+                        continue;
+                    }
+                }
+
+            }
+            {
+                fs::path    path(item.file);
+                std::string parentPathName = path.parent_path().filename().string();
+                if (path.parent_path().filename() != "base") {
+                    auto iter = std::find_if(syncToLocalRetInfo.vtLocalUserPreset.begin(), syncToLocalRetInfo.vtLocalUserPreset.end(),
+                                        [path](const LocalUserPreset& preset) {
+                                            fs::path pathbase = fs::path(path.parent_path()).append("base").append(path.filename());
+                                            return preset.file == pathbase;
+                                        });
+                    if (iter != syncToLocalRetInfo.vtLocalUserPreset.end()) {
+                        if (fs::exists(item.file)) {
+                            fs::remove(item.file);
+                            fs::remove(item.infoFile);
+
+                            BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets delLocalUserPresetsInUiThread preset[" << item.name << "] has move to base";
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            if (collection != nullptr) {
+                Preset*  preset = collection->find_preset(fs::path(item.file).filename().string());
+                MessageDialog msgDlg(nullptr, strTip, wxEmptyString, wxICON_QUESTION | wxYES_NO);
+                int           res = msgDlg.ShowModal();
+                if (res == wxID_YES) {
+                    if (preset != nullptr)
+                        collection->delete_preset(item.name);
+                    else {
+                        if (fs::exists(item.file)) {
+                            fs::remove(item.file);
+                            fs::remove(item.infoFile);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return 0;
 }
 
 }} // namespace Slic3r::GUI

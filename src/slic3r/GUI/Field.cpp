@@ -1285,7 +1285,7 @@ void Choice::BUILD()
             && m_list == nullptr) {
         m_is_editable = true;
         static Builder<choice_ctrl> builder1;
-        temp = builder1.build(m_parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxTE_PROCESS_ENTER);
+        temp = builder1.build(m_parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxCB_READONLY);
     }
     else {
 #ifdef UNDEIFNED__WXOSX__ // __WXOSX__ // BBS

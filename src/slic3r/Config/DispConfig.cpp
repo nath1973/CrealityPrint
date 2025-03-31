@@ -113,8 +113,8 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
         //tuple3:needSel
         static std::map<TextureType, std::tuple<std::string,bool,bool,bool>> s_names = {
             {e_tt_home,{"home.png",true,true,false}},
-            {e_tt_collapse,{"collapse_bk.png",true,false,false}},
-            {e_tt_collapse_item,{"collapse.png",true,true,true}},
+            {e_tt_collapse,{"collapse_bk.svg",true,false,false}},
+            {e_tt_collapse_item,{"collapse.svg",true,true,true}},
             {e_tt_bed_custom,{"custom.png",false,false,false}},
             {e_tt_bed_texture,{"texture.png",false,false,false}},
             {e_tt_bed_smooth,{"smooth.svg",false,false,false}},
@@ -459,6 +459,9 @@ ImU32 DispConfig::getColorImU32(ColorType ct) {
         break;
     case Slic3r::GUI::DispConfig::e_ct_sliderTip:
         ret = s_isDark ? IM_COL32(66, 75, 81,255) : IM_COL32(242, 242, 245,255);
+        break;
+    case Slic3r::GUI::DispConfig::e_ct_normalTip:
+        ret = IM_COL32(0, 255, 0, 255);
         break;
     default: break;
     }

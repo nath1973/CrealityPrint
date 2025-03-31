@@ -106,6 +106,9 @@ inline typename Derived::Scalar cross2(const Eigen::MatrixBase<Derived> &v1, con
     return v1.x() * v2.y() - v1.y() * v2.x();
 }
 
+template<typename T, int Options>
+inline Eigen::Matrix<T, 2, 1, Eigen::DontAlign> perp(const Eigen::MatrixBase<Eigen::Matrix<T, 2, 1, Options>> &v) { return Eigen::Matrix<T, 2, 1, Eigen::DontAlign>(- v.y(), v.x()); }
+
 // 2D vector perpendicular to the argument.
 template<typename Derived>
 inline Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> perp(const Eigen::MatrixBase<Derived> &v)
@@ -272,6 +275,8 @@ inline bool is_approx(const Point &p1, const Point &p2, coord_t epsilon = coord_
 	Point d = (p2 - p1).cwiseAbs();
 	return d.x() < epsilon && d.y() < epsilon;
 }
+
+inline Point turn90_ccw(const Point pt) { return Point(-pt(1), pt(0)); }
 
 inline bool is_approx(const Vec2f &p1, const Vec2f &p2, float epsilon = float(EPSILON))
 {

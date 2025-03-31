@@ -20,6 +20,7 @@
 #include <GL/glew.h>
 
 #include "FixModelByWin10.hpp"
+#include <libslic3r/SLA/Hollowing.hpp>
 
 #define MAX_SIZE std::string_view { "9999.99" }
 
@@ -106,6 +107,25 @@ bool GLGizmoDrill::on_mouse(const wxMouseEvent& mouse_event)
     return false;
 }
 
+void generate_circle_points(const Vec3d& center, const Vec3d& direction, double radius, int num_points, std::vector<Vec3d>& points)
+{
+    // Normalize the input direction
+    Vec3d d = direction.normalized();
+
+    // Choose a vector that is not collinear with d as the initial reference
+    Vec3d arbitrary = (std::abs(d.x()) < 0.9) ? Vec3d(1, 0, 0) : Vec3d(0, 1, 0);
+    // Calculate the plane basis, u and v are both perpendicular to d
+    Vec3d u = (arbitrary - arbitrary.dot(d) * d).normalized();
+    Vec3d v = d.cross(u).normalized();
+
+    // Generate points on the circumference in the plane
+    for (int i = 0; i < num_points; ++i) {
+        double angle = 2.0 * M_PI * i / num_points;
+        Vec3d  point = center + radius * (std::cos(angle) * u + std::sin(angle) * v);
+        points.push_back(point);
+    }
+}
+
 bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
     if (action != SLAGizmoEventType::LeftDown)
@@ -135,8 +155,7 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 
     // Cast a ray on all meshes, pick the closest hit and save it for the respective mesh
     for (int mesh_id = 0; mesh_id < int(trafo_matrices.size()); ++mesh_id) {
-        MeshRaycaster mesh_raycaster = MeshRaycaster(mo->volumes[mesh_id]->mesh_ptr());
-        if (mesh_raycaster.unproject_on_mesh(m_mouse_pos, trafo_matrices[mesh_id], camera, hit, normal,
+        if (m_raycaster->unproject_on_mesh(m_mouse_pos, Transform3d::Identity(), camera, hit, normal,
                                                 m_c->object_clipper()->get_clipping_plane(), &facet)) {
             // Is this hit the closest to the camera so far?
             double hit_squared_distance = (camera.get_position() - trafo_matrices[mesh_id] * hit.cast<double>()).squaredNorm();
@@ -147,18 +166,38 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
                 closest_normal               = normal;
 
                 {
-                Vec3f normalSec = Vec3f::Zero();
-                Vec3f hitSec    = Vec3f::Zero();
-                // get second hit by MeshRaycaster::second_closest_hit
-                if (m_one_layer_only && mesh_raycaster.second_closest_hit(m_mouse_pos, trafo_matrices[mesh_id], camera, hitSec, normalSec,
-                                                      m_c->object_clipper()->get_clipping_plane())) {
-                    depth = (hit - hitSec).norm();
+                if (m_one_layer_only) {
+                    depth = 0.;
+                    const AABBMesh& aabb = m_raycaster->get_aabb_mesh();
+                    Vec3d orient = normal.cast<double>();
+                    getDirection(orient);
+
+                    std::vector<Vec3d> points;
+                    points.reserve(17);
+                    points.push_back(hit.cast<double>());
+                    generate_circle_points(hit.cast<double>(), orient, m_radius, 16, points);
+                    for (const auto& point : points) {
+                        std::vector<AABBMesh::hit_result> ray_hits = aabb.query_ray_hits(point, -orient, {});
+                        if (ray_hits.empty())
+                            continue;
+                        for (const auto& ray_hit : ray_hits) {
+                            if (ray_hit.normal().dot(-orient) <= 0)
+                                continue;
+                            Vec3d  hitPos   = ray_hit.position();
+                            Vec3d  diff     = hitPos - point;
+                            double distance = diff.norm();
+                            if (distance > depth) {
+                                depth     = distance;
+                            }
+                            break;
+                        }
+                    }
+                    depth += 2.;
                 }
                 }
             }
         }
     }
-
     if (closest_hit == Vec3f::Zero() && closest_normal == Vec3f::Zero())
         return false;
     m_src.trafo      = mo->volumes[closest_hit_mesh_id]->get_matrix();
@@ -204,7 +243,7 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
             break;
         }
     }
-
+    auto m = indexed_triangle_set{};
     TriangleMesh        temp_src_mesh{selected_volumes->mesh().its};
 
     TriangleMesh              temp_tool_mesh(get_drill_mesh());
@@ -212,50 +251,52 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     const Transform3d         src_matrix = selected_volumes->get_transformation().get_matrix();
     temp_src_mesh.transform(selected_volumes_matrix);
     temp_tool_mesh.transform(feature_matrix);
-    Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "A_NOT_B");
-    if (temp_mesh_resuls.size() != 0) {
+
+    auto ret = sla::hollow_mesh_and_drill(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls);
 #ifdef HAS_WIN10SDK
-        bool b_mesh_change = (temp_src_mesh.its.indices.size() != temp_mesh_resuls.front().its.indices.size());
-        // fix_non_manifold_edges
-        if (!b_mesh_change && is_windows10()) {
-                ModelObject* model_obj = m_c->selection_info()->model_object();
+    // fix_non_manifold_edges
+    if (ret && is_windows10()) {
+        ModelObject* model_obj = m_c->selection_info()->model_object();
 
-                std::vector<std::string> succes_models;
-                // model_name     failing reason
-                std::vector<std::pair<std::string, std::string>> failed_models;
-                auto                                             plater = wxGetApp().plater();
-                auto fix_and_update_progress = [this, plater](ModelObject* model_object, const int vol_idx, const string& model_name,
-                                                                ProgressDialog& progress_dlg, std::vector<std::string>& succes_models,
-                                                                std::vector<std::pair<std::string, std::string>>& failed_models) {
-                    wxString msg = _L("Repairing model object");
-                    msg += ": " + from_u8(model_name) + "\n";
-                    std::string res;
-                    if (!fix_model_by_win10_sdk_gui(*model_object, vol_idx, progress_dlg, msg, res))
-                        return false;
-                    return true;
-                };
-                ProgressDialog progress_dlg(_L("Repairing model object"), "", 100, find_toplevel_parent(plater),
-                                            wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT, true);
+        std::vector<std::string> succes_models;
+        // model_name     failing reason
+        std::vector<std::pair<std::string, std::string>> failed_models;
+        auto                                             plater = wxGetApp().plater();
+        auto fix_and_update_progress = [this, plater](ModelObject* model_object, const int vol_idx, const string& model_name,
+                                                        ProgressDialog& progress_dlg, std::vector<std::string>& succes_models,
+                                                        std::vector<std::pair<std::string, std::string>>& failed_models) {
+            wxString msg = _L("Repairing model object");
+            msg += ": " + from_u8(model_name) + "\n";
+            std::string res;
+            if (!fix_model_by_win10_sdk_gui(*model_object, vol_idx, progress_dlg, msg, res))
+                return false;
+            return true;
+        };
+        ProgressDialog progress_dlg(_L("Repairing model object"), "", 100, find_toplevel_parent(plater),
+                                    wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT, true);
 
-                auto model_name = model_obj->name;
-                if (!fix_and_update_progress(model_obj, m_src.volume_idx, model_name, progress_dlg, succes_models, failed_models)) {
-                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "run fix_and_update_progress error";
-                };
+        auto model_name = model_obj->name;
+        if (!fix_and_update_progress(model_obj, m_src.volume_idx, model_name, progress_dlg, succes_models, failed_models)) {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "run fix_and_update_progress error";
+        };
  
-                TriangleMesh temp_src_mesh{selected_volumes->mesh().its};
-                TriangleMesh              temp_tool_mesh(get_drill_mesh());
-                temp_src_mesh.transform(selected_volumes_matrix);
-                temp_tool_mesh.transform(feature_matrix);
-                temp_mesh_resuls.clear();
-                Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "A_NOT_B");
-        }
-#endif
-        int active_inst = m_c->selection_info()->get_active_instance();
-        const Transform3d instance_matrix = mo->instances[active_inst]->get_transformation().get_matrix_no_offset();
-        temp_mesh_resuls.front().transform(instance_matrix.inverse());
-        generate_new_volume(true, *temp_mesh_resuls.begin());
-        wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+        TriangleMesh temp_src_mesh{selected_volumes->mesh().its};
+        TriangleMesh              temp_tool_mesh(get_drill_mesh());
+        temp_src_mesh.transform(selected_volumes_matrix);
+        temp_tool_mesh.transform(feature_matrix);
+        temp_mesh_resuls.clear();
+        auto ret = sla::hollow_mesh_and_drill(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls);
+        if (ret)
+            Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "A_NOT_B");
     }
+#endif
+    if (temp_mesh_resuls.empty())
+        return mouse_on_object;
+    int active_inst = m_c->selection_info()->get_active_instance();
+    const Transform3d instance_matrix = mo->instances[active_inst]->get_transformation().get_matrix_no_offset();
+    temp_mesh_resuls.front().transform(instance_matrix.inverse());
+    generate_new_volume(true, *temp_mesh_resuls.begin());
+    wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
     return mouse_on_object;
 }
 

@@ -167,6 +167,8 @@ set(lisbslic3r_sources
     Format/svg.cpp
     Format/ZipperArchiveImport.hpp
     Format/ZipperArchiveImport.cpp
+	Format/AssimpModel.cpp
+    Format/AssimpModel.hpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/CoolingBuffer.cpp
@@ -328,31 +330,45 @@ set(lisbslic3r_sources
     SlicesToTriangleMesh.cpp
     SlicingAdaptive.cpp
     SlicingAdaptive.hpp
-    Support/SupportCommon.cpp
-    Support/SupportCommon.hpp
-    Support/SupportDebug.cpp
-    Support/SupportDebug.hpp
-    Support/SupportLayer.hpp
+    #Support/SupportCommon.cpp
+    #Support/SupportCommon.hpp
+    #Support/SupportDebug.cpp
+    #Support/SupportDebug.hpp
+    #Support/SupportLayer.hpp
     # Support/SupportMaterial.cpp
     # Support/SupportMaterial.hpp
-    Support/SupportParameters.cpp
-    Support/SupportParameters.hpp
-    Support/OrganicSupport.cpp
-    Support/OrganicSupport.hpp
-    Support/TreeSupport.cpp
-    Support/TreeSupport.hpp
-    Support/TreeSupportCommon.cpp
-    Support/TreeSupportCommon.hpp
-    Support/TreeModelVolumes.cpp
-    Support/TreeModelVolumes.hpp
-    SupportMaterial.cpp
-    SupportMaterial.hpp
+    #Support/SupportParameters.cpp
+    #Support/SupportParameters.hpp
+    #Support/OrganicSupport.cpp
+    #Support/OrganicSupport.hpp
+    #Support/TreeSupport.cpp
+    #Support/TreeSupport.hpp
+    #Support/TreeSupportCommon.cpp
+    #Support/TreeSupportCommon.hpp
+    #Support/TreeModelVolumes.cpp
+    #Support/TreeModelVolumes.hpp
+    #SupportMaterial.cpp
+    #SupportMaterial.hpp
+	support_new/SupportCommon.cpp
+	support_new/SupportCommon.hpp
+	support_new/SupportLayer.hpp
+	support_new/SupportMaterial.cpp
+	support_new/SupportMaterial.hpp
+	support_new/SupportParameters.hpp
+	support_new/TreeModelVolumes.cpp
+	support_new/TreeModelVolumes.hpp
+	support_new/TreeSupport.cpp
+	support_new/TreeSupport.hpp
+	support_new/TreeSupport3D.cpp
+	support_new/TreeSupport3D.hpp
+	support_new/TreeSupportCommon.hpp
+	
     PrincipalComponents2D.cpp
     PrincipalComponents2D.hpp
-    SupportSpotsGenerator.cpp
-    SupportSpotsGenerator.hpp
-    TreeSupport.hpp 
-    TreeSupport.cpp
+    #SupportSpotsGenerator.cpp
+    #SupportSpotsGenerator.hpp
+    #TreeSupport.hpp 
+    #TreeSupport.cpp
     MinimumSpanningTree.hpp
     MinimumSpanningTree.cpp
     Surface.cpp

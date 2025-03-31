@@ -552,7 +552,13 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
     wxColor cardColor  = wxColor(45, 45, 49);
     if (!m_plater)
         return;
-    PartPlate* plate      = m_plater->get_partplate_list().get_plate(m_plater->get_partplate_list().get_curr_plate_index());
+
+    bool is_all_plates     = wxGetApp().plater()->get_preview_canvas3D()->is_all_plates_selected();
+    int  current_plate_idx = wxGetApp().plater()->get_partplate_list().get_curr_plate_index();
+    if (is_all_plates) {
+        current_plate_idx = 0;
+    }
+    PartPlate* plate = m_plater->get_partplate_list().get_plate(current_plate_idx);
     {
         ThumbnailData data;
         GCodeProcessorResult* current_result = plate->get_slice_result();
@@ -1633,7 +1639,12 @@ bool UploadGcodeToCloudDialog::Show(bool show)
     if (show) {
         wxGetApp().reset_to_active();
         if (wxGetApp().plater()) {
-            set_plate_info(wxGetApp().plater()->get_partplate_list().get_curr_plate_index());
+            bool is_all_plates     = wxGetApp().plater()->get_preview_canvas3D()->is_all_plates_selected();
+            int  current_plate_idx = wxGetApp().plater()->get_partplate_list().get_curr_plate_index();
+            if (is_all_plates) {
+                current_plate_idx = 0;
+            }
+            set_plate_info(current_plate_idx);
         }
         update_user_machine_list();
         get_current_plate_color();
@@ -1650,9 +1661,6 @@ bool UploadGcodeToCloudDialog::Show(bool show)
 
 int UploadGcodeToCloudDialog::doModel() { 
     wxGetApp().reset_to_active();
-    if (wxGetApp().plater()) {
-        set_plate_info(wxGetApp().plater()->get_partplate_list().get_curr_plate_index());
-    }
     update_user_machine_list();
     get_current_plate_color();
     update_3mf_info();

@@ -1262,8 +1262,22 @@ bool IMSlider::render(int canvas_width, int canvas_height)
             }
         }
 
-        config.prepareWindow(DispConfig::e_wt_slider_move, ImVec2(canvas_width / 2, canvas_height), scale);
+        //config.prepareWindow(DispConfig::e_wt_slider_move, ImVec2(canvas_width / 2, canvas_height), scale);
         
+        float left_widgets_width = (90 + 300) * scale; // thumbs + gcode viewer
+        ImGuiWindow* win = ImGui::FindWindowByName("gcode_legend");
+        if (win) {
+            left_widgets_width = std::max(win->Pos.x + win->SizeFull.x, left_widgets_width);
+        }
+        const float right_widgets_width = (215 + 10)* scale; // slicer buttons
+        const float remaining_space = canvas_width - left_widgets_width - right_widgets_width;
+        const float minsize = 280.0f;
+        ImVec2      winsize = config.getWindowSize(DispConfig::e_wt_slider_move, scale);
+        winsize.x = std::min(std::max(remaining_space, minsize), winsize.x);
+
+        ImGui::SetNextWindowPos(ImVec2(left_widgets_width + remaining_space / 2, canvas_height - 10), ImGuiCond_Always, ImVec2(0.5, 1.0));
+        ImGui::SetNextWindowSize(winsize);
+
         ImGui::PushStyleColor(ImGuiCol_WindowBg,m_is_dark ? ImVec4(75.0 / 255.0, 75.0 / 255.0, 77.0 / 255.0, 1.0) : ImVec4(255,255,255,1));
         ImGui::PushStyleColor(ImGuiCol_Border, m_is_dark ? ImVec4(38.0 / 255.0, 38.0 / 255.0, 38.0 / 255.0, 1.0) : ImVec4(203/255, 203/255, 204/255,1.0));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5);
@@ -1277,10 +1291,13 @@ bool IMSlider::render(int canvas_width, int canvas_height)
             
             float win_h = ImGui::GetWindowHeight();
             float item_height = ImGui::GetFrameHeight();
-            float slider_size = 290.0f * scale;
             float input_size = 50.0f * scale;
             const ImVec2 updown_button_size = ImVec2(15.0f * scale, item_height / 2.0f);
-            float        total_size         = input_size + updown_button_size.x + 5.0f * scale;
+            float border_size = input_size + updown_button_size.x + 5.0f * scale;
+
+            const float misc_size  = 170.0f * scale;// play button size + border_size + animate button size + spaces
+            float       slider_size = winsize.x - misc_size;
+
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
             
             // play button
@@ -1324,8 +1341,13 @@ bool IMSlider::render(int canvas_width, int canvas_height)
                     ImVec2 pos       = ImGui::GetCursorScreenPos();
                     
                     ImVec2 pos_min = ImVec2(pos.x, win_pos.y + 10.0f * scale);
-                    ImVec2 pos_max = ImVec2(pos_min.x + total_size, pos_min.y + ImGui::GetWindowHeight() - 20.0f * scale);
-                    draw_list->AddRect(pos_min, pos_max, IM_COL32(0, 255, 0, 255), 5.0f, ImDrawFlags_RoundCornersAll);
+                    ImVec2 pos_max = ImVec2(pos_min.x + border_size, pos_min.y + ImGui::GetWindowHeight() - 20.0f * scale);
+
+                    bool hover = ImGui::IsMouseHoveringRect(pos_min, pos_max);
+
+                    ImVec4 border_color = hover ? ImGuiWrapper::COL_CREALITY : ImVec4(110.0f / 255.0f, 110.0f / 255.0f, 114.0f/255.0f, 1.0f);
+
+                    draw_list->AddRect(pos_min, pos_max, ImGui::ColorConvertFloat4ToU32(border_color), 5.0f, ImDrawFlags_RoundCornersAll);
                 }
 
                 bool input = ImGui::BBLDragScalar("##steps_input", ImGuiDataType_S32, &value, 1, &min, &max);
@@ -1417,8 +1439,8 @@ bool IMSlider::render(int canvas_width, int canvas_height)
         if (remain_h < slider_size.y) {
             slider_size.y = remain_h;
         }
-
-        ImGui::SetNextWindowPos(slider_pos, ImGuiCond_Always, ImVec2(0.84, 0));
+        const float bias_x = 0.84f;
+        ImGui::SetNextWindowPos(slider_pos, ImGuiCond_Always, ImVec2(bias_x, 0));
         ImGui::SetNextWindowSize(slider_size);
 
         config.processWindows("laysers_slider", [&]() { 
@@ -1437,6 +1459,23 @@ bool IMSlider::render(int canvas_width, int canvas_height)
                     SetLowerValue(lower_value);
             }
         }, cfg);
+
+        //draw ? in circle
+        if (view_type == GLCanvas3D::CanvasPreview) {
+
+            ImVec2 frmae_pos = ImVec2(slider_pos.x + slider_size.x * (1.0f - bias_x) - config.getWindowSize(DispConfig::e_wt_slider, scale).x * 0.5f,
+                                       slider_pos.y + slider_size.y);
+            ImGui::SetNextWindowPos(frmae_pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+            //ImGui::SetNextWindowSize(ImVec2(50,50));
+
+            config.processWindows("circle_frame", [this]() {    
+                
+                draw_circle_frame("?");
+
+            }, cfg);
+        }
+
+
     }
     return ret;
 }
@@ -2013,6 +2052,60 @@ std::array<int, 2> IMSlider::get_active_extruders_for_tick(int tick) const
     }
 
     return extruders;
+}
+
+ImVec2 IMSlider::draw_circle_frame(const char* label, const ImVec2& size_arg)
+{
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems)
+        return ImVec2();
+    const float frame_padding = 2.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(frame_padding, frame_padding));
+
+    ImGuiContext&     g          = *GImGui;
+    const ImGuiStyle& style      = g.Style;
+    const ImGuiID     id         = window->GetID(label);
+    const ImVec2      label_size = ImGui::CalcTextSize(label, NULL, true);
+
+    const float max_label = ImMax(label_size.x, label_size.y);
+
+    ImVec2 pos  = window->DC.CursorPos;
+    ImVec2 win_size = ImGui::GetContentRegionAvail();
+    ImVec2 size = ImGui::CalcItemSize(size_arg, max_label + style.FramePadding.x * 2.0f, max_label + style.FramePadding.y * 2.0f);
+    
+    pos.x = pos.x + win_size.x * 0.5 - size.x * 0.5; //in window top center
+    const ImRect bb(pos, pos + size);
+    ImGui::ItemSize(size, style.FramePadding.y);
+    if (!ImGui::ItemAdd(bb, id)) {
+        ImGui::PopStyleVar();
+        return ImVec2();
+    }
+
+    bool hovered, held;
+    bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+
+    float radius = size.x * 0.5f;
+    // Render
+    ImU32 normal = ImGui::GetColorU32(IM_COL32(75, 75, 77, 125));
+    ImU32 hover = ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY);
+    const ImU32 col = (!held && !hovered) ? normal : hover;
+    ImGui::RenderNavHighlight(bb, id);
+    ImGui::RenderFrame(bb.Min, bb.Max, col, false, radius);
+
+    ImVec2 center = ImVec2((bb.Min.x + bb.Max.x) * 0.5f, (bb.Min.y + bb.Max.y) * 0.5f);
+    /*window->DrawList->AddCircleFilled(center, radius, col, 32);*/
+
+    // Draw text
+    ImVec2 text_pos = ImVec2(center.x - label_size.x * 0.5f, center.y - label_size.y * 0.5f);
+    ImGui::RenderText(text_pos, label);
+
+    if (hovered) {
+        show_tooltip(_u8L("Right click to show more operation"));
+    }
+
+    ImGui::PopStyleVar();
+
+    return size;
 }
 
 }

@@ -1047,7 +1047,6 @@ static ExPolygons outer_inner_brim_area(const Print& print,
                     support_material_extruder = printExtruders.front() + 1;
             }
             if (support_material_extruder == extruderNo && brimToWrite.at(object->id()).sup) {
-
                 if (!object->support_layers().empty()) {
                     for (const auto &support_contour : object->support_layers().front()->support_islands) {
                         no_brim_area_support.emplace_back(support_contour);

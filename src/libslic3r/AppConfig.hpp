@@ -287,7 +287,10 @@ public:
 	std::string         loading_path() { return (m_loading_path.empty() ? config_path() : m_loading_path); }
 
     std::vector<std::string> get_recent_projects() const;
+    std::vector<std::string> get_projects_open_time() const;
+
     void set_recent_projects(const std::vector<std::string>& recent_projects);
+    void set_project_times(const std::deque<std::string>& project_times);
 
 	const std::map<std::string, ProfileMachine>& get_profile_machines();
 

@@ -293,6 +293,7 @@ include(MPFR/MPFR.cmake)
 include(CGAL/CGAL.cmake)
 
 include(NLopt/NLopt.cmake)
+include(Assimp/Assimp.cmake)
 
 
 # I *think* 1.1 is used for *just* md5 hashing?
@@ -363,6 +364,7 @@ set(_dep_list
     ${EXPAT_PKG}
     dep_OSS
     dep_BREAKPAD
+	dep_Assimp
     )
 
 if (MSVC)

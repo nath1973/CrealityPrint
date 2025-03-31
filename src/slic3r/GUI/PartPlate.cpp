@@ -28,6 +28,7 @@
 #include "GUI_App.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
 #include "BackgroundSlicingProcess.hpp"
 #include "Widgets/Label.hpp"
 #include "3DBed.hpp"
@@ -1281,6 +1282,137 @@ int PartPlate::picking_id_component(int idx) const
 	return id;
 }
 
+const BoundingBoxf3& PartPlate::color_bed_exclude_area(bool* valid)
+{
+	if (valid)
+		*valid = false;
+
+	m_color_bed_exclude_area = BoundingBoxf3();
+    bool is_multi_color = fff_print()->object_used_extruders().size() > 1;
+	if (!is_multi_color)
+		return m_color_bed_exclude_area;
+
+	const Preset& preset = Slic3r::GUI::wxGetApp().preset_bundle->printers.get_selected_preset();
+	const ConfigOptionString* vec = static_cast<const ConfigOptionString*>(preset.config.option("color_bed_exclude_area"));
+	if (!vec) 
+		return m_color_bed_exclude_area;
+
+	std::string area = vec->serialize();
+    if (area.empty())
+        return m_color_bed_exclude_area;
+	size_t start = 0, end = area.find(',');
+	float min_x = 10000, max_x = 0, min_y =10000, max_y = 0;
+	auto parse_point_item = [&](bool is_end = false) {
+		std::string part;
+		if (!is_end) part = area.substr(start, end - start);
+		else part = area.substr(start);
+		size_t x_pos = part.find('x');
+		float x = std::stof(part.substr(0, x_pos));
+		min_x = min_x < x ? min_x : x;
+		max_x = max_x > x ? max_x : x;
+		float y = std::stof(part.substr(x_pos + 1));
+		min_y = min_y < y ? min_y : y;
+		max_y = max_y > y ? max_y : y;
+	};
+	while (end != std::string::npos) {
+		parse_point_item();
+		start = end + 1;
+		end   = area.find(',', start);
+	}
+	parse_point_item(true);
+
+	float offset_x = m_bounding_box.min.x();
+    float offset_y = m_bounding_box.min.y();
+    min_x += offset_x;
+    max_x += offset_x;
+    min_y += offset_y;
+    max_y += offset_y;
+
+	//double printable_height = build_volume.printable_height();
+	m_color_bed_exclude_area.min = {min_x, min_y, 0};
+    m_color_bed_exclude_area.max = {max_x, max_y, (float)m_height};
+	
+	if (valid)
+		*valid = true;
+
+	return m_color_bed_exclude_area;
+}
+
+void PartPlate::check_gcode_path_contain_in_bed()
+{
+	if (!m_gcode_result || m_gcode_result->moves.size() <= 0)
+		return;
+
+	auto compute_start = std::chrono::high_resolution_clock::now();
+
+	const BuildVolume& bed_build_volume = wxGetApp().plater()->build_volume();
+
+	bool contained_in_bed = false;
+
+	//use convex_hull for toolpath outside check
+	Points pts;
+
+	m_gcode_paths_bounding_box = BoundingBoxf3();
+
+	// extract approximate paths bounding box from result
+	for (const GCodeProcessorResult::MoveVertex& move : m_gcode_result->moves) {
+		if (move.type == EMoveType::Extrude && move.extrusion_role != erCustom && move.width != 0.0f && move.height != 0.0f) {
+			m_gcode_paths_bounding_box.merge(move.position.cast<double>());
+			//use convex_hull for toolpath outside check
+			pts.emplace_back(Point(scale_(move.position.x()), scale_(move.position.y())));
+		}
+	}
+
+	// also merge the point on arc to bounding box
+	for (const GCodeProcessorResult::MoveVertex& move : m_gcode_result->moves) {
+		// continue if not arc path
+		if (!move.is_arc_move_with_interpolation_points())
+			continue;
+
+		if (move.type == EMoveType::Extrude && move.width != 0.0f && move.height != 0.0f)
+			for (int i = 0; i < move.interpolation_points.size(); i++) {
+				m_gcode_paths_bounding_box.merge(move.interpolation_points[i].cast<double>());
+				//use convex_hull for toolpath outside check
+				pts.emplace_back(Point(scale_(move.interpolation_points[i].x()), scale_(move.interpolation_points[i].y())));
+			}
+		//}
+	}
+
+	BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",paths_bounding_box {%1%, %2%}-{%3%, %4%}\n")
+		% m_gcode_paths_bounding_box.min.x() % m_gcode_paths_bounding_box.min.y() % m_gcode_paths_bounding_box.max.x() % m_gcode_paths_bounding_box.max.y();
+
+	// use convex_hull for toolpath outside check
+	contained_in_bed = bed_build_volume.all_paths_inside(*m_gcode_result, m_gcode_paths_bounding_box);
+
+	if (contained_in_bed)
+	{
+		const std::vector<BoundingBoxf3>& exclude_bounding_box = get_exclude_areas();
+		if (exclude_bounding_box.size() > 0)
+		{
+			int index;
+			Slic3r::Polygon convex_hull_2d = Slic3r::Geometry::convex_hull(std::move(pts));
+			for (index = 0; index < exclude_bounding_box.size(); index++)
+			{
+				Slic3r::Polygon p = exclude_bounding_box[index].polygon(true);  // instance convex hull is scaled, so we need to scale here
+				if (intersection({ p }, { convex_hull_2d }).empty() == false)
+				{
+					contained_in_bed = false;
+					break;
+				}
+			}
+		}
+	}
+
+	m_gcode_result->toolpath_outside = !contained_in_bed;
+
+	auto compute_end = std::chrono::high_resolution_clock::now();
+
+	std::chrono::duration<double> elapsed = compute_end - compute_start;
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(elapsed);
+	//std::cout << "Code execution time: " << elapsed.count() << " seconds, " << duration.count() << " micro seconds." << std::endl;
+	BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(":Code execution time:  %1%  micro seconds.") % duration.count();
+}
+
 std::vector<int> PartPlate::get_extruders(bool conside_custom_gcode) const
 {
 	std::vector<int> plate_extruders;
@@ -1559,6 +1691,12 @@ Vec3d PartPlate::estimate_wipe_tower_size(const DynamicPrintConfig & config, con
 		BoundingBoxf3 bbox = m_model->objects[obj_idx]->bounding_box_exact();
 		max_height = std::max(bbox.size().z(), max_height);
 	}
+
+    if (max_height < 1e-3)
+    {
+        return wipe_tower_size;
+    }
+
 	wipe_tower_size(2) = max_height;
 
 	//const DynamicPrintConfig &dconfig = wxGetApp().preset_bundle->prints.get_edited_preset().config;
@@ -2109,6 +2247,11 @@ BoundingBoxf3 PartPlate::get_objects_bounding_box()
         }
     }
     return bbox;
+}
+
+BoundingBoxf3 PartPlate::get_gcode_path_bounding_box()
+{
+	return m_gcode_paths_bounding_box;
 }
 
 //translate instance on the plate
@@ -4158,6 +4301,63 @@ int PartPlateList::add_to_plate(int obj_id, int instance_id, int plate_id)
 }
 
 //reload all objects
+
+void PartPlateList::determine_model_position(bool isClear)
+{
+    if (isClear)
+    {
+        for (unsigned int i = 0; i < (unsigned int)m_plate_list.size(); ++i)
+        {
+            PartPlate* plate = m_plate_list[i];
+            if (!plate)
+                continue;
+
+            //plate->clear();
+            plate->obj_to_instance_set.clear();
+            plate->instance_outside_set.clear();
+            plate->m_ready_for_slice = true;
+            plate->update_slice_result_valid_state(false);
+        }
+    }
+
+    unsigned int i, j, k;
+    for (i = 0; i < (unsigned int)m_model->objects.size(); ++i)
+    {
+        ModelObject* object = m_model->objects[i];
+        for (j = 0; j < (unsigned int)object->instances.size(); ++j)
+        {
+            ModelInstance* instance = object->instances[j];
+            BoundingBoxf3 boundingbox = object->instance_convex_hull_bounding_box(j);
+            for (k = 0; k < (unsigned int)m_plate_list.size(); ++k)
+            {
+                PartPlate* plate = m_plate_list[k];
+                assert(plate != NULL);
+
+                if (plate->intersect_instance(i, j, &boundingbox))
+                {
+                    //found a new plate, add it to plate
+                    plate->add_instance(i, j, false, &boundingbox);
+                    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": found plate_id %1%, for obj_id %2%, instance_id %3%") % k % i % j;
+
+                    //need to judge whether this instance has an outer part
+                    /*if (plate->check_outside(i, j))
+                    {
+                        plate->m_ready_for_slice = false;
+                    }*/
+                    break;
+                }
+            }
+
+            if ((k == m_plate_list.size()) && (unprintable_plate.intersect_instance(i, j, &boundingbox)))
+            {
+                //found in unprintable plate, add it to plate
+                unprintable_plate.add_instance(i, j, false, &boundingbox);
+                BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": found in unprintable plate, obj_id %1%, instance_id %2%") % i % j;
+            }
+        }
+    }
+}
+
 int PartPlateList::reload_all_objects(bool except_locked, int plate_index)
 {
 	int ret = 0;
@@ -4167,42 +4367,7 @@ int PartPlateList::reload_all_objects(bool except_locked, int plate_index)
 
 	BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": m_model->objects.size() is %1%") % m_model->objects.size();
 	//try to find a new plate
-	for (i = 0; i < (unsigned int)m_model->objects.size(); ++i)
-	{
-		ModelObject* object = m_model->objects[i];
-		for (j = 0; j < (unsigned int)object->instances.size(); ++j)
-		{
-			ModelInstance* instance = object->instances[j];
-			BoundingBoxf3 boundingbox = object->instance_convex_hull_bounding_box(j);
-			for (k = 0; k < (unsigned int)m_plate_list.size(); ++k)
-			{
-				PartPlate* plate = m_plate_list[k];
-				assert(plate != NULL);
-
-				if (plate->intersect_instance(i, j, &boundingbox))
-				{
-					//found a new plate, add it to plate
-					plate->add_instance(i, j, false, &boundingbox);
-					BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": found plate_id %1%, for obj_id %2%, instance_id %3%") % k % i % j;
-
-					//need to judge whether this instance has an outer part
-					/*if (plate->check_outside(i, j))
-					{
-						plate->m_ready_for_slice = false;
-					}*/
-					break;
-				}
-			}
-
-			if ((k == m_plate_list.size()) && (unprintable_plate.intersect_instance(i, j, &boundingbox)))
-			{
-				//found in unprintable plate, add it to plate
-				unprintable_plate.add_instance(i, j, false, &boundingbox);
-				BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": found in unprintable plate, obj_id %1%, instance_id %2%") % i % j;
-			}
-		}
-
-	}
+    determine_model_position();
 
 	return ret;
 }

@@ -903,12 +903,12 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             new_config = inherit_preset->config;
         } else {
             // We support custom root preset now
-            auto inherits_config2 = dynamic_cast<ConfigOptionString *>(inherits_config);
+            /* auto inherits_config2 = dynamic_cast<ConfigOptionString*>(inherits_config);
             if (inherits_config2 && !inherits_config2->value.empty()) {
                 // we should skip this preset here
                 BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format(", can not find inherit preset for user preset %1%, just skip") % name;
                 return false;
-            }
+            }*/
             // Find a default preset for the config. The PrintPresetCollection provides different default preset based on the "printer_technology" field.
             const Preset &default_preset = collection->default_preset_for(config);
             new_config                   = default_preset.config;
@@ -929,7 +929,19 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             }
         }
 
-        Preset &preset     = collection->load_preset(collection->path_from_name(name, inherit_preset == nullptr), name, std::move(new_config), false);
+        bool detach = false;
+        if (inherit_preset == nullptr) {
+            if (config.has(BBL_JSON_KEY_INHERITS)) {
+                const ConfigOption* opt = config.option(BBL_JSON_KEY_INHERITS);
+                if (opt != nullptr) {
+                    std::string value = opt->serialize();
+                    if (value.empty())
+                        detach = true;
+                }
+            }
+        }
+
+        Preset &preset     = collection->load_preset(collection->path_from_name(name, detach), name, std::move(new_config), false);
         if (key_values.find(BBL_JSON_KEY_FILAMENT_ID) != key_values.end())
             preset.filament_id = key_values[BBL_JSON_KEY_FILAMENT_ID];
         preset.is_external = true;

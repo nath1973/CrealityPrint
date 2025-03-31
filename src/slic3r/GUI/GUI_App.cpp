@@ -14,6 +14,7 @@
 #include <wx/bitmap.h>
 #include <wx/string.h>
 #include "CrealityrintDump.hpp"
+#include "slic3r/Utils/ColorSpaceConvert.hpp"
 // Localization headers: include libslic3r version first so everything in this file
 // uses the slic3r/GUI version (the macros will take precedence over the functions).
 // Also, there is a check that the former is not included from slic3r module.
@@ -161,7 +162,7 @@
 #include "libslic3r/GlobalConfig.hpp"
 #include "SyncUserPresets.hpp"
 #include "print_manage/AppMgr.hpp"
-
+#include "UpdateParams.hpp"
 
 using namespace std::literals;
 namespace pt = boost::property_tree;
@@ -617,10 +618,10 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".3mf"sv } },
 #ifdef __APPLE__
     /* FT_MODEL */
-    {"Supported files"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv, ".usd"sv, ".usda"sv, ".usdc"sv, ".usdz"sv, ".abc"sv, ".ply"sv}},
+    {"All"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv, ".usd"sv, ".usda"sv, ".usdc"sv, ".usdz"sv, ".abc"sv, ".ply"sv,".dae"sv,".3ds"sv,".off"sv}},
 #else
     /* FT_MODEL */
-    {"Supported files"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv}},
+    {"All"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv, ".dae"sv, ".3ds"sv, ".ply"sv, ".off"sv}},
 #endif
     /* FT_ZIP */     { "ZIP files"sv,       { ".zip"sv } },
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".cxprj"sv } },
@@ -632,6 +633,8 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv } },
     /* FT_CXPRJ */   { "Cxprj files"sv,     { ".cxprj"sv } },
     /* FT_ONLY_GCODE */   { "G-code files"sv,    { ".gcode"sv } },
+    /* FT_MESH_FILE */ { "Mesh files"sv,   { ".stl"sv, ".obj"sv, ".dae"sv, ".3ds"sv, ".off"sv, ".ply"sv, ".3mf"sv } },
+    /* FT_CAD_FILE */     { "CAD files"sv, { ".stp"sv, ".step"sv } },
 };
 
 // This function produces a Win32 file dialog file template mask to be consumed by wxWidgets on all platforms.
@@ -918,6 +921,17 @@ void GUI_App::post_openlink_cmd(std::string link)
 
     }
 }
+
+// param_set 参数集合页
+void GUI_App::swith_community_sub_page(const std::string& pageName)
+{
+    json m_Res       = json::object();
+    m_Res["command"] = "switch_sub_page";
+    m_Res["page_name"]     = pageName;
+    wxString strJS   = wxString::Format("window.handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
+    GUI::wxGetApp().run_script(strJS);
+}
+
 void GUI_App::post_init()
 {
     assert(initialized());
@@ -1109,6 +1123,8 @@ void GUI_App::post_init()
 
             //  检测是否有5.x的配置需要加载
             mainframe->checkHaveOldPresetsNeedLoad();
+            //  检查是否有参数需要更新
+            UpdateParams::getInstance().checkParamsNeedUpdate();
 
         });
     }
@@ -2023,15 +2039,15 @@ void GUI_App::init_download_path()
     std::string down_path = app_config->get("download_path");
 
     if (down_path.empty()) {
-        std::string user_down_path = wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToUTF8().data();
-        app_config->set("download_path", user_down_path);
+        boost::filesystem::path user_down_path =  boost::filesystem::path(data_dir()) / "cloud_download_data";//wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToUTF8().data();
+        app_config->set("download_path", user_down_path.string());
     }
     else {
         fs::path dp(down_path);
         if (!fs::exists(dp)) {
 
-            std::string user_down_path = wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToUTF8().data();
-            app_config->set("download_path", user_down_path);
+            boost::filesystem::path user_down_path =  boost::filesystem::path(data_dir()) / "cloud_download_data";
+            app_config->set("download_path", user_down_path.string());
         }
     }
 }
@@ -2101,6 +2117,12 @@ void GUI_App::init_app_config()
 #else
     set_log_path_and_level(log_filename, 3);
 #endif
+
+    //  remove system dir
+    boost::filesystem::path dir = (boost::filesystem::path(data_dir()) / PRESET_SYSTEM_DIR).make_preferred();
+    if (boost::filesystem::exists(dir)) {
+        boost::filesystem::remove_all(dir);
+    }
 
     //BBS: remove GCodeViewer as seperate APP logic
 	if (!app_config)
@@ -2408,8 +2430,10 @@ bool GUI_App::OnInit()
         {
             const auto url = this->init_params->input_files.front();
             if(boost::starts_with(url, "minidump://file=")) {
+                
                 const auto file = url.substr(16);
                 if (boost::filesystem::exists(file)) {
+                    m_http_server.stop();
                     // BBS: if the file exists, we will show a error dialog and create a default config file.
                     ErrorReportDialog* err_report_dialog = new ErrorReportDialog(nullptr, _L("Error Report"));
                     err_report_dialog->Centre(wxBOTH);
@@ -3212,17 +3236,21 @@ unsigned GUI_App::get_colour_approx_luma(const wxColour &colour)
 bool GUI_App::dark_mode()
 {
 #ifdef SUPPORT_DARK_MODE
-#if __APPLE__
-    // The check for dark mode returns false positive on 10.12 and 10.13,
-    // which allowed setting dark menu bar and dock area, which is
-    // is detected as dark mode. We must run on at least 10.14 where the
-    // proper dark mode was first introduced.
-    return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
-#else
-    return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();
-    //const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-    //return luma < 128;
-#endif
+    #if __APPLE__
+        // The check for dark mode returns false positive on 10.12 and 10.13,
+        // which allowed setting dark menu bar and dock area, which is
+        // is detected as dark mode. We must run on at least 10.14 where the
+        // proper dark mode was first introduced.
+        return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
+    #elif __linux__
+        // return false;
+        return wxSystemSettings::GetAppearance().IsDark();
+        // return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : false;
+    #else 
+        return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();
+        //const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+        //return luma < 128;
+    #endif
 #else
     //BBS disable DarkUI mode
     return false;
@@ -3314,6 +3342,9 @@ static bool is_default(wxWindow* win)
 
 void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool just_font/* = false*/)
 {
+    if (m_is_dark_mode != dark_mode() )
+        m_is_dark_mode = dark_mode();   
+
     if (wxButton *btn = dynamic_cast<wxButton*>(window)) {
         if (btn->GetWindowStyleFlag() & wxBU_AUTODRAW)
             return;
@@ -3354,10 +3385,6 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
         if (btn->GetWindowStyleFlag() & wxBU_AUTODRAW)
             return;
     }
-
-
-    /*if (m_is_dark_mode != dark_mode() )
-        m_is_dark_mode = dark_mode();*/
 
     if (m_is_dark_mode) {
 
@@ -3407,6 +3434,7 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
         }
     }
 }
+
 
 // recursive function for scaling fonts for all controls in Window
 static void update_dark_children_ui(wxWindow* window, bool just_buttons_update = false)
@@ -3594,6 +3622,24 @@ bool GUI_App::tabs_as_menu() const
 wxSize GUI_App::get_min_size() const
 {
     return wxSize(120*m_em_unit, 49 * m_em_unit);
+}
+
+wxSize GUI_App::get_min_size_ex(wxWindow* display_win) const
+{
+    // be careful when setting "105 * m_em_unit", in some screen size when toggle the maximize button, could possibly hide the maximize and close button
+    wxSize min_size(105 * m_em_unit, 60 * m_em_unit);
+
+    //const wxDisplay display = wxDisplay(display_win);
+    //wxRect display_rect = display.GetGeometry();  // for example: 1920 * 1080
+    //display_rect.width *= 0.75;
+    //display_rect.height *= 0.75;
+
+    //if (min_size.x > display_rect.GetWidth())
+    //    min_size.x = display_rect.GetWidth();
+    //if (min_size.y > display_rect.GetHeight())
+    //    min_size.y = display_rect.GetHeight();
+
+    return min_size;
 }
 
 float GUI_App::toolbar_icon_scale(const bool is_limited/* = false*/) const
@@ -3931,8 +3977,15 @@ void GUI_App::load_project(wxWindow *parent, wxString& input_file) const
         input_file = dialog.GetPath();
 }
 
-void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
+void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files, bool Category_or_not) const
 {
+    wxString wildcard;
+    wildcard = file_wildcards(FT_MODEL);
+    if (Category_or_not)
+    {
+        wildcard = GUI::format_wxstr("%s|%s|%s", file_wildcards(FT_MODEL), file_wildcards(FT_MESH_FILE),file_wildcards(FT_CAD_FILE));
+    }
+
     input_files.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
 #ifdef __APPLE__
@@ -3941,7 +3994,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
         _L("Choose one or more files (3mf/step/stl/svg/obj/amf):"),
 #endif
         from_u8(app_config->get_last_dir()), "",
-        file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+        wildcard, wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
 
     if (dialog.ShowModal() == wxID_OK)
         dialog.GetPaths(input_files);
@@ -4753,6 +4806,37 @@ std::string GUI_App::handle_web_request(std::string cmd)
                                         return true;
                                 }).perform_sync();
                 }
+                if(true){
+                        std::string base_url              = get_cloud_api_url();
+                        auto        preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";
+                        Http::set_extra_headers(get_extra_header());
+                        Http http = Http::post(base_url + preupload_profile_url);
+                        json        j;
+                        j["engineVersion"]  = "3.0.0";
+                        boost::uuids::uuid uuid = boost::uuids::random_generator()();
+                            http.header("Content-Type", "application/json")
+                                .header("__CXY_REQUESTID_", to_string(uuid))
+                                .set_post_body(j.dump())
+                                .on_complete([&](std::string body, unsigned status) {
+                                    if(status!=200){
+                                        return;
+                                    }
+                                    try{
+                                        json j = json::parse(body);
+                                        json printer_list = j["result"];
+                                        auto out_printer_list_file = fs::path(data_dir()).append("system")
+                                                                         .append("Creality")
+                                                                         .append("machineList.json")
+                                                                         .string();
+                                        boost::nowide::ofstream c;
+                                        c.open(out_printer_list_file, std::ios::out | std::ios::trunc);
+                                        c << std::setw(4) << printer_list << std::endl;
+                                    }catch(...){
+                                        return;
+                                    }
+                                }).perform_sync();
+                        
+                    }
                 for (auto& v : data_node) {
                     std::string printer_model  = v.second.get_child("name").data();
                     if(printer_model.find("Creality") == std::string::npos){
@@ -5083,6 +5167,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                                         if (index != std::string::npos) {
                                             basename = basename.substr(0, index);
                                         }
+                                        boost::trim_right(basename);
                                         basename = basename + " @" + printer_model + " " + nozzle + " nozzle";
                                         json_out["name"] = basename;
                                         json compatible_printers_array;
@@ -5132,37 +5217,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                             fs::remove(tmp_path);
                         })
                         .perform_sync();
-                    if(true){
-                        std::string base_url              = get_cloud_api_url();
-                        auto        preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";
-                        Http::set_extra_headers(get_extra_header());
-                        Http http = Http::post(base_url + preupload_profile_url);
-                        json        j;
-                        j["engineVersion"]  = "3.0.0";
-                        boost::uuids::uuid uuid = boost::uuids::random_generator()();
-                            http.header("Content-Type", "application/json")
-                                .header("__CXY_REQUESTID_", to_string(uuid))
-                                .set_post_body(j.dump())
-                                .on_complete([&](std::string body, unsigned status) {
-                                    if(status!=200){
-                                        return;
-                                    }
-                                    try{
-                                        json j = json::parse(body);
-                                        json printer_list = j["result"];
-                                        auto out_printer_list_file = fs::path(data_dir()).append("system")
-                                                                         .append("Creality")
-                                                                         .append("machineList.json")
-                                                                         .string();
-                                        boost::nowide::ofstream c;
-                                        c.open(out_printer_list_file, std::ios::out | std::ios::trunc);
-                                        c << std::setw(4) << printer_list << std::endl;
-                                    }catch(...){
-                                        return;
-                                    }
-                                }).perform_sync();
-                        
-                    }
+                    
                     auto* app_config = GUI::wxGetApp().app_config;
                     GUI::wxGetApp().preset_bundle->load_presets(*app_config,
                                                                 ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
@@ -5209,6 +5264,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
 						c.close();
                     }
                 }
+                UpdateParams::getInstance().hasUpdateParams();
             }
             else if(command_str.compare("refresh_all_device") == 0){
                 if (wxGetApp().mainframe->get_printer_mgr_view()) {
@@ -5556,6 +5612,9 @@ void GUI_App::check_new_version_cx(bool show_tips, int by_user)
     #ifdef __LINUX__
         palform_ = 2;
     #endif
+    #if defined(__aarch64__) || defined(_M_ARM64)
+        palform_ = 4;
+    #endif
     bool       check_stable_only = app_config->get_bool("check_stable_update_only");
     std::string base_url = get_cloud_api_url();
     auto        preupload_profile_url = "/api/cxy/search/softwareSearch";
@@ -5800,7 +5859,15 @@ bool GUI_App::check_privacy_update()
     }
     return false;
 }
-
+void GUI_App::reinit_downloader()
+{
+    std::string user_id = m_user.userId;
+    if(user_id.empty())
+        return;
+    if (model_downloaders_.find(user_id) != model_downloaders_.cend()) {
+        model_downloaders_[user_id]->init();
+    }
+}
 void GUI_App::on_check_privacy_update(wxCommandEvent& evt)
 {
     int online_login = evt.GetInt();
@@ -6529,7 +6596,20 @@ void GUI_App::sync_preset(Preset* preset)
     }
 
 }
-
+bool GUI_App::wait_cloud_token()
+{
+    auto token = app_config->get("cloud", "token");
+    int wait_time = 60;
+    while(token== app_config->get("cloud", "token"))
+    {
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+        wait_time--;
+         if (wait_time <= 0) {
+            return false;
+        }
+    }
+    return true;
+}
 void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 {
     if (!is_login()) {

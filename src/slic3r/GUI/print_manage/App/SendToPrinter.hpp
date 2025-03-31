@@ -70,6 +70,8 @@ private:
     void handle_send_gcode(const nlohmann::json& json_data);
     void handle_send_3mf(const nlohmann::json& json_data);
     void handle_cancel_send(const nlohmann::json& json_data);
+    void handle_start_heartbeat_cmd(const nlohmann::json& json_data);
+    void handle_stop_heartbeat_cmd(const nlohmann::json& json_data);
     std::string build_match_color_cmd_info(int plateIndex, const std::string& ipAddress);
     void handle_request_color_match_info(const nlohmann::json& json_data);
     void handle_receive_color_match_info(const nlohmann::json& json_data);
@@ -83,6 +85,7 @@ private:
     void restore_extruder_colors();
     void OnCloseWindow(wxCloseEvent& event);
     void handle_set_error_cmd(const nlohmann::json& json_data);
+    void replaceIllegalChars(std::string& str);
 
     wxWebView* m_browser;
     long       m_zoomFactor;

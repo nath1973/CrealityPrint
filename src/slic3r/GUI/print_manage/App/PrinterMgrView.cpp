@@ -74,15 +74,16 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
         this->handle_request_update_device_relate_to_account(json_data);
     });
     std::string version = std::string(CREALITYPRINT_VERSION);
+    int port = wxGetApp().get_server_port();
 //#define _DEBUG1
 #ifdef _DEBUG1
-        wxString url = wxString::Format("http://localhost:5174/?version=%s", version);
+        wxString url = wxString::Format("http://localhost:5173/?version=%s&port=%d", version, port);
         this->load_url(url, wxString());
          m_browser->EnableAccessToDevTools();
      #else
         //wxString url = wxString::Format("http://localhost:%d/deviceMgr/index.html", wxGetApp().get_server_port());
         
-        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s", from_u8(resources_dir()), version);
+        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s&port=%d", from_u8(resources_dir()), version,port);
         url.Replace(wxT("\\"), wxT("/"));
         url.Replace(wxT("#"), wxT("%23"));
         wxURI uri(url);
@@ -275,7 +276,12 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
            std::string file_type = j["file_type"];
 
            this->down_file(url, name, file_type);
-        }
+        } else if (strCmd.compare("common_openurl") == 0) {
+            boost::optional<std::string> path = j["url"];
+            if (path.has_value()) {
+                wxLaunchDefaultBrowser(path.value());
+            }
+        } 
         else if (strCmd == "scan_device")
         {
             scan_device();
@@ -288,15 +294,44 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
         {
             std::string presetName = j["preset_name"];
             std::string address = j["address"];
+            int direction = 0;
+            int machine_LED_light_exist = 0;
+            int auxiliary_fan = 0;
+            int support_air_filtration = 0;
             Preset*     preset = Slic3r::GUI::wxGetApp().preset_bundle->printers.find_preset(presetName);
-            if (preset != nullptr && preset->config.has("machine_platform_motion_enable")) {
-                const ConfigOption* option = preset->config.option("machine_platform_motion_enable");
-                bool b = option->getBool();
-                int                 i      = b ? 1 : 0;
+            if (preset != nullptr) {
+                if(preset->config.has("machine_platform_motion_enable"))
+                {
+                    const ConfigOption* option = preset->config.option("machine_platform_motion_enable");
+                    bool b = option->getBool();
+                    direction     = b ? 1 : 0;
+                }
+                if(preset->config.has("support_air_filtration"))
+                {
+                    const ConfigOption* option = preset->config.option("support_air_filtration");
+                    bool b = option->getBool();
+                    support_air_filtration     = b ? 1 : 0;
+                }
+                if(preset->config.has("machine_LED_light_exist"))
+                {
+                    const ConfigOption* option = preset->config.option("machine_LED_light_exist");
+                    bool b = option->getBool();
+                    machine_LED_light_exist     = b ? 1 : 0;
+                }
+                if(preset->config.has("auxiliary_fan"))
+                {
+                    const ConfigOption* option = preset->config.option("auxiliary_fan");
+                    bool b = option->getBool();
+                    auxiliary_fan     = b ? 1 : 0;
+                }
                 nlohmann::json commandJson;
                 nlohmann::json  dataJson;
                 commandJson["command"] = "req_device_move_direction";
-                dataJson["direction"]  = i;
+                dataJson["direction"]  = direction;
+                dataJson["machine_LED_light_exist"]  = machine_LED_light_exist;
+                dataJson["auxiliary_fan"]  = auxiliary_fan;
+                dataJson["support_air_filtration"]  = support_air_filtration;
+                
                 dataJson["address"]    = address;
                 commandJson["data"]    = dataJson;
                 wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump());
@@ -511,11 +546,21 @@ void PrinterMgrView::down_file(std::string download_info, std::string filename, 
                     wxGetApp().CallAfter([this, strJS] { run_script(strJS.ToStdString()); });
                 }
             })
-            .on_error([](std::string body, std::string error, unsigned http_status) {
+            .on_error([this](std::string body, std::string error, unsigned http_status) {
                 (void) body;
-                BOOST_LOG_TRIVIAL(error) << wxSecretString::Format("Error getting: `%1%`: HTTP %2%, %3%", body, http_status, error);
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format("Error getting: HTTP %1%, %2%")%http_status%error;
+                nlohmann::json commandJson;
+                    commandJson["command"] = "update_download_progress";
+                    commandJson["data"]    = -2;
+
+                    wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump()));
+                    wxGetApp().CallAfter([this, strJS] { run_script(strJS.ToStdString()); });
+                return;
             })
-            .on_complete([tmp_path, target_path, extension](std::string body, unsigned /* http_status */) {
+            .on_complete([tmp_path, target_path, extension](std::string body, unsigned http_status) {
+                if(http_status!=200){
+                    return ;
+                }
                 fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
                 file.write(body.c_str(), body.size());
                 file.close();

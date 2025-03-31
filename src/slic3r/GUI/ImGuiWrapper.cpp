@@ -985,9 +985,20 @@ void ImGuiWrapper::tooltip(const char *label, float wrap_width)
 {
     ImGui::BeginTooltip();
     ImGui::PushTextWrapPos(wrap_width);
-    //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
     ImGui::TextUnformatted(label);
-    //ImGui::PopStyleColor(1);
+    ImGui::PopStyleColor(1);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+void ImGuiWrapper::tooltip(const std::string& label, float wrap_width) 
+{
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(wrap_width);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::PopStyleColor(1);
     ImGui::PopTextWrapPos();
     ImGui::EndTooltip();
 }
@@ -2625,6 +2636,49 @@ void ImGuiWrapper::pop_radio_style()
     ImGui::PopStyleColor(1);
 }
 
+bool HasUnsupportedCharacters(const std::string& str, ImFont* font) {
+    if (!font) {
+        return false;
+    }
+
+    const char* p = str.c_str();
+    while (*p) {
+        unsigned int codepoint;
+        // 手动处理 UTF - 8 字符到 Unicode 码点的转换
+        if (*p < 0x80) {
+            // 单字节字符
+            codepoint = *p;
+            p += 1;
+        } else if ((*p & 0xE0) == 0xC0) {
+            // 双字节字符
+            if (p[1] == '\0') break;
+            codepoint = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+            p += 2;
+        } else if ((*p & 0xF0) == 0xE0) {
+            // 三字节字符
+            if (p[1] == '\0' || p[2] == '\0') break;
+            codepoint = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+            p += 3;
+        } else if ((*p & 0xF8) == 0xF0) {
+            // 四字节字符
+            if (p[1] == '\0' || p[2] == '\0' || p[3] == '\0') break;
+            codepoint = ((p[0] & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+            p += 4;
+        } else {
+            // 无效的 UTF - 8 序列
+            break;
+        }
+
+        // 使用 FindGlyph 检查字符是否在字体中
+        const ImFontGlyph* glyph = font->FindGlyph(static_cast<ImWchar>(codepoint));
+        if (!glyph) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void ImGuiWrapper::init_font(bool compress)
 {
     destroy_font();
@@ -2766,6 +2820,7 @@ void ImGuiWrapper::init_font(bool compress)
 
     // Restore state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
+
 }
 
 void ImGuiWrapper::init_font_all(bool compress)
@@ -2965,6 +3020,14 @@ void ImGuiWrapper::init_font_all(bool compress)
 
     // Restore state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
+
+    auto fonts = io.Fonts->Fonts;
+    for (auto font : fonts) {
+        if (HasUnsupportedCharacters("텍스트 양각", font)) {
+            BOOST_LOG_TRIVIAL(warning) << "Font does not support all characters";
+        }
+    }
+
 }
 
 

@@ -447,6 +447,9 @@ namespace DM {
 
     void DeviceMgr::SetCurrentDevice(std::string mac)
     {
+        if (!IsPrinterExist(mac)) {
+            return;
+        }
         auto& node = p->data["current_device"];
 
         json item;

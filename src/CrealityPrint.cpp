@@ -6392,6 +6392,9 @@ static bool dumpCallback(const google_breakpad::MinidumpDescriptor& descriptor,v
 #endif
 int main(int argc, char **argv)
 {
+#ifdef __linux__
+    setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", 1);
+#endif
     
     boost::filesystem::path   tempPath = boost::filesystem::path(wxFileName::GetTempDir().ToStdString());
     if (argc == 2 && boost::starts_with(std::string(argv[1]), "minidump://file=")) {

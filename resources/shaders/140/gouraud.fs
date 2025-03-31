@@ -21,6 +21,13 @@ struct PrintVolumeDetection
 	vec2 z_data;
 };
 
+struct ColorBedExcludeArea
+{
+	int enable;
+	vec4 xy_data;
+	vec2 z_data;
+};
+
 struct SlopeDetection
 {
     bool actived;
@@ -43,6 +50,7 @@ uniform bool is_outline;
 #endif // ENABLE_ENVIRONMENT_MAP
 
 uniform PrintVolumeDetection print_volume;
+uniform ColorBedExcludeArea color_bed_exclude_area;
 
 in vec3 clipping_planes_dots;
 in float color_clip_plane_dot;
@@ -84,6 +92,7 @@ void main()
     // if the fragment is outside the print volume -> use darker color
 	vec3 pv_check_min = ZERO;
 	vec3 pv_check_max = ZERO;
+    bool outside = false;
     if (print_volume.type == 0) {
 		// rectangle
 		pv_check_min = world_pos.xyz - vec3(print_volume.xy_data.x, print_volume.xy_data.y, print_volume.z_data.x);
@@ -95,8 +104,16 @@ void main()
 		pv_check_min = vec3(delta_radius, 0.0, world_pos.z - print_volume.z_data.x);
 		pv_check_max = vec3(0.0, 0.0, world_pos.z - print_volume.z_data.y);
 	}
-	color.rgb = (any(lessThan(pv_check_min, ZERO)) || any(greaterThan(pv_check_max, ZERO))) ? mix(color.rgb, ZERO, 0.3333) : color.rgb;
+	outside = (any(lessThan(pv_check_min, ZERO)) || any(greaterThan(pv_check_max, ZERO)));
 	
+    if (!outside && color_bed_exclude_area.enable == 1) {
+		pv_check_min = world_pos.xyz - vec3(color_bed_exclude_area.xy_data.x, color_bed_exclude_area.xy_data.y, color_bed_exclude_area.z_data.x);
+		pv_check_max = vec3(color_bed_exclude_area.xy_data.z, color_bed_exclude_area.xy_data.w, color_bed_exclude_area.z_data.y) - world_pos.xyz;
+        outside = (all(greaterThan(pv_check_min, ZERO)) && all(greaterThan(pv_check_max, ZERO)));
+    }
+
+    color.rgb = outside ? mix(color.rgb, ZERO, 0.3333) : color.rgb;
+
     //BBS: add outline_color
     if (is_outline)
         out_color = uniform_color;

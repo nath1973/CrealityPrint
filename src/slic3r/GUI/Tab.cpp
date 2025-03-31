@@ -2312,8 +2312,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("support_type", "support#support-types");
         optgroup->append_single_option_line("support_style", "support#support-styles");
         optgroup->append_single_option_line("support_threshold_angle", "support#threshold-angle");
-        optgroup->append_single_option_line("raft_first_layer_density");
-        optgroup->append_single_option_line("raft_first_layer_expansion");
+        //optgroup->append_single_option_line("raft_first_layer_density");
+        //optgroup->append_single_option_line("raft_first_layer_expansion");
         optgroup->append_single_option_line("support_on_build_plate_only");
         optgroup->append_single_option_line("support_critical_regions_only");
         optgroup->append_single_option_line("support_remove_small_overhang");
@@ -2333,6 +2333,9 @@ void TabPrint::build()
 
         // Support 
         optgroup = page->new_optgroup(L("Advanced"), L"param_advanced");
+        optgroup->append_single_option_line("raft_first_layer_density");   // not only for raft, but for support too
+        optgroup->append_single_option_line("raft_first_layer_expansion"); // not only for raft, but for support too
+        optgroup->append_single_option_line("tree_support_wall_count");
         optgroup->append_single_option_line("support_top_z_distance", "support#top-z-distance");
         optgroup->append_single_option_line("support_bottom_z_distance", "support#bottom-z-distance");
         optgroup->append_single_option_line("support_base_pattern", "support#base-pattern");
@@ -2347,6 +2350,7 @@ void TabPrint::build()
         //optgroup->append_single_option_line("support_interface_loop_pattern");
 
         optgroup->append_single_option_line("support_object_xy_distance", "support");
+        optgroup->append_single_option_line("support_object_first_layer_gap", "support");
         optgroup->append_single_option_line("support_xy_overrides_z", "support");
         optgroup->append_single_option_line("bridge_no_support", "support#base-pattern");
         optgroup->append_single_option_line("max_bridge_length", "support#base-pattern");
@@ -2355,21 +2359,23 @@ void TabPrint::build()
         optgroup->append_single_option_line("tree_hybrid_cross_height", "support");
 
         optgroup = page->new_optgroup(L("Tree supports"), L"param_support_tree");
-        optgroup->append_single_option_line("tree_support_tip_diameter");
+        //optgroup->append_single_option_line("tree_support_tip_diameter");
         optgroup->append_single_option_line("tree_support_branch_distance", "support#tree-support-only-options");
-        optgroup->append_single_option_line("tree_support_branch_distance_organic", "support#tree-support-only-options");
-        optgroup->append_single_option_line("tree_support_top_rate");
+        //optgroup->append_single_option_line("tree_support_branch_distance_organic", "support#tree-support-only-options");
+        //optgroup->append_single_option_line("tree_support_top_rate");
         optgroup->append_single_option_line("tree_support_branch_diameter", "support#tree-support-only-options");
-        optgroup->append_single_option_line("tree_support_branch_diameter_organic", "support#tree-support-only-options");
-        optgroup->append_single_option_line("tree_support_branch_diameter_angle");
+        //optgroup->append_single_option_line("tree_support_branch_diameter_organic", "support#tree-support-only-options");
         optgroup->append_single_option_line("tree_support_branch_angle", "support#tree-support-only-options");
-        optgroup->append_single_option_line("tree_support_branch_angle_organic", "support#tree-support-only-options");
-        optgroup->append_single_option_line("tree_support_angle_slow");
-        optgroup->append_single_option_line("tree_support_branch_diameter_double_wall");
-        optgroup->append_single_option_line("tree_support_wall_count");
-        optgroup->append_single_option_line("tree_support_adaptive_layer_height");
-        optgroup->append_single_option_line("tree_support_auto_brim");
-        optgroup->append_single_option_line("tree_support_brim_width");
+        optgroup->append_single_option_line("tree_support_branch_diameter_angle");
+        //optgroup->append_single_option_line("tree_support_branch_angle_organic", "support#tree-support-only-options");
+        //optgroup->append_single_option_line("tree_support_angle_slow");
+        //optgroup->append_single_option_line("tree_support_branch_diameter_double_wall");
+        ////optgroup->append_single_option_line("tree_support_wall_count");
+        //optgroup->append_single_option_line("tree_support_adaptive_layer_height");
+        //optgroup->append_single_option_line("tree_support_auto_brim");
+        //optgroup->append_single_option_line("tree_support_brim_width");
+        optgroup->append_single_option_line("support_base_pattern_tree");
+        optgroup->append_single_option_line("tree_support_wall_count_tree");
         
         page = add_options_page(L("Multimaterial"), "custom-gcode_multi_material"); // ORCA: icon only visible on placeholders
 
@@ -2593,6 +2599,8 @@ void TabPrint::toggle_options()
     if (m_preset_bundle) {
         bool is_BBL_printer = wxGetApp().preset_bundle->is_bbl_vendor();
         m_config_manipulation.set_is_BBL_Printer(is_BBL_printer);
+        bool is_CX_printer = wxGetApp().preset_bundle->is_cx_vendor();
+        m_config_manipulation.set_is_CX_Printer(is_CX_printer);
     }
 
     m_config_manipulation.toggle_print_fff_options(m_config, m_type < Preset::TYPE_COUNT);
@@ -2602,7 +2610,7 @@ void TabPrint::toggle_options()
     if (auto choice = dynamic_cast<Choice*>(field)) {
         auto def = print_config_def.get("support_style");
         std::vector<int> enum_set_normal = {smsDefault, smsGrid, smsSnug };
-        std::vector<int> enum_set_tree   = { smsDefault, smsTreeSlim, smsTreeStrong, smsTreeHybrid, smsOrganic };
+        std::vector<int> enum_set_tree   = { smsDefault, smsTreeSlim, smsTreeStrong, smsTreeHybrid, smsTreeOrganic };
         auto &           set             = is_tree(support_type) ? enum_set_tree : enum_set_normal;
         auto &           opt             = const_cast<ConfigOptionDef &>(field->m_opt);
         auto             cb              = dynamic_cast<ComboBox *>(choice->window);
@@ -4153,12 +4161,15 @@ void TabFilament::create_preset_tab()
     }
     // new Layout
 
+    bool is_dark = wxGetApp().dark_mode();
     m_boxPanel = new wxPanel(m_top_panel);
+    m_boxPanel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
     wxBoxSizer* bSizer = new wxBoxSizer(wxHORIZONTAL);
     m_boxPanel->SetSizer(bSizer);
 
     wxStaticText* vendorLabel = new wxStaticText(m_boxPanel, wxID_ANY, _L("Vendor"), wxDefaultPosition, wxDefaultSize, 0);
     //m_top_sizer->Add(vendorLabel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
+    vendorLabel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
     bSizer->Add(vendorLabel, 0, wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
 
     if (!m_wcb_choiceVendor)
@@ -4175,6 +4186,7 @@ void TabFilament::create_preset_tab()
     wxStaticText* typeLabel = new wxStaticText(m_boxPanel, wxID_ANY, _L("Type"), wxDefaultPosition, wxDefaultSize, 0);
     //m_top_sizer->Add(typeLabel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
     bSizer->Add(typeLabel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
+    typeLabel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
     if (!m_wcb_choicePrintType)
         m_wcb_choicePrintType = new TabPresetComboBox(m_boxPanel, Preset::TYPE_INVALID);
     m_wcb_choicePrintType->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent& e) {
@@ -5389,7 +5401,11 @@ void Tab::load_current_preset()
     if (m_type == Slic3r::Preset::TYPE_PRINTER) {
         // For the printer profile, generate the extruder pages.
         if (preset.printer_technology() == ptFFF)
+        {
             on_preset_loaded();
+            wxGetApp().obj_list()->update_plate_values_for_items();
+            wxGetApp().plater()->get_view3D_canvas3D()->deselect_all();
+        }
         else
             wxGetApp().obj_list()->update_objects_list_filament_column(1);
     }
@@ -6916,12 +6932,15 @@ void TabPrinter::create_preset_tab()
     }
     // new Layout
 
+    bool is_dark = wxGetApp().dark_mode();
     m_boxPanel = new wxPanel(m_top_panel);
+    m_boxPanel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
     wxBoxSizer* bSizer = new wxBoxSizer(wxHORIZONTAL);
     m_boxPanel->SetSizer(bSizer);
 
     wxStaticText* vendorLabel = new wxStaticText(m_boxPanel, wxID_ANY, _L("Vendor"), wxDefaultPosition, wxDefaultSize, 0);
     //m_top_sizer->Add(vendorLabel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
+    vendorLabel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
     bSizer->Add(vendorLabel, 0, wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
 
     if (!m_wcb_choiceVendor)
@@ -6937,6 +6956,7 @@ void TabPrinter::create_preset_tab()
 
     wxStaticText* typeLabel = new wxStaticText(m_boxPanel, wxID_ANY, _L("Printer"), wxDefaultPosition, wxDefaultSize, 0);
     //m_top_sizer->Add(typeLabel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
+    typeLabel->SetBackgroundColour(is_dark ? wxColour("#4B4B4D") : wxColour("#FFFFFF"));
     bSizer->Add(typeLabel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
     if (!m_wcb_choicePrintType)
         m_wcb_choicePrintType = new TabPresetComboBox(m_boxPanel, Preset::TYPE_INVALID);

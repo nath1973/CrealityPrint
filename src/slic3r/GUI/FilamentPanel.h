@@ -13,6 +13,9 @@
 #include "Widgets/Label.hpp"
 #include "print_manage/data/DataType.hpp"
 
+#define FILAMENT_BTN_WIDTH  110
+#define FILAMENT_BTN_HEIGHT 41
+
 namespace Slic3r { 
 
 namespace GUI {
@@ -75,6 +78,7 @@ public:
 	void update_sync_box_state(bool sync, const wxString& box_filament_name = "");
 	void update_child_button_color(const wxColour& color);
     void resetCFS(bool bCFS);
+	void update_child_button_size();
 
 protected:
 
@@ -129,8 +133,8 @@ public:
 	Slic3r::GUI::PlaterPresetComboBox* m_filamentCombox;
     ScalableButton* m_img_extruderTemp;
     ScalableButton* m_img_bedTemp;
-    Label* m_lb_extruderTemp;
-    Label* m_lb_bedTemp;
+    Label*                             m_lb_extruderTemp = nullptr;
+    Label*                             m_lb_bedTemp      = nullptr;
 
     ScalableButton* m_edit_btn;
 	wxColour m_bg_color;
@@ -152,7 +156,7 @@ public:
         bool small_state = false;
     };
 public:
-    FilamentItem(wxWindow* parent, const Data&data, const wxSize&size=wxSize(110, 41));
+    FilamentItem(wxWindow* parent, const Data&data, const wxSize&size=wxSize(FILAMENT_BTN_WIDTH, FILAMENT_BTN_HEIGHT));
 
     void set_checked(bool checked = true);
     bool is_checked();
@@ -168,6 +172,7 @@ public:
 	void update_box_sync_state(bool sync, const wxString& box_filament_name = "");
 	void update_box_sync_color(const std::string& sync_color);
     void resetCFS(bool bCFS);
+	void update_button_size();
 	
 private:
     wxBoxSizer* m_sizer;
@@ -217,6 +222,7 @@ public:
 	void on_auto_mapping_filament(const DM::Device& deviceData);
 	void update_box_filament_sync_state(bool sync);
 	void reset_filament_sync_state();
+    void resetFilamentToCFS();
 	void on_sync_one_filament(int filament_index, const std::string& new_filament_color, const std::string& new_filament_name, const wxString& sync_label);
 	void backup_extruder_colors();
 	void restore_prev_extruder_colors();

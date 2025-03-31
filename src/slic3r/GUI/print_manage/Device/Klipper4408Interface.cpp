@@ -14,7 +14,16 @@ Klipper4408Interface::Klipper4408Interface() {
 Klipper4408Interface::~Klipper4408Interface() {
     curl_global_cleanup();
 }
-
+bool isGCodeFile(const boost::filesystem::path& filePath) {
+    // 获取文件扩展名
+    boost::filesystem::path extension = filePath.extension();
+    // 将扩展名转换为小写并检查是否为 .gcode
+    std::string extStr = extension.string();
+    for (char& c : extStr) {
+        c = std::tolower(c);
+    }
+    return extStr == ".gcode";
+}
 std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback) {
     return std::async(std::launch::async, [=]() {
     bool res = false;
@@ -27,9 +36,15 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
     m_pHttp   = &http;
 
     std::string temp_upload_name = uploadFileName;
-    std::string md5 = DM::AppUtils::MD5(localFilePath); 
+    
     http.clear_header();
-    http.header("MD5", md5);
+    progressCallback(0.1f);
+    //Disable MD5
+    //     if(isGCodeFile(localFilePath)) {
+    //         std::string md5 = DM::AppUtils::MD5(localFilePath); 
+    //         http.header("MD5", md5);
+    //     }
+    progressCallback(1.0f);
     std::string filePath =  wxString::FromUTF8(localFilePath.c_str()).ToStdString();
     http.header("Content-Type", "multipart/form-data")
         .mime_form_add_file(temp_upload_name, filePath.c_str())
@@ -60,7 +75,8 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
         .on_progress([&](Slic3r::Http::Progress progress, bool& cancel) {
             if (progressCallback) {
                 if(progress.ultotal > 0) {
-                    progressCallback(static_cast<float>(progress.ulnow) / progress.ultotal * 100.0f);
+                    float percent = static_cast<float>(progress.ulnow) / progress.ultotal * 100.0f;
+                    progressCallback(percent<1.0f?1.0f:percent);
                 }
             }
             if (cancel) {

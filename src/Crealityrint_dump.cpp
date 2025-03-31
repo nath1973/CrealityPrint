@@ -67,7 +67,8 @@ void ErrorReportDialog::sendEmail(wxString zipFilePath) {
             curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
             curl_easy_setopt(curl, CURLOPT_READDATA, &upload_ctx);
             curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-
+            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  // 连接超时5秒
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);       // 数据传输超时15秒
             curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
 
             res = curl_easy_perform(curl);

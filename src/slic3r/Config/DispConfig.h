@@ -71,6 +71,7 @@ namespace GUI {
             e_ct_interSel,
             e_ct_line,
             e_ct_lineSel,
+            e_ct_normalTip,
         };
         ImVec4 getColor(ColorType);
         ImU32 getColorImU32(ColorType);

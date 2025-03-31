@@ -829,7 +829,7 @@ Point to_point(const stbtt__point &point) {
 
 namespace {
 EmbossStyle create_style(const std::wstring& name, const std::wstring& path) {
-    return {boost::nowide::narrow(name.c_str()), boost::nowide::narrow(name.c_str()),
+    return { boost::nowide::narrow(name.c_str()),
              boost::nowide::narrow(path.c_str()),
              EmbossStyle::Type::file_path, FontProp() };
 }

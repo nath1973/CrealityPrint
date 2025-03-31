@@ -428,7 +428,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         auto   support_type = config->opt_enum<SupportType>("support_type");
         auto   support_style = config->opt_enum<SupportMaterialStyle>("support_style");
         std::set<int> enum_set_normal = { smsDefault, smsGrid, smsSnug };
-        std::set<int> enum_set_tree   = { smsDefault, smsTreeSlim, smsTreeStrong, smsTreeHybrid, smsOrganic };
+        std::set<int> enum_set_tree   = { smsDefault, smsTreeSlim, smsTreeStrong, smsTreeHybrid, smsTreeOrganic };
         auto &           set             = is_tree(support_type) ? enum_set_tree : enum_set_normal;
         if (set.find(support_style) == set.end()) {
             DynamicPrintConfig new_conf = *config;
@@ -605,39 +605,48 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
     bool have_support_interface = config->opt_int("support_interface_top_layers") > 0 || config->opt_int("support_interface_bottom_layers") > 0;
     bool have_support_soluble = have_support_material && config->opt_float("support_top_z_distance") == 0;
     auto support_style = config->opt_enum<SupportMaterialStyle>("support_style");
-    for (auto el : { "support_style", "support_base_pattern",
+    for (auto el : { "support_style",
         "support_base_pattern_spacing", "support_expansion", "support_angle",
         "support_interface_pattern", "support_interface_top_layers", "support_interface_bottom_layers",
         "bridge_no_support", "max_bridge_length", "support_top_z_distance", "support_bottom_z_distance",
         "support_type", "support_on_build_plate_only", "support_critical_regions_only","support_interface_not_for_body",
-        "support_object_xy_distance"/*, "independent_support_layer_height"*/,"minimum_support_area","support_xy_overrides_z","ironing_support_layer","tree_hybrid_cross_height"})
+        "support_object_xy_distance", "independent_support_layer_height","minimum_support_area","support_xy_overrides_z","ironing_support_layer","tree_hybrid_cross_height","support_object_first_layer_gap","raft_first_layer_density","raft_first_layer_expansion","tree_support_wall_count","tree_support_wall_count_tree","bridge_no_support","raft_layers","support_remove_small_overhang"})
         toggle_field(el, have_support_material);
     toggle_field("support_threshold_angle", have_support_material && is_auto(support_type));
+    toggle_field("support_base_pattern_tree", have_support_material && is_tree(support_type));
+    toggle_field("support_base_pattern", have_support_material && support_style != smsTreeOrganic);
     //toggle_field("support_closing_radius", have_support_material && support_style == smsSnug);
     
     bool support_is_tree = config->opt_bool("enable_support") && is_tree(support_type);
-    bool support_is_normal_tree = support_is_tree && support_style != smsOrganic;
+    bool support_is_normal_tree = support_is_tree && support_style != smsTreeOrganic;
     //&&
     //// use organic as TreeHybrid
     //support_style != smsDefault;
     bool support_is_organic = support_is_tree && !support_is_normal_tree;
+
+
+
     // settings shared by normal and organic trees
-    for (auto el : {"tree_support_branch_angle", "tree_support_branch_distance", "tree_support_branch_diameter" })
-        toggle_line(el, support_is_normal_tree);
-    // settings specific to normal trees
-    for (auto el : {"tree_support_wall_count", "tree_support_auto_brim", "tree_support_brim_width", "tree_support_adaptive_layer_height"})
-        toggle_line(el, support_is_normal_tree);
-    // settings specific to organic trees
-    for (auto el : {"tree_support_branch_angle_organic", "tree_support_branch_distance_organic", "tree_support_branch_diameter_organic","tree_support_angle_slow","tree_support_tip_diameter", "tree_support_top_rate", "tree_support_branch_diameter_angle", "tree_support_branch_diameter_double_wall"})
-        toggle_line(el, support_is_organic);
+    //for (auto el : {"tree_support_branch_angle", "tree_support_branch_distance", "tree_support_branch_diameter" })
+    //    toggle_line(el, support_is_normal_tree);
+    //// settings specific to normal trees
+    //for (auto el : {"tree_support_wall_count", "tree_support_auto_brim", "tree_support_brim_width", "tree_support_adaptive_layer_height"})
+    //    toggle_line(el, support_is_normal_tree);
+    //// settings specific to organic trees
+    //for (auto el : {"tree_support_branch_angle_organic", "tree_support_branch_distance_organic", "tree_support_branch_diameter_organic","tree_support_angle_slow","tree_support_tip_diameter", "tree_support_top_rate", "tree_support_branch_diameter_angle", "tree_support_branch_diameter_double_wall"})
+    //    toggle_line(el, support_is_organic);
     
-    toggle_field("tree_support_brim_width", support_is_tree && !config->opt_bool("tree_support_auto_brim"));
+    //toggle_field("tree_support_brim_width", support_is_tree && !config->opt_bool("tree_support_auto_brim"));
     // non-organic tree support use max_bridge_length instead of bridge_no_support
-    toggle_line("max_bridge_length", support_is_normal_tree);
-    toggle_line("bridge_no_support", !support_is_normal_tree);
-    
-    // This is only supported for auto normal tree
-    toggle_line("support_critical_regions_only", is_auto(support_type) && support_is_normal_tree);
+   
+    // hide tree support settings when normal is selected
+    for (auto el : {"tree_support_branch_angle", "tree_support_branch_distance", "tree_support_branch_diameter",
+                    "tree_support_branch_diameter_angle", "max_bridge_length", "support_base_pattern_tree", "tree_support_wall_count_tree"})
+        toggle_line(el, support_is_tree);
+    toggle_line("support_critical_regions_only", is_auto(support_type) && support_is_tree);
+
+    // tree support use max_bridge_length instead of bridge_no_support
+    toggle_line("bridge_no_support", !is_tree(support_type));
     
     for (auto el : { "support_interface_spacing", "support_interface_filament",
         "support_interface_loop_pattern", "support_bottom_interface_spacing" })
@@ -661,9 +670,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
     
     toggle_line("raft_contact_distance", have_raft && !have_support_soluble);
     
-    // Orca: Raft, grid, snug and organic supports use these two parameters to control the size & density of the "brim"/flange
-    for (auto el : { "raft_first_layer_expansion", "raft_first_layer_density"})
-        toggle_field(el, have_support_material && !(support_is_normal_tree && !have_raft));
+    //// Orca: Raft, grid, snug and organic supports use these two parameters to control the size & density of the "brim"/flange
+    //for (auto el : { "raft_first_layer_expansion", "raft_first_layer_density"})
+    //    toggle_field(el, have_support_material && !(support_is_normal_tree && !have_raft));
     
     bool has_ironing = (config->opt_enum<IroningType>("ironing_type") != IroningType::NoIroning);
     for (auto el : { "ironing_pattern", "ironing_flow", "ironing_spacing", "ironing_speed", "ironing_angle" })
@@ -726,7 +735,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
         toggle_field(el, have_prime_tower);
     
     // BBS: MusangKing - Hide "Independent support layer height" option
-    toggle_line("independent_support_layer_height", have_support_material && !have_prime_tower);
+    //toggle_line("independent_support_layer_height", have_support_material && !have_prime_tower);
     
     bool have_avoid_crossing_perimeters = config->opt_bool("reduce_crossing_wall");
     toggle_line("max_travel_detour_distance", have_avoid_crossing_perimeters);
@@ -786,7 +795,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
         new_conf.set_key_value("overhang_reverse_threshold", new ConfigOptionFloatOrPercent(0,true));
         apply(config, &new_conf);
     }
-    toggle_line("timelapse_type", is_BBL_Printer);
+    toggle_line("timelapse_type", (is_BBL_Printer || is_CX_Printer));
 
 
     bool have_small_area_infill_flow_compensation = config->opt_bool("small_area_infill_flow_compensation");

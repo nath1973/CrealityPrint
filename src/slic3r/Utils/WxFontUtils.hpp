@@ -26,7 +26,6 @@ public:
 
     static EmbossStyle::Type get_current_type();
     static EmbossStyle       create_emboss_style(const wxFont& font, const std::string& name = "");
-    static EmbossStyle       create_emboss_style(const wxFont& font, const std::string& name, const std::string& actual_name);
 
     static std::string get_human_readable_name(const wxFont &font);
 

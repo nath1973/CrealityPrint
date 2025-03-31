@@ -239,7 +239,7 @@ static t_config_enum_values s_keys_map_SupportMaterialStyle {
     { "tree_slim",      smsTreeSlim },
     { "tree_strong",    smsTreeStrong },
     { "tree_hybrid",    smsTreeHybrid },
-    { "organic",        smsOrganic }
+    { "organic",        smsTreeOrganic }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportMaterialStyle)
 
@@ -502,6 +502,13 @@ void PrintConfigDef::init_common_params()
     def->mode = comAdvanced;
     def->gui_type = ConfigOptionDef::GUIType::one_string;
     def->set_default_value(new ConfigOptionPoints{ Vec2d(0, 0) });
+
+    def             = this->add("color_bed_exclude_area", coString);
+    def->label      = L("Color bed exclude area");
+    def->tooltip    = L("Color bed exclude area");
+    def->mode       = comAdvanced;
+    def->gui_type = ConfigOptionDef::GUIType::one_string;
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("bed_custom_texture", coString);
     def->label = L("Bed custom texture");
@@ -3917,7 +3924,6 @@ void PrintConfigDef::init_fff_params()
     def->min        = 0;
     def->set_default_value(new ConfigOptionFloats{0.});
 
-
     def = this->add("z_hop_types", coEnums);
     def->label = L("Z hop type");
     def->tooltip = L("Z hop type");
@@ -4528,6 +4534,17 @@ void PrintConfigDef::init_fff_params()
     //Support with too small spacing may touch the object and difficult to remove.
     def->set_default_value(new ConfigOptionFloat(0.35));
 
+    def           = this->add("support_object_first_layer_gap", coFloat);
+    def->label    = L("Support/object first layer gap");
+    def->category = L("Support");
+    def->tooltip  = L("XY separation between an object and its support at the first layer.");
+    def->sidetext = L("mm");
+    def->min      = 0;
+    def->max      = 10;
+    def->mode     = comAdvanced;
+    // Support with too small spacing may touch the object and difficult to remove.
+    def->set_default_value(new ConfigOptionFloat(0.2));
+
     def           = this->add("minimum_support_area", coFloat);
     def->label    = L("Small Overhang Area");
     def->category = L("Support");
@@ -4718,7 +4735,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Spacing of bottom interface lines. Zero means solid interface");
     def->sidetext = L("mm");
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode     = comDevelop;
     def->set_default_value(new ConfigOptionFloat(0.5));
 
     def = this->add("support_interface_speed", coFloat);
@@ -4731,9 +4748,38 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(80));
 
     def = this->add("support_base_pattern", coEnum);
-    def->label = L("Base pattern");
+    def->label = L("Base pattern(Normal)");
     def->category = L("Support");
     def->tooltip = L("Line pattern of support");
+    def->enum_keys_map = &ConfigOptionEnum<SupportMaterialPattern>::get_enum_values();
+    def->enum_values.push_back("default");
+    def->enum_values.push_back("rectilinear");
+    def->enum_values.push_back("rectilinear-grid");
+    def->enum_values.push_back("honeycomb");
+    def->enum_values.push_back("lightning");
+    def->enum_values.push_back("hollow");
+    def->enum_values.push_back("cross");
+    def->enum_values.push_back("gyroid");
+    def->enum_values.push_back("triangles");
+    def->enum_values.push_back("zigzag");
+
+    def->enum_labels.push_back(L("Default"));
+    def->enum_labels.push_back(L("Rectilinear"));
+    def->enum_labels.push_back(L("Rectilinear grid"));
+    def->enum_labels.push_back(L("Honeycomb"));
+    def->enum_labels.push_back(L("Lightning"));
+    def->enum_labels.push_back(L("Hollow"));
+    def->enum_labels.push_back(L("Cross"));
+    def->enum_labels.push_back(L("Gyroid"));
+    def->enum_labels.push_back(L("Triangles"));
+    def->enum_labels.push_back(L("Zig Zag"));
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<SupportMaterialPattern>(smpDefault));
+
+    def = this->add("support_base_pattern_tree", coEnum);
+    def->label         = L("Base pattern(Tree)");
+    def->category      = L("Support");
+    def->tooltip       = L("Line pattern of support");
     def->enum_keys_map = &ConfigOptionEnum<SupportMaterialPattern>::get_enum_values();
     def->enum_values.push_back("default");
     def->enum_values.push_back("rectilinear");
@@ -5013,11 +5059,19 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(3.));
 
     def = this->add("tree_support_wall_count", coInt);
-    def->label = L("Support wall loops");
+    def->label = L("Support wall loops(Normal)");
     def->category = L("Support");
     def->tooltip = L("This setting specify the count of walls around support");
     def->min = 0;
     def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("tree_support_wall_count_tree", coInt);
+    def->label    = L("Support wall loops(Tree)");
+    def->category = L("Support");
+    def->tooltip  = L("This setting specify the count of walls around support");
+    def->min      = 0;
+    def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("tree_support_with_infill", coBool);

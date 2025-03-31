@@ -8,9 +8,8 @@
 #include "Layer.hpp"
 #include "MutablePolygon.hpp"
 #include "PrintConfig.hpp"
-#include "SupportMaterial.hpp"
-#include "SupportSpotsGenerator.hpp"
-#include "Support/TreeSupport.hpp"
+#include "support_new/SupportMaterial.hpp"
+#include "support_new/TreeSupport.hpp"
 #include "Surface.hpp"
 #include "Slicing.hpp"
 #include "Tesselate.hpp"
@@ -702,11 +701,11 @@ void PrintObject::estimate_curled_extrusions()
 
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float support_flow_width = support_material_flow(this, this->config().layer_height).width();
-            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
-                                                 float(this->print()->default_object_config().inner_wall_acceleration.getFloat()),
-                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
-                                                 float(this->config().brim_width.getFloat())};
-            SupportSpotsGenerator::estimate_malformations(this->layers(), params);
+            //SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
+            //                                     float(this->print()->default_object_config().inner_wall_acceleration.getFloat()),
+            //                                     this->config().raft_layers.getInt(), this->config().brim_type.value,
+            //                                     float(this->config().brim_width.getFloat())};
+            //SupportSpotsGenerator::estimate_malformations(this->layers(), params);
             m_print->throw_if_canceled();
 
             debug_estimate_curled_extrusions(m_print, this);
@@ -866,14 +865,14 @@ void PrintObject::clear_support_layers()
 std::shared_ptr<TreeSupportData> PrintObject::alloc_tree_support_preview_cache()
 {
     if (!m_tree_support_preview_cache) {
-        const coordf_t layer_height = m_config.layer_height.value;
+        //const coordf_t layer_height = m_config.layer_height.value;
         const coordf_t xy_distance = m_config.support_object_xy_distance.value;
-        const double angle = m_config.tree_support_branch_angle.value * M_PI / 180.;
-        const coordf_t max_move_distance
-            = (angle < M_PI / 2) ? (coordf_t)(tan(angle) * layer_height) : std::numeric_limits<coordf_t>::max();
-        const coordf_t radius_sample_resolution = g_config_tree_support_collision_resolution;
+        //const double angle = m_config.tree_support_branch_angle.value * M_PI / 180.;
+        //const coordf_t max_move_distance
+        //    = (angle < M_PI / 2) ? (coordf_t)(tan(angle) * layer_height) : std::numeric_limits<coordf_t>::max();
+        //const coordf_t radius_sample_resolution = g_config_tree_support_collision_resolution;
 
-        m_tree_support_preview_cache = std::make_shared<TreeSupportData>(*this, xy_distance, max_move_distance, radius_sample_resolution);
+        m_tree_support_preview_cache = std::make_shared<TreeSupportData>(*this, xy_distance, g_config_tree_support_collision_resolution);
     }
 
     return m_tree_support_preview_cache;
@@ -1037,8 +1036,10 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_interface_spacing"
             || opt_key == "support_bottom_interface_spacing" //BBS
             || opt_key == "support_base_pattern"
+            || opt_key == "support_base_pattern_tree"
             || opt_key == "support_style"
             || opt_key == "support_object_xy_distance"
+            || opt_key == "support_object_first_layer_gap"
             || opt_key == "support_base_pattern_spacing"
             || opt_key == "support_expansion"
             || opt_key == "ironing_support_layer"
@@ -1065,7 +1066,8 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "tree_support_branch_angle"
             || opt_key == "tree_support_branch_angle_organic"
             || opt_key == "tree_support_angle_slow"
-            || opt_key == "tree_support_wall_count") {
+            || opt_key == "tree_support_wall_count"
+            || opt_key == "tree_support_wall_count_tree") {
             steps.emplace_back(posSupportMaterial);
         } else if (
                opt_key == "bottom_shell_layers"
@@ -3542,17 +3544,13 @@ void PrintObject::combine_infill()
 
 void PrintObject::_generate_support_material()
 {
-    PrintObjectSupportMaterial support_material(this, m_slicing_params);
-    support_material.generate(*this);
-
-    //use TreeHybrid as default
-    if (this->config().enable_support.value && is_tree(this->config().support_type.value)) {
-        if (this->config().support_style.value == smsOrganic ) {
-            fff_tree_support_generate(*this, std::function<void()>([this]() { this->throw_if_canceled(); }));
-        } else {
-            TreeSupport tree_support(*this, m_slicing_params);
-            tree_support.generate();
-        }
+    if (is_tree(m_config.support_type.value)) {
+        TreeSupport tree_support(*this, m_slicing_params);
+        tree_support.throw_on_cancel = [this]() { this->throw_if_canceled(); };
+        tree_support.generate();
+    } else {
+        PrintObjectSupportMaterial support_material(this, m_slicing_params);
+        support_material.generate(*this);
     }
 }
 
@@ -3984,7 +3982,7 @@ static void project_triangles_to_slabs(ConstLayerPtrsAdaptor layers, const index
 }
 
 void PrintObject::project_and_append_custom_facets(
-        bool seam, EnforcerBlockerType type, std::vector<Polygons>& out) const
+        bool seam, EnforcerBlockerType type, std::vector<Polygons>& out, std::vector<std::pair<Vec3f, Vec3f>>* vertical_points) const
 {
     for (const ModelVolume* mv : this->model_object()->volumes)
         if (mv->is_model_part()) {
@@ -3999,7 +3997,7 @@ void PrintObject::project_and_append_custom_facets(
                 else {
                     std::vector<Polygons> projected;
                     // Support blockers or enforcers. Project downward facing painted areas upwards to their respective slicing plane.
-                    slice_mesh_slabs(custom_facets, zs_from_layers(this->layers()), this->trafo_centered() * mv->get_matrix(), nullptr, &projected, [](){});
+                    slice_mesh_slabs(custom_facets, zs_from_layers(this->layers()), this->trafo_centered() * mv->get_matrix(), nullptr, &projected, vertical_points, [](){});
                     // Merge these projections with the output, layer by layer.
                     assert(! projected.empty());
                     assert(out.empty() || out.size() == projected.size());

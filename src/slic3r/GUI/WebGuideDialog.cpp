@@ -33,6 +33,7 @@
 #include "CreatePresetsDialog.hpp"
 
 #include <slic3r/GUI/Tab.hpp>
+#include "UpdateParams.hpp"
 
 using namespace nlohmann;
 
@@ -1316,6 +1317,7 @@ bool GuideFrame::run()
         //app.obj_manipul()->update_ui_from_settings();
         BOOST_LOG_TRIVIAL(info) << "GuideFrame applied";
         this->Close();
+        UpdateParams::getInstance().checkParamsNeedUpdate();
         return true;
     } else if (result == wxID_CANCEL) {
         BOOST_LOG_TRIVIAL(info) << "GuideFrame cancelled";

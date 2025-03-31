@@ -6057,9 +6057,10 @@ void ObjectList::apply_object_instance_transfrom_to_all_volumes(ModelObject *mod
 
 void ObjectList::render_plate_tree_by_ImGui()
 {
-    /*ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 0.0f, 0.0, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 1.0f, 0.0, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY); //for selected*/
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.0f, 0.0f, 0.0, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY); //use for TreeNode be selected
+
 
     wxDataViewItemArray all_plates;
     m_objects_model->GetChildren(wxDataViewItem(nullptr), all_plates);
@@ -6071,7 +6072,7 @@ void ObjectList::render_plate_tree_by_ImGui()
     GLCanvas3D::ECanvasType type = wxGetApp().plater()->get_current_canvas3D()->get_canvas_type();
     float table_h = 0.0f; 
     if (type == GLCanvas3D::CanvasView3D) {
-        table_h = canvas_h * 0.75f - pos_y;
+        table_h = canvas_h * 0.65f - pos_y;
     } else if (type == GLCanvas3D::CanvasPreview) {
         table_h = canvas_h * 0.4f - pos_y;
     }
@@ -6081,20 +6082,77 @@ void ObjectList::render_plate_tree_by_ImGui()
     
     static ImGuiTableFlags flags    = ImGuiTableFlags_None | ImGuiTableFlags_RowBg | ImGuiTableFlags_Hideable | ImGuiTableFlags_ScrollY;
     
+
+    auto get_a_node_valid_column = [](ObjectDataViewModelNode* node) {
+        if (node == NULL)
+            return 0;
+
+        int init_column = 0;
+        
+        if (node->HasSupportPainting()) {
+            init_column++;
+        }
+        if (node->HasColorPainting()) {
+            init_column++;
+        }
+        if (node->HasSinking()) {
+            init_column++;
+        }
+        if (node->IsActionEnabled()) {
+            init_column++;
+        }
+        return init_column;
+    };
+
+    std::function<int(ObjectDataViewModelNode * node)> get_node_and_children_max_valid_column;
+    get_node_and_children_max_valid_column = [&](ObjectDataViewModelNode* node) {
+        if (node == NULL)
+            return 0;
+
+        int sub_column = get_a_node_valid_column(node);
+
+        if (node->get_open() && node->GetChildCount() > 0) {
+            MyObjectTreeModelNodePtrArray& sub_nodes = node->GetChildren();
+            for (int child_n = 0; child_n < sub_nodes.size(); child_n++) {
+                int c      = get_node_and_children_max_valid_column(sub_nodes[child_n]);
+                sub_column = std::max(c, sub_column);
+            }
+        }
+        return sub_column;
+    };
+    
+
+    int num_var_column = 0;
+
+    for (size_t i = 0; i < all_plates.size(); i++) {
+        wxDataViewItem&          p    = all_plates[i];
+        ObjectDataViewModelNode* node = static_cast<ObjectDataViewModelNode*>(p.GetID());
+        
+        num_var_column = std::max(get_node_and_children_max_valid_column(node), num_var_column);
+        
+    }
+
+
     // HelpMarker("See \"Columns flags\" section to configure how indentation is applied to individual columns.");
-    if (ImGui::BeginTable("##obj_table", 6, flags, ImVec2(ImGui::GetCurrentWindow()->Size.x - 10.0f, table_h))) {
+    if (ImGui::BeginTable("##obj_table", num_var_column + 2, flags, ImVec2(ImGui::GetCurrentWindow()->Size.x - 10.0f, table_h))) {
         // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthStretch);
+        
         ImGuiTableColumnFlags flags = ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthFixed;
         const float icon_size             = 20.0f * view_scale;
-        ImGui::TableSetupColumn("Extruder", flags, 40.0f * view_scale);
-        ImGui::TableSetupColumn("Support", flags, icon_size);
-        //ImGui::TableSetupColumn("Seam", flags, icon_size);
-        ImGui::TableSetupColumn("Mmu", flags, icon_size);
-        ImGui::TableSetupColumn("Sinking", flags, icon_size);
-        ImGui::TableSetupColumn("UndoSettings", flags, icon_size);
 
-        // ImGui::TableHeadersRow();
+        for (size_t i = 0; i < num_var_column; i++) {
+            ImGui::TableSetupColumn(("Column_" + std::to_string(i)).c_str(), flags, icon_size);
+        }
+
+        //ImGui::TableSetupColumn("Support", flags, icon_size);
+        ////ImGui::TableSetupColumn("Seam", flags, icon_size);
+        //ImGui::TableSetupColumn("Mmu", flags, icon_size);
+        //ImGui::TableSetupColumn("Sinking", flags, icon_size);
+        //ImGui::TableSetupColumn("UndoSettings", flags, icon_size);
+
+        ImGui::TableSetupColumn("Extruder", flags, 40.0f * view_scale);
+
         for (size_t i = 0; i < all_plates.size(); i++) {
             wxDataViewItem&          p    = all_plates[i];
             ObjectDataViewModelNode* node = static_cast<ObjectDataViewModelNode*>(p.GetID());
@@ -6107,7 +6165,7 @@ void ObjectList::render_plate_tree_by_ImGui()
     m_table_data.table_height   = ImGui::GetItemRectSize().y;
     m_table_data.table_offset_y = ImGui::GetItemRectMin().y;
     //ImGui::Text("Table Height: %.2f", table_size.y);
-    //ImGui::PopStyleColor(1);
+    ImGui::PopStyleColor(3);
 }
 
 void ObjectList::render_plate(ObjectDataViewModelNode* plate) 
@@ -6217,15 +6275,8 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
     float  view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
     ImVec2 icon_size = ImVec2(20 * view_scale, 20 * view_scale);
     
-    
-    ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY); 
 
-    // extruder
-    ImGui::TableNextColumn();
-
+ #if  0
     // Support
     ImGui::TableNextColumn();
 
@@ -6237,6 +6288,14 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
 
     // Sinking
     ImGui::TableNextColumn();
+
+    // extruder
+    ImGui::TableNextColumn();
+#endif //  0
+
+    for (size_t i = 0; i < ImGui::TableGetColumnCount()-2; i++) {
+        ImGui::TableNextColumn();
+    }
 
     // undo settings
     ImGui::TableNextColumn();
@@ -6282,7 +6341,6 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
         ImGui::TreePop();
     }
 
-    ImGui::PopStyleColor(3);
     plate->set_open(open);
 }
 
@@ -6325,11 +6383,6 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
     float view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
     ImVec2 icon_size = ImVec2(20 * view_scale, 20 * view_scale);
 
-    ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY); 
-
     ImGuiContext& g = *GImGui;
     // ImGuiWindow* window = g.CurrentWindow;
     const ImGuiStyle& style = g.Style;
@@ -6368,29 +6421,6 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
     }
 
 
-    auto select_node_func = [this, node_selected](ObjectDataViewModelNode* n) {
-        if (n != nullptr) {
-            m_last_selected_item = wxDataViewItem(n);
-#ifdef __WXMSW__
-            m_last_selected_column = -1;
-#endif //__WXMSW__
-
-            // multi select when CONTROL key press
-            if (wxGetKeyState(WXK_CONTROL)) {
-                if (node_selected) {
-                    Unselect(m_last_selected_item);
-                } else {
-                    Select(m_last_selected_item);
-                }
-                selection_changed();
-            } else {
-                //selected_object(n); // avoid set wxwidget focus
-                select_item(wxDataViewItem(n));
-                //ensure_current_item_visible();
-                selection_changed();
-            }
-        }
-    };
 
 
     bool   is_dark    = wxGetApp().dark_mode();
@@ -6458,7 +6488,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         bool result = ImGui::ImageButton(normal_id, icon_size, m_texture.get_texture_uv0(printable_name, false),
                                          m_texture.get_texture_uv1(printable_name, false), 0);
         if (result) {
-            select_node_func(node);
+            select_node(node, node_selected);
             toggle_printable_state();
         }
         ImGui::PopID();
@@ -6477,7 +6507,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         bool result = ImGui::ImageButton(normal_id, icon_size, m_texture.get_texture_uv0(repair_name, true),
                                          m_texture.get_texture_uv1(repair_name, true), 0);
         if (result) {
-            select_node_func(node);
+            select_node(node, node_selected);
 
             if (is_windows10())
                 fix_through_netfabb();
@@ -6527,6 +6557,8 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         return label;
     };
 
+    const bool shift_press = wxGetKeyState(WXK_SHIFT);
+    bool left_clicked = false;
     if (type & ItemType::itVolume && volume_type != ModelVolumeType::INVALID) {
         
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0, 0.0));
@@ -6540,7 +6572,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
 
             ImGui::PushID((node_label + "name_button").c_str());
 
-            bool left_clicked =  ImGui::ImageTextButton(icon_size, node_name, normal_id, icon_size,
+            left_clicked =  ImGui::ImageTextButton(icon_size, node_name, normal_id, icon_size,
                                    m_texture.get_texture_uv0(name, node_selected), m_texture.get_texture_uv1(name, node_selected), 0);
             bool right_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
             bool left_draged = false;
@@ -6582,28 +6614,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
 
             ImGui::PopID();
 
-            if (left_clicked || left_draged) 
-            {
-                select_node_func(node);
-            }
-
-            if (right_clicked) {
-                
-                if (node_selected) {
-                
-                } else {
-                    select_node_func(node);
-                }
-                // show_context_menu(true);
-                auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, 0);
-                event.SetEventObject(this);
-                wxPostEvent(this, event);
-            }
-
-            //
-            if (left_clicked && node_selected && sels.size() == 1) {
-                rename_item();
-            }
+            handle_obj_list_select_event(left_clicked, right_clicked, left_draged, shift_press, node_selected, node, sels);
 
         }
 
@@ -6629,7 +6640,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         ImGui::ImageTextButton(icon_size, node_name, normal_id, icon_size,
                                m_texture.get_texture_uv0(name, node_selected), m_texture.get_texture_uv1(name, node_selected), 0);
 
-        bool left_clicked  = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+        left_clicked  = ImGui::IsItemClicked(ImGuiMouseButton_Left);
         bool right_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
 
         if (ImGui::IsItemHovered()) {
@@ -6639,7 +6650,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         ImGui::PopID();
 
         if (left_clicked || right_clicked) {
-            select_node_func(node);
+            select_node(node, node_selected);
         }
         ImGui::PopStyleVar(1);
     
@@ -6651,7 +6662,6 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, fp.y));
         
-        bool left_clicked = false;
         if (type & ItemType::itObject && node->has_lock()) {
             
             ImGui::PushID((node_label + "cut_button").c_str());
@@ -6707,198 +6717,29 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             }
         }
         
-        if (left_clicked || left_draged) {
-            select_node_func(node);
-        }
-
-        if (right_clicked) {
-
-            if (node_selected) {
-                
-            } else {
-                select_node_func(node);
-            }
-
-            // show_context_menu(true);
-            auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, 0);
-            event.SetEventObject(this);
-            wxPostEvent(this, event);
-        }
-
-        if (left_clicked && node_selected && sels.size() == 1) {
-            rename_item();
-        }
+        handle_obj_list_select_event(left_clicked, right_clicked, left_draged, shift_press, node_selected, node, sels);
 
         ImGui::PopStyleVar(1);
     }
     
-    ImGui::SameLine();   
+    
+    int column_count = 2;
+    if (node->HasSupportPainting()) {
+        column_count++;
+    }
+    if (node->HasColorPainting()) {
+        column_count++;
+    }
+    if (node->HasSinking()) {
+        column_count++;
+    }
+    if (node->IsActionEnabled()) {
+        column_count++;
+    }
 
-    // extruder
-    ImGui::TableNextColumn();
-    {
-        wxString ext = node->GetExtruder();
-        if (!ext.empty()) {
-            
-            std::vector<std::string> extruder_colors;
-            std::vector<std::string> ext_names;
-            std::vector<ImVec4>      color_values;
-            std::vector<ImVec4>      text_colors;
-
-            if (volume_type == ModelVolumeType::PARAMETER_MODIFIER || type & ItemType::itLayer) {
-                extruder_colors.emplace_back("#ffffff");
-                ext_names.emplace_back(_u8L("default"));
-                color_values.emplace_back(ImVec4(0.0, 0.0, 0.0, 0.0));
-                text_colors.emplace_back(ImVec4(0.0, 0.0, 0.0, 1.0));
-            }
-
-            std::vector<std::string> config_extruder_colors = wxGetApp().plater()->get_extruder_colors_from_plater_config(); // like "#0834f1", ...
-            for (size_t i = 0; i < config_extruder_colors.size(); i++) {
-
-                const std::string& sub_string = config_extruder_colors.at(i);
-                extruder_colors.emplace_back(sub_string);
-
-                size_t t = i + 1;
-                ext_names.emplace_back(std::to_string(t));
-
-                
-                wxColor            wxc(sub_string);
-                ImVec4             color_v4 = ImVec4(wxc.Red() / 255.0, wxc.Green() / 255.0, wxc.Blue() / 255.0, 1.0);
-                color_values.emplace_back(color_v4);
-
-                float gray = color_v4.x * 0.299f + color_v4.y * 0.587f + color_v4.z *0.114f;
-                if (gray > 0.5f) {
-                    gray = 0.0f;
-                } else {
-                    gray = 1.0f;
-                }
-                text_colors.emplace_back(ImVec4(gray, gray, gray, 1.0f));
-            }
-
-            int ext_idx = 0;
-
-            if (volume_type == ModelVolumeType::PARAMETER_MODIFIER || type & ItemType::itLayer) {
-                if (ext == _(L("default"))) {
-                    ext_idx = 0;
-                } else {
-                    int k   = atoi(ext.c_str());
-                    ext_idx = std::clamp<int>(k, 1, (int) extruder_colors.size() - 1);
-                }
-
-            } else {
-            
-                int k = atoi(ext.c_str());
-                ext_idx = k > 0 ? (k - 1) : 0;
-                ext_idx = std::min<int>(ext_idx, (int)extruder_colors.size() - 1);
-            }
-
-            ImVec2 pos = ImGui::GetCursorPos();
-            ImVec2 p_min = ImGui::GetCursorScreenPos();
-   
-            const ImVec4& filament_color = color_values.at(ext_idx);
-            const ImVec4&   title_color  = text_colors.at(ext_idx);
-                             
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, filament_color);
-            ImGui::PushStyleColor(ImGuiCol_Text, title_color);
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight()/2.0); 
-            ImGui::PushItemWidth(40.0f * view_scale);
-
-            if (ImGui::BeginCombo((std::string(unique_label) + "_combo").c_str(), "",
-                                  ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLargest)) {
-                
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-                
-                for (int n = 0; n < ext_names.size(); n++) {
-                    const std::string& cur_name = ext_names[n];
-
-                    const bool is_selected = (ext_idx == n);
-
-                    const ImVec4  sub_color  = cur_name == _u8L("default") ? ImVec4(0, 0, 0, 0) : color_values.at(n);
-                    const ImVec4& text_color = text_colors.at(n);
-
-                    ImGui::PushStyleColor(ImGuiCol_Button, sub_color);
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sub_color);
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, sub_color); 
-                    ImGui::PushStyleColor(ImGuiCol_Text, text_color);
-
-                    if (ImGui::Selectable(("##" + cur_name).c_str(), is_selected, ImGuiSelectableFlags_None)) {
-
-                        if (cur_name == _u8L("default")) {
-                            node->SetExtruder(_(L("default")));
-                        } else {
-                            node->SetExtruder(ext_names[n]);
-                        }
-                        
-                        wxDataViewItem item = wxDataViewItem(node);
-                        if (m_objects_model->GetItemType(item) == ItemType::itObject)
-                            m_objects_model->UpdateVolumesExtruderBitmap(item, true);
-                        update_filament_in_config(item);
-                    }
-
-                    ImGui::SameLine();
-                    
-                    ImVec2 size = ImVec2(50 * view_scale, 20 * view_scale);
-
-                    if (cur_name == _u8L("default")) {
-                        ImVec2 pp = ImGui::GetCursorPos();
-                        auto tex_id = DispConfig().getTextureId(DispConfig::e_tt_retangle_transparent, false, false);
-                        ImGui::Image(tex_id, size);
-                        ImGui::SetCursorPos(pp);
-                    }
-
-                    ImGui::Button(cur_name.c_str(), size);
-                   
-                    ImGui::SameLine();
-                    ImGui::InvisibleButton("##", ImVec2(0.1, 25*view_scale));
-                    
-                    ImGui::PopStyleColor(4);
-
-                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                    if (is_selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-
-                ImGui::PopStyleVar(1);
-                ImGui::PopStyleVar(1);
-                ImGui::EndCombo();
-            }
-
-
-            //draw border for default extruder
-            if (ext == _(L("default"))) {
-                /*ImVec4 border_color = ImVec4(110.0f / 255.0f, 110.0f / 255.0f, 114.0f / 255.0f, 1.0f);
-                ImGui::PushStyleColor(ImGuiCol_Border, border_color);
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
-
-                float rounding = 9;
-
-                ImVec2 p_max = ImVec2(p_min.x + 40.0f * view_scale, p_min.y + ImGui::GetFrameHeight());
-                ImGui::RenderFrameBorder(p_min, p_max, rounding);*/
-
-                ImGui::SetCursorPos(pos);
-                auto tex_id = DispConfig().getTextureId(DispConfig::e_tt_rounding_transparent, false, false);
-                ImGui::Image(tex_id, ImVec2(40.0f * view_scale, ImGui::GetFrameHeight()));   
-
-                /*ImGui::PopStyleColor(1);
-                ImGui::PopStyleVar(1);*/
-            }
-
-            //draw text
-            {
-                float item_width = ImGui::CalcItemWidth();
-                const char* t = ext_names[ext_idx].c_str();
-                ImVec2 text_size  = ImGui::CalcTextSize(t);
-
-                float x = pos.x + (item_width - text_size.x) * 0.5f;
-                ImGui::SetCursorPos(ImVec2(x, pos.y + style.FramePadding.y));
-
-                ImGui::Text(t);
-
-                ImGui::PopItemWidth();
-                ImGui::PopStyleVar(1);
-                ImGui::PopStyleColor(2);
-            }
+    if (ImGui::TableGetColumnCount() > column_count) {
+        for (size_t i = 0; i < ImGui::TableGetColumnCount() - column_count; i++) {
+            ImGui::TableNextColumn();
         }
     }
 
@@ -6918,7 +6759,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
                                    m_texture.get_texture_uv1(ObjList_Texture::IM_TEXTURE_NAME::texSupportPainting, node_selected), 0) &&
                 is_view3D) 
             {
-                select_node_func(node);
+                select_node(node, node_selected);
                 
                 auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, ObjList_Texture::IM_TEXTURE_NAME::texSupportPainting);
                 event.SetEventObject(this);
@@ -6961,7 +6802,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
                 if (is_view3D) {
                     if (node && node->HasColorPainting()) {
 
-                        select_node_func(node);
+                        select_node(node, node_selected);
 
                         auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, ObjList_Texture::IM_TEXTURE_NAME::texColorPainting); 
                         event.SetEventObject(this); 
@@ -6993,7 +6834,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
                                m_texture.get_texture_uv1(ObjList_Texture::IM_TEXTURE_NAME::texSinking, node_selected), 0)) {
             if (is_view3D) {
                 if (node && node->HasSinking()) {
-                    select_node_func(node);
+                    select_node(node, node_selected);
 
                     /* auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, ObjList_Texture::IM_TEXTURE_NAME::texColorPainting);
                      event.SetEventObject(this);
@@ -7036,7 +6877,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
                                m_texture.get_texture_uv1(ObjList_Texture::IM_TEXTURE_NAME::texEditing, node_selected), 0)) {
             if (is_view3D) {
                 if (node && node->IsActionEnabled()) {
-                    select_node_func(node);
+                    select_node(node, node_selected);
 
                     /* auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, ObjList_Texture::IM_TEXTURE_NAME::texColorPainting);
                      event.SetEventObject(this);
@@ -7065,6 +6906,168 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         ImGui::PopID();
     }
 
+    // extruder
+    ImGui::TableNextColumn();
+    {
+        wxString ext = node->GetExtruder();
+        if (!ext.empty()) {
+            std::vector<std::string> extruder_colors;
+            std::vector<std::string> ext_names;
+            std::vector<ImVec4>      color_values;
+            std::vector<ImVec4>      text_colors;
+
+            if (volume_type == ModelVolumeType::PARAMETER_MODIFIER || type & ItemType::itLayer) {
+                extruder_colors.emplace_back("#ffffff");
+                ext_names.emplace_back(_u8L("default"));
+                color_values.emplace_back(ImVec4(0.0, 0.0, 0.0, 0.0));
+                text_colors.emplace_back(ImVec4(0.0, 0.0, 0.0, 1.0));
+            }
+
+            std::vector<std::string> config_extruder_colors =
+                wxGetApp().plater()->get_extruder_colors_from_plater_config(); // like "#0834f1", ...
+            for (size_t i = 0; i < config_extruder_colors.size(); i++) {
+                const std::string& sub_string = config_extruder_colors.at(i);
+                extruder_colors.emplace_back(sub_string);
+
+                size_t t = i + 1;
+                ext_names.emplace_back(std::to_string(t));
+
+                wxColor wxc(sub_string);
+                ImVec4  color_v4 = ImVec4(wxc.Red() / 255.0, wxc.Green() / 255.0, wxc.Blue() / 255.0, 1.0);
+                color_values.emplace_back(color_v4);
+
+                float gray = color_v4.x * 0.299f + color_v4.y * 0.587f + color_v4.z * 0.114f;
+                if (gray > 0.5f) {
+                    gray = 0.0f;
+                } else {
+                    gray = 1.0f;
+                }
+                text_colors.emplace_back(ImVec4(gray, gray, gray, 1.0f));
+            }
+
+            int ext_idx = 0;
+
+            if (volume_type == ModelVolumeType::PARAMETER_MODIFIER || type & ItemType::itLayer) {
+                if (ext == _(L("default"))) {
+                    ext_idx = 0;
+                } else {
+                    int k   = atoi(ext.c_str());
+                    ext_idx = std::clamp<int>(k, 1, (int) extruder_colors.size() - 1);
+                }
+
+            } else {
+                int k   = atoi(ext.c_str());
+                ext_idx = k > 0 ? (k - 1) : 0;
+                ext_idx = std::min<int>(ext_idx, (int) extruder_colors.size() - 1);
+            }
+
+            ImVec2 pos   = ImGui::GetCursorPos();
+            ImVec2 p_min = ImGui::GetCursorScreenPos();
+
+            const ImVec4& filament_color = color_values.at(ext_idx);
+            const ImVec4& title_color    = text_colors.at(ext_idx);
+
+            ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, filament_color);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, filament_color);
+            ImGui::PushStyleColor(ImGuiCol_Text, title_color);
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() / 2.0);
+            ImGui::PushItemWidth(40.0f * view_scale);
+
+            if (ImGui::BeginCombo((std::string(unique_label) + "_combo").c_str(), "",
+                                  ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLargest)) {
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+
+                for (int n = 0; n < ext_names.size(); n++) {
+                    const std::string& cur_name = ext_names[n];
+
+                    const bool is_selected = (ext_idx == n);
+
+                    const ImVec4  sub_color  = cur_name == _u8L("default") ? ImVec4(0, 0, 0, 0) : color_values.at(n);
+                    const ImVec4& text_color = text_colors.at(n);
+
+                    ImGui::PushStyleColor(ImGuiCol_Button, sub_color);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sub_color);
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, sub_color);
+                    ImGui::PushStyleColor(ImGuiCol_Text, text_color);
+
+                    if (ImGui::Selectable(("##" + cur_name).c_str(), is_selected, ImGuiSelectableFlags_None)) {
+                        if (cur_name == _u8L("default")) {
+                            node->SetExtruder(_(L("default")));
+                        } else {
+                            node->SetExtruder(ext_names[n]);
+                        }
+
+                        wxDataViewItem item = wxDataViewItem(node);
+                        if (m_objects_model->GetItemType(item) == ItemType::itObject)
+                            m_objects_model->UpdateVolumesExtruderBitmap(item, true);
+                        update_filament_in_config(item);
+                    }
+
+                    ImGui::SameLine();
+
+                    ImVec2 size = ImVec2(50 * view_scale, 20 * view_scale);
+
+                    if (cur_name == _u8L("default")) {
+                        ImVec2 pp     = ImGui::GetCursorPos();
+                        auto   tex_id = DispConfig().getTextureId(DispConfig::e_tt_retangle_transparent, false, false);
+                        ImGui::Image(tex_id, size);
+                        ImGui::SetCursorPos(pp);
+                    }
+
+                    ImGui::Button(cur_name.c_str(), size);
+
+                    ImGui::SameLine();
+                    ImGui::InvisibleButton("##", ImVec2(0.1, 25 * view_scale));
+
+                    ImGui::PopStyleColor(4);
+
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::PopStyleVar(1);
+                ImGui::PopStyleVar(1);
+                ImGui::EndCombo();
+            }
+
+            // draw border for default extruder
+            if (ext == _(L("default"))) {
+                /*ImVec4 border_color = ImVec4(110.0f / 255.0f, 110.0f / 255.0f, 114.0f / 255.0f, 1.0f);
+                ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
+
+                float rounding = 9;
+
+                ImVec2 p_max = ImVec2(p_min.x + 40.0f * view_scale, p_min.y + ImGui::GetFrameHeight());
+                ImGui::RenderFrameBorder(p_min, p_max, rounding);*/
+
+                ImGui::SetCursorPos(pos);
+                auto tex_id = DispConfig().getTextureId(DispConfig::e_tt_rounding_transparent, false, false);
+                ImGui::Image(tex_id, ImVec2(40.0f * view_scale, ImGui::GetFrameHeight()));
+
+                /*ImGui::PopStyleColor(1);
+                ImGui::PopStyleVar(1);*/
+            }
+
+            // draw text
+            {
+                float       item_width = ImGui::CalcItemWidth();
+                const char* t          = ext_names[ext_idx].c_str();
+                ImVec2      text_size  = ImGui::CalcTextSize(t);
+
+                float x = pos.x + (item_width - text_size.x) * 0.5f;
+                ImGui::SetCursorPos(ImVec2(x, pos.y + style.FramePadding.y));
+
+                ImGui::Text(t);
+
+                ImGui::PopItemWidth();
+                ImGui::PopStyleVar(1);
+                ImGui::PopStyleColor(3);
+            }
+        }
+    }
 
     if (node_selected) {
         ensure_current_item_visible_imgui();
@@ -7083,9 +7086,89 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         ImGui::TreePop();
     }
 
-    ImGui::PopStyleColor(4);
+    ImGui::PopStyleColor(1);
 
     node->set_open(open);
+}
+
+void ObjectList::handle_obj_list_select_event(
+    bool left_clicked, bool right_clicked, 
+    bool left_draged, bool shift_press,
+                                              bool                     node_selected,
+                                              ObjectDataViewModelNode* node,
+                                              wxDataViewItemArray&      selecteds)
+{
+    if ((left_clicked || left_draged) && !shift_press) {
+        select_node(node, node_selected);
+    }
+
+    // multi selection when press shift key
+    if (left_clicked && shift_press && !node_selected && m_last_selected_item) {
+        // has same parent
+        ObjectDataViewModelNode* sel        = static_cast<ObjectDataViewModelNode*>(m_last_selected_item.GetID());
+        ObjectDataViewModelNode* the_parent = node->GetParent();
+        if (the_parent && the_parent == sel->GetParent()) {
+            int idx0 = the_parent->GetChildIndex(sel);
+            int idx1 = the_parent->GetChildIndex(node);
+
+            int  start       = std::min(idx0, idx1);
+            int  end         = std::max(idx0, idx1);
+            bool need_update = false;
+            for (int j = start; j <= end; j++) {
+                ObjectDataViewModelNode* sub_child = the_parent->GetNthChild(j);
+                wxDataViewItem           sub_item  = wxDataViewItem(sub_child);
+                if (std::find(selecteds.begin(), selecteds.end(), sub_item) == selecteds.end()) {
+                    selecteds.push_back(sub_item);
+                    need_update = true;
+                }
+            }
+            if (need_update) {
+                select_items(selecteds);
+                selection_changed();
+            }
+        }
+    }
+
+    if (right_clicked) {
+        if (node_selected) {
+        } else {
+            select_node(node, node_selected);
+        }
+
+        // show_context_menu(true);
+        auto event = IntEvent(EVT_OBJ_LIST_COLUMN_SELECT, 0);
+        event.SetEventObject(this);
+        wxPostEvent(this, event);
+    }
+
+    if (left_clicked && node_selected && selecteds.size() == 1 && !shift_press) {
+        rename_item();
+    }
+}
+
+void ObjectList::select_node(ObjectDataViewModelNode* node, bool node_select_state)
+{
+    if (node != nullptr) {
+        m_last_selected_item = wxDataViewItem(node);
+#ifdef __WXMSW__
+        m_last_selected_column = -1;
+#endif //__WXMSW__
+
+        // multi select when CONTROL key press
+        if (wxGetKeyState(WXK_CONTROL)) {
+            if (node_select_state) {
+                Unselect(m_last_selected_item);
+            } else {
+                Select(m_last_selected_item);
+            }
+            selection_changed();
+        } else {
+            // selected_object(n); // avoid set wxwidget focus
+            select_item(wxDataViewItem(node));
+            // ensure_current_item_visible();
+            selection_changed();
+        }
+    }
 }
 
 void GUI::ObjectList::render_current_device_name(const float max_right) {
@@ -7094,7 +7177,6 @@ void GUI::ObjectList::render_current_device_name(const float max_right) {
         return;
     
     std::string device_name = current_device.name;
-
     auto remake_text_to_fit_size = [max_right](const std::string& input_text) {
         const float device_label_max_right   = max_right;
         const float device_label_max_width   = device_label_max_right - ImGui::GetCursorPosX() - ImGui::GetStyle().ItemSpacing.x;
@@ -7151,11 +7233,8 @@ void ObjectList::render_printer_preset_by_ImGui()
     ImVec2 icon_size = ImVec2(22 * scale, 22 * scale);
 
     const ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
-    ImGui::PushStyleColor(ImGuiCol_Button, transparent);
-    ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY);   
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY);
     bool is_dark = wxGetApp().dark_mode();
+    ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY);
     ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(51 / 255.0, 51 / 255.0, 51 / 255.0, 1.0);
     ImGui::PushStyleColor(ImGuiCol_Text, text_color);
 
@@ -7166,13 +7245,10 @@ void ObjectList::render_printer_preset_by_ImGui()
     ImGuiWrapper& imgui = *wxGetApp().imgui();
     imgui.title(_u8L("Printer"), true);
     ImGui::SetWindowFontScale(1.0f);
+    
     ImGui::SameLine();
 
     const float device_label_max_right = 240.0f * scale;
-
-    render_current_device_name(device_label_max_right);
-    
-    ImGui::SameLine();
     ImGui::SetCursorPosX(device_label_max_right);
 
     // Setting
@@ -7210,6 +7286,9 @@ void ObjectList::render_printer_preset_by_ImGui()
 
     ImGui::PopID();
 
+    const float device_name_max_right = 300.0f * scale;
+    render_current_device_name(device_name_max_right);
+
     ImGui::Dummy(ImVec2(0, 0));
 
     /**************************************************************************************/
@@ -7227,9 +7306,9 @@ void ObjectList::render_printer_preset_by_ImGui()
 
     
     ImVec4 border_color = ImVec4(110.0f / 255.0f, 110.0f / 255.0f, 114.0f/255.0f, 1.0f);
-    ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+    //ImGui::PushStyleColor(ImGuiCol_Border, border_color);
     
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
+    //ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
 
     float  rounding            = 4.0f * scale;
     float  item_height         = 22.0f * scale;
@@ -7238,13 +7317,10 @@ void ObjectList::render_printer_preset_by_ImGui()
 
     ImVec2 p_min = window->DC.CursorPos;
     ImVec2 p_max = ImVec2(p_min.x + 280 * scale, p_min.y + item_height + pading * 2.0f);
-    ImGui::RenderFrameBorder(p_min, p_max, rounding);
+    //ImGui::RenderFrameBorder(p_min, p_max, rounding);
 
     window->DrawList->AddLine(ImVec2(p_min.x + printer_combo_width+1, p_min.y), ImVec2(p_min.x + printer_combo_width+1, p_max.y - 1.0),
                               ImGui::GetColorU32(border_color), 1.0f);
-
-    ImGui::PopStyleColor(1);
-    ImGui::PopStyleVar(1);
 
     window->DC.CursorPos = window->DC.CursorPos + ImVec2(pading, pading);
 
@@ -7258,9 +7334,6 @@ void ObjectList::render_printer_preset_by_ImGui()
     ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY);
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGuiWrapper::COL_CREALITY);
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGuiWrapper::COL_CREALITY);
-
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
 
     static bool next_loop_open = false;
     static int  selected_idx   = -1;
@@ -7298,7 +7371,32 @@ void ObjectList::render_printer_preset_by_ImGui()
         ImGui::PushStyleColor(ImGuiCol_Text, ImGuiWrapper::COL_CREALITY);
     }
 
-    bool click = ImGui::CPBBLBeginCombo("##combo_printer", (const char*) combo_preview_value, ImGuiComboFlags_HeightLargest);
+    auto remake_text_to_fit_size = [scale](const std::string& input_text) {
+    const float device_label_max_right   = 225.0f * scale;
+    const float device_label_max_width   = device_label_max_right - ImGui::GetCursorPosX() - ImGui::GetStyle().ItemSpacing.x;
+    const float origin_device_name_width = ImGui::CalcTextSize(input_text.c_str()).x;
+
+    if (origin_device_name_width <= device_label_max_width) {
+        return input_text;
+    } else {
+        const char* ellipsis       = "...";
+        const float ellipsis_width = ImGui::CalcTextSize(ellipsis).x;
+        size_t      name_length    = input_text.length();
+
+        for (size_t i = name_length - 1; i >= 0; i--) {
+            std::string sub_name           = input_text.substr(0, i);
+            std::string name_with_ellipsis = sub_name + ellipsis;
+            const float sub_width          = ImGui::CalcTextSize((name_with_ellipsis).c_str()).x;
+            if (sub_width <= device_label_max_width) {
+                return name_with_ellipsis;
+            }
+        }
+    }
+    return input_text;
+    };
+
+    bool click = ImGui::CPBBLBeginCombo("##combo_printer", remake_text_to_fit_size(combo_preview_value).c_str(),
+                                            ImGuiComboFlags_HeightLargest, 225.0f * scale, 30.0f * scale);
     if (click) {
 
         if (selected_match) {
@@ -7354,8 +7452,23 @@ void ObjectList::render_printer_preset_by_ImGui()
         }
     }
 
-    ImGui::PopStyleColor(6);
+    ImGui::PopStyleColor(4);
     ImGui::PopItemWidth();
+
+    {
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(combo_preview_value);
+            ImGui::PushStyleColor(ImGuiCol_Border, ImGuiWrapper::COL_CREALITY);
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
+        ImGui::RenderFrameBorder(p_min, p_max, rounding);
+
+        ImGui::PopStyleVar(1);
+        ImGui::PopStyleColor();
+    }
 
     ImGui::SameLine(printer_combo_width, 12);
 
@@ -7409,8 +7522,6 @@ void ObjectList::render_printer_preset_by_ImGui()
             ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY);
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGuiWrapper::COL_CREALITY);
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGuiWrapper::COL_CREALITY);
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
 
             int bed_type_selected_idx = bar.get_selection_bed_type();// Here we store our selection data as an index.
             // Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled
@@ -7426,7 +7537,9 @@ void ObjectList::render_printer_preset_by_ImGui()
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4, 0.4, 0.4, 1.0));
             }
             
-            if (ImGui::BBLBeginCombo("##combo_bed_type", combo_preview_value, ImGuiComboFlags_HeightLargest)) {
+            if (ImGui::BBLBeginCombo("##combo_bed_type", remake_text_to_fit_size(combo_preview_value).c_str(),
+                                     ImGuiComboFlags_HeightLargest,
+                                     200.0f * scale, 30.0f * scale)) {
                 
                 for (int n = 0; n < bed_types.size(); n++) {
                     const bool is_selected = (bed_type_selected_idx == n);
@@ -7446,15 +7559,19 @@ void ObjectList::render_printer_preset_by_ImGui()
                 ImGui::PopItemFlag();
             }
 
-            ImGui::PopStyleColor(6);
+            ImGui::PopStyleColor(4);
             ImGui::PopItemWidth();
-        }
 
-        {
             ImVec2 min = ImGui::GetItemRectMin();
             ImVec2 size = ImGui::GetItemRectSize();
+            // render border
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(combo_preview_value);
+                ImGui::PushStyleColor(ImGuiCol_Border, ImGuiWrapper::COL_CREALITY);
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+            }
 
-            ImGui::PushStyleColor(ImGuiCol_Border, border_color);
 
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
 
@@ -7462,12 +7579,12 @@ void ObjectList::render_printer_preset_by_ImGui()
             ImVec2 p_max = ImVec2(p_min.x + bed_type_combo_width + 2, p_min.y + item_height + pading * 2.0f);
             ImGui::RenderFrameBorder(p_min, p_max, rounding);
 
-            ImGui::PopStyleColor(1);
             ImGui::PopStyleVar(1);
+            ImGui::PopStyleColor(1);
         }
     }
 
-    ImGui::PopStyleColor(5);
+    ImGui::PopStyleColor(2);
 
 }
 
@@ -7481,11 +7598,6 @@ void ObjectList::render_unfold_button()
     if (m_texture.valid()) {
         ImTextureID normal_id = m_texture.get_texture_id();
 
-        ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, transparent); // ��ť��ɫ
-        // ImGui::PushStyleColor(ImGuiCol_ButtonHovered, transparent);                   // �����ͣʱ�İ�ť��ɫ
-        // ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);                     // ��ť�����ʱ����ɫ
-
         ImGui::PushID(ObjList_Texture::IM_TEXTURE_NAME::texCollapse);
 
         ImVec2 uv0 = m_texture.get_texture_uv0(ObjList_Texture::IM_TEXTURE_NAME::texCollapse, false);
@@ -7498,8 +7610,6 @@ void ObjectList::render_unfold_button()
         }
 
         ImGui::PopID();
-
-        ImGui::PopStyleColor(1);
     }
 }
 
@@ -7550,7 +7660,7 @@ void ObjectList::on_key(wxKeyEvent& evt)
     const int keyCode = evt.GetKeyCode();
 
     bool node_selected    = false;
-    auto select_node_func = [this, node_selected, keyCode](ObjectDataViewModelNode* n) {
+    auto select_node_func = [this, node_selected](ObjectDataViewModelNode* n) {
         if (n != nullptr) {
             m_last_selected_item = wxDataViewItem(n);
 #ifdef __WXMSW__

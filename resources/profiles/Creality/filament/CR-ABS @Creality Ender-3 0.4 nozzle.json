@@ -68,7 +68,7 @@
     ],
     "filament_toolchange_delay": "0",
     "filament_type": [
-        "ASA"
+        "ABS"
     ],
     "filament_unload_time": "0",
     "filament_unloading_speed": "90",

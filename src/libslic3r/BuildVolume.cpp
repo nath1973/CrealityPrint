@@ -313,9 +313,29 @@ BuildVolume::ObjectState BuildVolume::volume_state_bbox(const BoundingBoxf3& vol
         build_volume.max.z() = std::numeric_limits<double>::max();
     if (ignore_bottom)
         build_volume.min.z() = -std::numeric_limits<double>::max();
+
     return build_volume.max.z() <= - SceneEpsilon ? ObjectState::Below :
-           build_volume.contains(volume_bbox) ? ObjectState::Inside : 
-           build_volume.intersects(volume_bbox) ? ObjectState::Colliding : ObjectState::Outside;
+               build_volume.contains(volume_bbox) ? ObjectState::Inside : 
+               build_volume.intersects(volume_bbox) ? ObjectState::Colliding : ObjectState::Outside;
+}
+
+BuildVolume::ObjectState BuildVolume::volume_state_bbox(const BoundingBoxf3& volume_bbox, const BoundingBoxf3& exclude_box, bool ignore_bottom) const
+{
+    assert(m_type == BuildVolume_Type::Rectangle);
+    BoundingBox3Base<Vec3d> build_volume = this->bounding_volume().inflated(SceneEpsilon);
+    if (m_max_print_height == 0.0)
+        build_volume.max.z() = std::numeric_limits<double>::max();
+    if (ignore_bottom)
+        build_volume.min.z() = -std::numeric_limits<double>::max();
+
+    bool b1 = exclude_box.contains(volume_bbox);
+    bool b2 = exclude_box.intersects(volume_bbox);
+    //bool b3 = build_volume.contains(volume_bbox);
+    //bool b4 = build_volume.intersects(volume_bbox);
+
+    return build_volume.max.z() <= - SceneEpsilon ? ObjectState::Below :
+               build_volume.contains(volume_bbox) && !b1 && !b2 ? ObjectState::Inside : 
+               build_volume.intersects(volume_bbox) || b2 ? ObjectState::Colliding : ObjectState::Outside;
 }
 
 bool BuildVolume::all_paths_inside(const GCodeProcessorResult& paths, const BoundingBoxf3& paths_bbox, bool ignore_bottom) const

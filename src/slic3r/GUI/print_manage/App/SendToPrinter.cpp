@@ -98,15 +98,18 @@ CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater)
     SetSizer(topsizer);
 
     topsizer->Add(m_browser, 1, wxEXPAND | wxALL, 0);
+    std::string version = std::string(CREALITYPRINT_VERSION);
+    int port = wxGetApp().get_server_port();
 //#define _DEBUG1
 #ifdef _DEBUG1
-    this->load_url(wxString("http://localhost:5173/"), wxString());
+    wxString url = wxString::Format("http://localhost:5174/?version=%s&port=%d", version, port);
+    this->load_url(url, wxString());
     m_browser->EnableAccessToDevTools();
 #else
 
     // wxString url = wxString::Format("file://%s/web/sendToPrinterPage/index.html", from_u8(resources_dir()));
     // this->load_url(wxString(url), wxString());
-    wxString url = wxString::Format("%s/web/sendToPrinterPage/index.html", from_u8(resources_dir()));
+    wxString url = wxString::Format("%s/web/sendToPrinterPage/index.html?version=%s&port=%d", from_u8(resources_dir()),version, port);
     url.Replace(wxT("\\"), wxT("/"));
     url.Replace(wxT("#"), wxT("%23"));
     wxURI uri(url);
@@ -196,6 +199,12 @@ void CxSentToPrinterDialog::bind_events()
 
     RegisterHandler("send_start_print_cmd", [this](const nlohmann::json& json_data) {
         this->handle_send_start_print_cmd(json_data);
+    });
+    RegisterHandler("start_heartbeat_cmd", [this](const nlohmann::json& json_data) {
+        this->handle_start_heartbeat_cmd(json_data);
+    });
+    RegisterHandler("stop_heartbeat_cmd", [this](const nlohmann::json& json_data) {
+        this->handle_stop_heartbeat_cmd(json_data);
     });
 
     RegisterHandler("set_error_cmd", [this](const nlohmann::json& json_data) { this->handle_set_error_cmd(json_data); });
@@ -559,7 +568,7 @@ std::string CxSentToPrinterDialog::build_match_color_cmd_info(int plateIndex, co
     }
 
     nlohmann::json           plate_extruder_colors_json     = nlohmann::json::array();
-    std::vector<int> plate_extruders = plate->get_extruders(true);
+    std::vector<int> plate_extruders = plate->get_used_extruders();
     if(m_plater->only_gcode_mode()) {
         plate_extruders = m_plater->get_gcode_extruders_in_only_gcode_mode();
     }
@@ -648,15 +657,28 @@ void CxSentToPrinterDialog::handle_send_3mf(const nlohmann::json& json_data)
     int      plateIndex = json_data["printPlateIndex"];  // which plate to print
     wxString ipAddress  = json_data["ipAddress"];
     std::string upload3mfName = json_data["upload3mfName"];
-     
-    boost::filesystem::path temp_path(m_plater->model().get_backup_path("Metadata"));
-    temp_path /= (boost::format(".%1%.%2%_upload.3mf") % get_current_pid()%plateIndex).str();
 
-    std::string tmp_3mf_path = temp_path.string();
-    int result = m_plater->export_3mf(tmp_3mf_path, SaveStrategy::UploadToPrinter);
-    if(result < 0) {
-        return;
+    std::string tmp_3mf_path = "";
+    if (m_plater->only_gcode_mode())
+    {
+        tmp_3mf_path = m_plater->get_last_loaded_3mf().string();
+    } 
+    else 
+    {
+        boost::filesystem::path temp_path(m_plater->model().get_backup_path("Metadata"));
+        temp_path /= (boost::format(".%1%.%2%_upload.3mf") % get_current_pid() % plateIndex).str();
+
+        tmp_3mf_path = temp_path.string();
+        int         result       = m_plater->export_3mf(tmp_3mf_path, SaveStrategy::UploadToPrinter);
+        if (result < 0) {
+            return;
+        }
     }
+
+    if (tmp_3mf_path.empty())
+        return;
+     
+
     m_uploadingIp = ipAddress;
     RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(
         ipAddress.ToStdString(), upload3mfName, tmp_3mf_path,
@@ -732,11 +754,26 @@ void CxSentToPrinterDialog::handle_send_3mf(const nlohmann::json& json_data)
                 m_uploadingIp = wxEmptyString;
         });
 }
-
 void CxSentToPrinterDialog::handle_cancel_send(const nlohmann::json& json_data) {
     int      plateIndex = json_data["plateIndex"];
     wxString ipAddress  = json_data["ipAddress"];
     RemotePrint::RemotePrinterManager::getInstance().cancelUpload(ipAddress.ToStdString());
+}
+void CxSentToPrinterDialog::handle_start_heartbeat_cmd(const nlohmann::json& json_data) {
+    // create command to send to the webview
+    nlohmann::json commandJson;
+    commandJson["command"] = "start_heartbeat_cmd";
+    commandJson["data"]    = json_data["data"].dump(-1, ' ', true);
+
+    wxGetApp().mainframe->get_printer_mgr_view()->ExecuteScriptCommand(RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+}
+void CxSentToPrinterDialog::handle_stop_heartbeat_cmd(const nlohmann::json& json_data) {
+     // create command to send to the webview
+    nlohmann::json commandJson;
+    commandJson["command"] = "stop_heartbeat_cmd";
+    commandJson["data"]    = json_data["data"].dump(-1, ' ', true);
+
+    wxGetApp().mainframe->get_printer_mgr_view()->ExecuteScriptCommand(RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
 }
 
 void CxSentToPrinterDialog::handle_register_complete(const nlohmann::json& json_data)
@@ -969,76 +1006,91 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
     nlohmann::json json_array = nlohmann::json::array();
     nlohmann::json json_data;
 
-    PartPlate*            current_plate          = wxGetApp().plater()->get_partplate_list().get_curr_plate();
-
-    GCodeProcessorResult* current_result = current_plate->get_slice_result();
+    std::string printer_name = "";
+    float       nozzle_diameter = 0.0f;
 
     m_backup_extruder_colors.clear();
-    for(auto color :current_result->creality_default_extruder_colors)
+
+    for (int i = 0; i < wxGetApp().plater()->get_partplate_list().get_plate_count(); i++) 
     {
-        colors_json.push_back(color);
-        m_backup_extruder_colors.push_back(color);
-    }
-    //filament_types_json
-    for(auto filament_type :current_result->creality_extruder_types)
-    {
-        filament_types_json.push_back(filament_type);
-    }
-    int size = 0;
-    unsigned char* imgdata = nullptr;
-    ThumbnailData data;
-    int maxIndex = current_result->image_data.size() - 1;
-    if (maxIndex >= 0) {
-        data.width  = current_result->image_data[maxIndex].first[0];
-        data.height = current_result->image_data[maxIndex].first[1];
-        data.pixels = current_result->image_data[maxIndex].second;
-    }
-
-    size               = data.pixels.size();
-    imgdata            = new unsigned char[size];
-    memcpy(imgdata, data.pixels.data(), size);
-    std::size_t encoded_size = boost::beast::detail::base64::encoded_size(size);
-    std::string img_base64_data(encoded_size, '\0');
-    boost::beast::detail::base64::encode(&img_base64_data[0], imgdata, size);
-
-    json_data["image"]              = "data:image/png;base64," + std::move(img_base64_data);
-    json_data["plate_index"]        = current_plate->get_index();
-    fs::path gcode_path = fs::path(std::string(current_result->filename));
-    //std::filesystem::path gcode_path(std::string(current_result->filename));
-    json_data["upload_gcode__name"] = gcode_path.filename().string();
-    
-
-    nlohmann::json extruders_json = nlohmann::json::array();
-    int extruder_index = 1;
-    for (const auto& extruder : current_result->creality_default_extruder_colors) {
-        if(!extruder.empty())
+        PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(i);
+        if (!plate) 
         {
-            extruders_json.push_back(extruder_index);
+            continue;
         }
-        extruder_index++;    
+
+        GCodeProcessorResult* current_result = plate->get_slice_result();
+        if (!current_result->filename.empty() && current_result->image_data.size() > 0) 
+        {
+            printer_name = current_result->printer_model;
+            nozzle_diameter = current_result->nozzle_diameter;
+
+            for (auto color : current_result->creality_default_extruder_colors) {
+                colors_json.push_back(color);
+                m_backup_extruder_colors.push_back(color);
+            }
+            // filament_types_json
+            for (auto filament_type : current_result->creality_extruder_types) {
+                filament_types_json.push_back(filament_type);
+            }
+            int            size    = 0;
+            unsigned char* imgdata = nullptr;
+            ThumbnailData  data;
+            int            maxIndex = current_result->image_data.size() - 1;
+            if (maxIndex >= 0) {
+                data.width  = current_result->image_data[maxIndex].first[0];
+                data.height = current_result->image_data[maxIndex].first[1];
+                data.pixels = current_result->image_data[maxIndex].second;
+            }
+
+            size    = data.pixels.size();
+            imgdata = new unsigned char[size];
+            memcpy(imgdata, data.pixels.data(), size);
+            std::size_t encoded_size = boost::beast::detail::base64::encoded_size(size);
+            std::string img_base64_data(encoded_size, '\0');
+            boost::beast::detail::base64::encode(&img_base64_data[0], imgdata, size);
+
+            json_data["image"]       = "data:image/png;base64," + std::move(img_base64_data);
+            json_data["plate_index"] = plate->get_index();
+
+            std::filesystem::path gcode_path(current_result->filename);
+            json_data["upload_gcode__name"] = gcode_path.filename().string();
+
+            nlohmann::json extruders_json = nlohmann::json::array();
+            int            extruder_index = 1;
+            for (const auto& extruder : current_result->creality_default_extruder_colors) {
+                if (!extruder.empty()) {
+                    extruders_json.push_back(extruder_index);
+                }
+                extruder_index++;
+            }
+            json_data["plate_extruders"] = extruders_json;
+
+            wxString total_weight_str;
+            wxString print_time_str;
+            get_gcode_display_info(total_weight_str, print_time_str, m_plater->get_partplate_list().get_curr_plate());
+            json_data["total_weight"] = total_weight_str.ToStdString();
+            json_data["print_time"]   = print_time_str.ToStdString();
+
+            json_array.push_back(json_data);
+        }
     }
-    json_data["plate_extruders"] = extruders_json;
-
-    wxString total_weight_str;
-    wxString print_time_str;
-    get_gcode_display_info(total_weight_str, print_time_str, m_plater->get_partplate_list().get_curr_plate());
-    json_data["total_weight"] = total_weight_str.ToStdString();
-    json_data["print_time"] = print_time_str.ToStdString();
-
-    json_array.push_back(json_data);
 
     nlohmann::json top_level_json;
     top_level_json["extruder_colors"] = std::move(colors_json);
     top_level_json["filament_types"]    = std::move(filament_types_json);
     top_level_json["plates"]          = std::move(json_array);
 
-    top_level_json["current_plate_index"] = current_plate->get_index();
-    std::string printer_name;
-    if(current_result->printer_model.empty())
+    int cur_plate_index                   = m_plater->get_partplate_list().get_curr_plate_index();
+    top_level_json["current_plate_index"] = cur_plate_index;
+    
+    if (printer_name.empty())
     {
         printer_name = _L("Unknown model").ToUTF8().data();
-    }else{
-        printer_name = (boost::format("%s %.1f nozzle") % current_result->printer_model % current_result->nozzle_diameter).str();
+    }
+    else
+    {
+        printer_name = (boost::format("%s %.1f nozzle") % printer_name % nozzle_diameter).str();
     }
     
     //std::string presetname = wxGetApp().preset_bundle->prints.get_selected_preset_name();
@@ -1055,6 +1107,19 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
 
     return RemotePrint::Utils::url_encode(commandStr);
 }
+
+void CxSentToPrinterDialog::replaceIllegalChars(std::string& str)
+{
+    const std::unordered_set<char> illegalChars = { '/', '\\', ':', '*', '?', '"', '<', '>', '|' };
+    for (char& ch : str)
+    {
+        if (illegalChars.find(ch) != illegalChars.end())
+        {
+            ch = '_';
+        }
+    }
+}
+
 std::string CxSentToPrinterDialog::get_plate_data_on_show()
 {
     m_backup_extruder_colors.clear();
@@ -1129,7 +1194,7 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
 
             std::string default_gcode_name = "";
 
-            std::vector<int> plate_extruders = plate->get_extruders(true);
+            std::vector<int> plate_extruders = plate->get_used_extruders();
 
             if (m_plater->only_gcode_mode()) {
                 wxString   last_loaded_gcode = m_plater->get_last_loaded_gcode();
@@ -1149,6 +1214,10 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
                 const PrintEstimatedStatistics::Mode& plate_time_mode =
                     plate_print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)];
 
+                if (wxGetApp().plater()->has_illegal_filename_characters(obj0_name))
+                {
+                    replaceIllegalChars(obj0_name);
+                }
                 
                 if (plate_extruders.size() > 0) {
                     default_gcode_name = obj0_name + "_" + filament_types[plate_extruders[0] - 1] + "_" +

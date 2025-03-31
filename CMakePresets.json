@@ -130,6 +130,27 @@
             }
         },
         {
+            "name": "Clang_Mac_arm64",
+            "displayName": "mac_debug_arm64",
+            "description": "使用编译器: C = /usr/bin/clang, CXX = /usr/bin/clang++",
+            "binaryDir": "${sourceDir}/out/${presetName}/build",
+            "installDir": "${sourceDir}/out/${presetName}/install/",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/usr/bin/clang",
+                "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CONFIGURE_TYPE": "${presetName}",
+                "BBL_RELEASE_TO_PUBLIC": "1",
+                "CMAKE_INSTALL_PREFIX": "./CrealityPrint",
+                "CMAKE_PREFIX_PATH": "/Users/qprj/work/DEPS_LIB_DIR/usr/local/",
+                "GENERATE_ORCA_HEADER": "OFF",
+                "CMAKE_MACOSX_RPATH": "ON",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "11.3",
+                "CMAKE_MACOSX_BUNDLE": "ON"
+            }
+        },
+        {
             "name": "mac_clang",
             "displayName": "自定义配置预设",
             "description": "使用编译器: C = /usr/bin/clang, CXX = /usr/bin/clang++",

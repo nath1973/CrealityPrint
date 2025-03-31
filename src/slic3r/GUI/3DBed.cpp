@@ -737,10 +737,23 @@ void Bed3D::update_bed_triangles()
         origin_bed_shape.push_back(m_bed_shape[i] - m_bed_shape[0]);
     }
     std::vector<Vec2d> new_bed_shape; // offset to correct origin
-    for (auto point : origin_bed_shape) {
-        Vec2d new_point(point.x() + model_offset_ptr->x(), point.y() + model_offset_ptr->y());
-        new_bed_shape.push_back(new_point);
+    if (Slic3r::BuildVolume_Type::Circle == get_build_volume_type())
+    {
+        for (auto point : m_bed_shape) 
+        {
+            Vec2d new_point(point.x() + model_offset_ptr->x(), point.y() + model_offset_ptr->y());
+            new_bed_shape.push_back(new_point);
+        }
+    } 
+    else 
+    {
+        for (auto point : origin_bed_shape) 
+        {
+            Vec2d new_point(point.x() + model_offset_ptr->x(), point.y() + model_offset_ptr->y());
+            new_bed_shape.push_back(new_point);
+        }
     }
+
     ExPolygon poly{ Polygon::new_scale(new_bed_shape) };
     if (!init_model_from_poly(m_triangles, poly, GROUND_Z)) {
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ":Unable to update plate triangles\n";

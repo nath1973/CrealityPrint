@@ -147,21 +147,52 @@ HttpServer::HttpServer(boost::asio::ip::port_type port) : port(port) {}
 
 void HttpServer::start()
 {
-    BOOST_LOG_TRIVIAL(info) << "start_http_service...";
+    boost::asio::io_context io_context;
+    boost::asio::ip::tcp::socket socket(io_context);
+    boost::system::error_code ec;
+    
+    // 尝试绑定到指定端口
+    for(int i=1;i<10;i++)
+    {
+        socket.open(boost::asio::ip::tcp::v4()); // 使用IPv4地址
+        socket.bind(boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port), ec);
+        socket.close();
+        if (ec) {
+            // 如果绑定失败，则端口被占用
+            std::cout << "Port " << port << " is in use." << std::endl;
+            this->port = this->port+1;
+        }else{
+            break;
+        }
+        if(i==9)
+        {
+            return;
+        }
+    }
+    
+    
+    BOOST_LOG_TRIVIAL(info) << "start_http_service...:"<<port;
     start_http_server    = true;
     m_http_server_thread = create_thread([this] {
         set_current_thread_name("http_server");
-        server_ = std::make_unique<IOServer>(*this);
-        server_->acceptor.listen();
+        try {
+            server_ = std::make_unique<IOServer>(*this);
+            server_->acceptor.listen();
 
-        server_->do_accept();
+            server_->do_accept();
 
-        server_->io_service.run();
+            server_->io_service.run();
+        }catch(boost::system::system_error& e)
+        {
+            start_http_server = false;
+        }
     });
 }
 
 void HttpServer::stop()
 {
+    if(!start_http_server)
+        return;
     start_http_server = false;
     if (server_) {
         server_->acceptor.close();
@@ -245,6 +276,22 @@ std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const 
     boost::filesystem::path currentPath = boost::filesystem::path(resources_dir()).append("web");
     if (path.find("/resources") == 0) {
         currentPath = boost::filesystem::path(resources_dir()).parent_path();
+    }
+    if(path.find("/login") == 0) {
+        std::string   redirect_url           = url_get_param(url, "redirect_url");
+        std::string   code           = url_get_param(url, "code");
+        std::string url_scheme = (boost::format("crealityprintlink://open?code=%1%") % code).str();
+        wxGetApp().post_openlink_cmd(url_scheme);
+        if(wxGetApp().wait_cloud_token())
+        {
+            std::string location_str = (boost::format("%1%?result=success") % redirect_url).str();
+            return std::make_shared<ResponseRedirect>(location_str);
+        }
+        else
+        {
+            std::string location_str = (boost::format("%1%?result=fail") % redirect_url).str();
+            return std::make_shared<ResponseRedirect>(location_str);
+        }
     }
     
 

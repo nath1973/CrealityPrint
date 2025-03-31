@@ -11,14 +11,16 @@ namespace Slic3r
 
 class WipeTowerWriterCreality;
 class PrintRegionConfig;
+class WipeTowerWriter;
 
 class WipeTowerCreality
 {
 public:
     // Construct ToolChangeResult from current state of WipeTowerCreality and WipeTowerWriterCreality.
     // WipeTowerWriterCreality is moved from !
-    WipeTower::ToolChangeResult construct_tcr(WipeTowerWriterCreality& writer,
-                                   size_t old_tool,
+    WipeTower::ToolChangeResult construct_tcr(WipeTowerWriterCreality& writer, 
+								   bool priming,
+                                   size_t old_tool, 
 								   bool is_finish) const;
 
 	// x			-- x coordinates of wipe tower in mm ( left bottom corner )
@@ -42,14 +44,19 @@ public:
 	// Iterates through prepared m_plan, generates ToolChangeResults and appends them to "result"
 	void generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &result);
 
+	WipeTower::ToolChangeResult only_generate_out_wall();
+
     float get_depth() const { return m_wipe_tower_depth; }
 	std::vector<std::pair<float, float>> get_z_and_depth_pairs() const;
     float get_brim_width() const { return m_wipe_tower_brim_width_real; }
 	float get_wipe_tower_height() const { return m_wipe_tower_height; }
 
-
-
-
+	void set_last_layer_extruder_fill(bool extruder_fill)
+    {
+        if (!m_plan.empty()) {
+            m_plan.back().extruder_fill = extruder_fill;
+        }
+    }
 
 	// Switch to a next layer.
 	void set_layer(
@@ -94,11 +101,11 @@ public:
 
 	// Returns gcode for a toolchange and a final print head position.
 	// On the first layer, extrude a brim around the future wipe tower first.
-    WipeTower::ToolChangeResult tool_change(size_t new_tool);
+    WipeTower::ToolChangeResult tool_change(size_t new_tool, bool extrude_perimeter = false, bool first_toolchange_to_nonsoluble = false);
 
 	// Fill the unfilled space with a sparse infill.
 	// Call this method only if layer_finished() is false.
-	WipeTower::ToolChangeResult finish_layer();
+    WipeTower::ToolChangeResult finish_layer(bool extruder_perimeter = true, bool extruder_fill = true);
 
 	// Is the current layer finished?
 	bool 			 layer_finished() const {
@@ -134,6 +141,7 @@ private:
         return m_filpar[0].filament_area; // all extruders are assumed to have the same filament diameter at this point
     }
 
+	bool   m_enable_timelapse_print = false;
     Vec2f  m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.
 	float  m_wipe_tower_width; 			// Width of the wipe tower.
 	float  m_wipe_tower_depth 	= 0.f; 	// Depth of the wipe tower
@@ -211,6 +219,9 @@ private:
 	// Calculates depth for all layers and propagates them downwards
 	void plan_tower();
 
+	// BBS
+    WipeTower::box_coordinates align_perimeter(const WipeTower::box_coordinates& perimeter_box);
+
     // to store information about tool changes for a given layer
 	struct WipeTowerInfo{
 		struct ToolChange {
@@ -227,6 +238,7 @@ private:
 		float height;	// layer height
 		float depth;	// depth of the layer based on all layers above
 		float extra_spacing;
+        bool  extruder_fill{true};
 		float toolchanges_depth() const { float sum = 0.f; for (const auto &a : tool_changes) sum += a.required_depth; return sum; }
 
 		std::vector<ToolChange> tool_changes;

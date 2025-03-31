@@ -713,8 +713,7 @@ void store_style(AppConfig &cfg, const StyleManager::Style &s, unsigned index)
 {
     const EmbossProjection &ep = s.projection;
     Section data;
-    //data[APP_CONFIG_FONT_NAME]        = s.name;
-    data[APP_CONFIG_FONT_NAME]        = s.actual_name;
+    data[APP_CONFIG_FONT_NAME]        = s.name;
     data[APP_CONFIG_FONT_DESCRIPTOR]  = s.path;
     const FontProp &fp                = s.prop;
     data[APP_CONFIG_FONT_LINE_HEIGHT] = std::to_string(fp.size_in_mm);

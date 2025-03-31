@@ -1,4 +1,4 @@
-#include "MainFrame.hpp"
+﻿#include "MainFrame.hpp"
 
 #include <wx/colour.h>
 #include <wx/panel.h>
@@ -74,6 +74,7 @@
 #include <slic3r/GUI/CreatePresetsDialog.hpp>
 #include "print_manage/AppMgr.hpp"
 #define ALL_PLATFORM 1
+#include "UpdateParams.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -413,10 +414,23 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     // BBS
     Fit();
 
-    const wxSize min_size = wxGetApp().get_min_size(); //wxSize(76*wxGetApp().em_unit(), 49*wxGetApp().em_unit());
+    //const wxSize min_size = wxGetApp().get_min_size(); //wxSize(76*wxGetApp().em_unit(), 49*wxGetApp().em_unit());
+    const wxSize min_size = wxGetApp().get_min_size_ex(this);
 
-    SetMinSize(min_size/*wxSize(760, 490)*/);
-    SetSize(wxSize(FromDIP(1293), FromDIP(727)));
+    //SetMinSize(min_size/*wxSize(760, 490)*/);
+    //SetSize(wxSize(FromDIP(1293), FromDIP(727)));
+
+#ifdef __APPLE__
+// Using SetMinSize() on Mac messes up the window position in some cases
+// cf. https://groups.google.com/forum/#!topic/wx-users/yUKPBBfXWO0
+    SetSize(min_size/*wxSize(760, 490)*/);
+#else
+    SetMinSize(min_size);
+    SetSize(min_size);
+
+	//on some screen size(1920 * 1080), when minimize the frame, the closeBtn and Maximize button would be hidden if use GetMinSize()
+    //SetSize(wxSize(FromDIP(1050), FromDIP(700)));
+#endif
 
     Layout();
 
@@ -990,11 +1004,13 @@ void MainFrame::init_tabpanel() {
                 if (m_tab_event_enabled)
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLVIEWTOOLBAR_3D));
                 m_param_panel->OnActivate();
+                UpdateParams::getInstance().checkParamsNeedUpdate();
             }
             else if (sel == tpPreview) {
                 if (m_tab_event_enabled)
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLVIEWTOOLBAR_PREVIEW));
                 m_param_panel->OnActivate();
+                UpdateParams::getInstance().closeParamsUpdateTip();
             }
         }
         //else if (panel == m_param_panel)
@@ -1965,15 +1981,15 @@ bool MainFrame::get_enable_print_status(bool is_all_or_any_of_them)
             enable = false;
         enable = enable && !is_all_plates;
     }
-    else if (m_print_select == eUploadGcode) {
-        if (wxGetApp().plater()->only_gcode_mode()) {
-            enable = true;
-        } else if (!current_plate->is_slice_result_valid())
-            enable = false;
-        /*f (!can_send_gcode())
-            enable = false;*/
-        enable = enable && !is_all_plates;
-    }
+    //else if (m_print_select == eUploadGcode) {
+    //    if (wxGetApp().plater()->only_gcode_mode()) {
+    //        enable = true;
+    //    } else if (!current_plate->is_slice_result_valid())
+    //        enable = false;
+    //    /*f (!can_send_gcode())
+    //        enable = false;*/
+    //    enable = enable && !is_all_plates;
+    //}
     else if (m_print_select == eExportSlicedFile)
     {
         if (!current_plate->is_slice_result_ready_for_export())
@@ -1993,7 +2009,7 @@ bool MainFrame::get_enable_print_status(bool is_all_or_any_of_them)
 		}
         enable = enable && !is_all_plates;
 	}
-    else if (m_print_select == eSendToLocalNetPrinter)
+    else if (m_print_select == eSendToLocalNetPrinter || m_print_select == eUploadGcode)
     {
         if (wxGetApp().plater()->only_gcode_mode())
         {
@@ -4228,6 +4244,7 @@ void MainFrame::add_to_recent_projects(const wxString& filename)
             recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
         }
         wxGetApp().app_config->set_recent_projects(recent_projects);
+        wxGetApp().app_config->set_project_times(m_recent_projects.GetFileOpenTimeVector());
         m_webview->SendRecentList(0);
     }
 }
@@ -4241,15 +4258,39 @@ std::wstring MainFrame::FileHistory::GetThumbnailUrl(int index) const
     return wss.str();
 }
 
+std::wstring MainFrame::FileHistory::GetFileOpenTime(int index) const
+{
+    if (m_file_open_time[index].empty()) return L"";
+
+    std::wstring wide_from = boost::nowide::widen(m_file_open_time[index]);
+    return wide_from;
+}
+
+static std::string getCurrentTime()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm = *std::localtime(&now_time_t);
+    std::stringstream ss;
+    ss << std::put_time(&now_tm, "%Y.%m.%d %H:%M:%S");
+    return ss.str();
+}
+
 void MainFrame::FileHistory::AddFileToHistory(const wxString &file)
 {
     if (this->m_fileMaxFiles == 0)
         return;
     wxFileHistory::AddFileToHistory(file);
     if (m_load_called)
+    {
         m_thumbnails.push_front(bbs_3mf_get_thumbnail(into_u8(file).c_str()));
+        m_file_open_time.push_front(getCurrentTime());
+    }
     else
+    {
         m_thumbnails.push_front("");
+        m_file_open_time.push_front("");
+    }
 }
 
 void MainFrame::FileHistory::RemoveFileFromHistory(size_t i)
@@ -4258,6 +4299,7 @@ void MainFrame::FileHistory::RemoveFileFromHistory(size_t i)
         return;
     wxFileHistory::RemoveFileFromHistory(i);
     m_thumbnails.erase(m_thumbnails.begin() + i);
+    m_file_open_time.erase(m_file_open_time.begin() + i);
 }
 
 size_t MainFrame::FileHistory::FindFileInHistory(const wxString & file)
@@ -4275,6 +4317,14 @@ void MainFrame::FileHistory::LoadThumbnails()
             }
         }
     });
+
+    std::vector<std::string> recent_project_times = wxGetApp().app_config->get_projects_open_time();
+    //std::reverse(recent_project_times.begin(), recent_project_times.end());
+    for (int j = 0; j < recent_project_times.size(); j++)
+    {
+        m_file_open_time[j] = recent_project_times[j];
+    }
+
     m_load_called = true;
 }
 
@@ -4284,6 +4334,11 @@ inline void MainFrame::FileHistory::SetMaxFiles(int max)
     size_t numFiles = m_fileHistory.size();
     while (numFiles > m_fileMaxFiles)
         RemoveFileFromHistory(--numFiles);
+}
+
+std::deque<std::string> MainFrame::FileHistory::GetFileOpenTimeVector()
+{
+    return this->m_file_open_time;
 }
 
 void MainFrame::get_recent_projects(boost::property_tree::wptree &tree, int images)
@@ -4296,7 +4351,8 @@ void MainFrame::get_recent_projects(boost::property_tree::wptree &tree, int imag
         boost::system::error_code ec;
         std::time_t t = boost::filesystem::last_write_time(proj, ec);
         if (!ec) {
-            std::wstring time = wxDateTime(t).FormatISOCombined(' ').ToStdWstring();
+            //std::wstring time = wxDateTime(t).FormatISOCombined(' ').ToStdWstring();
+            std::wstring time =  m_recent_projects.GetFileOpenTime(i);
             item.put(L"time", time);
             if (i <= images) {
                 auto thumbnail = m_recent_projects.GetThumbnailUrl(i);
@@ -4334,6 +4390,7 @@ void MainFrame::open_recent_project(size_t file_id, wxString const & filename)
                 recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
             }
             wxGetApp().app_config->set_recent_projects(recent_projects);
+            wxGetApp().app_config->set_project_times(m_recent_projects.GetFileOpenTimeVector());
             m_webview->SendRecentList(-1);
         }
     }
@@ -4357,6 +4414,7 @@ void MainFrame::remove_recent_project(size_t file_id, wxString const &filename)
         recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
     }
     wxGetApp().app_config->set_recent_projects(recent_projects);
+    wxGetApp().app_config->set_project_times(m_recent_projects.GetFileOpenTimeVector());
     m_webview->SendRecentList(-1);
 }
 

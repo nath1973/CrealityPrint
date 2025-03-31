@@ -658,6 +658,8 @@ set(SLIC3R_GUI_SOURCES
 	GUI/SyncUserPresets.cpp
 	GUI/CommunicateWithCXCloud.hpp
 	GUI/CommunicateWithCXCloud.cpp
+	GUI/UpdateParams.hpp
+	GUI/UpdateParams.cpp
     Config/OptionConfig.h
     Config/OptionConfig.cpp
 )

@@ -597,6 +597,18 @@ public:
 
     void render_generic_columns(ObjectDataViewModelNode* node);
 
+    void select_node(ObjectDataViewModelNode* node, bool node_select_state);
+
+    //no use for plate select
+    void handle_obj_list_select_event(
+        bool left_clicked,
+        bool right_clicked,
+        bool left_draged, 
+        bool shift_press, 
+        bool node_selected, 
+        ObjectDataViewModelNode* node,
+        wxDataViewItemArray& selecteds);
+
     void render_current_device_name(const float max_right);
 };
 

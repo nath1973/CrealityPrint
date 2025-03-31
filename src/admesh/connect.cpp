@@ -42,7 +42,13 @@ struct HashEdge {
 	// Compare two keys.
 	bool operator==(const HashEdge &rhs) const { return memcmp(key, rhs.key, sizeof(key)) == 0; }
 	bool operator!=(const HashEdge &rhs) const { return ! (*this == rhs); }
-	int  hash(int M) const { return ((key[0] / 11 + key[1] / 7 + key[2] / 3) ^ (key[3] / 11  + key[4] / 7 + key[5] / 3)) % M; }
+	int  hash(int M) const {
+        uint32_t h = 0;
+        for (size_t i = 0; i < 6; ++i) {
+            h = (h * 31) + static_cast<uint32_t>(key[i]);
+        }
+        return h % M;
+	}
 
 	// Index of a facet owning this edge.
 	int        facet_number;
@@ -154,6 +160,11 @@ struct HashTableEdges {
 	int           			M;
 	boost::object_pool<HashEdge> pool;
 
+	long long int m_conflict = 0;
+	long long int m_insert_head = 0;
+	long long int m_equal_head = 0;
+	long long int m_find_link = 0;
+
 #ifndef NDEBUG
 	size_t 					malloced   	= 0;
 	size_t 					freed 	  	= 0;
@@ -180,22 +191,25 @@ private:
 		HashEdge *link         = this->heads[chain_number];
 		if (link == this->tail) {
 			// This list doesn't have any edges currently in it.  Add this one.
-			HashEdge *new_edge = pool.construct(edge);
+            HashEdge* new_edge = pool.construct(edge);
 #ifndef NDEBUG
 			++ this->malloced;
 #endif /* NDEBUG */
 			new_edge->next = this->tail;
 			this->heads[chain_number] = new_edge;
+            m_insert_head++;
 		} else if (edges_equal(edge, *link)) {
 			// This is a match.  Record result in neighbors list.
 			match_neighbors(edge, *link);
 			// Delete the matched edge from the list.
 			this->heads[chain_number] = link->next;
 			// pool.destroy(link);
+            m_equal_head++;
 #ifndef NDEBUG
 			++ this->freed;
 #endif /* NDEBUG */
 		} else {
+            m_conflict++;
 			// Continue through the rest of the list.
 			for (;;) {
 				if (link->next == this->tail) {
@@ -224,6 +238,7 @@ private:
 #endif /* NDEBUG */
 					break;
 				}
+                m_find_link++;
 				// This is not a match.  Go to the next link.
 				link = link->next;
 #ifndef NDEBUG
@@ -470,7 +485,6 @@ void stl_check_facets_exact(stl_file *stl)
 			hash_table.insert_edge_exact(stl, edge);
 		}
 	}
-
 #if 0
 	printf("Number of faces: %d, number of manifold edges: %d, number of connected edges: %d, number of unconnected edges: %d\r\n", 
     	stl->stats.number_of_facets, stl->stats.number_of_facets * 3, 

@@ -820,6 +820,7 @@ bool AssembleView::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrint
     m_canvas->enable_labels(false);
     m_canvas->enable_slope(false);
     //BBS: GUI refactor: GLToolbar
+    // m_canvas->enable_assemble_view_toolbar(true);
     m_canvas->enable_assemble_view_toolbar(false);
     m_canvas->enable_return_toolbar(true);
     m_canvas->enable_separator_toolbar(false);

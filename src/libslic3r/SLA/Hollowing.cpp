@@ -5,6 +5,7 @@
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/Hollowing.hpp>
+#include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/SLA/IndexedMesh.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
@@ -14,6 +15,7 @@
 
 #include <libslic3r/MTUtils.hpp>
 #include <libslic3r/I18N.hpp>
+#include <libslic3r/MeshBoolean.hpp>
 
 //! macro used to mark string used at localization,
 //! return same string
@@ -559,6 +561,86 @@ void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
 
     mesh = TriangleMesh{mesh.its};
     //FIXME do we want to repair the mesh? Are there duplicate vertices or flipped triangles?
+}
+
+// The same as its_compactify_vertices, but returns a new mesh, doesn't touch
+// the original
+static indexed_triangle_set remove_unconnected_vertices(const indexed_triangle_set& its)
+{
+    if (its.indices.empty()) {};
+
+    indexed_triangle_set M;
+
+    std::vector<int> vtransl(its.vertices.size(), -1);
+    int              vcnt = 0;
+    for (auto& f : its.indices) {
+        for (int i = 0; i < 3; ++i)
+            if (vtransl[size_t(f(i))] < 0) {
+                M.vertices.emplace_back(its.vertices[size_t(f(i))]);
+                vtransl[size_t(f(i))] = vcnt++;
+            }
+
+        std::array<int, 3> new_f = {vtransl[size_t(f(0))], vtransl[size_t(f(1))], vtransl[size_t(f(2))]};
+
+        M.indices.emplace_back(new_f[0], new_f[1], new_f[2]);
+    }
+
+    return M;
+}
+
+int hollow_mesh_and_drill(TriangleMesh& mesh,
+    TriangleMesh& mesh_hole,
+    std::vector<TriangleMesh>& mesh_result)
+{
+    auto tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(mesh.its.vertices, mesh.its.indices);
+
+    std::uniform_real_distribution<float> dist(0., float(EPSILON));
+    indexed_triangle_set                  part_to_drill   = mesh.its;
+
+    indexed_triangle_set m = mesh_hole.its;
+
+    part_to_drill.indices.clear();
+    auto                        bb = bounding_box(m);
+    Eigen::AlignedBox<float, 3> ebb{bb.min.cast<float>(), bb.max.cast<float>()};
+
+    AABBTreeIndirect::traverse(tree, AABBTreeIndirect::intersecting(ebb), [&part_to_drill, &mesh](const auto& node) {
+        part_to_drill.indices.emplace_back(mesh.its.indices[node.idx]);
+        // continue traversal
+        return true;
+    });
+
+    auto cgal_meshpart = MeshBoolean::cgal::triangle_mesh_to_cgal(remove_unconnected_vertices(part_to_drill));
+
+    auto ret = static_cast<int>(HollowMeshResult::Ok);
+
+    if (MeshBoolean::cgal::does_self_intersect(*cgal_meshpart)) {
+        ret |= static_cast<int>(HollowMeshResult::DrillingFailed);
+        return ret;
+    }
+
+    auto cgal_hole = MeshBoolean::cgal::triangle_mesh_to_cgal(m);
+
+    auto hollowed_mesh_cgal = MeshBoolean::cgal::triangle_mesh_to_cgal(mesh);
+
+    if (!MeshBoolean::cgal::does_bound_a_volume(*hollowed_mesh_cgal)) {
+        ret |= static_cast<int>(HollowMeshResult::FaultyMesh);
+    }
+
+    if (!MeshBoolean::cgal::empty(*cgal_hole) && !MeshBoolean::cgal::does_bound_a_volume(*cgal_hole)) {
+        ret |= static_cast<int>(HollowMeshResult::FaultyHoles);
+    }
+
+    try {
+        if (!MeshBoolean::cgal::empty(*cgal_hole))
+            MeshBoolean::cgal::minus(*hollowed_mesh_cgal, *cgal_hole);
+        mesh_result.emplace_back(TriangleMesh(MeshBoolean::cgal::cgal_to_indexed_triangle_set(*hollowed_mesh_cgal)
+    ));
+
+    } catch (const Slic3r::RuntimeError&) {
+        ret |= static_cast<int>(HollowMeshResult::DrillingFailed);
+    }
+
+    return ret;
 }
 
 }} // namespace Slic3r::sla

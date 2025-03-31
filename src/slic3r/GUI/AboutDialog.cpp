@@ -223,7 +223,7 @@ AboutDialog::AboutDialog()
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     // wxPanel *m_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(560), FromDIP(237)), wxTAB_TRAVERSAL);
-    wxPanel *m_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(800), FromDIP(200)), wxTAB_TRAVERSAL);
+    wxPanel *m_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(800), FromDIP(220)), wxTAB_TRAVERSAL);
 
     wxBoxSizer *panel_versizer = new wxBoxSizer(wxVERTICAL);
 
@@ -261,7 +261,7 @@ AboutDialog::AboutDialog()
     panel_versizer->AddSpacer(FromDIP(18));
     panel_versizer->Add(top_sizer, 0, wxALL | wxEXPAND, 0);
 
-    panel_versizer->AddSpacer(is_zh ? FromDIP(35) : FromDIP(15) );
+    panel_versizer->AddStretchSpacer(is_zh ? FromDIP(35) : FromDIP(15));
 
     //official_introduction
     {
@@ -272,7 +272,7 @@ AboutDialog::AboutDialog()
         panel_versizer->Add(official_introduction_text, 0, wxALL | wxALIGN_LEFT, is_zh ? FromDIP(10) : FromDIP(10));
     }
 
-    panel_versizer->AddStretchSpacer(is_zh ? FromDIP(30) : FromDIP(10));
+    panel_versizer->AddStretchSpacer();
 
     // version
     {
@@ -280,12 +280,10 @@ AboutDialog::AboutDialog()
         wxStaticText* version_text = new wxStaticText(this, wxID_ANY, version_string.c_str(), wxDefaultPosition, wxDefaultSize);
         version_text->SetFont(Label::Body_12);
         version_text->SetBackgroundColour(font_bg);
-        version_text->SetSize(-1,50);
+        version_text->SetLabel(version_string);
 
-        panel_versizer->Add(version_text, 0, wxALL | wxALIGN_LEFT, FromDIP(10));
+        panel_versizer->Add(version_text, -1, wxLEFT, FromDIP(10));
     }
-
-    panel_versizer->AddSpacer(FromDIP(2));
 
     wxBoxSizer *text_sizer_horiz = new wxBoxSizer(wxHORIZONTAL);
     wxBoxSizer *text_sizer = new wxBoxSizer(wxVERTICAL);

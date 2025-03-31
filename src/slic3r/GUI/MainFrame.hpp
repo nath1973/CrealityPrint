@@ -159,6 +159,7 @@ class MainFrame : public DPIFrame
     {
         FileHistory(int max) : wxFileHistory(max) {}
         std::wstring GetThumbnailUrl(int index) const;
+        std::wstring GetFileOpenTime(int index) const;
 
         virtual void AddFileToHistory(const wxString &file);
         virtual void RemoveFileFromHistory(size_t i);
@@ -167,8 +168,12 @@ class MainFrame : public DPIFrame
         void LoadThumbnails();
 
         void SetMaxFiles(int max);
+
+        std::deque<std::string> GetFileOpenTimeVector();
+
     private:
         std::deque<std::string> m_thumbnails;
+        std::deque<std::string> m_file_open_time;
         bool m_load_called = false;
     };
 

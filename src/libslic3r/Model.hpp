@@ -24,6 +24,7 @@
 //BBS: add stl
 #include "Format/STL.hpp"
 #include "Format/OBJ.hpp"
+#include "Format/AssimpModel.hpp"
 
 #include <map>
 #include <memory>

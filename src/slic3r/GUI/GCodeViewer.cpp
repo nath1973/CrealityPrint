@@ -25,6 +25,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Layer.hpp"
 #include "Widgets/ProgressDialog.hpp"
+#include "NotificationManager.hpp"
 
 #include <imgui/imgui_internal.h>
 
@@ -463,7 +464,17 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
     //BBS: GUI refactor: add canvas size from parameters
-    imgui.set_next_window_pos(0.5f * static_cast<float>(canvas_width), static_cast<float>(canvas_height), ImGuiCond_Always, 0.5f, 1.0f);
+
+    const float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+    float left_widgets_width = (90 + 300) * scale; // thumbs + gcode viewer
+    ImGuiWindow* win = ImGui::FindWindowByName("gcode_legend");
+    if (win) {
+        left_widgets_width = std::max(win->Pos.x + win->SizeFull.x, left_widgets_width);
+    }
+    const float right_widgets_width = (215 + 10) * scale; // slicer buttons
+    const float remaining_space     = canvas_width - left_widgets_width - right_widgets_width;
+       
+    imgui.set_next_window_pos(left_widgets_width + remaining_space / 2.0, static_cast<float>(canvas_height), ImGuiCond_Always, 0.5f, 1.0f);
     imgui.push_toolbar_style(m_scale);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0, 4.0 * m_scale));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0 * m_scale, 6.0 * m_scale));
@@ -486,7 +497,7 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
     std::string fanspeed = ImGui::ColorMarkerStart + _u8L("Fan: ") + ImGui::ColorMarkerEnd;
     std::string temperature = ImGui::ColorMarkerStart + _u8L("Temperature: ") + ImGui::ColorMarkerEnd;
     std::string acceleration = ImGui::ColorMarkerStart + _u8L("Acceleration") + ": " + ImGui::ColorMarkerEnd;
-    const float item_size = imgui.calc_text_size(std::string_view{"X: 000.000  "}).x;
+    const float item_size = imgui.calc_text_size(std::string_view{"X: 000.000000  "}).x;
     const float item_spacing = imgui.get_item_spacing().x;
     const float window_padding = ImGui::GetStyle().WindowPadding.x;
 
@@ -645,7 +656,7 @@ void GCodeViewer::GCodeWindow::reset()
     m_filename.shrink_to_fit();
 }
 
-void GCodeViewer::GCodeWindow::renderGcode(uint64_t curr_line_id, int canvas_width, int canvas_height)
+void GCodeViewer::GCodeWindow::renderGcode(uint64_t curr_line_id, int canvas_width, int canvas_height, bool isReduceHeight)
 {
     if (!wxGetApp().show_gcode_window() 
         || m_filename.empty() 
@@ -655,8 +666,22 @@ void GCodeViewer::GCodeWindow::renderGcode(uint64_t curr_line_id, int canvas_wid
 
     auto pos = ImGui::GetCursorPos();
     auto siz = ImGui::GetWindowSize();
+
+    float wnd_height ;
+    float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+    auto screenPoxY = ImGui::GetCursorScreenPos().y;
+    float canvas_h = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size().get_height();
+    if (isReduceHeight)
+    {
+        wnd_height = canvas_h - screenPoxY - GCODE_REDUCE_HEIGHT*scale;
+    }
+    else
+    {
+        wnd_height = canvas_h - screenPoxY;
+    }
+
     const float zoom = 0.8f;
-    float wnd_height = siz.y - pos.y;
+    //float wnd_height = siz.y - pos.y;
     const float text_height = ImGui::CalcTextSize("0").y* zoom;
     const ImGuiStyle& style = ImGui::GetStyle();
     uint64_t lines_count = static_cast<uint64_t>((wnd_height - 2.0f * style.WindowPadding.y + style.ItemSpacing.y) / (text_height + style.ItemSpacing.y));
@@ -1167,6 +1192,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     if (current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances) {
         only_gcode_3mf = true;
         wxGetApp().plater()->set_only_gcode(true);
+        wxGetApp().plater()->check_sidebar_state_in_only_gcode_mode();
     }
     m_layers_slider->set_menu_enable(!(only_gcode || only_gcode_3mf));
     m_layers_slider->set_as_dirty();
@@ -2426,7 +2452,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     m_extruders_count = gcode_result.extruders_count;
 
     unsigned int progress_count = 0;
-    static const unsigned int progress_threshold = 1000;
+    static const unsigned int progress_threshold = m_moves_count/100;
     //BBS: add only gcode mode
     ProgressDialog *          progress_dialog    = m_only_gcode_in_preview ?
         new ProgressDialog(_L("Loading G-codes"), "...",
@@ -2434,6 +2460,18 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
     wxBusyCursor busy;
 
+    PartPlateList& partplate_list = wxGetApp().plater()->get_partplate_list();
+    PartPlate* current_plate = partplate_list.get_curr_plate();
+
+    m_contained_in_bed = (current_plate->get_slice_result()->toolpath_outside == false);
+    m_paths_bounding_box = current_plate->get_gcode_path_bounding_box();
+
+    // set approximate max bounding box (take in account also the tool marker)
+    m_max_bounding_box = m_paths_bounding_box;
+    m_max_bounding_box.merge(m_paths_bounding_box.max + marker.get_bounding_box().size().z() * Vec3d::UnitZ());
+
+    // move the path bounding box calculation to partplate after slicing process complete
+    /*
     //BBS: use convex_hull for toolpath outside check
     Points pts;
 
@@ -2506,6 +2544,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         }
         (const_cast<GCodeProcessorResult&>(gcode_result)).toolpath_outside = !m_contained_in_bed;
     }
+    */
 
     m_sequential_view.gcode_ids.clear();
     for (size_t i = 0; i < gcode_result.moves.size(); ++i) {
@@ -4156,7 +4195,7 @@ void GCodeViewer::render_shells(int canvas_width, int canvas_height)
     if ((!m_shells.previewing && !m_shells.visible) || m_shells.volumes.empty())
         return;
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_preview");
     if (shader == nullptr)
         return;
 
@@ -4164,7 +4203,16 @@ void GCodeViewer::render_shells(int canvas_width, int canvas_height)
 
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
-    const Camera& camera = wxGetApp().plater()->get_camera();
+    Plater* plater = wxGetApp().plater();
+    const Camera& camera = plater->get_camera();
+    Model& model = plater->model();
+    const CustomGCode::Info& info = model.plates_custom_gcodes[model.curr_plate_index];
+    const Slic3r::DynamicPrintConfig* config = &wxGetApp().preset_bundle->project_config;
+    if (config->has("filament_colour")) 
+    {
+        std::vector<std::string> filament_colors = (config->option<ConfigOptionStrings>("filament_colour"))->values;
+        GLVolumeCollection::apply_custom_gcode(shader, info, filament_colors);
+    }
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, false, camera.get_view_matrix(), camera.get_projection_matrix());
     shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
@@ -4860,8 +4908,8 @@ public:
 
         switch (m_view_type)
         {
-        case Slic3r::GUI::GCodeViewer::EViewType::FeatureType: {
-            
+        case Slic3r::GUI::GCodeViewer::EViewType::FeatureType: 
+        {
             for (size_t i = 0; i < m_roles.size(); ++i) {
                 ExtrusionRole role = m_roles[i];
                 if (role >= erCount)
@@ -5122,7 +5170,8 @@ private:
     std::vector<float> calculate_offsets(const std::vector<std::pair<std::string, std::vector<::string>>>& title_columns, float extra_size = 0.0f) {
         const ImGuiStyle& style = ImGui::GetStyle();
         std::vector<float> offsets;
-        offsets.push_back(max_width(title_columns[0].second, title_columns[0].first, extra_size) + 3.0f * style.ItemSpacing.x);
+        //offsets.push_back(max_width(title_columns[0].second, title_columns[0].first, extra_size) + 3.0f * style.ItemSpacing.x);
+        offsets.push_back(max_width(title_columns[0].second, title_columns[0].first, extra_size) + style.ItemSpacing.x + icon_size);
         for (size_t i = 1; i < title_columns.size() - 1; i++)
             offsets.push_back(offsets.back() + max_width(title_columns[i].second, title_columns[i].first) + style.ItemSpacing.x);
         if (title_columns.back().first == _u8L("Percent")) {
@@ -5331,6 +5380,19 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
             }
             if (m_fold)
                 return;
+
+            bool isReduceHeight = false;
+            auto* notificationManager = wxGetApp().plater()->get_notification_manager();
+            if (notificationManager)
+            {
+                size_t notificationNum = notificationManager->get_warning_and_error_notification_count();
+                if (notificationNum > 0)
+                {
+                    isReduceHeight = true;
+                }
+            }
+
+
             helper.showOption(m_showMark, m_showBed, m_showColor);
             if (m_showColor) {
                 ImGui::Dummy(ImVec2(0, 5));
@@ -5364,9 +5426,13 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
                 float pos_y    = ImGui::GetCursorScreenPos().y;
                 float canvas_h = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size().get_height();
 
-                const bool child_is_visible = ImGui::BeginChild(child_id, ImVec2(-1.0f, canvas_h - pos_y - 20.0f),
-                                                                false, child_flags);
-            
+
+                float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+                float reduceHeight = isReduceHeight ? GCODE_REDUCE_HEIGHT*scale : 20.0f;
+
+                const bool child_is_visible = ImGui::BeginChild(child_id, ImVec2(-1.0f, canvas_h - pos_y - reduceHeight),
+                    false, child_flags);
+
                 helper.showColorTable(m_view_type, m_custom_gcode_per_print_z, m_tools
                     , [this]() {
                         refresh_render_paths(false, false);
@@ -5387,7 +5453,7 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
             else if (!m_no_render_path)
             {
                 auto line = m_sequential_view.gcode_ids[m_sequential_view.current.last];
-                gcode_window.renderGcode(line, canvas_width, canvas_height);
+                gcode_window.renderGcode(line, canvas_width, canvas_height,isReduceHeight);
             }
             }, wcfg);
 

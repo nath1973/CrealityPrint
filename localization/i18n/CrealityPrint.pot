@@ -15687,3 +15687,12 @@ msgid ""
 "height, and results in less but still apparent layer lines and slightly "
 "higher printing quality, but longer printing time in some printing cases."
 msgstr ""
+
+msgid "The cloud printer preset [%s] has been deleted. \nDo you want to delete the local printer preset?"
+msgstr ""
+
+msgid "The cloud filament preset [%s] has been deleted. \nDo you want to delete the local filament preset?"
+msgstr ""
+
+msgid "The cloud process preset [%s] has been deleted. \nDo you want to delete the local process preset?"
+msgstr ""

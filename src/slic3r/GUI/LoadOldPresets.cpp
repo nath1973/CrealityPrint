@@ -179,7 +179,9 @@ void LoadOldPresets::getSubFileName(const std::string& zipFileName, std::vector<
         mz_zip_archive_file_stat file_stat;
         status = mz_zip_reader_file_stat(&zip_archive, i, &file_stat);
         if (status) {
-            std::string file_name = into_u8(file_stat.m_filename);
+            //std::string file_name = into_u8(file_stat.m_filename);
+            std::string file_name = file_stat.m_filename;
+
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Form zip file: " << zipFileName << ". Read file name: " << file_stat.m_filename;
             if (file_stat.m_is_directory) {
                 boost::system::error_code ec;
@@ -427,97 +429,128 @@ bool LoadOldPresets::doDefJson(const FileData& fileData)
         std::string inherits = "";
         if (jsonIn.contains("metadata") && jsonIn["metadata"].contains("inherits_from")) {
             inherits = getInherits(jsonIn["metadata"]["inherits_from"]);
+            if (!inherits.empty()) {
+                if (!fileData.inheritsName.empty()) {
+                    outputName = fileData.inheritsName;
+                } else {
+                    int dotpos = outputName.rfind("-");
+                    if (dotpos != std::string::npos) {
+                        outputName = outputName.substr(0, dotpos);
+                    }
+                }
+                m_printerData.printerInherits  = inherits;
+                jsonOut["base_id"]             = "";
+                jsonOut["from"]                = "User";
+                jsonOut["inherits"]            = inherits;
+                jsonOut["is_custom_defined"]   = "0";
+                jsonOut["name"]                = outputName;
+                jsonOut["printer_settings_id"] = outputName;
+                jsonOut["version"]             = "3.0.0.0";
+                if (jsonIn.contains("printer")) {
+                    jsonOut.merge_patch(jsonIn["printer"]);
+                }
+                if (jsonIn["extruders"].is_array() && jsonIn["extruders"].size() > 0) {
+                    jsonOut.merge_patch(jsonIn["extruders"][0]["engine_data"]);
+                }
 
-            if (!fileData.inheritsName.empty()) {
-                outputName = fileData.inheritsName;
+                std::string tmpOutputName = getTmpOutputName(fileData.name);
+
+                if (fs::exists(tmpOutputName)) {
+                    fs::remove(tmpOutputName);
+                }
+                boost::nowide::ofstream c1;
+                c1.open(tmpOutputName, std::ios::out | std::ios::trunc);
+                c1 << std::setw(4) << jsonOut << std::endl;
+                c1.close();
+
+                DynamicPrintConfig                 config;
+                std::map<std::string, std::string> key_values;
+                std::string                        reason;
+                config.load_from_json(tmpOutputName, ForwardCompatibilitySubstitutionRule::Enable, key_values, reason);
+
+                DynamicPrintConfig new_config;
+                PresetCollection*  collection = nullptr;
+                collection                    = &GUI::wxGetApp().preset_bundle->printers;
+                Preset*       inherit_preset  = nullptr;
+                ConfigOption* inherits_config = config.option(BBL_JSON_KEY_INHERITS);
+                std::string   inherits_value;
+                if (inherits_config) {
+                    ConfigOptionString* option_str = dynamic_cast<ConfigOptionString*>(inherits_config);
+                    inherits_value                 = option_str->value;
+                    inherit_preset                 = collection->find_preset(inherits_value, false, true);
+                }
+                if (inherit_preset) {
+                    new_config = inherit_preset->config;
+                } else {
+                    break;
+                }
+                t_config_option_keys diffKeys = new_config.diff(config);
+
+                if (m_override == 4) {
+                    std::string new_name   = "";
+                    Preset*     new_preset = nullptr;
+                    for (int i = 1; i < 100; ++i) {
+                        new_name   = outputName + "(" + std::to_string(i) + ")";
+                        new_preset = collection->find_preset(new_name, false);
+                        if (new_preset == nullptr)
+                            break;
+                    }
+                    if (!new_preset) {
+                        outputName = new_name;
+                    }
+                }
+
+                //  重新组合
+                jsonOut                        = json();
+                jsonOut["base_id"]             = inherit_preset->base_id;
+                jsonOut["from"]                = "User";
+                jsonOut["inherits"]            = inherits;
+                jsonOut["is_custom_defined"]   = "0";
+                jsonOut["name"]                = outputName;
+                jsonOut["printer_settings_id"] = outputName;
+                jsonOut["version"]             = "3.0.0.0";
+                for (auto item : diffKeys) {
+                    if (item == BBL_JSON_KEY_INHERITS || item == "printer_model" || item == "default_print_profile" ||
+                        item == "printer_variant" || item == "support_multi_bed_types")
+                        continue;
+                    if (jsonIn.contains("printer") && !jsonIn["printer"][item].is_null()) {
+                        jsonOut[item] = jsonIn["printer"][item];
+                    }
+                    if (jsonIn["extruders"].is_array() && jsonIn["extruders"].size() > 0 &&
+                        !jsonIn["extruders"][0]["engine_data"][item].is_null()) {
+                        jsonOut[item] = jsonIn["extruders"][0]["engine_data"][item];
+                    }
+                }
             } else {
+                std::string printerName = "";
+                std::string nozzle      = "";
+                splitPrinterPresetFileName(outputName, printerName, nozzle);
                 int dotpos = outputName.rfind("-");
                 if (dotpos != std::string::npos) {
                     outputName = outputName.substr(0, dotpos);
                 }
-            }
-            m_printerData.printerInherits  = inherits;
-            jsonOut["base_id"]             = "";
-            jsonOut["from"]                = "User";
-            jsonOut["inherits"]            = inherits;
-            jsonOut["is_custom_defined"]   = "0";
-            jsonOut["name"]                = outputName;
-            jsonOut["printer_settings_id"] = outputName;
-            jsonOut["version"]             = "3.0.0.0";
-            if (jsonIn.contains("printer")) {
-                jsonOut.merge_patch(jsonIn["printer"]);
-            }
-            if (jsonIn["extruders"].is_array() && jsonIn["extruders"].size() > 0) {
-                jsonOut.merge_patch(jsonIn["extruders"][0]["engine_data"]);
-            }
 
-            std::string tmpOutputName = getTmpOutputName(fileData.name);
-
-            if (fs::exists(tmpOutputName)) {
-                fs::remove(tmpOutputName);
-            }
-            boost::nowide::ofstream c1;
-            c1.open(tmpOutputName, std::ios::out | std::ios::trunc);
-            c1 << std::setw(4) << jsonOut << std::endl;
-            c1.close();
-
-            DynamicPrintConfig                 config;
-            std::map<std::string, std::string> key_values;
-            std::string                        reason;
-            config.load_from_json(tmpOutputName, ForwardCompatibilitySubstitutionRule::Enable, key_values, reason);
-
-            DynamicPrintConfig new_config;
-            PresetCollection*  collection = nullptr;
-            collection                    = &GUI::wxGetApp().preset_bundle->printers;
-            Preset*       inherit_preset  = nullptr;
-            ConfigOption* inherits_config = config.option(BBL_JSON_KEY_INHERITS);
-            std::string   inherits_value;
-            if (inherits_config) {
-                ConfigOptionString* option_str = dynamic_cast<ConfigOptionString*>(inherits_config);
-                inherits_value                 = option_str->value;
-                inherit_preset                 = collection->find_preset(inherits_value, false, true);
-            }
-            if (inherit_preset) {
-                new_config = inherit_preset->config;
-            } else {
-                break;
-            }
-            t_config_option_keys diffKeys = new_config.diff(config);
-
-            if (m_override == 4) {
-                std::string new_name   = "";
-                Preset*     new_preset = nullptr;
-                for (int i = 1; i < 100; ++i) {
-                    new_name   = outputName + "(" + std::to_string(i) + ")";
-                    new_preset = collection->find_preset(new_name, false);
-                    if (new_preset == nullptr)
-                        break;
+                jsonOut["base_id"]             = "";
+                jsonOut["from"]                = "User";
+                jsonOut["inherits"]            = "";
+                jsonOut["is_custom_defined"]   = "0";
+                jsonOut["name"]                = outputName;
+                jsonOut["printer_settings_id"] = outputName;
+                jsonOut["version"]             = "3.0.0.0";
+                jsonOut["family"]              = "Creality";
+                if (jsonIn.contains("printer")) {
+                    jsonOut.merge_patch(jsonIn["printer"]);
                 }
-                if (!new_preset) {
-                    outputName = new_name;
+                if (jsonIn.contains("engine_data")) {
+                    if (jsonIn["engine_data"].contains("inherits")) {
+                        jsonIn["engine_data"].erase("inherits");
+                    }
+                    jsonOut.merge_patch(jsonIn["engine_data"]);
                 }
-            }
-
-            //  重新组合
-            jsonOut                        = json();
-            jsonOut["base_id"]             = inherit_preset->base_id;
-            jsonOut["from"]                = "User";
-            jsonOut["inherits"]            = inherits;
-            jsonOut["is_custom_defined"]   = "0";
-            jsonOut["name"]                = outputName;
-            jsonOut["printer_settings_id"] = outputName;
-            jsonOut["version"]             = "3.0.0.0";
-            for (auto item : diffKeys) {
-                if (item == BBL_JSON_KEY_INHERITS || item == "printer_model" || item == "default_print_profile" ||
-                    item == "printer_variant" || item == "support_multi_bed_types")
-                    continue;
-                if (jsonIn.contains("printer") && !jsonIn["printer"][item].is_null()) {
-                    jsonOut[item] = jsonIn["printer"][item];
+                if (jsonIn.contains("extruders") && jsonIn["extruders"].is_array() && jsonIn["extruders"][0].contains("engine_data")) {
+                    jsonOut.merge_patch(jsonIn["extruders"][0]["engine_data"]);
                 }
-                if (jsonIn["extruders"].is_array() && jsonIn["extruders"].size() > 0 &&
-                    !jsonIn["extruders"][0]["engine_data"][item].is_null()) {
-                    jsonOut[item] = jsonIn["extruders"][0]["engine_data"][item];
-                }
+                m_printerData.printerInherits = outputName;
             }
         } else {
             std::string printerName = "";
@@ -557,10 +590,25 @@ bool LoadOldPresets::doDefJson(const FileData& fileData)
         const UserInfo& userInfo = wxGetApp().get_user();
         std::string     outJsonFile;
         if (userInfo.bLogin) {
-            outJsonFile =
-                fs::path(data_dir()).append("user").append(userInfo.userId).append("machine").append(outputName + ".json").string();
+            fs::path pathMachine = fs::path(data_dir()).append("user").append(userInfo.userId).append("machine");
+            if (inherits.empty()) {
+                fs::path pathBase = pathMachine.append("base");
+                if (!fs::exists(pathBase))
+                    fs::create_directory(pathBase);
+                outJsonFile = fs::path(pathBase).append(outputName + ".json").string();
+            } else {
+                outJsonFile = fs::path(pathMachine).append(outputName + ".json").string();
+            }
         } else {
-            outJsonFile = fs::path(data_dir()).append("user").append("default").append("machine").append(outputName + ".json").string();
+            fs::path pathMachine = fs::path(data_dir()).append("user").append("default").append("machine");
+            if (inherits.empty()) {
+                fs::path pathBase = pathMachine.append("base");
+                if (!fs::exists(pathBase))
+                    fs::create_directory(pathBase);
+                outJsonFile = fs::path(pathBase).append(outputName + ".json").string();
+            } else {
+                outJsonFile = fs::path(pathMachine).append(outputName + ".json").string();
+            }
         }
         if (fs::exists(outJsonFile)) {
             fs::remove(outJsonFile);
@@ -573,7 +621,15 @@ bool LoadOldPresets::doDefJson(const FileData& fileData)
         //  保存info文件
         std::string outInfoFile;
         if (userInfo.bLogin && !fileData.isSystemPreset) {
-            outInfoFile = fs::path(data_dir()).append("user").append(userInfo.userId).append("machine").append(outputName + ".info").string();
+            fs::path pathMachine = fs::path(data_dir()).append("user").append(userInfo.userId).append("machine");
+            if (inherits.empty()) {
+                fs::path pathBase = pathMachine.append("base");
+                if (!fs::exists(pathBase))
+                    fs::create_directory(pathBase);
+                outInfoFile = fs::path(pathBase).append(outputName + ".info").string();
+            } else {
+                outInfoFile = fs::path(pathMachine).append(outputName + ".info").string();
+            }
 
             if (fs::exists(outInfoFile)) {
                 fs::remove(outInfoFile);
@@ -630,6 +686,13 @@ bool LoadOldPresets::doFilamentJson(const FileData& fileData)
         std::string       inherits   = getFilamentInherits(m_printerData.filamentType);
         PresetCollection* collection = nullptr;
         collection                   = &GUI::wxGetApp().preset_bundle->filaments;
+        
+        //  如果文件名和继承的名字相同，说明是系统文件
+        if (inherits == outputName) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "doFilamentJson outputName=inherist," << outputName << " is system preset.";
+            bRet = true;
+            break;
+        }
 
         if (!inherits.empty()) {
             jsonIn["engine_data"].erase("inherits");

@@ -10,6 +10,13 @@
 namespace Slic3r
 {
 
+inline float align_round(float value, float base) { return std::round(value / base) * base; }
+
+inline float align_ceil(float value, float base) { return std::ceil(value / base) * base; }
+
+inline float align_floor(float value, float base) { return std::floor((value) / base) * base; }
+
+
 class WipeTowerWriterCreality
 {
 public:
@@ -268,6 +275,16 @@ public:
 		return *this;
 	}
 
+    // Elevate the extruder head above the current print_z position.
+    WipeTowerWriterCreality& relative_zhop(float hop, float f = 0.f, std::string _str = "G1")
+    {
+        m_gcode += _str + set_format_Z(hop);
+        if (f != 0 && f != m_current_feedrate)
+            m_gcode += set_format_F(f);
+        m_gcode += "\n";
+        return *this;
+    }
+
 	// Lower the extruder head back to the current print_z position.
 	WipeTowerWriterCreality& z_hop_reset(float f = 0.f) 
 		{ return z_hop(0, f); }
@@ -456,19 +473,18 @@ private:
 
 
 
-WipeTower::ToolChangeResult WipeTowerCreality::construct_tcr(WipeTowerWriterCreality& writer,
-                                                     size_t old_tool,
-                                                     bool is_finish) const
+WipeTower::ToolChangeResult WipeTowerCreality::construct_tcr(
+    WipeTowerWriterCreality& writer, bool priming, size_t old_tool, bool is_finish) const
 {
     WipeTower::ToolChangeResult result;
-    result.priming      = false;
+    result.priming      = priming;
     result.initial_tool = int(old_tool);
     result.new_tool     = int(m_current_tool);
     result.print_z      = m_z_pos;
     result.layer_height = m_layer_height;
     result.elapsed_time = writer.elapsed_time();
     result.start_pos    = writer.start_pos_rotated();
-    result.end_pos      = writer.pos_rotated();
+    result.end_pos      = priming ? writer.pos() : writer.pos_rotated();
     result.gcode        = std::move(writer.gcode());
 #if ORCA_CHECK_GCODE_PLACEHOLDERS
     result.gcode += is_finish ? ";toolchange_change finished ################\n" : ";toolchange_change ################\n";
@@ -500,7 +516,8 @@ WipeTowerCreality::WipeTowerCreality(const PrintConfig& config, const PrintRegio
     m_perimeter_speed(default_region_config.inner_wall_speed),
     m_current_tool(initial_tool),
     wipe_volumes(wiping_matrix),
-    m_wipe_tower_max_purge_speed(float(config.wipe_tower_max_purge_speed))
+    m_wipe_tower_max_purge_speed(float(config.wipe_tower_max_purge_speed)),
+    m_enable_timelapse_print(config.timelapse_type.value == TimelapseType::tlSmooth)
 {
     // Read absolute value of first layer speed, if given as percentage,
     // it is taken over following default. Speeds from config are not
@@ -579,13 +596,12 @@ void WipeTowerCreality::set_extruder(size_t idx, const PrintConfig& config)
     m_used_filament_length.resize(std::max(m_used_filament_length.size(), idx + 1)); // makes sure that the vector is big enough so we don't have to check later
 }
 
-WipeTower::ToolChangeResult WipeTowerCreality::tool_change(size_t tool)
+WipeTower::ToolChangeResult WipeTowerCreality::tool_change(size_t tool, bool extrude_perimeter, bool first_toolchange_to_nonsoluble)
 {
     size_t old_tool = m_current_tool;
 
     float wipe_area = 0.f;
 	float wipe_volume = 0.f;
-	
 	// Finds this toolchange info
 	if (tool != (unsigned int)(-1))
 	{
@@ -632,7 +648,23 @@ WipeTower::ToolChangeResult WipeTowerCreality::tool_change(size_t tool)
         toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material,
                           is_first_layer() ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature);
         toolchange_Change(writer, tool, m_filpar[tool].material); // Change the tool, set a speed override for soluble and flex materials.
+
         writer.travel(writer.x(), writer.y()-m_perimeter_width); // cooling and loading were done a bit down the road
+        /* if (extrude_perimeter) {
+            WipeTower::box_coordinates wt_box(Vec2f(0.f, (m_current_shape == SHAPE_REVERSED) ? m_layer_info->toolchanges_depth() - m_layer_info->depth :
+                                                                                    0.f),
+                                   m_wipe_tower_width, m_layer_info->depth + m_perimeter_width);
+            // align the perimeter
+            wt_box = align_perimeter(wt_box);
+            writer.rectangle(wt_box);
+            writer.travel(initial_position);
+        }
+
+        if (first_toolchange_to_nonsoluble) {
+            writer.travel(Vec2f(0, 0));
+            writer.travel(initial_position);
+        }*/
+
         toolchange_Wipe(writer, cleaning_box, wipe_volume);     // Wipe the newly loaded filament until the end of the assigned wipe area.
         writer.append(";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Tower_End) + "\n");
         ++ m_num_tool_changes;
@@ -653,7 +685,8 @@ WipeTower::ToolChangeResult WipeTowerCreality::tool_change(size_t tool)
     if (m_current_tool < m_used_filament_length.size())
         m_used_filament_length[m_current_tool] += writer.get_and_reset_used_filament_length();
 
-    return construct_tcr(writer, old_tool, false);
+    //return construct_tcr(writer, old_tool, false);
+    return construct_tcr(writer, false, old_tool, false);
 }
 
 
@@ -725,8 +758,10 @@ void WipeTowerCreality::toolchange_Change(
     // This is where we want to place the custom gcodes. We will use placeholders for this.
     // These will be substituted by the actual gcodes when the gcode is generated.
     writer.append("[change_filament_gcode]\n");
+    //std::string z_up_for_firmware = "[z_up_for_firmware]"
  
-    writer.z_hop(0.4f+m_z_offset, 1200.0f, "G0");//¹Ì¼þbug,ÁÙÊ±Ì§Éý0.4,·ÀÖ¹Z¸ß¶È´íÎóµ¼ÖÂµÄÒÆ¶¯µ½²ÁÊÃËþÊ±²úÉú¹Ð²ä
+     //writer.z_hop(0.4f + m_z_offset, 1200.0f, "G0"); // ï¿½Ì¼ï¿½bug,ï¿½ï¿½Ê±Ì§ï¿½ï¿½0.4,ï¿½ï¿½Ö¹Zï¿½ß¶È´ï¿½ï¿½ï¿½ï¿½Âµï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Ð²ï¿½
+     writer.relative_zhop(0.4f + m_z_offset, 1200.0f, "relative_zhop_up_for_firmware G0"); // ï¿½Ì¼ï¿½bug,ï¿½ï¿½Ê±Ì§ï¿½ï¿½0.4,ï¿½ï¿½Ö¹Zï¿½ß¶È´ï¿½ï¿½ï¿½ï¿½Âµï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Ð²ï¿½
     // Travel to where we assume we are. Custom toolchange or some special T code handling (parking extruder etc)
     // gcode could have left the extruder somewhere, we cannot just start extruding. We should also inform the
     // postprocessor that we absolutely want to have this in the gcode, even if it thought it is the same as before.
@@ -736,7 +771,10 @@ void WipeTowerCreality::toolchange_Change(
           .append(std::string("G1 X") + Slic3r::float_to_string_decimal_point(current_pos.x())
                              +  " Y"  + Slic3r::float_to_string_decimal_point(current_pos.y())
                              + WipeTower::never_skip_tag() + "\n");
-    writer.z_hop(m_z_offset);
+
+
+     writer.relative_zhop(m_z_offset,0.0,"relative_zhop_recovery_for_firmware G1");
+  //   writer.z_hop(m_z_offset);
     writer.append("[deretraction_from_wipe_tower_generator]");
 
      // Orca TODO: handle multi extruders
@@ -820,7 +858,30 @@ void WipeTowerCreality::toolchange_Wipe(
     writer.set_extrusion_flow(m_extrusion_flow); // Reset the extrusion flow.
 }
 
-WipeTower::ToolChangeResult WipeTowerCreality::finish_layer()
+
+// BBS
+WipeTower::box_coordinates WipeTowerCreality::align_perimeter(const WipeTower::box_coordinates& perimeter_box)
+{
+    WipeTower::box_coordinates aligned_box = perimeter_box;
+
+    float spacing = m_extra_spacing * m_perimeter_width;
+    float up      = perimeter_box.lu(1) - m_perimeter_width;
+    up            = align_ceil(up, spacing);
+    up += m_perimeter_width;
+    up = std::min(up, m_wipe_tower_depth);
+
+    float down = perimeter_box.ld(1) - m_perimeter_width;
+    down       = align_floor(down, spacing);
+    down += m_perimeter_width;
+    down = std::max(down, -m_y_shift);
+
+    aligned_box.lu(1) = aligned_box.ru(1) = up;
+    aligned_box.ld(1) = aligned_box.rd(1) = down;
+
+    return aligned_box;
+}
+
+WipeTower::ToolChangeResult WipeTowerCreality::finish_layer(bool extrude_perimeter, bool extruder_fill)
 {
 	assert(! this->layer_finished());
     m_current_layer_finished = true;
@@ -862,7 +923,8 @@ WipeTower::ToolChangeResult WipeTowerCreality::finish_layer()
     const float dy = (fill_box.lu.y() - fill_box.ld.y() - m_perimeter_width);
     float left = fill_box.lu.x() + 2*m_perimeter_width;
     float right = fill_box.ru.x() - 2 * m_perimeter_width;
-    if (dy > m_perimeter_width)
+    //if (extruder_fill && dy > m_perimeter_width)
+      if ( dy > m_perimeter_width)
     {
         writer.travel(fill_box.ld + Vec2f(m_perimeter_width * 2, 0.f))
               .append(";--------------------\n"
@@ -914,6 +976,14 @@ WipeTower::ToolChangeResult WipeTowerCreality::finish_layer()
         writer.append("; CP EMPTY GRID END\n"
                       ";------------------\n\n\n\n\n\n\n");
     }
+
+    // outer perimeter (always):
+    /* WipeTower::box_coordinates wt_box(Vec2f(0.f, (m_current_shape == SHAPE_REVERSED ? m_layer_info->toolchanges_depth() : 0.f)),
+                                      m_wipe_tower_width, m_layer_info->depth + m_perimeter_width);
+    wt_box = this->align_perimeter(wt_box);
+    if (extrude_perimeter) {
+        writer.rectangle(wt_box, feedrate);
+    }*/
 
     const float spacing = m_perimeter_width - m_layer_height*float(1.-M_PI_4);
 
@@ -1041,6 +1111,7 @@ WipeTower::ToolChangeResult WipeTowerCreality::finish_layer()
             }
         }
 
+
         WipeTower::box_coordinates box = _wt_box;
         if (loops_num > 0) {
             for (size_t i = 0; i < loops_num; ++i) {
@@ -1107,7 +1178,7 @@ WipeTower::ToolChangeResult WipeTowerCreality::finish_layer()
         m_current_height += m_layer_info->height;
     }
 
-    return construct_tcr(writer, old_tool, true);
+    return construct_tcr(writer,false, old_tool, true);
 }
 
 // Appends a toolchange into m_plan and calculates neccessary depth of the corresponding box
@@ -1200,6 +1271,62 @@ static WipeTower::ToolChangeResult merge_tcr(WipeTower::ToolChangeResult& first,
 }
 
 
+WipeTower::ToolChangeResult WipeTowerCreality::only_generate_out_wall()
+{
+    size_t old_tool = m_current_tool;
+
+    WipeTowerWriterCreality writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+    writer.set_extrusion_flow(m_extrusion_flow)
+        .set_z(m_z_pos)
+        .set_initial_tool(m_current_tool)
+        .set_y_shift(m_y_shift - (m_current_shape == SHAPE_REVERSED ? m_layer_info->toolchanges_depth() : 0.f));
+
+    // Slow down on the 1st layer.
+    bool first_layer = is_first_layer();
+    // BBS: speed up perimeter speed to 90mm/s for non-first layer
+    float           feedrate   = first_layer ? std::min(m_first_layer_speed * 60.f, 5400.f) :
+                                               std::min(60.0f * m_filpar[m_current_tool].max_e_speed / m_extrusion_flow, 5400.f);
+    float           fill_box_y = m_layer_info->toolchanges_depth() + m_perimeter_width;
+    WipeTower::box_coordinates fill_box(Vec2f(m_perimeter_width, fill_box_y), m_wipe_tower_width - 2 * m_perimeter_width,
+                             m_layer_info->depth - fill_box_y);
+
+    writer.set_initial_position((m_left_to_right ? fill_box.ru : fill_box.lu), // so there is never a diagonal travel
+                                m_wipe_tower_width, m_wipe_tower_depth, m_internal_rotation);
+
+    bool toolchanges_on_layer = m_layer_info->toolchanges_depth() > WT_EPSILON;
+
+    // we are in one of the corners, travel to ld along the perimeter:
+    // BBS: Delete some unnecessary travel
+    // if (writer.x() > fill_box.ld.x() + EPSILON) writer.travel(fill_box.ld.x(), writer.y());
+    // if (writer.y() > fill_box.ld.y() + EPSILON) writer.travel(writer.x(), fill_box.ld.y());
+    writer.append(";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Tower_Start) + "\n");
+    // outer perimeter (always):
+    // BBS
+    WipeTower::box_coordinates wt_box(Vec2f(0.f, (m_current_shape == SHAPE_REVERSED ? m_layer_info->toolchanges_depth() : 0.f)),
+                                    m_wipe_tower_width,
+                           m_layer_info->depth + m_perimeter_width);
+    wt_box = align_perimeter(wt_box);
+    writer.rectangle(wt_box, feedrate);
+
+    // Now prepare future wipe. box contains rectangle that was extruded last (ccw).
+    Vec2f target = (writer.pos() == wt_box.ld ?
+                        wt_box.rd :
+                        (writer.pos() == wt_box.rd ? wt_box.ru : (writer.pos() == wt_box.ru ? wt_box.lu : wt_box.ld)));
+    writer.add_wipe_point(writer.pos()).add_wipe_point(target);
+
+    writer.append(";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Tower_End) + "\n");
+
+    // Ask our writer about how much material was consumed.
+    // Skip this in case the layer is sparse and config option to not print sparse layers is enabled.
+    if (!m_no_sparse_layers || toolchanges_on_layer)
+        if (m_current_tool < m_used_filament_length.size())
+            m_used_filament_length[m_current_tool] += writer.get_and_reset_used_filament_length();
+
+    return construct_tcr(writer, false, old_tool, true);
+}
+
+
+
 // Processes vector m_plan and calls respective functions to generate G-code for the wipe tower
 // Resulting ToolChangeResults are appended into vector "result"
 void WipeTowerCreality::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &result)
@@ -1240,18 +1367,38 @@ void WipeTowerCreality::generate(std::vector<std::vector<WipeTower::ToolChangeRe
 
         int idx = first_toolchange_to_nonsoluble(layer.tool_changes);
         WipeTower::ToolChangeResult finish_layer_tcr;
-
+        WipeTower::ToolChangeResult timelapse_wall;
         if (idx == -1) {
             // if there is no toolchange switching to non-soluble, finish layer
             // will be called at the very beginning. That's the last possibility
             // where a nonsoluble tool can be.
-            finish_layer_tcr = finish_layer();
+            //finish_layer_tcr = finish_layer();
+            if (m_enable_timelapse_print) {
+                timelapse_wall = only_generate_out_wall();
+            }
+            finish_layer_tcr = finish_layer(m_enable_timelapse_print ? false : true, layer.extruder_fill);
         }
 
         for (int i=0; i<int(layer.tool_changes.size()); ++i) {
-            layer_result.emplace_back(tool_change(layer.tool_changes[i].new_tool));
-            if (i == idx) // finish_layer will be called after this toolchange
-                finish_layer_tcr = finish_layer();
+            //layer_result.emplace_back(tool_change(layer.tool_changes[i].new_tool));
+            //if (i == idx) // finish_layer will be called after this toolchange
+            //    finish_layer_tcr = finish_layer();
+
+              if (i == 0 && m_enable_timelapse_print) {
+                timelapse_wall = only_generate_out_wall();
+              }
+
+            if (i == idx) {
+                layer_result.emplace_back(tool_change(layer.tool_changes[i].new_tool, m_enable_timelapse_print ? false : true));
+                // finish_layer will be called after this toolchange
+                finish_layer_tcr = finish_layer(false, layer.extruder_fill);
+            } else {
+                if (idx == -1 && i == 0) {
+                    layer_result.emplace_back(tool_change(layer.tool_changes[i].new_tool, false, true));
+                } else {
+                    layer_result.emplace_back(tool_change(layer.tool_changes[i].new_tool));
+                }
+            }
         }
 
         if (layer_result.empty()) {

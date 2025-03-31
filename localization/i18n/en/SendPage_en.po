@@ -767,10 +767,17 @@ msgstr "Cannot contain special characters"
 msgid "Please add the device to the device list"
 msgstr "Please add the device to the device list"
 
-#~ msgid "Reconnecting"
-#~ msgstr "Reconnecting"
+msgid "Reconnecting"
+msgstr "Reconnecting"
 
-#~ msgid ""
-#~ "Creality Print camera function does not currently support devices that "
-#~ "are only bound to Creality Cloud"
-#~ msgstr "Creality Print摄像头功能暂不支持仅绑定创想云的设备"
+msgid "Creality Print camera function does not currently support devices that are only bound to Creality Cloud"
+msgstr "Creality Print摄像头功能暂不支持仅绑定创想云的设备"
+
+msgid "Feed issue, filament failed to exit extruder.Please resolve and click 'Retry' button."
+msgstr "Feed issue, filament failed to exit extruder.Please resolve and click 'Retry' button."
+
+msgid "During device self-test, printing and sending files are not supported"
+msgstr "During device self-test, printing and sending files are not supported"
+
+msgid "Self checking"
+msgstr "Self checking"

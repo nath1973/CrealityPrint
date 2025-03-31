@@ -60,6 +60,8 @@ public:
 
     wxTextCtrl const *GetTextCtrl() const { return text_ctrl; }
 
+    void setLeftMargin(int margin) { m_LeftMargin = margin; }
+
 protected:
     virtual void OnEdit() {}
 
@@ -75,6 +77,7 @@ private:
 
     void messureSize();
 
+    int m_LeftMargin = 5;
     DECLARE_EVENT_TABLE()
 };
 

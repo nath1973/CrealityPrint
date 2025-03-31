@@ -913,7 +913,12 @@ wxBoxSizer* PreferencesDialog ::create_item_downloads(wxWindow* parent)
             item_panel->SetLabel(download_path);
 
             string user_down_path = download_path.ToUTF8().data();
-            app_config->set("download_path", user_down_path);
+            if(app_config->get("download_path")!=user_down_path)
+            {
+                app_config->set("download_path", user_down_path);
+                wxGetApp().reinit_downloader();
+            }
+            
 
             item_panel->Layout();
         }

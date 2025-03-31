@@ -122,11 +122,13 @@ SlicingParameters SlicingParameters::create_from_config(const PrintConfig&      
     params.min_layer_height = std::min(params.min_layer_height, params.layer_height);
     params.max_layer_height = std::max(params.max_layer_height, params.layer_height);
 
-    if (!soluble_interface || is_tree_slim(object_config.support_type.value, object_config.support_style.value)) {
+    if (!soluble_interface /*|| is_tree_slim(object_config.support_type.value, object_config.support_style.value)*/) {
         params.gap_raft_object = object_config.raft_contact_distance.value;
         // BBS
         params.gap_object_support = object_config.support_bottom_z_distance.value;
         params.gap_support_object = object_config.support_top_z_distance.value;
+        if (params.gap_object_support <= 0)
+            params.gap_object_support = params.gap_support_object;
 
         if (!print_config.independent_support_layer_height) {
             params.gap_raft_object = std::round(params.gap_raft_object / object_config.layer_height + EPSILON) * object_config.layer_height;
