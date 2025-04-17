@@ -2602,14 +2602,82 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         }*/
 
         // ensure there is at least one vertex buffer
-        if (v_multibuffer.empty())
-            v_multibuffer.push_back(VertexBuffer());
+        if (v_multibuffer.empty()) {
+            BOOST_LOG_TRIVIAL(warning) << "v_multibuffer.empty(),  v_multibuffer.push_back(VertexBuffer())";
+            v_multibuffer.push_back(VertexBuffer());        
+        }
+
 
         // if adding the vertices for the current segment exceeds the threshold size of the current vertex buffer
         // add another vertex buffer
         // BBS: get the point number and then judge whether the remaining buffer is enough
         size_t points_num = curr.is_arc_move_with_interpolation_points() ? curr.interpolation_points.size() + 1 : 1;
         size_t vertices_size_to_add = (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) ? t_buffer.model.data.vertices_size_bytes() : points_num * t_buffer.max_vertices_per_segment_size_bytes();
+        if (v_multibuffer.empty()) { // <--- 只在这里添加日志逻辑
+            // --- 检测到致命错误：即将访问空 vector 的 back() ---
+            std::ostringstream error_msg;
+            // 获取尽可能多的相关上下文信息
+            const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1]; // 确保 i > 0
+            error_msg << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+                      << __FUNCTION__ << ": IMMINENT CRASH DETECTED!"<< ")\n"
+                      << "Reason: v_multibuffer is unexpectedly EMPTY right before accessing back().size()!\n"
+                      << "This contradicts earlier logic that should ensure it's not empty.\n"
+                      << "Suspect memory corruption or subtle logic/optimization error.\n"
+                      << "Allowing crash to proceed for reporting purposes after logging.\n"
+                      << "---------------- Context Information -----------------\n"
+                      << "Loop Index (i): " << i
+                      << "\n"
+                      // << "Move ID (move_id): " << move_id << "\n" // 如果 move_id 在此作用域可用
+                      << "Buffer ID (id): " << (int) id << "\n"
+                      << "Overall State: vertices.size()=" << vertices.size() << ", m_buffers.size()=" << m_buffers.size()
+                      << "\n"
+                      // << "Target TBuffer Info: render_primitive_type=" << static_cast<int>(t_buffer.render_primitive_type) << "\n" //
+                      // 如果 t_buffer 可用
+                      // << "Calculated vertices_size_to_add: " << vertices_size_to_add << "\n" // 如果 vertices_size_to_add 可用
+                      << "--- Current Move (curr) ---\n"
+                      << "  Type: " << static_cast<int>(curr.type) << " (" << buffer_id(curr.type) << ")\n"
+                      << "  Position: (" << curr.position.x() << ", " << curr.position.y() << ", " << curr.position.z() << ")\n"
+                      << "  Extruder ID: " << curr.extruder_id << ", G-code Line ID: " << curr.gcode_id << "\n"
+                      << "--- Previous Move (prev) ---\n"
+                      << "  Type: " << static_cast<int>(prev.type) << " (" << buffer_id(prev.type) << ")\n"
+                      << "  Position: (" << prev.position.x() << ", " << prev.position.y() << ", " << prev.position.z() << ")\n"
+                      << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+
+            // 1. 使用日志库记录错误 (FATAL 级别)
+            BOOST_LOG_TRIVIAL(error) << error_msg.str();
+
+            // 2. 强制刷新日志库缓冲区 (关键步骤)
+            BOOST_LOG_TRIVIAL(warning) << "Attempting to flush logs before expected crash...";
+            try {
+                boost::log::core::get()->flush();
+                BOOST_LOG_TRIVIAL(warning) << "Log flush initiated successfully.";
+            } catch (const std::exception& e) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Error: " << e.what();
+            } catch (...) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Unknown exception.";
+            }
+
+            // 3. 短暂延迟，给日志写入留出时间 (不阻塞后台日志线程)
+            const int delay_ms = 1000;
+            BOOST_LOG_TRIVIAL(info) << "Introducing " << delay_ms << "ms delay to aid log writing...";
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            BOOST_LOG_TRIVIAL(info) << "Delay finished. Proceeding to expected crash point...";
+           
+            BOOST_LOG_TRIVIAL(warning) << "Attempting to flush logs before expected crash...";
+            try {
+                boost::log::core::get()->flush();
+                BOOST_LOG_TRIVIAL(warning) << "Log flush initiated successfully.";
+            } catch (const std::exception& e) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Error: " << e.what();
+            } catch (...) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Unknown exception.";
+            }
+
+            // 4. 不做任何阻止，让代码自然执行到下一行导致崩溃
+            BOOST_LOG_TRIVIAL(error) << ">>> Now executing the line expected to crash <<<";
+
+        }   
+        
         if (v_multibuffer.back().size() * sizeof(float) > t_buffer.vertices.max_size_bytes() - vertices_size_to_add) {
             v_multibuffer.push_back(VertexBuffer());
             if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Triangle) {

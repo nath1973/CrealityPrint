@@ -339,6 +339,7 @@ private:
     bool            initialized() const { return m_initialized; }
     inline bool     is_enable_multi_machine() { return this->app_config&& this->app_config->get("enable_multi_machine") == "true"; }
     int             get_server_port() { return m_http_server.get_port(); }
+    HttpServer*     get_server() { return &m_http_server;}
     std::map<std::string, bool> test_url_state;
     void            reinit_downloader();
     //BBS: remove GCodeViewer as seperate APP logic

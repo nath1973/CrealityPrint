@@ -4,6 +4,9 @@
 #include "slic3r/Utils/Http.hpp"
 #include "slic3r/Utils/NetworkAgent.hpp"
 #include <boost/regex.hpp>
+#if defined(__linux__) || defined(__LINUX__)
+#include "video/WebRTCDecoder.h"
+#endif
 namespace Slic3r {
 namespace GUI {
 
@@ -85,15 +88,42 @@ void session::read_next_line()
                     }
 
                     const std::string url_str = Http::url_decode(headers.get_url());
-                    const auto        resp    = server.server.m_request_handler(url_str);
-                    std::stringstream ssOut;
-                    resp->write_response(ssOut);
-                    std::shared_ptr<std::string> str = std::make_shared<std::string>(ssOut.str());
-                    async_write(socket, boost::asio::buffer(str->c_str(), str->length()),
-                                [this, self, str](const boost::beast::error_code& e, std::size_t s) {
-                        std::cout << "done" << std::endl;
-                        server.stop(self);
-                    });
+                    if (url_str.find("/videostream") == 0) {
+                        #if defined(__linux__) || defined(__LINUX__)
+                        std::string   ip           = url_get_param(url_str, "ip");
+                        std::string video_url = (boost::format("http://%1%:8000/call/webrtc_local") % ip).str();
+                        HttpServer *pServer = wxGetApp().get_server();
+                        if(pServer->mjpeg_server_started)
+                        {
+                            WebRTCDecoder::GetInstance()->stopPlay();
+                            pServer->mjpeg_server_started = false;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+                        }
+                        pServer->mjpeg_server_started = true;
+                        WebRTCDecoder::GetInstance()->startPlay(video_url, [pServer](std::vector<unsigned char>&jpeg_data){
+                        
+                        }); 
+                        std::cout << "start webrtc!\n";
+                        const std::string header =
+                                    "HTTP/1.1 200 OK\r\n"
+                                    "Content-Type: multipart/x-mixed-replace; boundary=boundarydonotcross\r\n"
+                                    "Connection: close\r\n\r\n";
+                        async_write(socket,  boost::asio::buffer(header),[this, self,pServer](const boost::beast::error_code& e, std::size_t s) {
+                            pServer->sendFrame(socket);
+                        });
+                        #endif
+                    }else{
+                        const auto        resp    = server.server.m_request_handler(url_str);
+                        std::stringstream ssOut;
+                        resp->write_response(ssOut);
+                        std::shared_ptr<std::string> str = std::make_shared<std::string>(ssOut.str());
+                        async_write(socket, boost::asio::buffer(str->c_str(), str->length()),
+                                    [this, self, str](const boost::beast::error_code& e, std::size_t s) {
+                            std::cout << "done" << std::endl;
+                            server.stop(self);
+                        });
+                    }
                 } else {
                     read_body();
                 }
@@ -105,7 +135,48 @@ void session::read_next_line()
         }
     });
 }
-
+#if defined(__linux__) || defined(__LINUX__)
+void HttpServer::sendFrame(boost::asio::ip::tcp::socket &socket)
+{
+        //this->frame_mutex_.lock();
+        std::vector<unsigned char> copy_frame = WebRTCDecoder::GetInstance()->getFrameData();
+        //this->frame_mutex_.unlock();
+        if(copy_frame.size()==0)
+        {
+            //std::this_thread::sleep_for(std::chrono::milliseconds(80));
+            //this->sendFrame(socket);
+        }
+        if(WebRTCDecoder::GetInstance()->isStop())
+        {
+            //break;
+        }
+        
+        //std::cout << "send!\n"<<copy_frame.size();
+        const std::string frame_header =
+                    "--boundarydonotcross\r\n"
+                    "Content-Type: image/jpeg\r\n"
+                    "Content-Length: " + 
+                    std::to_string(copy_frame.size()) + "\r\n\r\n";
+        
+        std::vector<boost::asio::const_buffer> buffers;
+        buffers.emplace_back(boost::asio::buffer(frame_header));
+        buffers.emplace_back(boost::asio::buffer(copy_frame));
+        //std::cout << "start send!\r\n";
+        boost::asio::async_write(socket,  buffers,[this,&socket](const boost::beast::error_code& ec, std::size_t s) {
+            
+            if(!ec)
+            {
+                //std::cout << "send!"<<ec<<"\r\n";
+                std::this_thread::sleep_for(std::chrono::milliseconds(80));
+                this->sendFrame(socket);
+            }else{
+                this->mjpeg_server_started = false;
+                std::cout << "end send!\r\n";
+            }
+            
+        });
+}
+#endif
 void HttpServer::IOServer::do_accept()
 {
     acceptor.async_accept([this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket) {
@@ -274,22 +345,22 @@ std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const 
     std::string params;
     parse_url(url, path, params);
     boost::filesystem::path currentPath = boost::filesystem::path(resources_dir()).append("web");
+   
     if (path.find("/resources") == 0) {
         currentPath = boost::filesystem::path(resources_dir()).parent_path();
     }
     if(path.find("/login") == 0) {
-        std::string   redirect_url           = url_get_param(url, "redirect_url");
-        std::string   code           = url_get_param(url, "code");
-        std::string url_scheme = (boost::format("crealityprintlink://open?code=%1%") % code).str();
-        wxGetApp().post_openlink_cmd(url_scheme);
-        if(wxGetApp().wait_cloud_token())
-        {
-            std::string location_str = (boost::format("%1%?result=success") % redirect_url).str();
+        std::string   result_url = url_get_param(url, "result_url");
+        std::string   code       = url_get_param(url, "code");
+        std::string   url_scheme = (boost::format("crealityprintlink://open?code=%1%") % code).str();
+
+        // hack：必须在 ui 线程 post_openlink_cmd，否则 web 端无法接收到 msg
+        GUI::wxGetApp().CallAfter([url_scheme] { wxGetApp().post_openlink_cmd(url_scheme); });
+        if (wxGetApp().wait_cloud_token()) {
+            std::string location_str = (boost::format("%1%?result=success") % result_url).str();
             return std::make_shared<ResponseRedirect>(location_str);
-        }
-        else
-        {
-            std::string location_str = (boost::format("%1%?result=fail") % redirect_url).str();
+        } else {
+            std::string location_str = (boost::format("%1%?result=fail") % result_url).str();
             return std::make_shared<ResponseRedirect>(location_str);
         }
     }

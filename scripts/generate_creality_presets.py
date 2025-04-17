@@ -355,10 +355,10 @@ def process_filament_json(printer,package_path, out_path):
                 filament_data["inherits"] = "fdm_filament_common"
                 filament_data["default_filament_colour"] = "\"\""
 
-                if "material_flow_dependent_temperature" in filament_data:
-                    del filament_data["material_flow_dependent_temperature"]
-                if "material_flow_temp_graph" in filament_data:
-                    del filament_data["material_flow_temp_graph"]
+                #if "material_flow_dependent_temperature" in filament_data:
+                #    del filament_data["material_flow_dependent_temperature"]
+                #if "material_flow_temp_graph" in filament_data:
+                #    del filament_data["material_flow_temp_graph"]
 
                 #删除空的key
                 for key in list(filament_data.keys()):

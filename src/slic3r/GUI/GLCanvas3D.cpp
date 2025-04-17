@@ -33,6 +33,7 @@
 #include "format.hpp"
 #include "DailyTips.hpp"
 
+#include "slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoEmboss.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
@@ -228,7 +229,9 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
     //const Size& cnv_size = canvas.get_canvas_size();
     //float left_pos = canvas.m_main_toolbar.get_item("layersediting")->render_left_pos;
     const float x  = canvas.get_input_window_render_left_pos(); //(1 + left_pos) * cnv_size.get_width() / 2;
-    imgui.set_next_window_pos(x, canvas.m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+
+    //imgui.set_next_window_pos(x, canvas.m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+    imgui.set_draggable_window_pos(x, canvas.m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
 
     imgui.push_toolbar_style(canvas.get_scale());
     //ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f * canvas.get_scale(), 10.0f * canvas.get_scale()));
@@ -239,7 +242,7 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
                         ImVec2(20.0f, (30.0f * canvas.get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5);
-    imgui.begin(_L("Variable layer height"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
+    imgui.begin_with_drag(_L("Variable layer height"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
     ImGui::PopStyleVar(2);
 
     const float sliders_width = imgui.scaled(7.0f);
@@ -2925,30 +2928,30 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 coordf_t plate_bbox_y_max_local_coord = plate_bbox.max(1) - plate_origin(1);
                 bool need_update = false;
                 if (x + margin + wipe_tower_size(0) > plate_bbox_x_max_local_coord) {
-                    //x = plate_bbox_x_max_local_coord - wipe_tower_size(0) - margin;
+                    x = plate_bbox_x_max_local_coord - wipe_tower_size(0) - margin;
                     need_update = true;
                 }
                 else if (x < margin) {
-                    //x = margin;
-                    need_update = true;
-                }
-                //if (need_update) {
-                //    ConfigOptionFloat wt_x_opt(x);
-                //    dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
-                //    need_update = false;
-                //}
-
-                if (y + margin + wipe_tower_size(1) > plate_bbox_y_max_local_coord) {
-                    //y = plate_bbox_y_max_local_coord - wipe_tower_size(1) - margin;
-                    need_update = true;
-                }
-                else if (y < margin) {
-                    //y = margin;
+                    x = margin;
                     need_update = true;
                 }
                 if (need_update) {
-                    //ConfigOptionFloat wt_y_opt(y);
-                    //dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
+                    ConfigOptionFloat wt_x_opt(x);
+                    dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
+                    need_update = false;
+                }
+
+                if (y + margin + wipe_tower_size(1) > plate_bbox_y_max_local_coord) {
+                    y = plate_bbox_y_max_local_coord - wipe_tower_size(1) - margin;
+                    need_update = true;
+                }
+                else if (y < margin) {
+                    y = margin;
+                    need_update = true;
+                }
+                if (need_update) {
+                    ConfigOptionFloat wt_y_opt(y);
+                    dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
                     ppl.set_default_wipe_tower_pos_for_plate(plate_id);
                 }
 
@@ -4377,6 +4380,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // Grab keyboard focus on any mouse click event.
         m_canvas->SetFocus();
 
+    auto LeftIsDownWithoutKey = [](wxMouseEvent& evt) { return evt.LeftIsDown() && !evt.ShiftDown();};
+
     if (evt.Entering()) {
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
@@ -4414,7 +4419,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         else
             post_event(SimpleEvent(EVT_GLCANVAS_SWITCH_TO_GLOBAL));
     }
-    else if (evt.Dragging() && evt.LeftIsDown() && !m_rectangle_selection.is_dragging() &&m_hover_volume_idxs.empty() && m_picking_enabled && m_layers_editing.state != LayersEditing::Editing)// start rectangle selection.
+    else if (evt.Dragging() && LeftIsDownWithoutKey(evt) && !m_rectangle_selection.is_dragging() &&m_hover_volume_idxs.empty() && m_picking_enabled && m_layers_editing.state != LayersEditing::Editing)// start rectangle selection.
     {
         auto t1 = evt.Dragging();
         auto t2 = evt.LeftIsDown();
@@ -4522,7 +4527,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
     }
-    else if (evt.Dragging() && evt.LeftIsDown() && m_mouse.drag.move_volume_idx != -1 && m_layers_editing.state == LayersEditing::Unknown) {
+    else if (evt.Dragging() && LeftIsDownWithoutKey(evt) && m_mouse.drag.move_volume_idx != -1 && m_layers_editing.state == LayersEditing::Unknown) {
         if (m_canvas_type != ECanvasType::CanvasAssembleView) {
             if (!m_mouse.drag.move_requires_threshold) {
                 m_mouse.dragging = true;
@@ -4572,13 +4577,15 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
     }
-    else if (evt.Dragging() && evt.LeftIsDown() && m_picking_enabled && m_rectangle_selection.is_dragging()) {
+#ifndef __APPLE__
+    else if (evt.Dragging() && LeftIsDownWithoutKey(evt) && m_picking_enabled && m_rectangle_selection.is_dragging()) {
         //BBS not in assemble view
         if (m_canvas_type != ECanvasType::CanvasAssembleView) {
             m_rectangle_selection.dragging(pos.cast<double>());
             m_dirty = true;
         }
     }
+#endif
     else if (evt.Dragging() || is_camera_rotate(evt) || is_camera_pan(evt)) {
         m_mouse.dragging = true;
 
@@ -4880,7 +4887,12 @@ bool GLCanvas3D::is_camera_rotate(const wxMouseEvent& evt) const
     if (m_is_touchpad_navigation) {
         return evt.Moving() && evt.AltDown() && !evt.ShiftDown();
     } else {
+#if __APPLE__
+        return evt.Dragging() && (evt.HasAnyModifiers() ? evt.ControlDown() : true) ;
+
+#else
         return evt.Dragging() && evt.RightIsDown();
+#endif
     }
 }
 
@@ -4889,7 +4901,11 @@ bool GLCanvas3D::is_camera_pan(const wxMouseEvent& evt) const
     if (m_is_touchpad_navigation) {
         return evt.Moving() && evt.ShiftDown() && !evt.AltDown();
     } else {
-        return evt.Dragging() && (evt.MiddleIsDown());
+#if __APPLE__
+        return (evt.RawControlDown() && evt.Dragging());
+#else
+        return (evt.Dragging() && (evt.MiddleIsDown())) || (evt.ShiftDown() && evt.LeftIsDown());
+#endif
     }
 }
 
@@ -5293,6 +5309,23 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
     post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
 
     m_dirty = true;
+}
+
+void GLCanvas3D::on_object_list_selected()
+{ 
+    
+    if (m_gizmos.get_current_type() == GLGizmosManager::EType::MeshBoolean) 
+    {
+        auto boolean_gizmo = dynamic_cast<GLGizmoMeshBoolean*>(m_gizmos.get_current());
+        bool needUpdate = false;
+        boolean_gizmo->handle_object_list_changed(m_selection, needUpdate);
+        if (needUpdate) 
+            update_gizmos_on_off_state();
+    } 
+    else 
+    {
+        update_gizmos_on_off_state();
+    }
 }
 
 void GLCanvas3D::update_gizmos_on_off_state()
@@ -5754,15 +5787,17 @@ bool GLCanvas3D::_render_orient_menu(float left, float right, float bottom, floa
     //const float x = (1 + left) * canvas_w / 2;
     const float x = get_input_window_render_left_pos();
     ImGuiWrapper::push_toolbar_style(get_scale());
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+    // imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+    imgui->set_draggable_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
 #else
     const float x = canvas_w - m_main_toolbar.get_width();
     const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
-    imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+    // imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+    imgui->set_draggable_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
 #endif
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (30.0f * get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
-    imgui->begin(_L("Auto Orientation options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    imgui->begin_with_drag(_L("Auto Orientation options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleVar(1);
 
     OrientSettings settings = get_orient_settings();
@@ -5993,22 +6028,27 @@ bool GLCanvas3D::_render_arrange_menu(float left, float right, float bottom, flo
     //BBS: GUI refactor: move main toolbar to the right
     //original use center as {0.0}, and top is (canvas_h/2), bottom is (-canvas_h/2), also plus inv_camera
     //now change to left_up as {0,0}, and top is 0, bottom is canvas_h
+    static bool is_init = false;
+    if (!is_init) {
+        is_init = true;
 #if BBS_TOOLBAR_ON_TOP
-    //float left_pos = m_main_toolbar.get_item("arrange")->render_left_pos;
-    const float x = get_input_window_render_left_pos(); //(1 + left_pos) * canvas_w / 2;
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+        // float left_pos = m_main_toolbar.get_item("arrange")->render_left_pos;
+        const float x = get_input_window_render_left_pos(); //(1 + left_pos) * canvas_w / 2;
+        imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
 
 #else
-    const float x = canvas_w - m_main_toolbar.get_width();
-    const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
-    imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+        const float x = canvas_w - m_main_toolbar.get_width();
+        const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
+        imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
 #endif
+    }
 
     //BBS
     ImGuiWrapper::push_toolbar_style(get_scale());
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (30.0f * get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
-    imgui->begin(_L("Arrange options"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
+    // imgui->begin(_L("Arrange options"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
+    imgui->begin_with_drag(_L("Arrange options"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
     ImGui::PopStyleVar(1);
     
     ArrangeSettings settings = get_arrange_settings();
@@ -7501,8 +7541,11 @@ bool GLCanvas3D::_init_separator_toolbar()
     //BBS: assemble toolbar is at the top and right, we don't need the rounded-corner effect at the left side and the top side
     m_separator_toolbar.set_horizontal_orientation(GLToolbar::Layout::HO_Left);
     m_separator_toolbar.set_vertical_orientation(GLToolbar::Layout::VO_Top);
-    m_separator_toolbar.set_border(0.0f);
-    m_separator_toolbar.set_icons_size(20.0f);
+    m_separator_toolbar.set_border(1.0f);
+    //m_separator_toolbar.set_icons_size(20.0f);
+    m_separator_toolbar.set_separator_size(1.0f);
+    m_separator_toolbar.set_gap_size(10.0f);
+    
     m_separator_toolbar.del_all_item();
 
     GLToolbarItem::Data sperate_item;
@@ -8637,7 +8680,8 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
         return;
     }
 
-    float scale = wxGetApp().toolbar_icon_scale();
+    //float scale = wxGetApp().toolbar_icon_scale();
+    float scale = sc;
     Size cnv_size = get_canvas_size();
 
     //BBS: GUI refactor: GLToolbar
@@ -8649,17 +8693,20 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
 
     // Set current size for all top toolbars. It will be used for next calculations
 #if ENABLE_RETINA_GL
-    const float sc_const = m_retina_helper->get_scale_factor() * scale;
+    const float sc_const = m_retina_helper->get_scale_factor();
     //BBS: GUI refactor: GLToolbar
     m_main_toolbar.set_scale(sc_const);
     m_assemble_view_toolbar.set_scale(sc_const);
     m_separator_toolbar.set_scale(sc_const);
-    collapse_toolbar.set_scale(sc_const / 2.0);
+    collapse_toolbar.set_scale(sc_const);
     size *= m_retina_helper->get_scale_factor();
 
-    auto* m_notification = wxGetApp().plater()->get_notification_manager();
-    m_notification->set_scale(sc_const);
+//    auto* m_notification = wxGetApp().plater()->get_notification_manager();
+//    m_notification->set_scale(sc_const);
     m_gizmos.set_overlay_scale(sc_const);
+
+    ProcessBar::GLToolbar& toolbar = wxGetApp().plater()->get_process_toolbar();
+    toolbar.set_scale(sc_const);
 #else
     //BBS: GUI refactor: GLToolbar
     m_main_toolbar.set_icons_size(size);
@@ -9546,7 +9593,7 @@ void GLCanvas3D::_render_collapse_toolbar() const
 
     CollapseBar::GLToolbar& collapse_toolbar = plater.get_collapse_toolbar();
 
-    int margin_top = 113;
+    int margin_top = 113 * get_scale();
     //if (!plater.is_sidebar_collapsed())
     //{
     //    wxPoint pos = wxGetApp().params_panel()->ClientToScreen(wxPoint(0, 0));
@@ -9588,7 +9635,7 @@ void GLCanvas3D::_render_process_toolbar() const
 	wxPoint pos = wxGetApp().params_panel()->ClientToScreen(wxPoint(0, 0));
 	wxPoint sidebar_pos = plater.ClientToScreen(wxPoint(0, 0));
 	
-    int param_margin_top = 80;
+    int param_margin_top = 80 * get_scale();
     int margin_top = pos.y - sidebar_pos.y + param_margin_top;
 
 

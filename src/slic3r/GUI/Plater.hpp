@@ -143,6 +143,7 @@ public:
     void update_presets(Slic3r::Preset::Type preset_type);
     //BBS
     void update_presets_from_to(Slic3r::Preset::Type preset_type, std::string from, std::string to);
+    void updateLastFilement(const std::vector<std::string>& presetName);
 
     void change_top_border_for_mode_sizer(bool increase_border);
     void msw_rescale();
@@ -267,7 +268,7 @@ public:
     // BBS: check snapshot
     bool up_to_date(bool saved, bool backup);
 
-    bool open_3mf_file(const fs::path &file_path);
+    bool open_3mf_file(const fs::path &file_path,bool isModelAndConfig = false);
     int  get_3mf_file_count(std::vector<fs::path> paths);
     void add_file();
     void add_model(bool imperial_units = false, std::string fname = "");
@@ -485,6 +486,8 @@ public:
     void open_platesettings_dialog(wxCommandEvent& evt);
     void on_change_color_mode(SimpleEvent& evt);
 	void eject_drive();
+
+    void check_object_need_repair(int obj_idx, const wxString& op_name = wxEmptyString);
 
     void take_snapshot(const std::string &snapshot_name);
     //void take_snapshot(const wxString &snapshot_name);

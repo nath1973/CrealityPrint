@@ -74,16 +74,17 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
         this->handle_request_update_device_relate_to_account(json_data);
     });
     std::string version = std::string(CREALITYPRINT_VERSION);
+    std::string os = wxGetOsDescription().ToStdString();
     int port = wxGetApp().get_server_port();
 //#define _DEBUG1
 #ifdef _DEBUG1
-        wxString url = wxString::Format("http://localhost:5173/?version=%s&port=%d", version, port);
+        wxString url = wxString::Format("http://localhost:5173/?version=%s&port=%d&os=%s", version, port,os);
         this->load_url(url, wxString());
          m_browser->EnableAccessToDevTools();
      #else
         //wxString url = wxString::Format("http://localhost:%d/deviceMgr/index.html", wxGetApp().get_server_port());
         
-        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s&port=%d", from_u8(resources_dir()), version,port);
+        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s&port=%d&os=%s", from_u8(resources_dir()), version,port,os);
         url.Replace(wxT("\\"), wxT("/"));
         url.Replace(wxT("#"), wxT("%23"));
         wxURI uri(url);
@@ -597,8 +598,8 @@ void PrinterMgrView::scan_device()
         });
  
 
-    if (_thread.joinable())
-        _thread.join();
+   /* if (_thread.joinable())
+        _thread.join();*/
 }
 
 void     PrinterMgrView::RequestDeviceListFromDB() 

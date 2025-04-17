@@ -713,3 +713,6 @@ msgstr "设备自检中，不能发送和打印文件"
 
 msgid "Self checking"
 msgstr "自检中"
+
+msgid "The machine consumables do not match the printed file. Please check and restart printing"
+msgstr "机器耗材与打印文件不匹配,请检查后重新发起打印"

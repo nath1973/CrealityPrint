@@ -1133,6 +1133,8 @@ static void modulate_extrusion_by_overlapping_layers(
     // Get the initial extrusion parameters.
     ExtrusionPath *extrusion_path_template = dynamic_cast<ExtrusionPath*>(extrusions_in_out.front());
     assert(extrusion_path_template != nullptr);
+    if (extrusion_path_template == nullptr)
+        return;
     ExtrusionRole extrusion_role  = extrusion_path_template->role();
     float         extrusion_width = extrusion_path_template->width;
 
@@ -1207,11 +1209,30 @@ static void modulate_extrusion_by_overlapping_layers(
     {
         Polylines &polylines = path_fragments.back().polylines;
         for (ExtrusionEntity *ee : extrusions_in_out) {
-            ExtrusionPath *path = dynamic_cast<ExtrusionPath*>(ee);
-            assert(path != nullptr);
-            polylines.emplace_back(Polyline(std::move(path->polyline)));
-            path_ends.emplace_back(std::pair<Point, Point>(polylines.back().points.front(), polylines.back().points.back()));
-            delete path;
+          if (ExtrusionEntityCollection* collection = dynamic_cast<ExtrusionEntityCollection*>(ee)) 
+          {
+              for (size_t i = 0; i < collection->entities.size(); i++) {
+                 if (ExtrusionPath* path = dynamic_cast<ExtrusionPath*>(collection->entities[i])) {
+                      polylines.emplace_back(Polyline(std::move(path->polyline)));
+                      path_ends.emplace_back(std::pair<Point, Point>(polylines.back().points.front(), polylines.back().points.back()));
+                      delete path;
+                 }
+              }
+          }
+          else if (const ExtrusionPath* path = dynamic_cast<ExtrusionPath*>(ee)) 
+          {
+              polylines.emplace_back(Polyline(std::move(path->polyline)));
+              path_ends.emplace_back(std::pair<Point, Point>(polylines.back().points.front(), polylines.back().points.back()));
+              delete path;
+          } 
+          else if (const ExtrusionMultiPath* multipath = dynamic_cast<ExtrusionMultiPath*>(ee)) 
+          {
+                for (const ExtrusionPath& path : multipath->paths) 
+                {
+                    polylines.emplace_back(Polyline(std::move(path.polyline)));
+                    path_ends.emplace_back(std::pair<Point, Point>(polylines.back().points.front(), polylines.back().points.back()));
+                }
+          } 
         }
     }
     // Destroy the original extrusion paths, their polylines were moved to path_fragments already.

@@ -19,10 +19,21 @@ add_subdirectory(libigl)
 add_subdirectory(hints)
 add_subdirectory(mcut)
 add_subdirectory(qoi)
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+add_subdirectory(video)
+endif()
 # Adding libnest2d project for bin packing...
 add_subdirectory(libnest2d)
-
+#_VLD_ENABLED 
+set(CGAL_ENABLE_VLD 0)
+if(CMAKE_VLD_ENABLED)
+    if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        message(STATUS "Enabling Visual Leak Detector (VLD) for Debug build")
+        set(CGAL_ENABLE_VLD 1)
+    endif()
+endif()
+#
+message(STATUS "Before CGAL_ENABLE_VLD=${CGAL_ENABLE_VLD}")
 add_subdirectory(libslic3r)
 
 if (SLIC3R_GUI)
@@ -157,6 +168,16 @@ endif()
 message(STATUS "LIB_BREAKPAD=${LIB_BREAKPAD}")
 target_link_libraries(${PROJECT_DLL} libslic3r cereal::cereal ${LIB_BREAKPAD})
 
+
+if(CGAL_ENABLE_VLD AND VLD_LIBRARY)
+    message("------vld found, ${VLD_LIBRARY}------")   
+    target_link_libraries(${PROJECT_DLL} ${VLD_LIBRARY})
+    # Ensure VLD is enabled for the build.
+    target_compile_definitions(${PROJECT_DLL} PRIVATE -DCGAL_ENABLE_VLD)
+    message(STATUS "Visual Leak Detector (VLD) enabled for this build.")
+else()
+    message(STATUS "Visual Leak Detector (VLD) not found, proceeding without it.")
+endif()
 if(WIN32)
   if(MSVC_TOOLSET_VERSION)
     SET(MSVC_PREFIX "vc${MSVC_TOOLSET_VERSION}")
@@ -270,6 +291,9 @@ if (WIN32)
 
         if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
             crealityprint_copy_dlls(COPY_DLLS "Debug" "d" output_dlls_Debug)
+            if(CGAL_ENABLE_VLD AND VLD_LIBRARY)
+                copy_vld_dlls(COPY_DLLS "Debug")
+            endif()
         elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
             crealityprint_copy_dlls(COPY_DLLS "RelWithDebInfo" "" output_dlls_Release)
         else()

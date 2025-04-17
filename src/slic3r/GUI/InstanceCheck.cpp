@@ -69,7 +69,7 @@ namespace instance_check_internal
         for (int i = 1; i < argc; ++i) {
 			const std::string token = argv[i];
 			// Processing of boolean command line arguments shall match DynamicConfig::read_cli().
-			if (token == "--single-instance")
+			if (token == "--single-instance" || token == "crealityprintlink://open")
 				ret.should_send = true;
 			else if (token == "--no-single-instance")
 				ret.should_send = false;

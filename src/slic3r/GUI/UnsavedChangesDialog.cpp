@@ -813,6 +813,8 @@ UnsavedChangesDialog::UnsavedChangesDialog(Preset::Type type, PresetCollection *
         m_buttons &= ~ActionButtons::TRANSFER;
     build(type, dependent_presets, new_selected_preset);
     this->CenterOnScreen();
+    // 绑定窗口关闭事件
+    Bind(wxEVT_CLOSE_WINDOW, &UnsavedChangesDialog::OnClose, this);
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
@@ -1094,6 +1096,18 @@ void UnsavedChangesDialog::close(Action action)
     }
     m_exit_action = action;
     this->EndModal(wxID_CLOSE);
+}
+
+void UnsavedChangesDialog::OnClose(wxCloseEvent& event)
+{
+    // 在这里处理窗口关闭时的逻辑
+    if (event.CanVeto()) {
+        // 如果需要阻止关闭，可以调用event.Veto()
+        // event.Veto();
+    }
+
+    // 调用默认的关闭处理
+    event.Skip();
 }
 
 bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_save_preset_dialog/* = true*/)

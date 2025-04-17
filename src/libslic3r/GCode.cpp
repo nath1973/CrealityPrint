@@ -4329,7 +4329,7 @@ LayerResult GCode::process_layer(
         sprintf(buf, "; Calib_Retraction_tower: Z_HEIGHT: %g, length:%g\n", print_z, _length);
         gcode += buf;
     } else if (print.calib_mode() == CalibMode::Calib_Retraction_tower_speed) {
-        auto          _speed = print.calib_params().start + std::floor(std::max(0.0, print_z - 0.4) / 2.63) * print.calib_params().step;
+        auto          _speed = print.calib_params().start + std::floor(std::max(0.0, print_z-0.2+0.001)) * print.calib_params().step;
         DynamicConfig _cfg;
         _cfg.set_key_value("retraction_speed", new ConfigOptionFloats{_speed});
         _cfg.set_key_value("deretraction_speed", new ConfigOptionFloats{_speed});

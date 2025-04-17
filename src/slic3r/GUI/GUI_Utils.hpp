@@ -26,7 +26,11 @@
 #include "../libslic3r/libslic3r_version.h"
 #include "../libslic3r/Utils.hpp"
 #include "libslic3r/Color.hpp"
-
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
+#include <boost/thread.hpp>
+#include <boost/asio/ssl.hpp>
+using boost::asio::ip::tcp;
 class wxCheckBox;
 class wxTopLevelWindow;
 class wxRect;
@@ -507,7 +511,7 @@ public:
 bool load_image(const std::string& filename, wxImage &image);
 bool generate_image(const std::string &filename, wxImage &image, wxSize img_size, int method = GERNERATE_IMAGE_RESIZE);
 int get_dpi_for_window(const wxWindow *window);
-
+void download_file(const std::string& server, const std::string& path, const std::string& filename);
 
 }}
 

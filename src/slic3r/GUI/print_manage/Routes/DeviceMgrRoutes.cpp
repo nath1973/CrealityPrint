@@ -208,7 +208,15 @@ namespace DM {
             AccountDeviceMgr::getInstance().unbind_device_by_address(address);
             return true;
             });
-
+        this->Handler({ "update_device" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+            DM::DeviceMgr::Data device;
+            device.address = json_data["address"];
+            device.mac = json_data["mac"];
+            device.model = json_data["model"];
+            device.connectType = json_data["type"];
+            DM::DeviceMgr::Ins().UpdateDevice(device.address, device);
+            return true;
+            });
         this->Handler({ "add_device" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
             DM::DeviceMgr::Data device;
             device.address = json_data["address"];
@@ -220,6 +228,34 @@ namespace DM {
             DM::DeviceMgr::Ins().AddDevice(group, device);
             return true;
             });
+
+        this->Handler({"remove_to_first"}, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+            DM::DeviceMgr::Data device;
+            std::string         name = json_data["name"];
+            DM::DeviceMgr::Ins().remove2FirstGroup(name);
+            return true;
+        });
+
+        this->Handler({"move_to_group"}, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+            DM::DeviceMgr::Data device;
+            std::string         originGroup = json_data["originGroup"];
+            std::string         targetGroup = json_data["targetGroup"];
+            std::string         address     = json_data["address"];
+            DM::DeviceMgr::Ins().move2Group(originGroup, targetGroup, address);
+            return true;
+        });
+
+        this->Handler({"sort_group"}, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+            DM::DeviceMgr::Data device;
+            std::string              jsonString = json_data["groupMap"];
+            json                     groupMap   = json::parse(jsonString);
+            std::vector<std::string> groupVector;
+            for (const auto& elem : groupMap) {
+                groupVector.push_back(elem.get<std::string>());
+            }
+            DM::DeviceMgr::Ins().sortGroup(groupVector);
+            return true;
+        });
 
         this->Handler({ "add_group" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
             std::string group = json_data["group"];

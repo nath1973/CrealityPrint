@@ -2141,6 +2141,8 @@ void TreeSupport::draw_circles()
                 SupportLayer* ts_layer_prev = (layer_nr + m_raft_layers) > 1 ? m_object->get_support_layer(layer_nr + m_raft_layers - 1) : nullptr;
 
                 assert(ts_layer != nullptr);
+                if (ts_layer == nullptr)
+                    continue;
 
                 // skip if current layer has no points. This fixes potential crash in get_collision (see jira BBL001-355)
                 if (curr_layer_nodes.empty()) {
@@ -2463,6 +2465,7 @@ void TreeSupport::draw_circles()
                 const std::vector<SupportNode*>& curr_layer_nodes = contact_nodes[layer_nr];
                 SupportLayer* ts_layer = m_object->get_support_layer(layer_nr + m_raft_layers);
                 assert(ts_layer != nullptr);
+                if (ts_layer == nullptr) continue;
 
                 // skip if current layer has no points. This fixes potential crash in get_collision (see jira BBL001-355)
                 if (curr_layer_nodes.empty()) continue;
@@ -2553,6 +2556,7 @@ void TreeSupport::draw_circles()
                 const std::vector<SupportNode*>& curr_layer_nodes = contact_nodes[layer_nr];
                 SupportLayer* ts_layer = m_object->get_support_layer(layer_nr + m_raft_layers);
                 assert(ts_layer != nullptr);
+                if (ts_layer == nullptr) continue;
 
                 // skip if current layer has no points. This fixes potential crash in get_collision (see jira BBL001-355)
                 if (curr_layer_nodes.empty()) continue;

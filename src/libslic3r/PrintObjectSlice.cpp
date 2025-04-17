@@ -463,7 +463,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                 }
             });
     }
-
+#if 0
     // SoftFever: ported from SuperSlicer
     // filament shrink
     for (const std::unique_ptr<PrintRegion>& pr : print_object_regions.all_regions) {
@@ -479,7 +479,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
             }
         }
     }
-
+#endif
     return slices_by_region;
 }
 

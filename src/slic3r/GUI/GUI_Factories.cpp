@@ -2016,7 +2016,12 @@ void MenuFactory::append_menu_item_simplify(wxMenu* menu)
 
 void MenuFactory::append_menu_item_center(wxMenu* menu)
 {
-     append_menu_item(menu, wxID_ANY, _L("Center") , "",
+#ifdef __APPLE__
+    static const wxString center_shortcut_desc = ("F5");
+#else
+    static const wxString center_shortcut_desc = _L("F3");
+#endif
+     append_menu_item(menu, wxID_ANY, _L("Center") + "\t" + center_shortcut_desc, "",
         [this](wxCommandEvent&) {
             plater()->center_selection();
         }, "", nullptr,

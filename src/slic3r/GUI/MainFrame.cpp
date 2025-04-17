@@ -607,6 +607,19 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
             if (m_plater) { m_plater->add_file(); }
             return;
         }
+
+#ifdef __APPLE__
+        if (evt.GetKeyCode() == WXK_F5)
+#else
+        if (evt.GetKeyCode() == WXK_F3)
+#endif
+        {
+            if (m_plater) {
+                m_plater->center_selection();
+            }
+            return;
+        }
+
         evt.Skip();
     });
 
@@ -4511,6 +4524,13 @@ void MainFrame::update_side_preset_ui()
         };
     }
 
+    if (wxGetApp().get_user().bLogin) {
+        static bool bFirstUpdate = true;
+        if (bFirstUpdate) {
+            bFirstUpdate = false;
+            m_plater->sidebar().updateLastFilement(wxGetApp().preset_bundle->lastFilamentPresets);
+        }
+    }
     //BBS: update the preset
     m_plater->sidebar().update_presets(Preset::TYPE_PRINTER);
     m_plater->sidebar().update_presets(Preset::TYPE_FILAMENT);

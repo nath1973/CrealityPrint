@@ -224,6 +224,12 @@ namespace ImGui
     const wchar_t OpenHoverButton      = 0x085A;
     const wchar_t OpenHoverDarkButton  = 0x085B;
 
-    //    void MyFunction(const char* name, const MyMatrix44& v);
+    // Creality:Boolean icon
+    const wchar_t UnionBooleanButton = 0x095C;
+    const wchar_t UnionBooleanDarkButton = 0x0A5D;
+    const wchar_t IntersectionBooleanButton = 0x0B5E;
+    const wchar_t IntersectionBooleanDarkButton = 0x0C5F;
+    const wchar_t DifferenceBooleanButton = 0x0D60;
+    const wchar_t DifferenceBooleanDarkButton = 0x0E61;
 }
 

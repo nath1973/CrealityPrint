@@ -1058,18 +1058,14 @@ wxBoxSizer* PreferencesDialog::create_item_role_radiobutton(wxString title, wxWi
     boxsizer->Add(checkbox_title, 0, wxALIGN_CENTER | wxALL, 3);
     auto basic_radio = new wxRadioButton(parent, wxID_ANY, _L("Basic"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
     basic_radio->SetValue(app_config->get("role_type") == "0");
-    wxFont basic_font = basic_radio->GetFont();
-    basic_font.SetPointSize(9);
-    basic_radio->SetFont(basic_font);
+    basic_radio->SetFont(::Label::Body_13);
     basic_radio->Bind(wxEVT_RADIOBUTTON, [&](wxCommandEvent& event) {
         app_config->set("role_type", "0");
         Slic3r::GUI::wxGetApp().save_mode(comSimple, !app_config->has("user_mode"));
     });
     auto professional_radio = new wxRadioButton(parent, wxID_ANY, _L("Professional"), wxDefaultPosition, wxDefaultSize);
     professional_radio->SetValue(app_config->get("role_type") == "1");
-    wxFont professional_font = professional_radio->GetFont();
-    professional_font.SetPointSize(9);
-    professional_radio->SetFont(professional_font);
+    professional_radio->SetFont(::Label::Body_13);
     professional_radio->Bind(wxEVT_RADIOBUTTON, [&](wxCommandEvent& event) {
         app_config->set("role_type", "1");
         Slic3r::GUI::wxGetApp().save_mode(comAdvanced, !app_config->has("user_mode"));
@@ -1091,18 +1087,14 @@ wxBoxSizer* PreferencesDialog::create_default_page_radiobutton(wxString title, w
     boxsizer->Add(checkbox_title, 0, wxALIGN_CENTER | wxALL, 3);
     auto basic_radio = new wxRadioButton(parent, wxID_ANY, _L("Home"), wxDefaultPosition, wxSize(FromDIP(75), -1), wxRB_GROUP);
     basic_radio->SetValue(app_config->get("default_page") == "0");
-    wxFont home_font = basic_radio->GetFont();
-    home_font.SetPointSize(9);
-    basic_radio->SetFont(home_font);
+    basic_radio->SetFont(::Label::Body_13);
     basic_radio->Bind(wxEVT_RADIOBUTTON, [&](wxCommandEvent& event) {
         app_config->set("default_page", "0");
         //Slic3r::GUI::wxGetApp().save_mode(comSimple, !app_config->has("default_page"));
     });
     auto professional_radio = new wxRadioButton(parent, wxID_ANY, _L("Prepare"), wxDefaultPosition, wxSize(FromDIP(75), -1));
     professional_radio->SetValue(app_config->get("default_page") == "1");
-    wxFont professional_font = professional_radio->GetFont();
-    professional_font.SetPointSize(9);
-    professional_radio->SetFont(professional_font);
+    professional_radio->SetFont(::Label::Body_13);
     professional_radio->Bind(wxEVT_RADIOBUTTON, [&](wxCommandEvent& event) {
         app_config->set("default_page", "1");
         //Slic3r::GUI::wxGetApp().save_mode(comAdvanced, !app_config->has("default_page"));
