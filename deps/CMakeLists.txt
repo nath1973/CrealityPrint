@@ -339,10 +339,15 @@ if(NOT FREETYPE_FOUND)
     include(FREETYPE/FREETYPE.cmake)
     set(FREETYPE_PKG "dep_FREETYPE") 
 endif()
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(FFmpeg/ffmpeg.cmake)
+endif()
 include(OCCT/OCCT.cmake)
 include(OpenCV/OpenCV.cmake)
 include(aliyun-oss-cpp-sdk/aliyun-oss-cpp-sdk.cmake)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  include(metartc/metartc.cmake)
+endif()
 include(breakpad/breakpad.cmake)
 set(_dep_list
     dep_Boost
@@ -366,7 +371,9 @@ set(_dep_list
     dep_BREAKPAD
 	dep_Assimp
     )
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	list(APPEND _dep_list "dep_metartc")
+endif()
 if (MSVC)
     # Experimental
     #list(APPEND _dep_list "dep_qhull")
