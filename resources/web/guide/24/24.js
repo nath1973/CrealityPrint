@@ -15,7 +15,7 @@ let isFirstLoad = false // 是否第一次打开弹框
 function OnInit()
 {
 	//let strInput=JSON.stringify(cData);
-	// HandleStudio(strInput);
+	// handleStudioCmd(strInput);
 
     TranslatePage();
 	
@@ -32,7 +32,7 @@ function RequestProfile()
 	SendWXMessage( JSON.stringify(tSend) );
 }
 
-function HandleStudio( pVal )
+function handleStudioCmd( pVal )
 {
 	let strCmd=pVal['command'];
 

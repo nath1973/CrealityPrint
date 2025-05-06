@@ -16,7 +16,9 @@
 #include "Notebook.hpp"
 
 #define TOPBAR_ICON_SIZE  17
-#define TOPBAR_TITLE_WIDTH  150
+
+// original is 300, in some screen scale setting case(for example 175%), make the topbar too long
+#define TOPBAR_TITLE_WIDTH  172
 
 using namespace Slic3r;
 class ButtonsCtrl : public wxControl
@@ -276,7 +278,8 @@ void BBLTopbarArt::DrawLabel(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& it
 {
     dc.SetFont(m_font);
 #ifdef __WINDOWS__
-
+    dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
+#elif __linux__
     dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
 #else
     dc.SetTextForeground(*wxWHITE);
@@ -426,6 +429,8 @@ void BBLTopbarArt::DrawButton(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& i
     // set the item's text color based on if it is disabled
 #ifdef __WINDOWS__
     dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
+#elif __linux__
+    dc.SetTextForeground(Slic3r::GUI::wxGetApp().dark_mode() ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColor(0,0,0));
 #else
     dc.SetTextForeground(*wxWHITE);
 #endif
@@ -517,7 +522,7 @@ void BBLTopbar::Init(wxFrame* parent)
     this->SetForegroundColour(is_dark ? wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT) : wxColour(214, 214, 220));
 
     wxBitmap dropdown_bitmap = create_scaled_bitmap(is_dark ? "menu_down" : "menu_down_light", this, (8));
-    m_dropdown_menu_item = this->AddTool(ID_TOP_DROPDOWN_MENU, " ", dropdown_bitmap);
+    m_dropdown_menu_item = this->AddTool(ID_TOP_DROPDOWN_MENU, "", dropdown_bitmap);
  
     this->AddSpacer(FromDIP(5));
     this->AddSeparator();
@@ -597,8 +602,13 @@ void BBLTopbar::Init(wxFrame* parent)
     //CX END
 
     this->AddStretchSpacer(1);
-    m_title_item = this->AddLabel(ID_TITLE, "", FromDIP(TOPBAR_TITLE_WIDTH));
-    m_title_item->SetAlignment(wxALIGN_CENTER_VERTICAL);
+    m_title_LabelItem = new Label(this, Label::Head_12, _L(""));
+    m_title_LabelItem->SetMinSize(wxSize(172, FromDIP(-1)));
+    m_title_LabelItem->SetMaxSize(wxSize(172, FromDIP(-1)));
+    m_title_LabelItem->SetWindowStyleFlag(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL);
+    wxColour bgColor  = Slic3r::GUI::wxGetApp().dark_mode() ? wxColour("#010101") : wxColour(214, 214, 220);
+    m_title_LabelItem->SetBackgroundColour(bgColor);
+    m_title_item = this->AddControl(m_title_LabelItem);
     this->AddStretchSpacer(1);  
      //this->AddSpacer(FromDIP(15));
      //this->AddSeparator();
@@ -662,6 +672,7 @@ void BBLTopbar::Init(wxFrame* parent)
     wxAuiToolBarItem* close_btn    = this->AddTool(wxID_CLOSE_FRAME, "", close_bitmap, wxString("Models"));
     this->AddSpacer(FromDIP(5));
 #endif
+
     Realize();
     // m_toolbar_h = this->GetSize().GetHeight();
     m_toolbar_h = FromDIP(40);
@@ -810,11 +821,21 @@ void BBLTopbar::update_mode(int mode)
 {
     if (mode == 0) 
     {
+#ifdef __APPLE__
+        this->EnableTool(ID_CONFIG_RELATE, false);
+        this->GetParent()->Layout();
+        return;
+#endif
         m_top_menu.Remove(ID_CONFIG_RELATE);
         m_relationsItem = NULL;
     } 
     else if (mode == 1) 
     {
+#ifdef __APPLE__
+        this->EnableTool(ID_CONFIG_RELATE, true);
+        this->GetParent()->Layout();
+        return;
+#endif
         if (m_relationsItem)
             return;
 
@@ -866,9 +887,6 @@ void BBLTopbar::OnLogo(wxAuiToolBarEvent& evt)
         ButtonsCtrl* pCtr = dynamic_cast<ButtonsCtrl*>(m_tabCtrol);
         pCtr->SetSelection(-1);
     }
-
-    if(wxGetApp().mainframe->get_printer_mgr_view())
-        wxGetApp().mainframe->get_printer_mgr_view()->request_device_info_for_workshop();
 }
 
 void BBLTopbar::OnDownMgr(wxAuiToolBarEvent& evt) {}
@@ -903,7 +921,13 @@ wxMenu* BBLTopbar::GetCalibMenu()
 void BBLTopbar::SetTitle(wxString title)
 {
     wxGCDC dc(this);
-    title = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH));
+    wxString newTitle = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH) - FromDIP(30));
+
+    if (m_title_LabelItem) {
+        m_title_LabelItem->SetLabel(newTitle);
+        m_title_LabelItem->SetToolTip(title);
+    }
+
     if (m_title_item!=nullptr)
     {
         m_title_item->SetLabel(title);
@@ -1017,6 +1041,9 @@ void BBLTopbar::Rescale(bool isResize) {
         pCtr->reLayout();
         Realize();
     }
+
+    wxColour bgColor = Slic3r::GUI::wxGetApp().dark_mode() ? wxColour("#010101") : wxColour(214, 214, 220);
+    m_title_LabelItem->SetBackgroundColour(bgColor);
 }
 
 void BBLTopbar::OnIconize(wxAuiToolBarEvent& event)

@@ -142,6 +142,14 @@ public:
         return this->state_with_timestamp_unguarded(step).state == DONE;
     }
 
+    bool has_critical_warning() const
+    {
+        return std::any_of(std::begin(m_state), std::end(m_state), [](const auto& state) {
+            return std::any_of(state.warnings.begin(), state.warnings.end(),
+                               [](const auto& warning) { return warning.level == WarningLevel::CRITICAL; });
+        });
+    }
+
     // Set the step as started. Block on mutex while the Print / PrintObject / PrintRegion objects are being
     // modified by the UI thread.
     // This is necessary to block until the Print::apply() updates its state, which may
@@ -617,6 +625,8 @@ protected:
 
 	bool            is_step_started_unguarded(PrintStepEnum step) const { return m_state.is_started_unguarded(step); }
 	bool            is_step_done_unguarded(PrintStepEnum step) const { return m_state.is_done_unguarded(step); }
+
+    bool has_critical_warnings() const { return m_state.has_critical_warning(); }
 
 private:
     PrintState<PrintStepEnum, COUNT> m_state;

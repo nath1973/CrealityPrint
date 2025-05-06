@@ -40,6 +40,10 @@ namespace GUI {
             e_tt_gcode_pause,
             e_tt_rounding_transparent,
             e_tt_retangle_transparent,
+            e_tt_block_notification_close,
+            e_tt_block_notification_close_hover,
+            e_tt_normal_tip_block_notification_close,
+            e_tt_normal_tip_block_notification_close_hover,
             e_tt_count
         };
        
@@ -71,6 +75,7 @@ namespace GUI {
             e_ct_interSel,
             e_ct_line,
             e_ct_lineSel,
+            e_ct_normalTip,
         };
         ImVec4 getColor(ColorType);
         ImU32 getColorImU32(ColorType);
@@ -121,9 +126,9 @@ namespace GUI {
          * @param type[in]    button enable
          *                    0    enable ,1   disable ,2   always enable
          */
-        bool normalButton(const wxString& name, ButtonConfig, int type = 0);
-        int popupButton(const wxString& name, ButtonConfig bcfg,const std::vector< wxString>& list,ButtonConfig pcfg);
-        bool checkBox(const wxString& name, bool check,ButtonConfig = {});
+        bool normalButton(const std::string& name, ButtonConfig, int type = 0);
+        int  popupButton(const std::string& name, ButtonConfig bcfg, const std::vector<std::string>& list, ButtonConfig pcfg);
+        bool checkBox(const std::string& name, bool check, ButtonConfig = {});
 
         struct ComboConfig
         {

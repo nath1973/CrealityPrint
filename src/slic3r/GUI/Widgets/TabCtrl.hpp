@@ -43,7 +43,7 @@ public:
     void Unselect();
 
     virtual void Rescale();
-
+    int SelectItemByTitle(const wxString &title);
     wxString GetItemText(unsigned int item) const;
     void     SetItemText(unsigned int item, wxString const &value);
 

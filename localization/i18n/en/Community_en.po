@@ -1,7 +1,19 @@
 msgid ""
 msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
-"Plural-Forms: nplurals=1; plural=0;\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.5\n"
+
+msgid "Submit"
+msgstr "Submit"
 
 msgid "The file cannot be larger than 0.5M, please choose another SVG"
 msgstr "The file cannot be larger than 0.5M, please choose another SVG"
@@ -72,20 +84,23 @@ msgstr "Printing"
 msgid "Complete"
 msgstr "Complete"
 
-msgid "Failed"
-msgstr "Failed"
+msgid "Print complete"
+msgstr "Print complete"
 
-msgid "Termination"
-msgstr "Termination"
+msgid "Printing failed"
+msgstr "Printing failed"
 
-msgid "Paused"
-msgstr "Paused"
+msgid "Print termination"
+msgstr "Print termination"
+
+msgid "Printing paused"
+msgstr "Printing paused"
 
 msgid "Pause in progress"
 msgstr "Pause in progress"
 
-msgid "Stopping"
-msgstr "Stopping"
+msgid "STOPPING"
+msgstr "STOPPING"
 
 msgid "In recovery"
 msgstr "In recovery"
@@ -112,10 +127,10 @@ msgid "Layer Height"
 msgstr "Layer Height"
 
 msgid "Consumables Length"
-msgstr "Consumables Length"
+msgstr "Filament Length"
 
 msgid "Sync Consumables"
-msgstr "Sync Consumables"
+msgstr "Sync Filament"
 
 msgid "Time required"
 msgstr "Time required"
@@ -143,11 +158,11 @@ msgstr ""
 "The presets have not been synced to Creality Cloud yet. Click here to enable "
 "it."
 
-msgid "Please Input......"
-msgstr "Please Input......"
+msgid "Please Input"
+msgstr "Please Input"
 
 msgid "Consumables"
-msgstr "Consumables"
+msgstr "Filament"
 
 msgid "Technology"
 msgstr "Technology"
@@ -473,8 +488,8 @@ msgstr "Model Details"
 msgid "Category"
 msgstr "Category"
 
-msgid "models total {count}"
-msgstr "models total {count}"
+msgid "models total"
+msgstr "models total"
 
 msgid "Print Settings"
 msgstr "Print Settings"
@@ -484,6 +499,9 @@ msgstr "Files"
 
 msgid "No Print Settings"
 msgstr "No Print Settings"
+
+msgid "No Print Models"
+msgstr "No Print Models"
 
 msgid "Download All"
 msgstr "Download All"
@@ -846,8 +864,8 @@ msgstr ""
 msgid "No Data"
 msgstr "No Data"
 
-msgid "No results were found for {key}"
-msgstr "No results were found for {key}"
+msgid "No results were found for"
+msgstr "No results were found for"
 
 msgid "Select All"
 msgstr "Select All"
@@ -1055,3 +1073,90 @@ msgid ""
 msgstr ""
 "You can select one as the current device on the 'My Devices' or 'Multiple "
 "Devices' pages"
+
+msgid "System"
+msgstr "System"
+
+msgid "User"
+msgstr "User"
+
+msgid "Diameter"
+msgstr "Diameter"
+
+msgid "Vender"
+msgstr "Vender"
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Configuration Name"
+msgstr "Configuration Name"
+
+msgid "Firmware Type"
+msgstr "Firmware Type"
+
+msgid "Search Results"
+msgstr "Search Results"
+
+msgid "The model you want is not found. Please search again."
+msgstr "The model you want is not found. Please search again."
+
+msgid "System Filaments"
+msgstr "System Filaments"
+
+msgid "Custom Filaments"
+msgstr "Custom Filaments"
+
+msgid "Material Type"
+msgstr "Material Type"
+
+msgid "Brand Supplier"
+msgstr "Brand Supplier"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "At least one material must be selected."
+msgstr "At least one material must be selected."
+
+msgid "Do you want to use the default material list?"
+msgstr "Do you want to use the default material list?"
+
+msgid "Create New"
+msgstr "Create New"
+
+msgid "AI Modeling"
+msgstr "AI Modeling"
+
+msgid "Vast"
+msgstr "Vast"
+
+msgid "Deemos"
+msgstr "Deemos"
+
+msgid "Record"
+msgstr "Record"
+
+msgid "Filament Type"
+msgstr "Filament Type"
+
+msgid "At least one filament must be selected."
+msgstr "At least one filament must be selected."
+
+msgid "Do you want to use default filament?"
+msgstr "Do you want to use default filament?"
+
+msgid "Add New Filament"
+msgstr "Add New Filament"
+
+msgid "Please select at least one printer."
+msgstr "Please select at least one printer."
+
+msgid "The filament you want is not found"
+msgstr "The filament you want is not found"
+
+#~ msgid "Please search for the printer you want..."
+#~ msgstr "Please search for the printer you want..."
+
+#~ msgid "Update All"
+#~ msgstr "Update All"

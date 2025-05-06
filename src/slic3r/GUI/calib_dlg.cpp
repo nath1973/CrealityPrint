@@ -38,7 +38,7 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
 {
     iExtruderTypeSeletion = 0;
     imethod               = 0;
-
+    SetMaxSize(wxSize(FromDIP(612), FromDIP(320)));
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
@@ -81,16 +81,16 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
 	text_size.IncTo(wxWindow::GetTextExtent(end_pa_str));
 	text_size.IncTo(wxWindow::GetTextExtent(PA_step_str));
     text_size.IncTo(wxWindow::GetTextExtent(bed_temp_str));
-	text_size.x = text_size.x * 6;
+	text_size.x = text_size.x;
 	wxStaticBoxSizer* settings_sizer = new wxStaticBoxSizer(wxVERTICAL, this, _L("Settings"));
 
-	auto st_size = FromDIP(wxSize(text_size.x, -1));
-	auto ti_size = FromDIP(wxSize(160, -1));
+	auto st_size = wxSize(FromDIP(430),-1);
+	auto ti_size = wxSize(FromDIP(100),-1);
     // start PA
     auto start_PA_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_pa_text = new wxStaticText(this, wxID_ANY, start_pa_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
     start_pa_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
-    m_tiStartPA = new TextInput(this, "", "", "", wxDefaultPosition, ti_size, wxTE_CENTRE | wxTE_PROCESS_ENTER);
+    m_tiStartPA = new TextInput(this, "", "", "", wxDefaultPosition, ti_size, wxTE_CENTRE | wxTE_PROCESS_ENTER|wxALIGN_RIGHT);
     m_tiStartPA->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
 
 	start_PA_sizer->Add(start_pa_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
@@ -233,7 +233,7 @@ void PA_Calibration_Dlg::reset_params() {
             if (currentType != iExtruderTypeSeletion || currentMethod != imethod || isempty) {
                 if (currentType == 0) { //近端
                     m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
-                    m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.008));
+                    m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.08));
                     m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.005));
                 } else { //远端
                     m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
@@ -343,7 +343,7 @@ Temp_Calibration_Dlg::Temp_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plat
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(wxColour("#FFFFFF"));
-
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(320)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
     wxBoxSizer* choice_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -373,8 +373,8 @@ Temp_Calibration_Dlg::Temp_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plat
     text_size.IncTo(wxWindow::GetTextExtent(bed_temp_str));
     text_size.x = text_size.x * 5;
     wxStaticBoxSizer* settings_sizer = new wxStaticBoxSizer(wxVERTICAL, this, _L("Settings"));
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start temp
     auto start_temp_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_temp_text = new wxStaticText(this, wxID_ANY, start_temp_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -567,6 +567,7 @@ MaxVolumetricSpeed_Test_Dlg::MaxVolumetricSpeed_Test_Dlg(wxWindow* parent, wxWin
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(230)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -583,8 +584,8 @@ MaxVolumetricSpeed_Test_Dlg::MaxVolumetricSpeed_Test_Dlg(wxWindow* parent, wxWin
     text_size.x = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start vol
     auto start_vol_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_vol_text = new wxStaticText(this, wxID_ANY, start_vol_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -743,6 +744,7 @@ VFA_Test_Dlg::VFA_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(230)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -759,8 +761,8 @@ VFA_Test_Dlg::VFA_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
     text_size.x = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start vol
     auto start_vol_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_vol_text = new wxStaticText(this, wxID_ANY, start_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -915,6 +917,7 @@ Retraction_Test_Dlg::Retraction_Test_Dlg(wxWindow* parent, wxWindowID id, Plater
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(230)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
     // Settings
@@ -931,8 +934,8 @@ Retraction_Test_Dlg::Retraction_Test_Dlg(wxWindow* parent, wxWindowID id, Plater
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -1093,6 +1096,7 @@ Retraction_Speed_Dlg::Retraction_Speed_Dlg(wxWindow* parent, wxWindowID id, Plat
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(240)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -1109,8 +1113,8 @@ Retraction_Speed_Dlg::Retraction_Speed_Dlg(wxWindow* parent, wxWindowID id, Plat
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -1271,6 +1275,7 @@ Limit_Speed_Dlg::Limit_Speed_Dlg(wxWindow* parent, wxWindowID id, Plater* plater
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(260)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -1289,8 +1294,8 @@ Limit_Speed_Dlg::Limit_Speed_Dlg(wxWindow* parent, wxWindowID id, Plater* plater
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -1460,6 +1465,7 @@ Speed_Tower_Dlg::Speed_Tower_Dlg(wxWindow* parent, wxWindowID id, Plater* plater
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(230)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -1478,8 +1484,8 @@ Speed_Tower_Dlg::Speed_Tower_Dlg(wxWindow* parent, wxWindowID id, Plater* plater
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -1648,6 +1654,7 @@ Jitter_Speed_Dlg::Jitter_Speed_Dlg(wxWindow* parent, wxWindowID id, Plater* plat
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(230)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -1666,8 +1673,8 @@ Jitter_Speed_Dlg::Jitter_Speed_Dlg(wxWindow* parent, wxWindowID id, Plater* plat
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -1837,6 +1844,7 @@ Fan_Speed_Dlg::Fan_Speed_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(230)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -1855,8 +1863,8 @@ Fan_Speed_Dlg::Fan_Speed_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -2028,6 +2036,7 @@ Limit_Acceleration_Dlg::Limit_Acceleration_Dlg(wxWindow* parent, wxWindowID id, 
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(260)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -2046,8 +2055,8 @@ Limit_Acceleration_Dlg::Limit_Acceleration_Dlg(wxWindow* parent, wxWindowID id, 
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -2219,6 +2228,7 @@ Acceleration_Tower_Dlg::Acceleration_Tower_Dlg(wxWindow* parent, wxWindowID id, 
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(260)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -2237,8 +2247,8 @@ Acceleration_Tower_Dlg::Acceleration_Tower_Dlg(wxWindow* parent, wxWindowID id, 
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
@@ -2415,6 +2425,7 @@ Dec_Acceleration_Dlg::Dec_Acceleration_Dlg(wxWindow* parent, wxWindowID id, Plat
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
+    SetMaxSize(wxSize(FromDIP(600), FromDIP(260)));
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(v_sizer);
 
@@ -2433,8 +2444,8 @@ Dec_Acceleration_Dlg::Dec_Acceleration_Dlg(wxWindow* parent, wxWindowID id, Plat
     text_size.x                      = text_size.x * 4.0;
     wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto st_size = FromDIP(wxSize(text_size.x, -1));
-    auto ti_size = FromDIP(wxSize(160, -1));
+    auto st_size = FromDIP(wxSize(430, -1));
+    auto ti_size = FromDIP(wxSize(100, -1));
     // start length
     auto start_length_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_length_text  = new wxStaticText(this, wxID_ANY, start_length_str, wxDefaultPosition, st_size, wxALIGN_LEFT);

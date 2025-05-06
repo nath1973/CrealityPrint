@@ -95,6 +95,10 @@ void TextInput::SetLabel(const wxString& label)
     Refresh();
 }
 
+void TextInput::SetMaxLength(int maxLength)
+{
+    text_ctrl->SetMaxLength(maxLength);
+}
 void TextInput::SetIcon(const wxBitmap &icon)
 {
     this->icon = ScalableBitmap();
@@ -160,7 +164,7 @@ void TextInput::DoSetSize(int x, int y, int width, int height, int sizeFlags)
     wxWindow::DoSetSize(x, y, width, height, sizeFlags);
     if (sizeFlags & wxSIZE_USE_EXISTING) return;
     wxSize size = GetSize();
-    wxPoint textPos = {5, 0};
+    wxPoint textPos = {m_LeftMargin, 0};
     if (this->icon.bmp().IsOk()) {
         wxSize szIcon = this->icon.GetBmpSize();
         textPos.x += szIcon.x;
@@ -170,7 +174,7 @@ void TextInput::DoSetSize(int x, int y, int width, int height, int sizeFlags)
         textPos.x += labelSize.x;
     if (text_ctrl) {
         wxSize textSize = text_ctrl->GetSize();
-        textSize.x = size.x - textPos.x - labelSize.x - 10;
+        textSize.x      = size.x - textPos.x - labelSize.x - m_LeftMargin * 2;
         text_ctrl->SetSize(textSize);
         text_ctrl->SetPosition({textPos.x, (size.y - textSize.y) / 2});
     }

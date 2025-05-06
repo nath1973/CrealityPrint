@@ -135,7 +135,8 @@ struct PrintObjectTrafoAndInstances
 };
 
 // Generate a list of trafos and XY offsets for instances of a ModelObject
-static std::vector<PrintObjectTrafoAndInstances> print_objects_from_model_object(const ModelObject &model_object)
+static std::vector<PrintObjectTrafoAndInstances> print_objects_from_model_object(const ModelObject& model_object,
+                                                                                 const Vec3d&       shrinkage_compensation)
 {
     std::set<PrintObjectTrafoAndInstances> trafos;
     PrintObjectTrafoAndInstances           trafo;
@@ -143,7 +144,12 @@ static std::vector<PrintObjectTrafoAndInstances> print_objects_from_model_object
     int index = 0;
     for (ModelInstance *model_instance : model_object.instances) {
         if (model_instance->is_printable()) {
-            trafo.trafo = model_instance->get_matrix();
+          //  trafo.trafo = model_instance->get_matrix();
+
+            // Orca: Updated with XYZ filament shrinkage compensation
+            Geometry::Transformation model_instance_transformation = model_instance->get_transformation();
+            trafo.trafo = model_instance_transformation.get_matrix_with_applied_shrinkage_compensation(shrinkage_compensation);
+
             auto shift = Point::new_scale(trafo.trafo.data()[12], trafo.trafo.data()[13]);
             // Reset the XY axes of the transformation.
             trafo.trafo.data()[12] = 0;
@@ -1086,13 +1092,93 @@ bool detect_creality_cfs(const Slic3r::DynamicPrintConfig& config)
 {
     return creality::is_firmwaresoft_mm_printer_from_string(config.opt_string("printer_model"));
 }
+std::vector<unsigned int> get_used_extruders(const Model &model, DynamicPrintConfig new_full_config,int curr_plate_index)
+{
+    std::vector<unsigned int> plate_extruders;
+	int glb_support_intf_extr = new_full_config.opt_int("support_interface_filament");
+	int glb_support_extr = new_full_config.opt_int("support_filament");
+	bool glb_support = new_full_config.opt_bool("enable_support");
+    glb_support |= new_full_config.opt_int("raft_layers") > 0;
 
+	for (int obj_idx = 0; obj_idx < model.objects.size(); obj_idx++) {
+
+		ModelObject* mo =  model.objects[obj_idx];
+        for(auto  ins : mo->instances)
+        {
+            if (!ins->is_printable())
+                continue;
+            for (ModelVolume* mv : mo->volumes) {
+			    std::vector<int> volume_extruders = mv->get_extruders();
+			    plate_extruders.insert(plate_extruders.end(), volume_extruders.begin(), volume_extruders.end());
+		    }
+            // layer range
+            for (auto layer_range : mo->layer_config_ranges) {
+                if (layer_range.second.has("extruder")) {
+                    if (auto id = layer_range.second.option("extruder")->getInt(); id > 0)
+                        plate_extruders.push_back(id);
+                }
+            }
+            bool obj_support = false;
+            const ConfigOption* obj_support_opt = mo->config.option("enable_support");
+            const ConfigOption *obj_raft_opt    = mo->config.option("raft_layers");
+            if (obj_support_opt != nullptr || obj_raft_opt != nullptr) {
+                if (obj_support_opt != nullptr)
+                    obj_support = obj_support_opt->getBool();
+                if (obj_raft_opt != nullptr)
+                    obj_support |= obj_raft_opt->getInt() > 0;
+            }
+            else
+                obj_support = glb_support;
+
+            if (!obj_support)
+                continue;
+
+            int obj_support_intf_extr = 0;
+            const ConfigOption* support_intf_extr_opt = mo->config.option("support_interface_filament");
+            if (support_intf_extr_opt != nullptr)
+                obj_support_intf_extr = support_intf_extr_opt->getInt();
+            if (obj_support_intf_extr != 0)
+                plate_extruders.push_back(obj_support_intf_extr);
+            else if (glb_support_intf_extr != 0)
+                plate_extruders.push_back(glb_support_intf_extr);
+
+            int obj_support_extr = 0;
+            const ConfigOption* support_extr_opt = mo->config.option("support_filament");
+            if (support_extr_opt != nullptr)
+                obj_support_extr = support_extr_opt->getInt();
+            if (obj_support_extr != 0)
+                plate_extruders.push_back(obj_support_extr);
+            else if (glb_support_extr != 0)
+                plate_extruders.push_back(glb_support_extr);
+        }
+        
+	}
+       
+	if (true) {
+		//BBS
+        int nums_extruders = 0;
+        if (const ConfigOptionStrings *color_option = new_full_config.option<ConfigOptionStrings>("filament_colour")) {
+            nums_extruders = color_option->values.size();
+			if (model.plates_custom_gcodes.find(curr_plate_index) != model.plates_custom_gcodes.end()) {
+				for (auto item : model.plates_custom_gcodes.at(curr_plate_index).gcodes) {
+					if (item.type == CustomGCode::Type::ToolChange && item.extruder <= nums_extruders)
+						plate_extruders.push_back(item.extruder);
+				}
+			}
+		}
+	}
+	std::sort(plate_extruders.begin(), plate_extruders.end());
+	auto it_end = std::unique(plate_extruders.begin(), plate_extruders.end());
+	plate_extruders.resize(std::distance(plate_extruders.begin(), it_end));
+	return plate_extruders;
+
+}
 Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_config)
 {
-#if 0
+#if 1
     boost::filesystem::path temp_path(temporary_dir());
-    std::string cache_file_name = temp_path.string() + "/temp.slice.cache";
-    cache_slice_scene(*this, model, new_full_config, cache_file_name);
+    // std::string cache_file_name = temp_path.string() + "/temp.slice.cache";
+    // cache_slice_scene(*this, model, new_full_config, cache_file_name);
 
     std::string json_file_name = temp_path.string() + "/full_print_config.json";
     new_full_config.save_to_json(json_file_name, "", "", "");
@@ -1121,13 +1207,14 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         size_t used_filaments = strings_opt->values.size();
         std::vector<std::string> default_colors(used_filaments);
         std::vector<std::string> default_types(used_filaments);
-        std::vector<unsigned int> used_extruders =  this->extruders(true);
+        std::vector<unsigned int> used_extruders =  get_used_extruders(model, new_full_config, this->m_plate_index);
         for(unsigned i : used_extruders) {
-            if(i >= used_filaments)
+            int extruder = i -1;
+            if(extruder >= used_filaments)
                 continue;
                 
-            default_colors[i] = strings_opt->values[i];
-            default_types[i] = strings_type->values[i];
+            default_colors[extruder] = strings_opt->values[extruder];
+            default_types[extruder] = strings_type->values[extruder];
         }
 
         for(size_t i = 0; i < used_filaments; i++) {
@@ -1488,7 +1575,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         // Walk over all new model objects and check, whether there are matching PrintObjects.
         for (ModelObject *model_object : m_model.objects) {
             ModelObjectStatus &model_object_status = const_cast<ModelObjectStatus&>(model_object_status_db.reuse(*model_object));
-            model_object_status.print_instances    = print_objects_from_model_object(*model_object);
+            model_object_status.print_instances    = print_objects_from_model_object(*model_object, this->shrinkage_compensation());
             std::vector<const PrintObjectStatus*> old;
             old.reserve(print_object_status_db.count(*model_object));
             for (const PrintObjectStatus &print_object_status : print_object_status_db.get_range(*model_object))

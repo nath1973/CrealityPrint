@@ -33,6 +33,7 @@
 #include "CreatePresetsDialog.hpp"
 
 #include <slic3r/GUI/Tab.hpp>
+#include "UpdateParams.hpp"
 
 using namespace nlohmann;
 
@@ -110,7 +111,7 @@ static wxString update_custom_filaments()
         m_CustomFilaments.push_back(temp_j);
     }
     m_Res["data"]  = m_CustomFilaments;
-    wxString strJS = wxString::Format("HandleStudio(%s)", wxString::FromUTF8(m_Res.dump(-1, ' ', false, json::error_handler_t::ignore)));
+    wxString strJS = wxString::Format("handleStudioCmd(%s)", wxString::FromUTF8(m_Res.dump(-1, ' ', false, json::error_handler_t::ignore)));
     return strJS;
 }
 
@@ -261,7 +262,24 @@ wxString GuideFrame::SetStartPage(GuidePage startpage, bool load)
     TargetUrl.Replace("#", "%23");
     wxURI uri(TargetUrl);
     wxString encodedUrl = uri.BuildURI();
-    TargetUrl = "file://" + encodedUrl;
+
+    int port = wxGetApp().get_server_port();
+    if (startpage == BBL_FILAMENT_ONLY) {
+        wxString url = wxString::Format("http://localhost:%d/homepage/index.html?lang=%s&isScale=false#/Guide/createFilament", port, strlang);
+         TargetUrl    = url;
+        // 本地调试
+        // TargetUrl    = "http://localhost:9090/#/Guide/createFilament?lang=zh_CN&isScale=false";
+    } else if (startpage == BBL_MODELS_ONLY) {
+        wxString url = wxString::Format("http://localhost:%d/homepage/index.html?lang=%s&isScale=false#/Guide/addPrinter", port, strlang);
+         TargetUrl    = url;
+        // 本地调试
+        // TargetUrl    = "http://localhost:9090/#/Guide/addPrinter?lang=zh_CN&isScale=false";
+    }
+    else {
+        TargetUrl = "file://" + encodedUrl;
+    }
+    // TargetUrl = "file://" + encodedUrl;
+
     if (load)
         load_url(TargetUrl);
 
@@ -445,15 +463,19 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
             {
               Preset selectPreset = presetCollect->get_selected_preset();
               string strPrintName = selectPreset.name;
-              double opt_nozzle_diameters = selectPreset.config.option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
               string printer_model = selectPreset.config.option<ConfigOptionString>("printer_model", true)->value;
               m_Res["printName"] = strPrintName;
-              m_Res["nozzleSelect"] = std::to_string(opt_nozzle_diameters);
               m_Res["modelName"] = printer_model;
+
+              ConfigOptionFloats* option = selectPreset.config.option<ConfigOptionFloats>("nozzle_diameter");
+              if (option && (option->size() > 0))
+              {
+                  m_Res["nozzleSelect"] = option->get_at(0);
+              }
             }
 
-            //wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
-            wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', true));
+            //wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
+            wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', true));
 
             BOOST_LOG_TRIVIAL(trace) << "GuideFrame::OnScriptMessage;request_userguide_profile:" << strJS.c_str();
             wxGetApp().CallAfter([this,strJS] { RunScript(strJS); });
@@ -515,7 +537,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                             presetInfo["nozzle_diameter"] = 0.4;
                         }
                         
-                        presetInfo["user_presets"] = preset.m_is_user_presets;
+                        presetInfo["user_presets"] = preset.m_is_user_printer_hidden;
 
                         int  x = 0, y = 0;
                         ConfigOptionPoints *old_exclude_area_option = preset.config.option<ConfigOptionPoints>("printable_area", true);
@@ -543,7 +565,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                 }
             }
 
-            wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', true));
+            wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', true));
             BOOST_LOG_TRIVIAL(trace) << "GuideFrame::OnScriptMessage;request_userguide_profile:" << strJS.c_str();
             wxGetApp().CallAfter([this,strJS] { RunScript(strJS); });
         }
@@ -705,7 +727,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                     Preset& preset = presetColl->preset(i,true);  //true 返回  false 当前的copy
                     if ((preset.is_visible) && (preset.is_user()))
                     {
-                        preset.m_is_user_presets = true;
+                        preset.m_is_user_printer_hidden = true;
                         string strModelName = preset.name;
 
                         json useSelected = j["user_data"];
@@ -715,7 +737,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                             std::string sFrontName = useInfo["name"].get<std::string>();
                             if(strModelName == sFrontName && (!strModelName.empty() && !sFrontName.empty()))
                             {
-                                preset.m_is_user_presets = false;
+                                preset.m_is_user_printer_hidden = false;
                                 m_appconfig_new.set_userPresets(strModelName);
                             }
                         }
@@ -723,7 +745,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                 }
 
                 const Preset& presetSelect = presetColl->get_selected_preset();
-                if(false == presetSelect.m_is_user_presets)
+                if(false == presetSelect.m_is_user_printer_hidden)
                 {
                     size_t idxCurrent = presetColl->get_selected_idx();
                     size_t idx_new = idxCurrent + 1;
@@ -731,7 +753,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                     {
                         // for (; idx_new < presetColl->size() && !presetColl->preset(idx_new,true).is_visible; ++idx_new);
                         while ( idx_new < presetColl->size() &&
-                              (!presetColl->preset(idx_new, true).is_visible || !presetColl->preset(idx_new, true).m_is_user_presets))
+                              (!presetColl->preset(idx_new, true).is_visible || !presetColl->preset(idx_new, true).m_is_user_printer_hidden))
                         {
                             ++idx_new;
                         }
@@ -741,7 +763,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
                         // for (idx_new = idxCurrent - 1; idx_new > 0 && !presetColl->preset(idx_new,true).is_visible; --idx_new);
                         idx_new = idxCurrent - 1;
                         while (idx_new > 0 && 
-                              (!presetColl->preset(idx_new, true).is_visible || !presetColl->preset(idx_new, true).m_is_user_presets))
+                              (!presetColl->preset(idx_new, true).is_visible || !presetColl->preset(idx_new, true).m_is_user_printer_hidden))
                         {
                             --idx_new;
                         }
@@ -763,6 +785,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
 
             json fSelected = j["data"]["filament"];
             int nF = fSelected.size();
+            wxString strJS = wxString::Format("handleStudioCmd(%s)", fSelected.dump(-1, ' ', true));
             for (int m = 0; m < nF; m++)
             {
                 std::string fName = fSelected[m];
@@ -1294,6 +1317,7 @@ bool GuideFrame::run()
         //app.obj_manipul()->update_ui_from_settings();
         BOOST_LOG_TRIVIAL(info) << "GuideFrame applied";
         this->Close();
+        UpdateParams::getInstance().checkParamsNeedUpdate();
         return true;
     } else if (result == wxID_CANCEL) {
         BOOST_LOG_TRIVIAL(info) << "GuideFrame cancelled";
@@ -2308,7 +2332,7 @@ int GuideFrame::LoadMachineJson(std::string strVendor, std::string strFilePath)
             m_MachineJson["machine"].push_back(childList);
         }
 
-        //wxString strJS = wxString::Format("HandleStudio(%s)", m_MachineJson.dump(-1, ' ', true));
+        //wxString strJS = wxString::Format("handleStudioCmd(%s)", m_MachineJson.dump(-1, ' ', true));
 
     } catch (nlohmann::detail::parse_error &err) {
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": parse " << strFilePath << " got a nlohmann::detail::parse_error, reason = " << err.what();

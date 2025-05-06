@@ -104,6 +104,33 @@ protected:
 ///////////////////////////////////////////////////////////////////////////////
 /// Class ParamsPanel
 ///////////////////////////////////////////////////////////////////////////////
+class MyTreeItemData : public wxTreeItemData
+{
+public:
+    MyTreeItemData(const wxString& data) : m_data(data) {}
+    wxString GetData() const { return m_data; }
+    void     setData(const wxString& data) { m_data = data; }
+
+private:
+    wxString m_data = wxString();
+};
+
+class CustomTreeCtrl : public wxTreeCtrl
+{
+public:
+    CustomTreeCtrl(wxWindow*      parent,
+                   wxWindowID     id,
+                   const wxPoint& pos   = wxDefaultPosition,
+                   const wxSize&  size  = wxDefaultSize,
+                   long           style = wxTR_HIDE_ROOT | wxTR_NO_LINES);
+
+private:
+    void         OnPaint(wxPaintEvent& event);
+
+private:
+    wxTreeItemId m_lastHoverItem; // 记录上一次的悬停项
+};
+
 class ParamsPanel : public wxPanel
 {
 #if __WXOSX__
@@ -237,6 +264,7 @@ class ParamsPanel : public wxPanel
         void switch_to_object(bool with_tips = false);
         bool get_switch_of_object();
 
+        void refreshCurTreeItem(bool isDirty = true);
         void notify_object_config_changed();
         void notify_config_changed();
         void switch_to_object_if_has_object_configs();
@@ -262,7 +290,7 @@ class ParamsPanel : public wxPanel
         void ShowDetialView(bool show);
         void ShowDeleteButton(bool show);
 
-        void OnPanelShowInit();
+        void OnPanelShowInit(const std::string& printer = "");
         void OnPanelShowExit();
         void OnParentDialogOpen();
 
@@ -284,8 +312,9 @@ class ParamsPanel : public wxPanel
         void setCurVentor(const std::string& curVentor);
         void setCurType(const std::string& curType);
         std::string getPresetType(Preset reset);
-        void SelectRowByString(const wxString& text);
-        bool SelectRowRecursive(const wxDataViewItem& item, const wxString& text);
+        wxTreeItemId getItemIdByName(const wxString& name);
+        wxTreeItemId             SelectRowRecursive(const wxTreeItemId& item, const wxString& text);
+        bool SelectRowByString(const wxString& text);
         std::vector<std::string> filterVentor();
         std::vector<std::string> filterPresetType(const std::string& vector);
 
@@ -308,10 +337,12 @@ class ParamsPanel : public wxPanel
         wxString m_curVentor = wxString();
         wxString m_printerType = wxString();
         wxString m_curPreset = wxString();
+        //wxTreeItemId                                                   m_curItem;
 
         wxColor m_normal_color = wxColor(110, 110, 115);
         wxColor m_hover_color = wxColor(23, 204, 95);
 
+        bool            m_IsNeed          = true;
         PageState m_ps = PS_SYSTEM;
         WindowState m_ws = WS_PRINTER;
         wxPanel* m_btnsPanel = nullptr;
@@ -322,13 +353,14 @@ class ParamsPanel : public wxPanel
         wxButton* m_btn_system = nullptr;
         wxButton* m_btn_user = nullptr;
         wxPanel* m_bottomBtnsPanel = nullptr;
-        wxDataViewTreeCtrl* m_preset_listBox = nullptr;
+        CustomTreeCtrl* m_preset_listBox  = nullptr;
         
         std::unordered_set<wxString>  m_print_list;
         std::unordered_set<wxString>  m_ventor_list;
         std::vector<wxString> m_system_print_list;
         std::vector<wxString> m_user_print_list;
         std::vector<wxString> m_project_print_list;
+        std::string                   m_curNeedShowedPrinter = "";
 };
 
 class ProcessParamsPanel : public ParamsPanel

@@ -110,8 +110,11 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string &suffix, wxBox
         do {
             if (!m_parent->m_IsSave)
             {
+                if (sel_preset.type == Preset::TYPE_PRINT && !sel_preset.is_system) {
+                    break;
+                }
                 presetName = addIncrementedNumberInParentheses(presetName.ToStdString());
-
+                preset_name = presetName.ToStdString();
             }
             else {
                 presetName = preset_name;
@@ -119,12 +122,13 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string &suffix, wxBox
         } while (m_presets->find_preset(presetName.ToStdString(), false));
     }
 
-    m_input_ctrl = new ::TextInput(parent, from_u8(presetName.ToStdString()), wxEmptyString, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+    m_input_ctrl = new ::TextInput(parent, from_u8(preset_name), wxEmptyString, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
     StateColor input_bg(std::pair<wxColour, int>(wxColour("#F0F0F1"), StateColor::Disabled), std::pair<wxColour, int>(*wxWHITE, StateColor::Enabled));
     m_input_ctrl->SetBackgroundColor(input_bg);
     m_input_ctrl->Bind(wxEVT_TEXT, [this](wxCommandEvent &) { update(); });
     m_input_ctrl->SetMinSize(wxSize(SAVE_PRESET_DIALOG_INPUT_SIZE));
     m_input_ctrl->SetMaxSize(wxSize(SAVE_PRESET_DIALOG_INPUT_SIZE));
+    m_input_ctrl->SetMaxLength(100);
 
 
     input_sizer_v->Add(m_input_ctrl, 1, wxEXPAND, 0);
@@ -245,7 +249,7 @@ void SavePresetDialog::Item::update()
         m_valid_type = NoValid;
     }
 
-    if (m_valid_type == Valid && existing/* && m_preset_name != m_presets->get_selected_preset_name()*/) {
+    if (m_valid_type == Valid && existing && m_preset_name != m_presets->get_selected_preset_name()) {
         if (existing->is_compatible)
             info_line = from_u8((boost::format(_u8L("Preset \"%1%\" already exists.")) % m_preset_name).str());
         else
@@ -334,22 +338,6 @@ void SavePresetDialog::Item::update_valid_bmp()
 
 void SavePresetDialog::Item::accept()
 {
-    Preset* new_preset = m_presets->find_preset(m_preset_name, false);
-    if (new_preset) {
-        new_preset->sync_info = "update";
-        BOOST_LOG_TRIVIAL(info) << "sync_preset: update preset = " << new_preset->name;
-    }
-    else {
-        m_presets->save_current_preset(m_preset_name, m_parent->m_suffix == "Detached", save_to_project());
-        new_preset = m_presets->find_preset(m_preset_name, false);
-
-        new_preset->sync_info = "create";
-        if (wxGetApp().is_user_login())
-            new_preset->user_id = wxGetApp().getAgent()->get_user_id();
-        BOOST_LOG_TRIVIAL(info) << "sync_preset: create preset = " << new_preset->name;
-    }
-    new_preset->save_info();
-
     if (m_valid_type == Warning) {
         // BBS add sync info
         auto    it               = m_presets->find_preset(m_preset_name, false);

@@ -798,7 +798,7 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool, bool extrude_per
         toolchange_Load(writer, cleaning_box);
         // BBS
         //writer.travel(writer.x(), writer.y()-m_perimeter_width); // cooling and loading were done a bit down the road
-        if (extrude_perimeter) {
+        /* if (extrude_perimeter) {
             box_coordinates wt_box(Vec2f(0.f, (m_current_shape == SHAPE_REVERSED) ? m_layer_info->toolchanges_depth() - m_layer_info->depth : 0.f),
                 m_wipe_tower_width, m_layer_info->depth + m_perimeter_width);
             // align the perimeter
@@ -810,7 +810,7 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool, bool extrude_per
         if (first_toolchange_to_nonsoluble) {
             writer.travel(Vec2f(0, 0));
             writer.travel(initial_position);
-        }
+        }*/
         toolchange_Wipe(writer, cleaning_box, wipe_length);     // Wipe the newly loaded filament until the end of the assigned wipe area.
         writer.append(";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Tower_End) + "\n");
         ++ m_num_tool_changes;

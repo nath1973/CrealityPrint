@@ -1,9 +1,7 @@
 #include "PrinterBoxFilamentPanel.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
-#include "slic3r/GUI/print_manage/CustomEvent.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
-#include "slic3r/GUI/print_manage/DataCenter.hpp"
+#include "slic3r/GUI/print_manage/data/DataCenter.hpp"
 #include "slic3r/GUI/wxExtensions.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/Plater.hpp"
@@ -39,7 +37,7 @@ void OneFilamentColorItem::set_is_ext(bool is_ext)
     m_is_ext = is_ext;
 }
 
-void OneFilamentColorItem::setOriginMaterial(const RemotePrint::DeviceDB::Material& material_info) { m_originMaterial = material_info; }
+void OneFilamentColorItem::setOriginMaterial(const DM::Material& material_info) { m_originMaterial = material_info; }
 
 void OneFilamentColorItem::SetColor(const wxColour& color)
 {
@@ -58,7 +56,7 @@ wxColour OneFilamentColorItem::GetColor()
     return m_bk_color;
 }
 
-void OneFilamentColorItem::update_item_info_by_material(int box_id, const RemotePrint::DeviceDB::Material& material_info)
+void OneFilamentColorItem::update_item_info_by_material(int box_id, const DM::Material& material_info)
 {
     m_box_id  = box_id;
     m_bk_color = RemotePrint::Utils::hex_string_to_wxcolour(material_info.color);
@@ -76,7 +74,11 @@ void OneFilamentColorItem::update_item_info_by_material(int box_id, const Remote
         else 
         {
             if (m_originMaterial.state == 1)
-                m_material_index_info = "?";
+                if (m_originMaterial.editStatus == 0) {
+                    m_material_index_info = "/";
+                } else {
+                    m_material_index_info = "?";
+                }
             else
                 m_material_index_info = "/";
         }
@@ -89,7 +91,11 @@ void OneFilamentColorItem::update_item_info_by_material(int box_id, const Remote
 void OneFilamentColorItem::OnPaint(wxPaintEvent& event)
 {
     wxAutoBufferedPaintDC dc(this); // Use double-buffering to avoid flicker
-    //dc.Clear();
+    if (Slic3r::GUI::wxGetApp().dark_mode())
+        dc.SetBackground(wxBrush(wxColour(75, 75, 75)));
+    else
+        dc.SetBackground(wxBrush(wxColour(255, 255, 255)));
+    dc.Clear();
 
     // Set the background color and border color
     if (m_bk_color != wxNullColour) {
@@ -169,7 +175,7 @@ OneBoxFilamentColorItem::~OneBoxFilamentColorItem()
     }
 }
 
-void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const RemotePrint::DeviceDB::MaterialBox& material_box_info)
+void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const DM::MaterialBox& material_box_info)
 {
     m_box_id = material_box_info.box_id;
     
@@ -185,6 +191,7 @@ void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const Rem
 
         m_cfs_index_info        = wxString::Format("CFS%d", m_box_id); // CFS1, CFS2, CFS3, CFS4
         wxStaticText* cfs_label = new wxStaticText(this, wxID_ANY, m_cfs_index_info);
+        m_cfs_label             = cfs_label;
         if (Slic3r::GUI::wxGetApp().dark_mode())
             cfs_label->SetForegroundColour(wxColour("#FFFFFF"));
         else
@@ -215,7 +222,7 @@ void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const Rem
             }
 
             if (!has_exact_material) {
-                RemotePrint::DeviceDB::Material tmp_material;
+                DM::Material tmp_material;
                 tmp_material.material_id = material_id;
                 tmp_material.color      = "#808080"; // grey
                 filament_item->set_sync_state(false);
@@ -239,6 +246,7 @@ void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const Rem
         // }
 
         wxStaticText* cfs_label = new wxStaticText(this, wxID_ANY, m_cfs_index_info);
+        m_cfs_label             = cfs_label;
         if (Slic3r::GUI::wxGetApp().dark_mode())
             cfs_label->SetForegroundColour(wxColour("#FFFFFF"));
         else 
@@ -274,6 +282,12 @@ void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const Rem
 /// draw a text : CFS1, or CFS2, or CFS3, or CFS4, and then on the right draw 4(or less) OneFilamentColorItem, between them has some space
 void OneBoxFilamentColorItem::OnPaint(wxPaintEvent& event)
 {
+    if (m_cfs_label != nullptr) {
+        if (Slic3r::GUI::wxGetApp().dark_mode())
+            m_cfs_label->SetForegroundColour(wxColour("#FFFFFF"));
+        else
+            m_cfs_label->SetForegroundColour(wxColour("#000000"));
+    }
 }
 
 
@@ -316,9 +330,8 @@ void PrinterBoxFilamentPanel::on_auto_device_filament_mapping()
 {
     if(m_device_data.materialBoxes.empty())
         return;
-
-    Slic3r::GUI::DeviceDataEvent tmpEvent(Slic3r::GUI::EVT_AUTO_SYNC_CURRENT_DEVICE_FILAMENT, m_device_data);
-    wxPostEvent(Slic3r::GUI::wxGetApp().plater(), tmpEvent);
+ 
+    wxPostEvent(Slic3r::GUI::wxGetApp().plater(), wxCommandEvent(Slic3r::GUI::EVT_AUTO_SYNC_CURRENT_DEVICE_FILAMENT));
 }
 
 void PrinterBoxFilamentPanel::on_show_box_color_selection(wxPoint popup_pos, int sync_filament_item_index)
@@ -344,7 +357,7 @@ void PrinterBoxFilamentPanel::on_show_box_color_selection(wxPoint popup_pos, int
             m_box_color_pop_panel->SetPosition(popup_pos);
             m_box_color_pop_panel->set_filament_item_index(sync_filament_item_index);
             m_box_color_pop_panel->init_by_device_data(m_device_data);
-            m_box_color_pop_panel->Show();
+            m_box_color_pop_panel->Popup();
             m_box_color_pop_panel->select_first_on_show();
         }
     } catch (std::exception& e) {
@@ -366,7 +379,7 @@ void PrinterBoxFilamentPanel::OnPaint(wxPaintEvent& event)
 
 }
 
-void PrinterBoxFilamentPanel::update_device_data(const RemotePrint::DeviceDB::Data& device_data)
+void PrinterBoxFilamentPanel::update_device_data(const DM::Device& device_data)
 {
     try {
         m_device_data = device_data;
@@ -390,7 +403,7 @@ void PrinterBoxFilamentPanel::update_box_filament_items()
     }
 
     std::sort(m_device_data.materialBoxes.begin(), m_device_data.materialBoxes.end(),
-            [](const DeviceDB::MaterialBox& a, const DeviceDB::MaterialBox& b) { return a.box_type > b.box_type; });
+            [](const DM::MaterialBox& a, const DM::MaterialBox& b) { return a.box_type > b.box_type; });
 
     bool has_exact_material = false;
     for (const auto& materialBox : m_device_data.materialBoxes) {
@@ -442,80 +455,26 @@ void PrinterBoxFilamentPanel::OnTimer(wxTimerEvent& event)
     this->GetParent()->Layout();
     try {
 
-    std::string current_device_id = RemotePrint::DeviceDB::getInstance().get_current_device_id();
-    if (current_device_id.empty()) {
-        return;
-    }
+    nlohmann::json printer = DM::DataCenter::Ins().get_current_device();
+    DM::Device device_data= DM::Device::deserialize(printer);
 
-    nlohmann::json printer = DataCenter::Ins().find_printer_by_mac(current_device_id);
-
-    if (!printer.is_null()) {
-
-        RemotePrint::DeviceDB::Data device_data;
-        device_data.materialBoxes.clear();
-
-        device_data.mac             = printer.contains("mac") ? printer["mac"].get<std::string>() : "";
-        device_data.address         = printer.contains("address") ? printer["address"].get<std::string>() : "";
-        device_data.model           = printer.contains("model") ? printer["model"].get<std::string>() : "";
-        device_data.online          = printer.contains("online") ? printer["online"].get<bool>() : false;
-        device_data.deviceState     = printer.contains("deviceState") ?  printer["deviceState"].get<int>() : 0;
-        device_data.name            = printer.contains("name") ? printer["name"].get<std::string>() : "";
-
-        device_data.deviceType      = printer.contains("deviceType") ? printer["deviceType"].get<int>() : 0;
-        device_data.isCurrentDevice = printer.contains("isCurrentDevice") ? printer["isCurrentDevice"].get<bool>() : false;
-        device_data.webrtcSupport = printer.contains("webrtcSupport") ? printer["webrtcSupport"].get<int>() == 1:false;
-        device_data.tbId = (printer.contains("tbId") && !printer["tbId"].is_null()) ? printer["tbId"].get<std::string>() : "";
-        device_data.modelName = printer.contains("modelName") ? printer["modelName"].get<std::string>():"";
-
+    if (device_data.valid) {
         if (printer.contains("boxsInfo") && printer["boxsInfo"].contains("materialBoxs")) {
             auto& materialBoxs = printer["boxsInfo"]["materialBoxs"];
 
-            for (const auto& box : materialBoxs) {
-                RemotePrint::DeviceDB::MaterialBox materialBox;
-                materialBox.box_id    = box.contains("id") ? box["id"].get<int>() : 0;
-                materialBox.box_state = box.contains("state") ? box["state"].get<int>() : 0;
-                materialBox.box_type  = box.contains("type") ? box["type"].get<int>() : 0;
-                if (box.contains("temp")) {
-                    materialBox.temp = box["temp"];
-                }
-                if (box.contains("humidity")) {
-                    materialBox.humidity = box["humidity"];
-                }
-                
-                if(box.contains("materials")) {
-                    for (const auto& material : box["materials"]) {
-                        RemotePrint::DeviceDB::Material mat;
-                        mat.material_id = material.contains("id") ? material["id"].get<int>() : 0;
-                        mat.vendor      = material.contains("vendor") ? material["vendor"].get<std::string>() : "";
-                        mat.type        = material.contains("type") ? material["type"].get<std::string>() : "";
-                        mat.name        = material.contains("name") ? material["name"].get<std::string>() : "";
-                        mat.rfid        = material.contains("rfid") ? material["rfid"].get<std::string>() : "";
-                        mat.color       = material.contains("color") ? material["color"].get<std::string>() : "";
-                        mat.diameter    = material.contains("diameter") ? material["diameter"].get<double>() : 0.0;
-                        mat.minTemp     = material.contains("minTemp") ? material["minTemp"].get<int>() : 0;
-                        mat.maxTemp     = material.contains("maxTemp") ? material["maxTemp"].get<int>() : 0;
-                        mat.pressure    = material.contains("pressure") ? material["pressure"].get<double>() : 0.0;
-                        mat.percent     = material.contains("percent") ? material["percent"].get<int>() : 0;
-                        mat.state       = material.contains("state") ? material["state"].get<int>() : 0;
-                        mat.selected    = material.contains("selected") ? material["selected"].get<int>() : 0;
-                        mat.editStatus  = material.contains("editStatus") ? material["editStatus"].get<int>() : 0;
-
-                        materialBox.materials.push_back(mat);
-                    }
-                }
-
-
-                device_data.materialBoxes.push_back(materialBox);
-            }
 
             // 比较 device_data 的 materialBoxes 与 m_device_data 的 materialBoxes
             bool materialBoxesEqual = true;
             try {
-                for (const auto& box : device_data.materialBoxes) {
-                    if (!RemotePrint::findAndCompareMaterialBoxes(m_device_data.materialBoxes, box)) {
-                        materialBoxesEqual = false;
-                        break;
+                if (device_data.materialBoxes.size() == m_device_data.materialBoxes.size()) {
+                    for (const auto& box : device_data.materialBoxes) {
+                        if (!DM::MaterialBox::findAndCompareMaterialBoxes(m_device_data.materialBoxes, box)) {
+                            materialBoxesEqual = false;
+                            break;
+                        }
                     }
+                } else {
+                    materialBoxesEqual = false;
                 }
             } catch (std::exception& e) {
                 materialBoxesEqual = true;

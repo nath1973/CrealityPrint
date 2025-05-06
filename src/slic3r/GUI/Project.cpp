@@ -208,7 +208,7 @@ void ProjectPanel::on_reload(wxCommandEvent& evt)
         m_Res["sequence_id"] = std::to_string(ProjectPanel::m_sequence_id++);
         m_Res["model"] = j;
 
-        wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
+        wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
 
         if (m_web_init_completed) {
             wxGetApp().CallAfter([this, strJS] {
@@ -301,7 +301,7 @@ void ProjectPanel::clear_model_info()
     m_Res["command"] = "clear_3mf_info";
     m_Res["sequence_id"] = std::to_string(ProjectPanel::m_sequence_id++);
 
-    wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
+    wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
 
     wxGetApp().CallAfter([this, strJS] {
         RunScript(strJS.ToStdString());

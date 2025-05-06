@@ -261,6 +261,11 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
         //FIXME options & LoadStrategy::CheckVersion ?
         //BBS: is_xxx is used for is_bbs_3mf when load 3mf
         result = load_bbs_3mf(input_file.c_str(), config, config_substitutions, &model, plate_data, project_presets, is_xxx, file_version, proFn, options, project, plate_id);
+    else if (boost::algorithm::iends_with(input_file, ".dae") || boost::algorithm::iends_with(input_file, ".3ds") ||
+        boost::algorithm::iends_with(input_file, ".ply") || boost::algorithm::iends_with(input_file, ".off"))
+    {
+        result = load_assimp_model(input_file.c_str(), &model, is_cb_cancel, stepFn);
+    }
 #ifdef __APPLE__
     else if (boost::algorithm::iends_with(input_file, ".usd") || boost::algorithm::iends_with(input_file, ".usda") ||
              boost::algorithm::iends_with(input_file, ".usdc") || boost::algorithm::iends_with(input_file, ".usdz") ||
@@ -1175,7 +1180,10 @@ bool ModelObject::make_boolean(ModelObject *cut_object, const std::string &boole
     std::vector<TriangleMesh> new_meshes;
 
     const TriangleMesh &cut_mesh = cut_object->mesh();
+
+#ifndef CLOUD_SKIP_MESHBOOLEAN
     MeshBoolean::mcut::make_boolean(this->mesh(), cut_mesh, new_meshes, boolean_opts);
+#endif
 
     this->clear_volumes();
     int i = 1;

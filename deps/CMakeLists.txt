@@ -293,6 +293,7 @@ include(MPFR/MPFR.cmake)
 include(CGAL/CGAL.cmake)
 
 include(NLopt/NLopt.cmake)
+include(Assimp/Assimp.cmake)
 
 
 # I *think* 1.1 is used for *just* md5 hashing?
@@ -338,10 +339,16 @@ if(NOT FREETYPE_FOUND)
     include(FREETYPE/FREETYPE.cmake)
     set(FREETYPE_PKG "dep_FREETYPE") 
 endif()
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(FFmpeg/ffmpeg.cmake)
+endif()
 include(OCCT/OCCT.cmake)
 include(OpenCV/OpenCV.cmake)
 include(aliyun-oss-cpp-sdk/aliyun-oss-cpp-sdk.cmake)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  include(metartc/metartc.cmake)
+endif()
+include(breakpad/breakpad.cmake)
 set(_dep_list
     dep_Boost
     dep_TBB
@@ -361,8 +368,12 @@ set(_dep_list
     ${ZLIB_PKG}
     ${EXPAT_PKG}
     dep_OSS
+    dep_BREAKPAD
+	dep_Assimp
     )
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	list(APPEND _dep_list "dep_metartc")
+endif()
 if (MSVC)
     # Experimental
     #list(APPEND _dep_list "dep_qhull")

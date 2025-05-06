@@ -2019,7 +2019,7 @@ void GLGizmoSVG::draw_model_type()
     }
 
     // In simple mode are not modifiers
-    if (wxGetApp().plater()->printer_technology() != ptSLA && wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+    if (wxGetApp().plater()->printer_technology() != ptSLA) {
         ImGui::SameLine();
         if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
             new_type = modifier;

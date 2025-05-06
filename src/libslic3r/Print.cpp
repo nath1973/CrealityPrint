@@ -415,6 +415,54 @@ bool Print::is_step_done(PrintObjectStep step) const
     return true;
 }
 
+//Creality: return used extruders
+std::vector<unsigned int> Print::object_used_extruders() const
+{
+    std::vector<unsigned int> extruders;
+    extruders.reserve(m_print_regions.size() * m_objects.size() * 3);
+
+    //// Orca: Collect extruders from all regions.
+    //for (const PrintObject* object : m_objects)
+    //    for (const PrintRegion& region : object->all_regions())
+    //        region.collect_object_printing_extruders(*this, extruders);
+
+    for (const PrintObject* object : m_objects) {
+        const ModelObject* mo = object->model_object();
+        for (const ModelVolume* mv : mo->volumes) {
+            std::vector<int> volume_extruders = mv->get_extruders();
+            for (int extruder : volume_extruders) {
+                assert(extruder > 0);
+                extruders.push_back(extruder - 1);
+            }
+        }
+
+        // layer range
+        for (auto layer_range : mo->layer_config_ranges) {
+            if (layer_range.second.has("extruder")) {
+                // BBS: actually when user doesn't change filament by height range(value is default 0), height range should not save key
+                // "extruder". Don't know why height range always save key "extruder" because of no change(should only save difference)...
+                // Add protection here to avoid overflow
+                auto value = layer_range.second.option("extruder")->getInt();
+                if (value > 0)
+                    extruders.push_back(value - 1);
+            }
+        }
+    }
+    int num_extruders = m_config.filament_colour.size();
+    if (m_model.plates_custom_gcodes.find(m_model.curr_plate_index) != m_model.plates_custom_gcodes.end()) {
+        for (auto item : m_model.plates_custom_gcodes.at(m_model.curr_plate_index).gcodes) {
+            if (item.type == CustomGCode::Type::ToolChange && item.extruder <= num_extruders)
+                extruders.push_back((unsigned int) (item.extruder - 1));
+        }
+    }
+
+    std::vector<unsigned int> extruders_support = support_material_extruders();
+    extruders.insert(extruders.end(), extruders_support.begin(), extruders_support.end());
+
+    sort_remove_duplicates(extruders);
+    return extruders;
+}
+
 // returns 0-based indices of used extruders
 std::vector<unsigned int> Print::object_extruders() const
 {
@@ -503,6 +551,15 @@ std::vector<unsigned int> Print::extruders(bool conside_custom_gcode) const
             }
         }
     }
+
+    sort_remove_duplicates(extruders);
+    return extruders;
+}
+
+std::vector<unsigned int> Print::multi_filament_check_extruders() const 
+{ 
+    std::vector<unsigned int> extruders = this->object_used_extruders();
+    append(extruders, this->support_material_extruders());
 
     sort_remove_duplicates(extruders);
     return extruders;
@@ -1011,7 +1068,8 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
 StringObjectException Print::check_multi_filament_valid(const Print& print)
 {
     auto print_config = print.config();
-    std::vector<unsigned int> extruders = print.extruders();
+    //Creality: only checking used extruders  
+    std::vector<unsigned int> extruders = print.multi_filament_check_extruders();
     std::vector<std::string> filament_types;
     filament_types.reserve(extruders.size());
 
@@ -1118,24 +1176,21 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
         != m_objects.end();
 
     // Custom layering is not allowed for tree supports as of now.
-    for (size_t print_object_idx = 0; print_object_idx < m_objects.size(); ++ print_object_idx)
-        if (const PrintObject &print_object = *m_objects[print_object_idx];
-            // use TreeHybrid as default
-            print_object.has_support_material() && is_tree(print_object.config().support_type.value) && (print_object.config().support_style.value == smsOrganic ) &&
-            print_object.model_object()->has_custom_layering()) {
-            if (const std::vector<coordf_t> &layers = layer_height_profile(print_object_idx); ! layers.empty())
-                if (! check_object_layers_fixed(print_object.slicing_parameters(), layers))
-                    return {_u8L("Variable layer height is not supported with Organic supports.") };
-        }
-
-    for (size_t print_object_idx = 0; print_object_idx < m_objects.size(); ++print_object_idx)
-        if (const PrintObject& print_object = *m_objects[print_object_idx];
-            // use TreeHybrid as default
-            print_object.has_support_material() && is_tree(print_object.config().support_type.value) &&
-            (print_object.config().support_style.value == smsOrganic) && print_object.config().overhang_optimization.value) {
+    for (size_t print_object_idx = 0; print_object_idx < m_objects.size(); ++print_object_idx) {
+        PrintObject& print_object               = *m_objects[print_object_idx];
+        print_object.has_variable_layer_heights = false;
+        // use TreeHybrid as default
+        if (print_object.has_support_material() && is_tree(print_object.config().support_type.value) &&
+             print_object.model_object()->has_custom_layering()) {
             if (const std::vector<coordf_t>& layers = layer_height_profile(print_object_idx); !layers.empty())
-                return {_u8L("Overhang Optimization is not supported with Organic supports.")};
+                if (!check_object_layers_fixed(print_object.slicing_parameters(), layers)) {
+                    print_object.has_variable_layer_heights = true;
+                    BOOST_LOG_TRIVIAL(warning) << "print_object: " << print_object.model_object()->name
+                                               << " has_variable_layer_heights: " << print_object.has_variable_layer_heights;
+                    if (print_object.config().support_style.value == smsTreeOrganic) return {_u8L("Variable layer height is not supported with Organic supports.")};
+                }
         }
+    }
 
     if (this->has_wipe_tower() && ! m_objects.empty()) {
         // Make sure all extruders use same diameter filament and have the same nozzle diameter
@@ -1299,7 +1354,7 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                 // Prusa: Fixing crashes with invalid tip diameter or branch diameter
                 // https://github.com/prusa3d/PrusaSlicer/commit/96b3ae85013ac363cd1c3e98ec6b7938aeacf46d
                 // use TreeHybrid as default
-                if (is_tree(object->config().support_type.value) && (object->config().support_style == smsOrganic)) {
+                if (is_tree(object->config().support_type.value) && (object->config().support_style == smsTreeOrganic)) {
                     float extrusion_width = std::min(
                         support_material_flow(object).width(),
                         support_material_interface_flow(object).width());
@@ -1442,7 +1497,7 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
             };
             std::string warning_key;
             // check flush flush_multiplier
-            if (warning_key.empty() && m_config.flush_multiplier > 0) {
+            if (this->has_wipe_tower() && warning_key.empty() && m_config.flush_multiplier > 0) {
                 const auto flush_multiplier = m_config.flush_multiplier;
                 bool is_cx_vendor = getCrealityCFS();
                 float mini_flush_multiplier = is_cx_vendor ? 1.3 : 1.0;
@@ -1454,8 +1509,8 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                 warning->opt_key = warning_key;
             }
             // check jerk
-             //todo 临时设置不检查
-            /*
+           
+            
             if (m_default_object_config.default_jerk == 1 || m_default_object_config.outer_wall_jerk == 1 ||
                 m_default_object_config.inner_wall_jerk == 1) {
                warning->string = L("Setting the jerk speed too low could lead to artifacts on curved surfaces");
@@ -1484,10 +1539,10 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                     warning->opt_key = warning_key;
                }
             }
-            */
+            
             // check acceleration
-            // todo 临时设置不检查
-            /*
+       
+            
             const auto max_accel = m_config.machine_max_acceleration_extruding.values[0];
             if (warning_key.empty() && m_default_object_config.default_acceleration > 0 && max_accel > 0) {
                const bool support_travel_acc = (m_config.gcode_flavor == gcfRepetier || m_config.gcode_flavor == gcfMarlinFirmware ||
@@ -1545,7 +1600,7 @@ StringObjectException Print::validate(StringObjectException *warning, Polygons* 
                     }
                }
             }
-            */
+            
             // check speed
             // Orca: disable the speed check for now as we don't cap the speed
             // if (warning_key.empty()) {
@@ -1803,9 +1858,18 @@ std::map<ObjectID, unsigned int> getObjectExtruderMap(const Print& print) {
     return objectExtruderMap;
 }
 
+// PreSlice for select is need support
+
+bool Print::PreSliceForDetermineSupport(long long* time_cost_with_cache, bool use_cache) {
+
+    return false;
+}
+
 // Slicing process, running at a background thread.
 void Print::process(long long *time_cost_with_cache, bool use_cache)
 {
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start memory info " << log_memory_info();
+    DEFINE_PERFORMANCE_TEST("Slicing & G-code generation");
     long long start_time = 0, end_time = 0;
     if (time_cost_with_cache)
         *time_cost_with_cache = 0;
@@ -1813,7 +1877,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
     name_tbb_thread_pool_threads_set_locale();
 
     //compute the PrintObject with the same geometries
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": this=%1%, enter, use_cache=%2%, object size=%3%")%this%use_cache%m_objects.size();
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(": this=%1%, enter, use_cache=%2%, object size=%3%")%this%use_cache%m_objects.size();
     if (m_objects.empty())
         return;
 
@@ -1912,8 +1976,8 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
         }
     }
 
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": total object counts %1% in current print, need to slice %2%")%m_objects.size()%need_slicing_objects.size();
-    BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(": total object counts %1% in current print, need to slice %2%")%m_objects.size()%need_slicing_objects.size();
+    BOOST_LOG_TRIVIAL(error) << "Starting the slicing process." << log_memory_info();
     if (!use_cache) {
         for (PrintObject *obj : m_objects) {
             if (need_slicing_objects.count(obj) != 0) {
@@ -1956,6 +2020,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
             }
         }
 
+        BOOST_LOG_TRIVIAL(error) << "generate_support_material " << " start memory info " << log_memory_info();
         tbb::parallel_for(tbb::blocked_range<int>(0, int(m_objects.size())),
             [this, need_slicing_objects](const tbb::blocked_range<int>& range) {
                 for (int i = range.begin(); i < range.end(); i++) {
@@ -1970,6 +2035,9 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
                 }
             }
         );
+        BOOST_LOG_TRIVIAL(error) << "generate_support_material "
+                                 << " end memory info " << log_memory_info();
+
 
         for (PrintObject* obj : m_objects) {
             if (need_slicing_objects.count(obj) != 0) {
@@ -2144,7 +2212,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
         }
     }
     // TODO adaptive layer height won't work with conflict checker because m_fake_wipe_tower's path is generated using fixed layer height
-    if(!m_no_check && !has_adaptive_layer_height)
+    if(!m_no_check /*&& !has_adaptive_layer_height*/)
     {
         using Clock                 = std::chrono::high_resolution_clock;
         auto            startTime   = Clock::now();
@@ -2165,6 +2233,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
     }
 
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end memory info " << log_memory_info();
 }
 
 // G-code export process, running at a background thread.
@@ -2175,6 +2244,8 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
 {
     // output everything to a G-code file
     // The following call may die if the filename_format template substitution fails.
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start ";
+
     std::string path = this->output_filepath(path_template);
     std::string message;
     if (!path.empty() && result == nullptr) {
@@ -2184,6 +2255,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
         message += path;
     } else
         message = L("Generating G-code");
+    //DEFINE_PERFORMANCE_TEST("Generating G-code 80%");
     this->set_status(80, message);
 
     // The following line may die for multiple reasons.
@@ -2193,8 +2265,41 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     gcode.set_gcode_offset(origin(0), origin(1));
     gcode.do_export(this, path.c_str(), result, thumbnail_cb);
 
+#if AUTOMATION_TOOL
+    if (AutomationMgr::enabled()) {
+
+        // 导出confi配置到指定目录
+        std::string full_config;
+        GCode::append_full_config(*this, full_config);
+        std::string fileDir = Slic3r::data_dir() + "/automation/config/";
+        if (!fs::exists(fileDir)) {
+            fs::create_directories(fileDir);
+        }
+        std::string   fileName               = AutomationMgr::getFileName();
+        std::string   uniqueFilename         = AutomationMgr::generateUniqueFilename(fileDir, fileName, ".config");
+        std::string   automation_config_path = fileDir + uniqueFilename;
+        std::ofstream logFile(automation_config_path, std::ios::app);
+        logFile << full_config << std::endl;
+        logFile.close();
+
+        // 导出gcode到指定目录
+        std::string automation_path = Slic3r::data_dir() + "/automation/gcode";
+
+        if (!fs::exists(automation_path)) {
+            fs::create_directories(automation_path);
+        }
+        std::string filename      = AutomationMgr::getFileName();
+        std::string gcodeFilename = AutomationMgr::generateUniqueFilename(automation_path, filename, ".gcode");
+        std::string gcodePath     = automation_path + "/" + gcodeFilename;
+        gcode.do_export(this, gcodePath.c_str(), result, thumbnail_cb);
+    }
+
+#endif
+
+
     //BBS
     result->conflict_result = m_conflict_result;
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end";
 
     return path.c_str();
 }
@@ -2284,6 +2389,7 @@ void Print::_make_skirt()
                 break;
             layer->support_fills.collect_points(object_points);
         }
+        
 
         object_convex_hulls.insert({ object, Slic3r::Geometry::convex_hull(object_points) });
 
@@ -2384,7 +2490,8 @@ void Print::_make_skirt()
                 // The skirt lenght is not limited, extrude the skirt with the 1st extruder only.
             }
         }
-    } else {
+    }
+    else {
         m_skirt.clear();
     }
     // Brims were generated inside out, reverse to print the outmost contour first.
@@ -2398,21 +2505,31 @@ void Print::_make_skirt()
         // BBS
         for (auto obj_cvx_hull : object_convex_hulls) {
             double       object_skirt_distance = float(scale_(m_config.skirt_distance.value - spacing / 2.));
+            
+            //double       object_skirt_distance = scale_(1.0);
             PrintObject* object                = obj_cvx_hull.first;
+            if (has_skirt() && !(config().draft_shield != dsDisabled)) {
+                object_skirt_distance += scale_(object->config().brim_width.value);
+            }
+
+
             object->m_skirt.clear();
             extruded_length.assign(extruded_length.size(), 0.);
             for (size_t i = m_config.skirt_loops.value, extruder_idx = 0; i > 0; --i) {
                 object_skirt_distance += float(scale_(spacing));
+
+                  
                 Polygon loop;
-                {
+                //{
                     // BBS. skirt_distance is defined as the gap between skirt and outer most brim, so no need to add max_brim_width
                     Polygons loops = offset(obj_cvx_hull.second, object_skirt_distance, ClipperLib::jtRound, float(scale_(0.1)));
                     Geometry::simplify_polygons(loops, scale_(0.05), &loops);
                     if (loops.empty())
                         break;
                     loop = loops.front();
-                }
-
+                //}
+               
+                
                 // Extrude the skirt loop.
                 ExtrusionLoop eloop(elrSkirt);
                 eloop.paths.emplace_back(
@@ -2520,9 +2637,15 @@ void Print::finalize_first_layer_convex_hull()
 // Wipe tower support.
 bool Print::has_wipe_tower() const
 {
-    if (m_config.enable_prime_tower.value == true) {
+    if (m_config.enable_prime_tower.value == true)
+    {
         if (enable_timelapse_print())
             return true;
+
+        // Creality: check extruder num > 1
+        const std::vector<unsigned int>& extruders = object_used_extruders();
+        if (extruders.size() <= 1)
+            return false;
 
         return !m_config.spiral_mode.value && m_config.filament_diameter.values.size() > 1;
     }
@@ -2785,12 +2908,12 @@ void Print::_make_wipe_tower()
                     }
                 }
                 layer_tools.wiping_extrusions().ensure_perimeters_infills_order(*this);
-                //// if enable timelapse, slice all layer
-                //if (enable_timelapse_print()) {
-                //    if (layer_tools.wipe_tower_partitions == 0)
-                //        wipe_tower.set_last_layer_extruder_fill(false);
-                //    continue;
-                //}
+                // if enable timelapse, slice all layer
+                if (enable_timelapse_print()) {
+                    if (layer_tools.wipe_tower_partitions == 0)
+                        wipe_tower.set_last_layer_extruder_fill(false);
+                    continue;
+                }
                 if (&layer_tools == &m_wipe_tower_data.tool_ordering.back() || (&layer_tools + 1)->wipe_tower_partitions == 0)
                     break;
             }
@@ -3086,6 +3209,10 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
  // Returns scaling for each axis representing shrinkage compensations in each axis.
 Vec3d Print::shrinkage_compensation() const
 {
+#ifdef CLOUD_SKIP_MESHBOOLEAN
+    return Vec3d::Ones();
+#else
+
     if (!this->has_same_shrinkage_compensations())
         return Vec3d::Ones();
 
@@ -3098,6 +3225,7 @@ Vec3d Print::shrinkage_compensation() const
     const double z_compensation  = 100.0 / z_shrinkage_percent;
 
     return { xy_compensation, xy_compensation, z_compensation };
+#endif
 }
 
 const std::string PrintStatistics::FilamentUsedG     = "filament used [g]";

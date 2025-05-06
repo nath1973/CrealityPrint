@@ -2947,7 +2947,7 @@ namespace IMGUIZMO_NAMESPACE
                 int         vtx_write_start = drawList->VtxBuffer.Size;
                 const auto label       = gContext.mStyle.FaceLabels[iFace];
                 auto    labelOrigin = ImGui::CalcTextSize(label)/2;
-                float scale = labelOrigin.x>10?2:4;
+                float scale = labelOrigin.x>8?2:4;
                 float   scaleFactor = scale / size.y;
                 static int s_map[6] = {4,10,12,22,16,14};
                 auto tcolor = GetColorU32(TEXT);

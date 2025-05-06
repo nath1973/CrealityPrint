@@ -532,6 +532,7 @@ private:
     mutable GLToolbar m_separator_toolbar;
     mutable IMToolbar m_sel_plate_toolbar;
     mutable GLToolbar m_assemble_view_toolbar;
+    mutable GLToolbar m_assemble_view_internal_toolbar;
     mutable IMReturnToolbar m_return_toolbar;
     mutable float m_paint_toolbar_width;
 
@@ -990,6 +991,7 @@ public:
     void do_center_plate(const int plate_idx);
     void do_mirror(const std::string& snapshot_type);
 
+    void on_object_list_selected();
     void update_gizmos_on_off_state();
     void reset_all_gizmos() { m_gizmos.reset_all_states(); }
 

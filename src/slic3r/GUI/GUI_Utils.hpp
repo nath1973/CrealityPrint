@@ -7,6 +7,7 @@
 #include <functional>
 #ifdef _WIN32
 #include "libslic3r/UnittestFlow.hpp"
+#include "libslic3r/AutomationMgr.hpp"
 #endif
 #include <boost/optional.hpp>
 
@@ -26,7 +27,11 @@
 #include "../libslic3r/libslic3r_version.h"
 #include "../libslic3r/Utils.hpp"
 #include "libslic3r/Color.hpp"
-
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
+#include <boost/thread.hpp>
+#include <boost/asio/ssl.hpp>
+using boost::asio::ip::tcp;
 class wxCheckBox;
 class wxTopLevelWindow;
 class wxRect;
@@ -126,7 +131,14 @@ public:
         // Linux specific issue : get_dpi_for_window(this) still doesn't responce to the Display's scale in new wxWidgets(3.1.3).
         // So, calculate the m_em_unit value from the font size, as before
 #if !defined(__WXGTK__)
-        m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
+#ifdef _WIN32
+        const double font_to_em_koef = 10. / 9.;// Default font point size on Windows is 9 pt
+#else // ifdef __WXOSX__
+        const double font_to_em_koef = 10. / 11.;// Default font point size on OSX is 11 pt
+#endif
+        m_em_unit_from_font_size = int(font_to_em_koef * m_normal_font.GetPointSize());
+        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
+        //m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
 #else
         // initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
         m_em_unit = std::max<size_t>(10, this->GetTextExtent("m").x - 1);
@@ -228,6 +240,13 @@ public:
         if (BLCompareTestFlow::enabled()){
             return 0;
         }
+#if AUTOMATION_TOOL
+        // ����һЩӰ��ʱ��������������������̣��Զ������Բ���Ҫ�����Ի���
+        if (AutomationMgr::enabled()) {
+            return 0;
+        }
+#endif // AUTOMATION_TOOL
+ 
 #endif
         dialogStack.push_front(this);
         int r = wxDialog::ShowModal();
@@ -242,6 +261,7 @@ protected:
 private:
     float m_scale_factor;
     int m_em_unit;
+    int m_em_unit_from_font_size{ 10 };
 //    int m_font_size;
 
     wxFont m_normal_font;
@@ -299,7 +319,8 @@ private:
         m_normal_font = this->GetFont();
 
         // update em_unit value for new window font
-        m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
+        //m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
+        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
 
         // rescale missed controls sizes and images
         on_dpi_changed(suggested_rect);
@@ -498,7 +519,7 @@ public:
 bool load_image(const std::string& filename, wxImage &image);
 bool generate_image(const std::string &filename, wxImage &image, wxSize img_size, int method = GERNERATE_IMAGE_RESIZE);
 int get_dpi_for_window(const wxWindow *window);
-
+bool download_file(const std::string& server, const std::string& path, const std::string& filename);
 
 }}
 

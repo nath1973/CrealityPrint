@@ -700,9 +700,9 @@ void Preset::set_user_presets_from_appconfig(const AppConfig& app_config)
         //const std::string &model = config.opt_string("printer_model");
         //if (model.empty())
         //	return;
-         //m_is_user_presets = app_config.get_userPresets(model);
+         //m_is_user_printer_hidden = app_config.get_userPresets(model);
         if(this->name.empty()) return ;
-         m_is_user_presets = app_config.get_userPresets(this->name);
+         m_is_user_printer_hidden = app_config.get_userPresets(this->name);
 
     } 
 }
@@ -821,17 +821,17 @@ static std::vector<std::string> s_Preset_print_options {
     "max_travel_detour_distance","overhang_optimization",
     "fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_distance", "fuzzy_skin_first_layer",
     "max_volumetric_extrusion_rate_slope", "max_volumetric_extrusion_rate_slope_segment_length",
-    "acceleration_limit_mess_enable", "acceleration_limit_mess", "speed_limit_to_height_enable", "speed_limit_to_height","material_flow_dependent_temperature","material_flow_temp_graph",
+    "acceleration_limit_mess_enable", "acceleration_limit_mess", "speed_limit_to_height_enable", "speed_limit_to_height",
     "inner_wall_speed", "outer_wall_speed", "sparse_infill_speed", "internal_solid_infill_speed",
-    "top_surface_speed", "support_speed", "support_object_xy_distance", "support_interface_speed",
+    "top_surface_speed", "support_speed", "support_object_xy_distance", "support_object_first_layer_gap", "support_interface_speed",
     "bridge_speed", "internal_bridge_speed", "gap_infill_speed", "travel_speed", "travel_speed_z", "initial_layer_speed",
     "outer_wall_acceleration", "initial_layer_acceleration", "top_surface_acceleration", "default_acceleration","skirt_type", "skirt_loops", "skirt_speed","min_skirt_length", "skirt_distance", "skirt_height", "draft_shield",
     "brim_width", "brim_object_gap", "brim_type", "brim_ears_max_angle", "brim_ears_detection_length", "enable_support", "support_type", "support_threshold_angle", "enforce_support_layers",
     "raft_layers", "raft_first_layer_density", "raft_first_layer_expansion", "raft_contact_distance", "raft_expansion",
-    "support_base_pattern", "support_base_pattern_spacing", "support_expansion", "support_style",
+    "support_base_pattern", "support_base_pattern_tree","support_base_pattern_spacing", "support_expansion", "support_style",
     "independent_support_layer_height","ironing_support_layer","tree_hybrid_cross_height",
     "support_angle", "support_interface_top_layers", "support_interface_bottom_layers",
-    "support_interface_pattern", "support_interface_spacing", "support_interface_loop_pattern",
+    "support_interface_pattern", "support_interface_spacing", "support_interface_loop_pattern","support_interface_min_area",
     "support_top_z_distance", "support_on_build_plate_only","support_critical_regions_only", "bridge_no_support", "thick_bridges", "thick_internal_bridges","dont_filter_internal_bridges", "max_bridge_length", "print_sequence", "print_order", "support_remove_small_overhang",
     "filename_format", "wall_filament", "support_bottom_z_distance","minimum_support_area","support_xy_overrides_z",
     "sparse_infill_filament", "solid_infill_filament", "support_filament", "support_interface_filament","support_interface_not_for_body",
@@ -842,7 +842,7 @@ static std::vector<std::string> s_Preset_print_options {
     "prime_tower_width", "prime_tower_brim_width", "prime_volume", "prime_tower_enhance_type", 
     "wipe_tower_no_sparse_layers", "compatible_printers", "compatible_printers_condition", "inherits",
     "flush_into_infill", "flush_into_objects", "flush_into_support",
-     "tree_support_branch_angle", "tree_support_angle_slow", "tree_support_wall_count", "tree_support_top_rate", "tree_support_branch_distance", "tree_support_tip_diameter",
+     "tree_support_branch_angle", "tree_support_angle_slow", "tree_support_wall_count", "tree_support_wall_count_tree", "tree_support_top_rate", "tree_support_branch_distance", "tree_support_tip_diameter",
      "tree_support_branch_diameter", "tree_support_branch_diameter_angle", "tree_support_branch_diameter_double_wall",
      "detect_narrow_internal_solid_infill",
      "gcode_add_line_number", "enable_arc_fitting","arc_tolerance", "precise_z_height", "infill_combination", /*"adaptive_layer_height",*/
@@ -917,6 +917,8 @@ static std::vector<std::string> s_Preset_printer_options {
     "nozzle_height",
     "default_print_profile", "inherits",
     "silent_mode","curr_bed_type",
+    // Creality
+    "color_bed_exclude_area",
     // BBS
     "scan_first_layer", "machine_load_filament_time", "machine_unload_filament_time", "machine_tool_change_time","time_cost", "machine_pause_gcode", "template_custom_gcode",
     "nozzle_type", "nozzle_hrc","auxiliary_fan", "nozzle_volume","upward_compatible_machine", "z_hop_types","travel_slope", "retract_lift_enforce","support_chamber_temp_control","support_air_filtration","printer_structure",
@@ -931,7 +933,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "cooling_tube_retraction",
     "cooling_tube_length", "high_current_on_filament_swap", "parking_pos_retraction", "extra_loading_move", "purge_in_prime_tower", "enable_filament_ramming",
     "z_offset",
-    "disable_m73", "preferred_orientation", "emit_machine_limits_to_gcode", "pellet_modded_printer", "support_multi_bed_types","bed_mesh_min","bed_mesh_max","bed_mesh_probe_distance", "adaptive_bed_mesh_margin", "enable_long_retraction_when_cut","long_retractions_when_cut","retraction_distances_when_cut"
+    "disable_m73", "preferred_orientation", "emit_machine_limits_to_gcode", "pellet_modded_printer", "support_multi_bed_types","bed_mesh_min","bed_mesh_max","bed_mesh_probe_distance", "adaptive_bed_mesh_margin", "enable_long_retraction_when_cut","long_retractions_when_cut","retraction_distances_when_cut","creality_flush_time"
     };
 
 static std::vector<std::string> s_Preset_sla_print_options {
@@ -1231,7 +1233,7 @@ void PresetCollection::load_presets(
                     }
                     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " load preset: " << name << " and filament_id: " << preset.filament_id
                                             << " and base_id: " << preset.base_id;
-                    if (preset.type == Preset::Type::TYPE_PRINTER && preset.inherits().empty() && preset.m_is_user_presets) {
+                    if (preset.type == Preset::Type::TYPE_PRINTER && preset.inherits().empty() && preset.m_is_user_printer_hidden) {
                         if (config.has("printable_area")) {
                             if (dynamic_cast<const ConfigOptionPoints*>(config.option("printable_area"))->values.size() != 4) {
                                 config.erase("printable_area");
@@ -2440,7 +2442,6 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
         else if (m_type == Preset::TYPE_PRINTER)
             preset.config.option<ConfigOptionString>("printer_settings_id", true)->value = new_name;
         final_inherits = preset.inherits();
-        unlock();
         // TODO: apply change from custom root to devided presets.
         if (preset.inherits().empty()) {
             for (auto &preset2 : m_presets)
@@ -2490,7 +2491,6 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
             preset.config.option<ConfigOptionString>("printer_settings_id", true)->value = new_name;
         //BBS: add lock logic for sync preset in background
         final_inherits = inherits;
-        unlock();
     }
     // 2) Activate the saved preset.
     this->select_preset_by_name(new_name, true);
@@ -2508,6 +2508,7 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
         this->get_selected_preset().save(&(parent_preset->config));
     else
         this->get_selected_preset().save(nullptr);
+    unlock();
 }
 
 bool PresetCollection::delete_current_preset()
@@ -2859,7 +2860,7 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
 
 static constexpr const std::initializer_list<const char*> optional_keys { "compatible_prints", "compatible_printers" };
 //BBS: skip these keys for dirty check
-static std::set<std::string> skipped_in_dirty = {"printer_settings_id", "print_settings_id", "filament_settings_id"};
+static std::set<std::string> skipped_in_dirty = {"printer_settings_id", "print_settings_id", "filament_settings_id", "inherits", "curr_bed_type"};
 
 bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
 {

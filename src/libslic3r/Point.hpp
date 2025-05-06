@@ -15,8 +15,12 @@
 // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
 using coord_t = int32_t;
 #else
+#ifdef CLOUD_SKIP_MESHBOOLEAN1
+using coord_t = int32_t;
+#else
 //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
 using coord_t = int64_t;
+#endif
 #endif
 
 using coordf_t = double;
@@ -105,6 +109,9 @@ inline typename Derived::Scalar cross2(const Eigen::MatrixBase<Derived> &v1, con
     static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value, "cross2(): Scalar types of 1st and 2nd operand must be equal.");
     return v1.x() * v2.y() - v1.y() * v2.x();
 }
+
+template<typename T, int Options>
+inline Eigen::Matrix<T, 2, 1, Eigen::DontAlign> perp(const Eigen::MatrixBase<Eigen::Matrix<T, 2, 1, Options>> &v) { return Eigen::Matrix<T, 2, 1, Eigen::DontAlign>(- v.y(), v.x()); }
 
 // 2D vector perpendicular to the argument.
 template<typename Derived>
@@ -272,6 +279,8 @@ inline bool is_approx(const Point &p1, const Point &p2, coord_t epsilon = coord_
 	Point d = (p2 - p1).cwiseAbs();
 	return d.x() < epsilon && d.y() < epsilon;
 }
+
+inline Point turn90_ccw(const Point pt) { return Point(-pt(1), pt(0)); }
 
 inline bool is_approx(const Vec2f &p1, const Vec2f &p2, float epsilon = float(EPSILON))
 {

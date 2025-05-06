@@ -1174,7 +1174,8 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
         GLint max_tex_size = OpenGLManager::get_gl_info().get_max_tex_size();
         max_size_px = (max_tex_size < 2048) ? max_tex_size : 2048;
     }
-    const float scale = (float)max_size_px / std::max(image->width, image->height);
+    //float view_scale = wxGetApp().em_unit() / 10.0f;
+    const float scale = wxGetApp().em_unit() / 10.0f;
     m_width = (int)(scale * image->width);
     m_height = (int)(scale * image->height);
 

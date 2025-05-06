@@ -283,24 +283,36 @@ const std::string& custom_gcodes_dir()
 Slic3r::I18N::translate_fn_type Slic3r::I18N::translate_fn = nullptr;
 static std::string g_data_dir;
 
-void set_data_dir(const std::string &dir)
+void set_data_dir(const std::string &dir, bool use_directly)
 {
-	//A.0
-	std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
-    if(dir.empty())
-    {
-        g_data_dir = dir;
-    }
-    else
-    {
-        if (!dir.empty() && !boost::filesystem::exists(dir)) {
-            boost::filesystem::create_directories(dir);
+	if(use_directly)
+	{
+		g_data_dir = dir;
+	}else{
+		//A.0
+		std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
+		std::string version = std::string(PROJECT_VERSION_EXTRA);
+	    bool  is_alpha = boost::algorithm::icontains(version, "alpha");
+	   if (is_alpha) {
+	 	version_dir = version_dir + std::string(" Alpha");
+	   }
+
+		if(dir.empty())
+		{
+			g_data_dir = dir;
+		}
+		else
+		{
+            if (!dir.empty() && !boost::filesystem::exists(dir)) {
+                boost::filesystem::create_directories(dir);
+            }
+			#ifdef _WIN32
+            g_data_dir = dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir;
+			#else
+            g_data_dir = dir + "/" + SLIC3R_APP_USE_FORDER + "/" + version_dir;
+			#endif
+            //g_data_dir = dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir;
         }
-#ifdef _WIN32
-        g_data_dir = dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir;
-#else
-		g_data_dir = dir + "/" + SLIC3R_APP_USE_FORDER + "/" + version_dir;
-#endif
     }
 
     if (!g_data_dir.empty() && !boost::filesystem::exists(g_data_dir)) {
@@ -1582,6 +1594,41 @@ void load_string_file(const boost::filesystem::path& p, std::string& str)
     std::size_t sz = static_cast<std::size_t>(boost::filesystem::file_size(p));
     str.resize(sz, '\0');
     file.read(&str[0], sz);
+}
+
+std::string trim(const std::string& s) 
+{
+    size_t first = s.find_first_not_of(" \t\n\r");
+    if (first == std::string::npos) return "";
+    size_t last = s.find_last_not_of(" \t\n\r");
+    return s.substr(first, (last - first + 1));
+}
+
+std::string toLower(const std::string& s) 
+{
+    std::string result;
+    for (unsigned char c : s) {
+        result += tolower(c);
+    }
+    return result;
+}
+
+bool isEqualAfterProcessing(const std::string& a, const std::string& b) {
+    std::string s1 = toLower(trim(a));
+    std::string s2 = toLower(trim(b));
+    return s1 == s2;
+}
+
+void stringReplace(std::string& strBase, const std::string strSrc, const std::string strDes)
+{
+    std::string::size_type pos    = 0;
+    std::string::size_type srcLen = strSrc.size();
+    std::string::size_type desLen = strDes.size();
+    pos                      = strBase.find(strSrc, pos);
+    while ((pos != std::string::npos)) {
+        strBase.replace(pos, srcLen, strDes);
+        pos = strBase.find(strSrc, (pos + desLen));
+    }
 }
 
 }; // namespace Slic3r

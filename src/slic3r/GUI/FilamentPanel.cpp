@@ -18,11 +18,11 @@
 #include "MainFrame.hpp"
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "MainFrame.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
 #include "slic3r/GUI/print_manage/PrinterBoxFilamentPanel.hpp"
 #include <cstdint> 
+#include "print_manage/data/DataCenter.hpp"
+#include "LoginTip.hpp"
 
 
 static bool ShouldDark(const wxColour& bgColor)
@@ -180,6 +180,21 @@ void FilamentButton::eraseEvent(wxEraseEvent& evt)
 #endif
 }
 
+void FilamentButton::update_child_button_size()
+{
+    wxSize size = GetSize();
+    int childButtonWidth = size.GetWidth() / 2;
+    int childButtonHeight = size.GetHeight() * 5 / 6;
+    int childButtonX = size.GetWidth() / 2;
+    int childButtonY = (size.GetHeight() - childButtonHeight) / 2;
+
+    m_child_button->SetSize(wxSize(childButtonWidth, childButtonHeight));
+    m_child_button->SetPosition(wxPoint(childButtonX, childButtonY));
+
+    m_bitmap = create_scaled_bitmap("switch_cfs_tip", this, 16);
+    Refresh();      // 强制重绘
+}
+
 void FilamentButton::OnChildButtonClick(wxMouseEvent& event)
 {
     // Trigger the BoxColorPopPanel popup
@@ -218,7 +233,7 @@ void FilamentButton::OnChildButtonPaint(wxPaintEvent& event)
     wxColour bgColour = m_child_button->GetBackgroundColour();
 
     // Left half background color
-    wxRect leftRect(FromDIP(1), FromDIP(1), size.GetWidth() / 2, size.GetHeight() - FromDIP(2));
+    wxRect leftRect(1, 1, size.GetWidth() / 2, size.GetHeight() - 2);
     if (m_bReseted)
         dc.SetBrush(wxBrush(m_resetedColour));
     else
@@ -243,13 +258,16 @@ void FilamentButton::OnChildButtonPaint(wxPaintEvent& event)
 
     // Right half with bitmap
     wxRect rightRect(size.GetWidth() / 2, 0, size.GetWidth() / 2, size.GetHeight());
-    wxRect rightRect2(size.GetWidth() / 2, FromDIP(1), size.GetWidth() / 2, size.GetHeight() - FromDIP(2));
+    wxRect rightRect2(size.GetWidth() / 2, 1, size.GetWidth() / 2, size.GetHeight() - 2);
     if (m_bReseted)
         dc.SetBrush(wxBrush(m_resetedColour));
     else
         dc.SetBrush(wxBrush(m_back_color));
     dc.SetPen(*wxTRANSPARENT_PEN);
+
+    // draw the rightRect2 because when add a new filament, the right haft background color would be grey
     dc.DrawRectangle(rightRect2);
+
     if (m_bitmap.IsOk()) {
         int imgWidth = rightRect.GetWidth();
         int imgHeight = rightRect.GetHeight();
@@ -362,7 +380,11 @@ void FilamentButton::doRender(wxDC& dc)
 	if (!m_label.IsEmpty()) {
         int width, height;
         wxFont basic_font = dc.GetFont();
-        basic_font.SetPointSize(10);
+    #ifdef TARGET_OS_MAC
+         basic_font.SetPointSize(FromDIP(10));
+    #else
+        basic_font.SetPointSize(8);
+    #endif
         dc.SetFont(basic_font);
 
         dc.GetTextExtent(m_label, &width, &height);
@@ -376,7 +398,7 @@ void FilamentButton::doRender(wxDC& dc)
         int y = (panelHeight - height) / 2;
 
 		if (m_dark_img.bmp().IsOk() && m_light_img.bmp().IsOk()) {
-            x = (panelWidth - FromDIP(6) - width) / 2;
+            x = (panelWidth - 6 - width) / 2;
 		}
 
         dc.SetTextForeground(GetTextColorBasedOnBackground(m_back_color));
@@ -384,7 +406,7 @@ void FilamentButton::doRender(wxDC& dc)
     }
 
 	if (m_dark_img.bmp().IsOk() && m_light_img.bmp().IsOk()) {
-        int x = size.GetWidth() - FromDIP(10);
+        int x = size.GetWidth() - 10;
         int y = size.GetHeight() / 2 - 2;
 
 		if (!m_label.IsEmpty())
@@ -408,6 +430,7 @@ void FilamentButton::doRender(wxDC& dc)
 /*
 * FilamentPopPanel
 */
+
  FilamentPopPanel::FilamentPopPanel(wxWindow* parent, int index)
 	: PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS)
 {
@@ -420,28 +443,38 @@ void FilamentButton::doRender(wxDC& dc)
 	this->SetBackgroundColour(m_bg_color);
 
 	this->SetSize(wxSize(400 * em, 28 * em));
+    
+   #ifdef __APPLE__
+    Bind(wxEVT_LEAVE_WINDOW, &FilamentPopPanel::OnMouseLeave, this);
+   #endif
+
 	m_sizer_main = new wxBoxSizer(wxHORIZONTAL);
 	{
         m_filamentCombox = new Slic3r::GUI::PlaterPresetComboBox(this, Slic3r::Preset::TYPE_FILAMENT);
         m_filamentCombox->GetDropDown().setDrapDownGap(0);
         m_filamentCombox->set_filament_idx(index);
+        //m_filamentCombox->SetMaxSize(wxSize(FromDIP(200), -1));
         m_filamentCombox->update();
         m_filamentCombox->clr_picker->Hide();
         m_filamentCombox->setSelectedItemCb([&](int selectedItem) -> void { 
             if (m_pFilamentItem != nullptr) {
                 m_pFilamentItem->resetCFS(true);
                 }
-            
             });
-
+#ifdef __APPLE__
+        m_filamentCombox->Bind(wxEVT_COMBOBOX_CLOSEUP, [this](wxCommandEvent& event) {
+            this->Dismiss();
+            event.Skip();
+        });
+#endif
 		// filament combox
-		wxSizerItem* item = m_sizer_main->Add(m_filamentCombox, wxSizerFlags().Border(wxUP | wxDOWN | wxLEFT, 1));
+        wxSizerItem* item = m_sizer_main->Add(m_filamentCombox, 1, wxUP | wxDOWN | wxRIGHT, 1);
         item->SetProportion(wxEXPAND);
         bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
 
 		//
 		{
-            wxPanel* box = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(80, this->GetSize().GetHeight() - 2));
+            wxPanel* box = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);
             box->SetBackgroundColour(wxColour(255, 255, 255));
             wxBoxSizer*sz = new wxBoxSizer(wxHORIZONTAL);
 			box->SetSizer(sz);
@@ -449,37 +482,93 @@ void FilamentButton::doRender(wxDC& dc)
             m_img_extruderTemp = new ScalableButton(box, wxID_ANY, is_dark ? "extruderTemp" : "extruderTemp_black", wxEmptyString, wxDefaultSize,
                                                                   wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER, false, 12);
             m_img_extruderTemp->SetBackgroundColour(wxColour(255, 255, 255));
-            wxSizerItem* item1 = sz->Add(m_img_extruderTemp, wxSizerFlags().Border(wxRIGHT | wxLEFT, 5).Border(wxLEFT, 10));
-            item1->SetProportion(wxEXPAND);
+            sz->Add(m_img_extruderTemp, 0, wxLEFT | wxRIGHT, FromDIP(5));
 
-            m_lb_extruderTemp = new Label(box, Label::Body_13, wxString(""));
-            m_lb_extruderTemp->SetBackgroundColour(wxColour(255, 255, 255));
-            wxSizerItem* item = sz->Add(m_lb_extruderTemp, wxSizerFlags().Border(wxRIGHT | wxLEFT, 5).Border(wxRIGHT, 10));
-            item->SetFlag(wxALIGN_CENTER_VERTICAL);
-            item->SetProportion(wxEXPAND);
+            m_lb_extruderTemp = new Label(box, Label::Body_13, wxString::FromUTF8(""));
+            //m_lb_extruderTemp->setLeftMargin(FromDIP(1));
+            m_lb_extruderTemp->SetBackgroundColour(wxColour(255, 255, 255)); // 确保背景颜色与文本颜色不同
+            m_lb_extruderTemp->SetForegroundColour(wxColour(0, 0, 0));       // 设置文本颜色为黑色
+            m_lb_extruderTemp->SetMinSize(wxSize(FromDIP(30), -1));
+            //m_lb_extruderTemp->Enable(false);
 
-            m_sizer_main->Add(box, wxSizerFlags().Border(wxUP | wxDOWN | wxLEFT, 1));
+            Label* exTemp = new Label(box, Label::Body_13, wxString::FromUTF8("°C"));
+            //exTemp->SetMinSize(wxSize(FromDIP(10), -1));
+
+            sz->Add(m_lb_extruderTemp, 0, wxALIGN_CENTER_VERTICAL);
+            sz->Add(exTemp, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, FromDIP(5));
+
+            m_sizer_main->Add(box, 1, wxEXPAND | wxRIGHT | wxUP | wxDOWN, 1);
+
+            m_lb_extruderTemp->Bind(wxEVT_TEXT_ENTER, [](wxCommandEvent& event) {
+                wxString newText   = event.GetString();
+                // 在这里处理文本内容修改的逻辑
+                Tab*                        tab = wxGetApp().get_tab(Slic3r::Preset::TYPE_FILAMENT);
+                Slic3r::DynamicPrintConfig* cfg = &Slic3r::GUI::wxGetApp().preset_bundle->project_config;
+                // auto                        colors = static_cast<Slic3r::ConfigOptionStrings*>(cfg->option("filament_vendor")->clone());
+                if (tab) {
+                    PageShp strength_page = tab->get_page(L("Filament"));
+                    if (strength_page) {
+                        ConfigOptionsGroupShp optgroup = strength_page->get_optgroup(L("Print temperature"));
+                        if (optgroup) {
+                            optgroup->on_change_OG("nozzle_temperature", wxAtoi(newText));
+                        }
+                    }
+                }
+            });
 		}
         
 		//
 		{
-            wxPanel* box = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(80, this->GetSize().GetHeight() - 2));
+            wxPanel* box = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);
             box->SetBackgroundColour(wxColour(255, 255, 255));
             wxBoxSizer* sz = new wxBoxSizer(wxHORIZONTAL);
             box->SetSizer(sz);
 
             m_img_bedTemp = new ScalableButton(box, wxID_ANY, is_dark ? "bedTemp" :"bedTemp_black", wxEmptyString, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER, false, 12);
             m_img_bedTemp->SetBackgroundColour(wxColour(255, 255, 255));
-            wxSizerItem* item1 = sz->Add(m_img_bedTemp, wxSizerFlags().Border(wxRIGHT | wxLEFT, 5).Border(wxLEFT, 10));
-            item1->SetProportion(wxEXPAND);
+            sz->Add(m_img_bedTemp, 0, wxLEFT | wxRIGHT, FromDIP(5));
 
-            m_lb_bedTemp = new Label(box, Label::Body_13, wxString(""));
+            m_lb_bedTemp = new Label(box, Label::Body_13, wxString::FromUTF8(""));
+            //m_lb_bedTemp->setLeftMargin(FromDIP(1));
             m_lb_bedTemp->SetBackgroundColour(wxColour(255, 255, 255));
-            wxSizerItem* item = sz->Add(m_lb_bedTemp, wxSizerFlags().Border(wxRIGHT | wxLEFT, 5).Border(wxRIGHT, 10));
-            item->SetFlag(wxALIGN_CENTER_VERTICAL);
-            item->SetProportion(wxEXPAND);
+            m_lb_bedTemp->SetForegroundColour(wxColour(0, 0, 0));
+            m_lb_bedTemp->SetMinSize(wxSize(FromDIP(30), -1));
 
-			m_sizer_main->Add(box, wxSizerFlags().Border(wxUP | wxDOWN | wxLEFT, 1));
+            Label* bedLabel = new Label(box, Label::Body_13, wxString::FromUTF8("°C"));
+            //bedLabel->SetMinSize(wxSize(FromDIP(20), -1));
+
+            sz->Add(m_lb_bedTemp, 0, wxALIGN_CENTER_VERTICAL);
+            sz->Add(bedLabel, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, FromDIP(5));
+
+            m_sizer_main->Add(box, 1, wxEXPAND | wxUP | wxDOWN, 1);
+            m_lb_bedTemp->Bind(wxEVT_TEXT_ENTER, [](wxCommandEvent& event) {
+                wxString newText   = event.GetString();
+                // 在这里处理文本内容修改的逻辑
+                Tab*                        tab = wxGetApp().get_tab(Slic3r::Preset::TYPE_FILAMENT);
+                Slic3r::DynamicPrintConfig* cfg    = &Slic3r::GUI::wxGetApp().preset_bundle->project_config;
+                //auto                        colors = static_cast<Slic3r::ConfigOptionStrings*>(cfg->option("filament_vendor")->clone());
+                if (tab) {
+                    PageShp strength_page = tab->get_page(L("Filament"));
+                    if (strength_page) {
+                        ConfigOptionsGroupShp optgroup = strength_page->get_optgroup(L("Bed temperature"));
+                        if (optgroup) { 
+                            SidebarPrinter& bar      = wxGetApp().plater()->sidebar_printer();
+                            Slic3r::BedType bed_type = bar.get_selected_bed_type();
+                                    wxString        plateType = "";
+                            if (Slic3r::BedType::btPTE == bed_type)
+                                plateType = "textured_plate_temp";
+                            else if (Slic3r::BedType::btDEF == bed_type)
+                                plateType = "customized_plate_temp";
+                            else if (Slic3r::BedType::btER == bed_type)
+                                plateType = "epoxy_resin_plate_temp";
+                            else
+                                plateType = "hot_plate_temp";
+
+                            optgroup->on_change_OG(plateType.ToStdString(), wxAtoi(newText));
+                        }
+                    }
+                }
+            });
 		}
 		
 		//
@@ -502,6 +591,7 @@ void FilamentButton::doRender(wxDC& dc)
 		}
 	}
 
+    Slic3r::GUI::wxGetApp().UpdateDarkUIWin(this);
 	SetSizer(m_sizer_main);
 	Layout();
 	Thaw();
@@ -509,37 +599,32 @@ void FilamentButton::doRender(wxDC& dc)
 
 FilamentPopPanel::~FilamentPopPanel() {}
 
+#ifdef __APPLE__
+void FilamentPopPanel::OnMouseLeave(wxMouseEvent& event)
+{
+    // 如果鼠标离开窗口，则关闭弹窗
+    bool isDropDown = m_filamentCombox->is_drop_down();
+    if (!isDropDown)
+    {
+        Dismiss();
+    }
+   
+    event.Skip();
+}
+#endif
+
 void FilamentPopPanel::Popup(wxPoint position /*= wxDefaultPosition*/)
 {
-#ifdef __APPLE__
-    wxSize wSize = GetParent()->GetSize();
-     int height = wSize.GetHeight();
-     if (height <= FromDIP(41))
-     {
-         wSize.SetHeight(wSize.GetHeight() + FromDIP(26));
-         GetParent()->SetMinSize(wSize);
-         GetParent()->GetSizer()->Layout();
-         GetParent()->GetParent()->GetSizer()->Layout();
-     }
-#endif
 	SetPosition(position);
+#ifdef __APPLE__
+    PopupWindow::Show();
+#else
 	PopupWindow::Popup();
+#endif
 }
 
 void FilamentPopPanel::Dismiss()
 {
-#ifdef __APPLE__
-    wxSize wSize = GetParent()->GetSize();
-    int height = wSize.GetHeight();
-    
-    if (height >= FromDIP(41))
-    {
-        wSize.SetHeight(wSize.GetHeight() - FromDIP(26));
-        GetParent()->SetMinSize(wSize);
-        GetParent()->GetSizer()->Layout();
-        GetParent()->GetParent()->GetSizer()->Layout();
-    }
-#endif
     auto focus_window = this->GetParent()->HasFocus();
     if (!focus_window)
         PopupWindow::Dismiss();
@@ -832,6 +917,18 @@ void FilamentItem::update()
         return;
 
     auto filament_color = m_preset_bundle->project_config.opt_string("filament_colour", (unsigned int)m_data.index);
+    if (filament_color == "\"\"")
+        filament_color = "#000000";
+    Slic3r::DynamicPrintConfig* cfg    = &Slic3r::GUI::wxGetApp().preset_bundle->project_config;
+    auto                        colors = static_cast<Slic3r::ConfigOptionStrings*>(cfg->option("filament_colour")->clone());
+    colors->values[m_data.index]       = filament_color;
+    Slic3r::DynamicPrintConfig cfg_new = *cfg;
+    cfg_new.set_key_value("filament_colour", colors);
+    cfg->apply(cfg_new);
+    Slic3r::GUI::wxGetApp().plater()->update_project_dirty_from_presets();
+    Slic3r::GUI::wxGetApp().preset_bundle->export_selections(*Slic3r::GUI::wxGetApp().app_config);
+    Slic3r::GUI::wxGetApp().plater()->on_config_change(cfg_new);
+
     m_bk_color = wxColor(filament_color);
     m_btn_color->SetColor(m_bk_color);
     m_btn_param_list->SetColor(m_bk_color);
@@ -877,7 +974,7 @@ void FilamentItem::update()
 	if (nullptr != nozzle_temp_opt)
 	{
         int nozzle_temperature = nozzle_temp_opt->get_at(0);
-        m_popPanel->m_lb_extruderTemp->SetLabel(wxString(std::to_string(nozzle_temperature)) + wxString::FromUTF8("°C"));
+        m_popPanel->m_lb_extruderTemp->SetLabel(wxString(std::to_string(nozzle_temperature)));
 	}
 
 	const Slic3r::ConfigOptionInts* hot_plate_temp = filament_config.option<Slic3r::ConfigOptionInts>("hot_plate_temp");
@@ -894,7 +991,7 @@ void FilamentItem::update()
         else
             hot_plate_temp = filament_config.option<Slic3r::ConfigOptionInts>("hot_plate_temp");
         int plate_temp = hot_plate_temp->get_at(0);
-        m_popPanel->m_lb_bedTemp->SetLabel(wxString(std::to_string(plate_temp)) + wxString::FromUTF8("°C"));
+        m_popPanel->m_lb_bedTemp->SetLabel(wxString(std::to_string(plate_temp)));
 	}
 }
 
@@ -903,9 +1000,30 @@ void FilamentItem::sys_color_changed()
 	m_popPanel->sys_color_changed();
 }
 
+void FilamentItem::update_button_size()
+{
+    wxSize sz = GetSize();
+    if (m_small_state)
+        sz.SetWidth(sz.GetWidth() / 2);
+
+    wxSize btn_size;
+    btn_size.SetHeight(sz.GetHeight() / 2 - this->m_radius * 0.5);
+    btn_size.SetWidth(sz.GetWidth() - this->m_radius - this->m_border_width * 0.5);
+
+    m_btn_color->SetSize(btn_size);
+    m_btn_color->update_child_button_size();
+
+    m_btn_param_list->SetSize(btn_size);
+    wxPoint param_list_pos(this->m_radius * 0.5 + m_border_width * 0.5, this->m_radius + this->m_border_width * 0.5 + btn_size.GetHeight());
+    m_btn_param_list->SetPosition(param_list_pos);
+}
+
 void FilamentItem::msw_rescale() 
 {
 	m_popPanel->m_filamentCombox->msw_rescale();
+    wxSize newSize = wxSize(FromDIP(FILAMENT_BTN_WIDTH), FromDIP(FILAMENT_BTN_HEIGHT));
+    SetSize(newSize);
+    update_button_size();
 }
 
 void FilamentItem::paintEvent(wxPaintEvent& evt)
@@ -982,7 +1100,7 @@ bool FilamentPanel::add_filament()
 		});
 
 	m_vt_filament.push_back(filament);
-	m_sizer->Add(filament, wxSizerFlags().Border(wxALL, 1));
+	m_sizer->Add(filament, wxSizerFlags().Border(wxALL, FromDIP(2)));
 	m_sizer->Layout();
 	this->GetParent()->Layout();
 
@@ -1008,6 +1126,22 @@ void FilamentPanel::reset_filament_sync_state()
 	{
 		f->update_box_sync_color("#ffffff");
 	}
+}
+
+void FilamentPanel::resetFilamentToCFS() {
+    for (auto& item : this->m_vt_filament) {
+        item->resetCFS(true);
+    }
+}
+
+void FilamentPanel::updateLastFilament(const std::vector<std::string>& presetName)
+{
+    int i = 0;
+    for (auto& item : this->m_vt_filament) {
+        if (i >= presetName.size())
+            break;
+        item->set_filament_selection(from_u8(presetName[i++]));
+    }
 }
 
 void FilamentPanel::backup_extruder_colors()
@@ -1382,7 +1516,7 @@ int FilamentPanel::LoadFilamentProfile()
     return 1;
 }
 
-void FilamentPanel::SetFilamentProfile(std::vector<std::pair<int, RemotePrint::DeviceDB::Material>>& validMaterials)
+void FilamentPanel::SetFilamentProfile(std::vector<std::pair<int, DM::Material>>& validMaterials)
 {
 
     std::map<std::string,std::string> section_new;
@@ -1429,11 +1563,11 @@ void FilamentPanel::SetFilamentProfile(std::vector<std::pair<int, RemotePrint::D
     Slic3r::GUI::wxGetApp().app_config->save();
 }
 
-void FilamentPanel::on_auto_mapping_filament(const RemotePrint::DeviceDB::Data& deviceData)
+void FilamentPanel::on_auto_mapping_filament(const DM::Device& deviceData)
 {
     // 计算 materialBoxes 数组中 box_type == 0 的 Material 项，并且 Material 里 color 的值不为空的项
-    std::vector<std::pair<int, RemotePrint::DeviceDB::Material>> validMaterials;
-    for (const auto& materialBox : deviceData.materialBoxes)
+    std::vector<std::pair<int, DM::Material>> validMaterials;
+    for (const auto materialBox : deviceData.materialBoxes)
     {
         if (materialBox.box_type == 0)
         {
@@ -1509,16 +1643,36 @@ void FilamentPanel::on_auto_mapping_filament(const RemotePrint::DeviceDB::Data& 
 
 	// sychronize normal multi-color box first, and then extra box
 	int normalIdx = 0;  
+    LoginTip::getInstance().resetHasSkipToLogin();
 	for(int i = 0; i < validMaterials.size(); i++)
 	{
         auto& item = m_vt_filament[normalIdx];
-        item->update_bk_color(validMaterials[i].second.color);
-        item->set_filament_selection(validMaterials[i].second.name);
+        int   filamentUserMaterialRet = 0; // 1:不是用户预设, 0:是用户预设，且用户账号正常, wxID_YES:点击了登录
+        filamentUserMaterialRet       = LoginTip::getInstance().isFilamentUserMaterialValid(validMaterials[i].second.userMaterial);
+        if (filamentUserMaterialRet == (int) wxID_YES) { //  点击了登录
+            continue;
+        }
+
+        std::string new_filament_color = validMaterials[i].second.color;
+        std::string new_filament_name  = validMaterials[i].second.name;
 
         char     index_char          = 'A' + (validMaterials[i].second.material_id % 4); // Calculate the letter part (A, B, C, D)
         wxString material_sync_label = wxString::Format("%d%c", validMaterials[i].first, index_char);
+
+        if (filamentUserMaterialRet != 0 && filamentUserMaterialRet != 1 && filamentUserMaterialRet != (int) wxID_YES) {
+            new_filament_name = "";
+            material_sync_label = "";
+        } else if (filamentUserMaterialRet == 0) {
+            new_filament_name = from_u8(validMaterials[i].second.name).ToStdString();
+        }
+
+        item->update_bk_color(new_filament_color);
+        item->set_filament_selection(new_filament_name);
         item->update_box_sync_state(true, material_sync_label);
         item->resetCFS(false);
+        if (material_sync_label.empty()) {
+            item->resetCFS(true);
+        }
 
         normalIdx += 1;
     }
@@ -1542,15 +1696,16 @@ void FilamentPanel::on_sync_one_filament(int filament_index, const std::string& 
 	item->update_box_sync_state(true, sync_label);
 	item->update_box_sync_color(new_filament_color);
     item->resetCFS(false);
+    if (sync_label.empty()) {
+        item->resetCFS(true);
+    }
 
 	item->Refresh();
 }
 
 void FilamentPanel::on_re_sync_all_filaments(const std::string& selected_device_ip)
 {
-	auto& deviceDB = RemotePrint::DeviceDB::getInstance();
-
-	auto device = deviceDB.get_printer_data(selected_device_ip);
+	auto device = DM::DataCenter::Ins().get_printer_data(selected_device_ip);
 
 	if(m_vt_filament.size() != device.boxColorInfos.size())
 	{
@@ -1747,10 +1902,43 @@ BoxColorPopPanel::BoxColorPopPanel(wxWindow* parent)
 	m_mainSizer->Add(separatorLine, 0, wxEXPAND | wxALL, 0);
     m_mainSizer->Add(m_secondColumnPanel, 0, wxALL, 5);
 
+    #if __APPLE__
+        Bind(wxEVT_LEFT_DOWN, &BoxColorPopPanel::on_left_down, this); 
+     #endif
     SetSizer(m_mainSizer);
     Layout();
 }
-
+void BoxColorPopPanel::on_left_down(wxMouseEvent &evt)
+{
+   
+    auto pos = ClientToScreen(evt.GetPosition());
+    wxWindowList& children = m_secondColumnPanel->GetChildren();
+    for (wxWindowList::iterator it = children.begin(); it != children.end(); ++it) {
+        wxWindow* item = *it;
+        auto p_rect = item->ClientToScreen(wxPoint(0, 0));
+        if (pos.x > p_rect.x && pos.y > p_rect.y && pos.x < (p_rect.x + item->GetSize().x) && pos.y < (p_rect.y + item->GetSize().y)) {
+            wxCommandEvent event(wxEVT_BUTTON, GetId());
+		    event.SetEventObject(item);
+             OnSecondColumnItemClicked(event);
+             this->Dismiss();
+             //BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "on_left_down"<<r_pos.x<<"\n";
+        }
+        
+    }
+    auto firstChildren = m_firstColumnSizer->GetChildren();
+    for(wxSizerItem* firstItem: firstChildren)
+    {   
+        wxWindow* item = firstItem->GetWindow();
+        auto p_rect = item->ClientToScreen(wxPoint(0, 0));
+        if (pos.x > p_rect.x && pos.y > p_rect.y && pos.x < (p_rect.x + item->GetSize().x) && pos.y < (p_rect.y + item->GetSize().y)) {
+            wxCommandEvent event(wxEVT_BUTTON, GetId());
+		    event.SetEventObject(item);
+            OnFirstColumnButtonClicked(event);
+             //BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "on_left_down"<<r_pos.x<<"\n";
+        }
+    }
+    
+}
 BoxColorPopPanel::~BoxColorPopPanel()
 {
 }
@@ -1806,7 +1994,7 @@ void BoxColorPopPanel::OnFirstColumnButtonClicked(wxCommandEvent& event)
         // 使用 std::intptr_t 来存储指针值
         std::intptr_t boxId = reinterpret_cast<std::intptr_t>(button->GetClientData());
 
-        const RemotePrint::DeviceDB::MaterialBox* material_box_info = nullptr;
+        const DM::MaterialBox* material_box_info = nullptr;
         for (const auto& box_info : m_device_data.materialBoxes) {
             if (box_info.box_id == boxId) {
                 material_box_info = &box_info;
@@ -1840,7 +2028,7 @@ void BoxColorPopPanel::OnFirstColumnButtonClicked(wxCommandEvent& event)
                 }
 
                 if (!has_exact_material) {
-                    RemotePrint::DeviceDB::Material tmp_material;
+                    DM::Material tmp_material;
                     tmp_material.material_id = material_id;
                     tmp_material.color      = "#808080"; // grey
                     filament_item->set_sync_state(false);
@@ -1895,20 +2083,34 @@ void BoxColorPopPanel::OnSecondColumnItemClicked(wxCommandEvent& event)
 		return;
 	}
 
+    LoginTip::getInstance().resetHasSkipToLogin();
+    int filamentUserMaterialRet = 0; // 1:不是用户预设, 0:是用户预设，且用户账号正常, wxID_YES:点击了登录
+    filamentUserMaterialRet = LoginTip::getInstance().isFilamentUserMaterialValid(item->getUserMaterial());
+    if (filamentUserMaterialRet == (int)wxID_YES) {  //  点击了登录
+        return;
+    }
+
     // Perform the logic you want when an item in the second column is clicked
     // wxLogMessage("Second column item clicked");
 	wxColour item_color = item->GetColor();  // GetColor()
 	std::string new_filament_color = item_color.GetAsString(wxC2S_HTML_SYNTAX).ToStdString();
 	std::string new_filament_name = item->get_filament_name();
+    wxString syncLabel = item->get_material_index_info();
+    if (filamentUserMaterialRet != 0 && filamentUserMaterialRet != 1 && filamentUserMaterialRet != (int)wxID_YES) {
+        new_filament_name = "";
+        syncLabel         = "";
+    } else if (filamentUserMaterialRet == 0) {
+        new_filament_name = from_u8(item->get_filament_name()).ToStdString();
+    }
 
 	FilamentPanel* filament_panel = dynamic_cast<FilamentPanel*>(Slic3r::GUI::wxGetApp().sidebar().filament_panel());
 	if(filament_panel)
 	{
-		filament_panel->on_sync_one_filament(m_filament_item_index, new_filament_color, new_filament_name, item->get_material_index_info());
+		filament_panel->on_sync_one_filament(m_filament_item_index, new_filament_color, new_filament_name, syncLabel);
 	}
 }
 
-void BoxColorPopPanel::init_by_device_data(const RemotePrint::DeviceDB::Data& device_data)
+void BoxColorPopPanel::init_by_device_data(const DM::Device& device_data)
 {
 	m_device_data = device_data;
 
@@ -2002,19 +2204,21 @@ wxString FilamentColorSelectionItem::get_filament_type_label()
 
 std::string FilamentColorSelectionItem::get_filament_name()
 {
-	return m_filament_name;
-}
+	return m_filament_name; }
+
+std::string FilamentColorSelectionItem::getUserMaterial() { return m_userMaterial; }
 
 wxString FilamentColorSelectionItem::get_material_index_info()
 {
 	return m_material_index_info;
 }
 
-void FilamentColorSelectionItem::update_item_info_by_material(int box_id, const RemotePrint::DeviceDB::Material& material_info)
+void FilamentColorSelectionItem::update_item_info_by_material(int box_id, const DM::Material& material_info)
 {
     m_box_id  = box_id;
 	m_filament_type_label = material_info.type;
 	m_filament_name = material_info.name;
+    m_userMaterial = material_info.userMaterial;
     m_bk_color = RemotePrint::Utils::hex_string_to_wxcolour(material_info.color);
 	SetBackgroundColour(m_bk_color);
     char index_char    = 'A' + (material_info.material_id % 4); // Calculate the letter part (A, B, C, D)

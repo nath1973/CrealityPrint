@@ -29,6 +29,7 @@ class OpenGLManager;
 static const float GCODE_VIEWER_SLIDER_SCALE = 0.6f;
 static const float SLIDER_DEFAULT_RIGHT_MARGIN  = 10.0f;
 static const float SLIDER_DEFAULT_BOTTOM_MARGIN = 10.0f;
+static const float GCODE_REDUCE_HEIGHT = 150.0f;
 
 class GCodeViewer
 {
@@ -654,7 +655,7 @@ public:
         ~GCodeWindow() { stop_mapping_file(); }
         void load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends);
         void reset();
-        void renderGcode(uint64_t curr_line_id, int canvas_width, int canvas_height);
+        void renderGcode(uint64_t curr_line_id, int canvas_width, int canvas_height, bool isReduceHeight = false);
         void on_change_color_mode(bool is_dark) { m_is_dark = is_dark; }
         void stop_mapping_file();
     };
@@ -696,6 +697,7 @@ private:
     ETools m_tools;
     ConfigOptionMode m_user_mode;
     bool m_fold = {false};
+    float m_contentWidth {-1.0f};
 
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;

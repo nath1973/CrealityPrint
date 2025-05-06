@@ -10,7 +10,7 @@
     "activate_chamber_temp_control": "1",
     "additional_cooling_fan_speed": "0",
     "chamber_temperature": "35",
-    "close_fan_the_first_x_layers": "1",
+    "close_fan_the_first_x_layers": "3",
     "compatible_printers": [
         "Creality K2 Plus 0.4 nozzle"
     ],
@@ -75,7 +75,7 @@
     "filament_unloading_speed": "90",
     "filament_unloading_speed_start": "100",
     "filament_vendor": [
-        "Generic"
+        "Creality"
     ],
     "filament_wipe": "nil",
     "filament_wipe_distance": "nil",
@@ -84,10 +84,11 @@
     "full_fan_speed_layer": "0",
     "hot_plate_temp": "70",
     "hot_plate_temp_initial_layer": "70",
+    "material_flow_dependent_temperature": "0",
     "nozzle_temperature": "240",
     "nozzle_temperature_initial_layer": "240",
-    "nozzle_temperature_range_high": "250",
-    "nozzle_temperature_range_low": "190",
+    "nozzle_temperature_range_high": "270",
+    "nozzle_temperature_range_low": "220",
     "overhang_fan_speed": "100",
     "overhang_fan_threshold": "25%",
     "pressure_advance": "0.07",

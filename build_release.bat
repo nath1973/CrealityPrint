@@ -30,7 +30,7 @@ if "%1"=="slicer" (
 echo "building deps.."
 
 echo cmake ../ -G "Visual Studio 16 2019" -A x64 -DDESTDIR="%CD%/OrcaSlicer_dep" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%debug% -DORCA_INCLUDE_DEBUG_INFO=%debuginfo%
-cmake ../ -G "Visual Studio 16 2019" -A x64 -DDESTDIR="%CD%/OrcaSlicer_dep" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%debug% -DORCA_INCLUDE_DEBUG_INFO=%debuginfo%
+cmake ../ -G "Visual Studio 16 2019" -A x64 -DDESTDIR="%CD%/OrcaSlicer_dep" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%debug% -DORCA_INCLUDE_DEBUG_INFO=%debuginfo% -DCMAKE_SYSTEM_VERSION=10.0.22000.0
 cmake --build . --config %build_type% --target deps -- -m
 
 if "%1"=="deps" exit /b 0

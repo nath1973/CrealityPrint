@@ -29,16 +29,16 @@
 	<key>ATSApplicationFontsPath</key>
   	<string>fonts/</string>
   <key>CFBundleURLTypes</key>
-    <array>
-      <dict>
-        <key>CFBundleURLName</key>
-        <string>CrealityPrint Downloads</string>
-        <key>CFBundleURLSchemes</key>
-        <array>
-          <string>crealityprint</string>
-        </array>
-      </dict>
-    </array>
+  <array>
+    <dict>  
+        <key>CFBundleURLSchemes</key>  
+        <array>  
+            <string>CrealityPrintLink</string>  
+        </array>  
+        <key>CFBundleURLName</key>  
+        <string>com.creality.crealityprint</string>  
+    </dict>
+  </array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -99,9 +99,26 @@
 			<string>3MF</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>images/CrealityPrint.icns</string>
+      			<string>images/3mf.icns</string>
 			<key>CFBundleTypeName</key>
 			<string>3MF</string>
+		      	<key>CFBundleTypeRole</key>
+		      	<string>Viewer</string>
+		      	<key>LISsAppleDefaultForType</key>
+		      	<true/>
+		      	<key>LSHandlerRank</key>
+		      	<string>Alternate</string>
+		    </dict>
+		    <dict>
+		      <key>CFBundleTypeExtensions</key>
+		      <array>
+		        <string>cxprj</string>
+		        <string>CXPRJ</string>
+		      </array>
+		      <key>CFBundleTypeIconFile</key>
+		      <string>images/cxprj.icns</string>
+		      <key>CFBundleTypeName</key>
+		      <string>CXPRJ</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>LISsAppleDefaultForType</key>

@@ -10,6 +10,7 @@
 #include "libslic3r/Color.hpp"
 // BBS
 #include "libslic3r/ObjectID.hpp"
+#include "libslic3r/CustomGCode.hpp"
 
 #include "GLModel.hpp"
 #include "GLShader.hpp"
@@ -429,6 +430,9 @@ public:
         m_render_volume.type = -1;
     }
     ~GLVolumeCollection() { clear(); }
+
+    static void apply_custom_gcode(GLShaderProgram* shader, const CustomGCode::Info& gcode_info, const std::vector<std::string>& filament_std_colors);
+    static void apply_custom_gcode(GLShaderProgram* shader, const CustomGCode::Info& gcode_info, const std::vector<ColorRGBA>& filament_colors);
 
     std::vector<int> load_object(
         const ModelObject 		*model_object,

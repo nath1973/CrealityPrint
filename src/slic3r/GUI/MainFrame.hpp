@@ -33,7 +33,7 @@
 #include "PrinterWebView.hpp"
 #include "calib_dlg.hpp"
 #include "MultiMachinePage.hpp"
-#include "print_manage/PrinterMgrView.hpp"
+#include "print_manage/App/PrinterMgrView.hpp"
 
 #define ENABEL_PRINT_ALL 0
 
@@ -159,6 +159,7 @@ class MainFrame : public DPIFrame
     {
         FileHistory(int max) : wxFileHistory(max) {}
         std::wstring GetThumbnailUrl(int index) const;
+        std::wstring GetFileOpenTime(int index) const;
 
         virtual void AddFileToHistory(const wxString &file);
         virtual void RemoveFileFromHistory(size_t i);
@@ -167,8 +168,12 @@ class MainFrame : public DPIFrame
         void LoadThumbnails();
 
         void SetMaxFiles(int max);
+
+        std::deque<std::string> GetFileOpenTimeVector();
+
     private:
         std::deque<std::string> m_thumbnails;
+        std::deque<std::string> m_file_open_time;
         bool m_load_called = false;
     };
 
@@ -423,6 +428,7 @@ public:
     mutable bool          m_print_enable{ true };
     bool get_enable_slice_status();
     bool get_enable_print_status(bool is_all_or_any_of_them = true);
+    void  trackEvent(const std::string& event, const std::string& data);
     //BBS
     void update_side_button_style();
     void update_slice_print_status(SlicePrintEventType event, bool can_slice = true, bool can_print = true);

@@ -68,7 +68,7 @@
     ],
     "filament_toolchange_delay": "0",
     "filament_type": [
-        "ASA"
+        "ABS"
     ],
     "filament_unload_time": "0",
     "filament_unloading_speed": "90",
@@ -83,6 +83,8 @@
     "full_fan_speed_layer": "0",
     "hot_plate_temp": "105",
     "hot_plate_temp_initial_layer": "105",
+    "material_flow_dependent_temperature": "0",
+    "material_flow_temp_graph": "[[3.5,200],[7.0,240]]",
     "nozzle_temperature": "250",
     "nozzle_temperature_initial_layer": "250",
     "nozzle_temperature_range_high": "270",

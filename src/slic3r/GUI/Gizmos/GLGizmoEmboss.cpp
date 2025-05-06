@@ -1473,9 +1473,12 @@ void GLGizmoEmboss::draw_text_input()
         imgui_font->IsLoaded() &&
         imgui_font->Scale > 0.f &&
         imgui_font->ContainerAtlas != nullptr;
+    
+    bool exist_all_char = exist_font  && !m_text_contain_unknown_glyph;
     // NOTE: Symbol fonts doesn't have atlas 
     // when their glyph range is out of language character range
-    if (exist_font) ImGui::PushFont(imgui_font);
+    if (exist_all_char) 
+        ImGui::PushFont(imgui_font);
 
     // show warning about incorrectness view of font
     std::string warning_tool_tip;
@@ -1490,8 +1493,9 @@ void GLGizmoEmboss::draw_text_input()
         if (is_text_empty(m_text)) 
             append_warning(_u8L("Embossed text cannot contain only white spaces."));
         if (m_text_contain_unknown_glyph)
-            append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
-
+             append_warning(_u8L("The text includes unknown character glyphs(which have been replaced)."));
+            //append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
+        
         const FontProp &prop = m_style_manager.get_font_prop();
         if (prop.skew.has_value())     append_warning(_u8L("Text input doesn't show font skew."));
         if (prop.boldness.has_value()) append_warning(_u8L("Text input doesn't show font boldness."));
@@ -1523,7 +1527,8 @@ void GLGizmoEmboss::draw_text_input()
         range_text = create_range_text_prep();
     }
 
-    if (exist_font) ImGui::PopFont();
+    if (exist_all_char)
+        ImGui::PopFont();
 
     // warning tooltip has to be with default font
     if (!warning_tool_tip.empty()) {
@@ -1871,7 +1876,7 @@ void GLGizmoEmboss::draw_model_type()
     }
 
     // In simple mode are not modifiers
-    if (wxGetApp().plater()->printer_technology() != ptSLA && wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+    if (wxGetApp().plater()->printer_technology() != ptSLA) {
         ImGui::SameLine();
         if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
             new_type = modifier;
@@ -2247,7 +2252,7 @@ void GLGizmoEmboss::draw_style_list() {
     }
     ImGuiWrapper::pop_combo_style();
     if (!tooltip.empty())
-        m_imgui->tooltip(tooltip, m_gui_cfg->max_tooltip_width);
+        m_imgui->tooltip(from_u8(tooltip), m_gui_cfg->max_tooltip_width);
         
     // Check whether user wants lose actual style modification
     if (selected_style_index.has_value() && is_modified) { 

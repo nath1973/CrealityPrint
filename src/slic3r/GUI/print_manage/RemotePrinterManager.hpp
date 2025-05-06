@@ -4,12 +4,12 @@
 #include <functional>
 #include <mutex>
 #include <condition_variable>
-#include "LanPrinterInterface.hpp"
-#include "OctoPrintInterface.hpp"
-#include "KlipperInterface.hpp"
-#include "Klipper4408Interface.hpp"
+#include "Device/LanPrinterInterface.hpp"
+#include "Device/OctoPrintInterface.hpp"
+#include "Device/KlipperInterface.hpp"
+#include "Device/Klipper4408Interface.hpp"
 #include <curl/curl.h>
-#include "KlipperCXInterface.hpp"
+#include "Device/KlipperCXInterface.hpp"
 
 namespace RemotePrint {
 enum class RemotePrinerType {

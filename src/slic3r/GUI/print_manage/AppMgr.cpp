@@ -33,9 +33,12 @@ namespace DM{
 
     bool AppMgr::Invoke(wxWebView* browser, std::string data)
     {
-        nlohmann::json j = nlohmann::json::parse(data);
-        if (j.contains("command")) {
+        try
+        {
             return impl->m_routes.Invoke(browser, data);
+        }
+        catch (std::exception& e) {
+            BOOST_LOG_TRIVIAL(trace) << "DM::AppMgr::Invoke, Error:" << e.what();
         }
 
         return false;
@@ -68,7 +71,7 @@ namespace DM{
 
     void AppMgr::SystemUserChanged()
     {
-        nlohmann::json commandJson = { "command", DM::EVENT_SET_USER_THEME };
+        nlohmann::json commandJson = {{ "command", DM::EVENT_SET_USER_THEME }};
 
         for (const auto& app : impl->m_apps) {
             impl->m_routes.Invoke(app.browser, commandJson.dump(-1, ' ', true));

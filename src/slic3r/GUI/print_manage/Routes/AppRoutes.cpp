@@ -11,6 +11,7 @@
 namespace DM{
     bool AppRoutes::Invoke(wxWebView* browser, const std::string& data)
     {
+        try{
         nlohmann::json j = nlohmann::json::parse(data);
         if (j.contains("command")) {
             std::string command = j["command"].get<std::string>();
@@ -20,19 +21,21 @@ namespace DM{
             Apps apps;
             AppMgr::Ins().GetNeedToReceiveSysEventApp(command, apps);
 
-            for (const auto& app : apps) {
+            for (auto& app : apps) {
                 if (app.browser != browser) {
                     bSysEvent = true;
-                    
-                    break;
+                    AppUtils::PostMsg(app.browser, j);
                 }
             }
 
-            if (!bSysEvent) {
-                if(SysRoutes().Invoke(browser, data))return true;
-                if(SenderRoutes().Invoke(browser, data))return true;
-                if(DeviceMgrRoutes().Invoke(browser, data))return true;
+            if (1) {
+                if(SysRoutes().Invoke(browser, j, data))return true;
+                if(SenderRoutes().Invoke(browser, j, data))return true;
+                if(DeviceMgrRoutes().Invoke(browser, j, data))return true;
             }
+        }
+        }catch(...){
+            //BOOST_LOG_TRIVIAL(error) << "AppRoutes::Invoke error: " << e.what();
         }
 
         return false;

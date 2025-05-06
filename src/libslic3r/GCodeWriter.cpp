@@ -968,10 +968,10 @@ std::string GCodeWriter::set_additional_fan(unsigned int speed)
     return gcode.str();
 }
 
-std::string GCodeWriter::set_exhaust_fan(int speed, bool add_eol, bool isCrealityOS)
+std::string GCodeWriter::set_exhaust_fan(int speed, bool add_eol, bool isCXPrinter)
 {
     std::ostringstream gcode;
-    if(isCrealityOS)
+    if (isCXPrinter)
         gcode << "M106" << " P1" << " S" << (int)(speed / 100.0 * 255);
     else
         gcode << "M106" << " P3" << " S" << (int)(speed / 100.0 * 255);

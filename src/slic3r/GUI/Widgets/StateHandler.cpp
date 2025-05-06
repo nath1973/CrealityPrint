@@ -117,8 +117,15 @@ void StateHandler::changed(wxEvent &event)
     if (old != states_ && (old | states2_) != (states_ | states2_)) {
         if (parent_)
             parent_->changed(states_ | states2_);
+#ifdef __linux__
+        else {
+            owner_->Refresh();     // wxWidgets will deferred rendering in linux os
+            owner_->Update();
+        }
+#else
         else
-            owner_->Refresh();
+            owner_->Refresh(false);
+#endif
     }
 }
 

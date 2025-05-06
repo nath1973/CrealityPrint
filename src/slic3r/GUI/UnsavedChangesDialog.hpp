@@ -10,6 +10,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "Widgets/Button.hpp"
 #include "Widgets/ScrolledWindow.hpp"
+#include "Widgets/CheckBox.hpp"
 
 class ScalableButton;
 class wxStaticText;
@@ -341,6 +342,7 @@ public:
     void show_info_line(Action action, std::string preset_name = "");
     void update_config(Action action);
     void close(Action action);
+    void OnClose(wxCloseEvent& event);
     // save information about saved presets and their types to names_and_types and show SavePresetDialog to set the names for new presets
     bool save(PresetCollection* dependent_presets, bool show_save_preset_dialog = true);
 
@@ -409,7 +411,8 @@ class DiffPresetDialog : public DPIDialog
     wxBoxSizer*             m_presets_sizer     { nullptr };
     wxStaticText*           m_top_info_line     { nullptr };
     wxStaticText*           m_bottom_info_line  { nullptr };
-    wxCheckBox*             m_show_all_presets  { nullptr };
+    ::CheckBox*             m_show_all_presets{nullptr};
+    wxStaticText*           m_show_all_presets_text{nullptr};
     wxCheckBox*             m_use_for_transfer  { nullptr };
     Button*                 m_transfer_btn      { nullptr };
     Button*                 m_cancel_btn        { nullptr };

@@ -113,8 +113,8 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
         //tuple3:needSel
         static std::map<TextureType, std::tuple<std::string,bool,bool,bool>> s_names = {
             {e_tt_home,{"home.png",true,true,false}},
-            {e_tt_collapse,{"collapse_bk.png",true,false,false}},
-            {e_tt_collapse_item,{"collapse.png",true,true,true}},
+            {e_tt_collapse,{"collapse_bk.svg",true,false,false}},
+            {e_tt_collapse_item,{"collapse.svg",true,true,true}},
             {e_tt_bed_custom,{"custom.png",false,false,false}},
             {e_tt_bed_texture,{"texture.png",false,false,false}},
             {e_tt_bed_smooth,{"smooth.svg",false,false,false}},
@@ -135,6 +135,10 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
             {e_tt_gcode_pause, {"gcode_preview_pause.svg", false, false, false}},
             {e_tt_rounding_transparent, {"rounding_transparent.svg", false, false, false}},
             {e_tt_retangle_transparent, {"retangle_transparent.svg", false, false, false}},
+            {e_tt_block_notification_close, {"block_notification_close.svg", false, false, false}},
+            {e_tt_block_notification_close_hover, {"block_notification_close_hover.svg", false, false, false}},
+            {e_tt_normal_tip_block_notification_close, {"block_notification_close.svg", true, false, false}},
+            {e_tt_normal_tip_block_notification_close_hover, {"block_notification_close_hover.svg", true, false, false}}
         };
         std::string path = resources_dir() + "/images/";
         const auto &[name,needDark,needHover,needSel] = s_names[tt];
@@ -151,7 +155,7 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
     return tex;
 }
 
-bool DispConfig::checkBox(const wxString& name, bool check,ButtonConfig cfg) {
+bool DispConfig::checkBox(const std::string& name, bool check,ButtonConfig cfg) {
     auto bg = getColor(check? cfg.fg:cfg.bg);
     auto fg = getColor(cfg.fg);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
@@ -172,7 +176,7 @@ bool DispConfig::checkBox(const wxString& name, bool check,ButtonConfig cfg) {
     return check;
 }
 
-bool DispConfig::normalButton(const wxString& name, ButtonConfig cfg,int en) {
+bool DispConfig::normalButton(const std::string& name, ButtonConfig cfg,int en) {
     auto bg = getColor(en == 2 ? cfg.fg : cfg.bg);
     auto fg = getColor(en == 1 ? cfg.bg : cfg.fg);
 
@@ -185,7 +189,7 @@ bool DispConfig::normalButton(const wxString& name, ButtonConfig cfg,int en) {
         ImGui::PushStyleColor(ImGuiCol_BorderActive, fg);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, cfg.border);
     Loc_pushBoldStyle(cfg.boldScale);
-    bool active = ImGui::BBLButton(name.ToUTF8(), cfg.size);
+    bool active = ImGui::BBLButton(name.c_str(), cfg.size);
     Loc_popBoldStyle(cfg.boldScale);
     ImGui::PopStyleVar(1);
     ImGui::PopStyleColor(4);
@@ -252,7 +256,7 @@ ImVec2 DispConfig::getWindowSize(WindowType tp, float scale) {
         winsize = { 215, 55 };
         break;
     case DispConfig::e_wt_msg:
-        winsize = { 255, 85 };
+        winsize = { 300, 85 };
         break;
     case DispConfig::e_wt_error:
         winsize = { 405, 85 };
@@ -376,12 +380,12 @@ void DispConfig::processWindows(const wxString& name,CreateFn fn, WindowConfig s
     ImGui::PopStyleVar(varnum);
 }
 
-int DispConfig::popupButton(const wxString& name, ButtonConfig bcfg
-    , const std::vector< wxString>& list, ButtonConfig cfg) {
+int DispConfig::popupButton(const std::string& name, ButtonConfig bcfg
+    , const std::vector< std::string>& list, ButtonConfig cfg) {
     if (normalButton(name,bcfg))
-        ImGui::OpenPopup(name.ToUTF8());
+        ImGui::OpenPopup(name.c_str());
     int ret = -1;
-    if (ImGui::BeginPopup(name.ToUTF8()))
+    if (ImGui::BeginPopup(name.c_str()))
     {
         auto bg = getColor(cfg.bg);
         auto fg = getColor(cfg.fg);
@@ -390,7 +394,7 @@ int DispConfig::popupButton(const wxString& name, ButtonConfig bcfg
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, fg);
         for (int i=0;i<list.size();++i)
         {
-            if (ImGui::Button(list[i].ToUTF8(), cfg.size))
+            if (ImGui::Button(list[i].c_str(), cfg.size))
                 ret = i;    
         }
         if (ret>=0)
@@ -459,6 +463,9 @@ ImU32 DispConfig::getColorImU32(ColorType ct) {
         break;
     case Slic3r::GUI::DispConfig::e_ct_sliderTip:
         ret = s_isDark ? IM_COL32(66, 75, 81,255) : IM_COL32(242, 242, 245,255);
+        break;
+    case Slic3r::GUI::DispConfig::e_ct_normalTip:
+        ret = IM_COL32(23, 204, 95, 255);
         break;
     default: break;
     }

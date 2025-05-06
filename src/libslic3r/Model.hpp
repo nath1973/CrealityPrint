@@ -24,6 +24,7 @@
 //BBS: add stl
 #include "Format/STL.hpp"
 #include "Format/OBJ.hpp"
+#include "Format/AssimpModel.hpp"
 
 #include <map>
 #include <memory>
@@ -381,7 +382,6 @@ public:
 
     // Holes to be drilled into the object so resin can flow out
     sla::DrainHoles         sla_drain_holes;
-
     // Connectors to be added into the object before cut and are used to create a solid/negative volumes during a cut perform
     CutConnectors           cut_connectors;
     CutObjectBase           cut_id;

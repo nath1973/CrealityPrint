@@ -107,16 +107,15 @@ PROJECT_BUILD_DIR="$PROJECT_DIR/build_check_$ARCH"
 DEPS_DIR="$PROJECT_DIR/deps"
 DEPS_BUILD_DIR="$DEPS_DIR/build_$ARCH"
 DEPS="$DEPS_BUILD_DIR/dep_$ARCH"
-#"/Users/creality/Orca_work/orca_2.0/OrcaSlicer/deps/build_x86_64/OrcaSlicer_dep_x86_64"
-#"$DEPS_BUILD_DIR/dep_$ARCH"
-DEPS_PATH="/Users/creality/Orca_work/c3d_6.0/C3DSlicer/deps/build_x86_64/dep_x86_64"
-if [ -d "$DEPS_PATH" ]; then 
+
+# 读取环境变量 MY_DIR
+DEPS_PATH=$DEPS_ENV_DIR
+if [ -z "${DEPS_PATH}" ]; then
+    echo "env ${DEPS_PATH} is empty."
+else
     DEPS=$DEPS_PATH
-    export BUILD_TARGET="slicer"
-else 
-    echo "deps file is not exist" 
-    export BUILD_TARGET="all"
 fi
+echo "=====DEPS=====: $DEPS"
 
 # Fix for Multi-config generators
 if [ "$SLICER_CMAKE_GENERATOR" == "Xcode" ]; then
@@ -129,7 +128,7 @@ function build_deps() {
     echo "Building deps..."
     (
         set -x
-        mkdir -p "$DEPS"
+        mkdir -p "$DEPS_BUILD_DIR"
         cd "$DEPS_BUILD_DIR"
         if [ "1." != "$BUILD_ONLY". ]; then
             cmake .. \

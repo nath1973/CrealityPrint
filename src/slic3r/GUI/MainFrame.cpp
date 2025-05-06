@@ -1,4 +1,4 @@
-#include "MainFrame.hpp"
+﻿#include "MainFrame.hpp"
 
 #include <wx/colour.h>
 #include <wx/panel.h>
@@ -66,7 +66,7 @@
 #include "DailyTips.hpp"
 #include "LoadOldPresets.hpp"
 #include "LoadOldPresetsFromFolder.hpp"
-
+#include "slic3r/GUI/print_manage/Utils.hpp"
 #ifdef _WIN32
 #include <dbt.h>
 #include <shlobj.h>
@@ -74,6 +74,7 @@
 #include <slic3r/GUI/CreatePresetsDialog.hpp>
 #include "print_manage/AppMgr.hpp"
 #define ALL_PLATFORM 1
+#include "UpdateParams.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -413,10 +414,23 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     // BBS
     Fit();
 
-    const wxSize min_size = wxGetApp().get_min_size(); //wxSize(76*wxGetApp().em_unit(), 49*wxGetApp().em_unit());
+    //const wxSize min_size = wxGetApp().get_min_size(); //wxSize(76*wxGetApp().em_unit(), 49*wxGetApp().em_unit());
+    const wxSize min_size = wxGetApp().get_min_size_ex(this);
 
-    SetMinSize(min_size/*wxSize(760, 490)*/);
-    SetSize(wxSize(FromDIP(1293), FromDIP(727)));
+    //SetMinSize(min_size/*wxSize(760, 490)*/);
+    //SetSize(wxSize(FromDIP(1293), FromDIP(727)));
+
+#ifdef __APPLE__
+// Using SetMinSize() on Mac messes up the window position in some cases
+// cf. https://groups.google.com/forum/#!topic/wx-users/yUKPBBfXWO0
+    SetSize(min_size/*wxSize(760, 490)*/);
+#else
+    SetMinSize(min_size);
+    SetSize(min_size);
+
+	//on some screen size(1920 * 1080), when minimize the frame, the closeBtn and Maximize button would be hidden if use GetMinSize()
+    //SetSize(wxSize(FromDIP(1050), FromDIP(700)));
+#endif
 
     Layout();
 
@@ -569,7 +583,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
         if (evt.CmdDown() && evt.GetKeyCode() == 'J') { m_printhost_queue_dlg->Show(); return; }    
         if (evt.CmdDown() && evt.GetKeyCode() == 'N') { m_plater->new_project(); return;}
         if (evt.CmdDown() && evt.GetKeyCode() == 'O') { m_plater->load_project(); return;}
-        if (evt.CmdDown() && evt.ShiftDown() && evt.GetKeyCode() == 'S') { if (can_save_as()) m_plater->save_project(true); return;}
+        if (evt.CmdDown() && evt.ShiftDown() && evt.GetKeyCode() == 'S') { if (can_save_as()) m_plater->save_project(true, FT_PROJECT); return;}
         else if (evt.CmdDown() && evt.GetKeyCode() == 'S') { if (can_save()) m_plater->save_project(false, FT_PROJECT); return;}
         if (evt.CmdDown() && evt.GetKeyCode() == 'F') { 
             if (m_plater && (m_tabpanel->GetSelection() == TabPosition::tp3DEditor || m_tabpanel->GetSelection() == TabPosition::tpPreview)) {
@@ -593,6 +607,19 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
             if (m_plater) { m_plater->add_file(); }
             return;
         }
+
+#ifdef __APPLE__
+        if (evt.GetKeyCode() == WXK_F5)
+#else
+        if (evt.GetKeyCode() == WXK_F3)
+#endif
+        {
+            if (m_plater) {
+                m_plater->center_selection();
+            }
+            return;
+        }
+
         evt.Skip();
     });
 
@@ -773,10 +800,6 @@ void MainFrame::update_layout()
 
                 if (!preview_only_hint())
                     return;
-
-                if (m_printer_mgr_view) {
-                    m_printer_mgr_view->update_which_device_is_current();
-                }
             }
             else if (evt.GetId() == tpDeviceMgr){ 
                 if (m_printer_mgr_view) {
@@ -949,7 +972,21 @@ void MainFrame::show_option(bool show)
         }
     }
 }
-
+void  MainFrame::trackEvent(const std::string& event, const std::string& data)
+{
+    try{
+       nlohmann::json commandJson;
+        commandJson["command"] = "track";
+        commandJson["event"] = event;
+        commandJson["data"] = json::parse(data);
+        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+        if(m_printer_mgr_view)
+            m_printer_mgr_view->run_script(strJS.ToStdString());
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << "MainFrame::trackEvent: " << e.what();
+    }
+    
+}
 void MainFrame::init_tabpanel() {
     // wxNB_NOPAGETHEME: Disable Windows Vista theme for the Notebook background. The theme performance is terrible on
     // Windows 10 with multiple high resolution displays connected.
@@ -980,11 +1017,13 @@ void MainFrame::init_tabpanel() {
                 if (m_tab_event_enabled)
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLVIEWTOOLBAR_3D));
                 m_param_panel->OnActivate();
+                UpdateParams::getInstance().checkParamsNeedUpdate();
             }
             else if (sel == tpPreview) {
                 if (m_tab_event_enabled)
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLVIEWTOOLBAR_PREVIEW));
                 m_param_panel->OnActivate();
+                UpdateParams::getInstance().closeParamsUpdateTip();
             }
         }
         //else if (panel == m_param_panel)
@@ -1186,7 +1225,8 @@ bool MainFrame::preview_only_hint()
         if (preview_only_to_editor) {
             m_plater->new_project();
             preview_only_to_editor = false;
-
+            
+            return true;
         }
         else{//Event cannot be directly passed to TopBar object
             this->m_topbar->SetSelection(tpPreview);
@@ -1521,7 +1561,11 @@ bool MainFrame::can_reslice() const
 }
 
 void  MainFrame::slice_plate(SliceSelectType type){
-    if (!get_enable_slice_status() && type!=SliceSelectType::eSliceAll)
+    if (type != SliceSelectType::eSliceAll) {
+        if(!get_enable_slice_status())
+        return;
+    }
+    else if (m_plater->only_gcode_mode())
         return;
     // this->m_plater->select_view_3D("Preview");
     m_plater->exit_gizmo();
@@ -1950,15 +1994,15 @@ bool MainFrame::get_enable_print_status(bool is_all_or_any_of_them)
             enable = false;
         enable = enable && !is_all_plates;
     }
-    else if (m_print_select == eUploadGcode) {
-        if (wxGetApp().plater()->only_gcode_mode()) {
-            enable = true;
-        } else if (!current_plate->is_slice_result_valid())
-            enable = false;
-        /*f (!can_send_gcode())
-            enable = false;*/
-        enable = enable && !is_all_plates;
-    }
+    //else if (m_print_select == eUploadGcode) {
+    //    if (wxGetApp().plater()->only_gcode_mode()) {
+    //        enable = true;
+    //    } else if (!current_plate->is_slice_result_valid())
+    //        enable = false;
+    //    /*f (!can_send_gcode())
+    //        enable = false;*/
+    //    enable = enable && !is_all_plates;
+    //}
     else if (m_print_select == eExportSlicedFile)
     {
         if (!current_plate->is_slice_result_ready_for_export())
@@ -1978,7 +2022,7 @@ bool MainFrame::get_enable_print_status(bool is_all_or_any_of_them)
 		}
         enable = enable && !is_all_plates;
 	}
-    else if (m_print_select == eSendToLocalNetPrinter)
+    else if (m_print_select == eSendToLocalNetPrinter || m_print_select == eUploadGcode)
     {
         if (wxGetApp().plater()->only_gcode_mode())
         {
@@ -2040,7 +2084,7 @@ bool MainFrame::get_enable_print_status(bool is_all_or_any_of_them)
         enable = enable && !is_all_plates;
     }
 
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": m_print_select %1%, enable= %2% ")%m_print_select %enable;
+    //BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": m_print_select %1%, enable= %2% ")%m_print_select %enable;
 
     return enable;
 }
@@ -2331,6 +2375,11 @@ static wxMenu* generate_help_menu()
         std::string data_dir = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
         //A.0
         std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
+        std::string version = std::string(PROJECT_VERSION_EXTRA);
+        bool        is_alpha = boost::algorithm::icontains(version, "alpha");
+        if (is_alpha) {
+            version_dir = version_dir + std::string(" Alpha");
+        }
 #ifdef _WIN32
         std::string LogFilePath  = data_dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir + "\\" + "log";
 #else
@@ -2486,7 +2535,7 @@ void MainFrame::init_menubar_as_editor()
             [this](){return can_add_models(); }, this);
 #else
         append_menu_item(import_menu, wxID_ANY, _L("Import 3MF/STL/STEP/SVG/OBJ/AMF") + dots + "\t" + ctrl + "I", _L("Load a model"),
-            [this](wxCommandEvent&) { if (m_plater) { m_plater->add_model(); } }, "", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) { m_plater->add_model(); } }, "menu_import", nullptr,
             [this](){return can_add_models(); }, this);
 #endif
         // append_menu_item(import_menu, wxID_ANY, _L("Import Zip Archive") + dots, _L("Load models contained within a zip archive"),
@@ -3677,7 +3726,9 @@ public:
                 m_scrolledWindowSizer->Add(boxSizer);
             }
         }
-        this->ShowModal();
+        if (this->ShowModal() == wxID_CANCEL) {
+            m_nClickedButtonValue = -1;
+        }
     }
 
     int getClickedButtonValue() { return m_nClickedButtonValue; }
@@ -3800,9 +3851,15 @@ void MainFrame::load_config_file()
         dlg.showMiltiFile(lstOverrideConfirm);
         return dlg.getClickedButtonValue();
     });
-    for (auto item : cfiles) {
-        if (!spLoadOldPresets->loadPresets(item)) {
-            vtNewDataFile.push_back(item);
+    for (auto iter = cfiles.begin(); iter != cfiles.end();) {
+        if (!spLoadOldPresets->loadPresets(*iter)){
+            if (spLoadOldPresets->getLastError().code == "-1") {
+            } else {
+                vtNewDataFile.push_back(*iter);
+            }
+            iter = cfiles.erase(iter);
+        } else {
+            iter++;
         }
     }
     
@@ -3838,6 +3895,7 @@ void MainFrame::load_config_file()
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " user is: " << agent->get_user_id();
         }
     }
+    cfiles.insert(cfiles.begin(), vtNewDataFile.begin(), vtNewDataFile.end());
     wxGetApp().preset_bundle->update_compatible(PresetSelectCompatibleType::Always);
     update_side_preset_ui();
     auto msg = wxString::Format(_L_PLURAL("There is %d config imported. (Only non-system and compatible configs)",
@@ -4199,6 +4257,7 @@ void MainFrame::add_to_recent_projects(const wxString& filename)
             recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
         }
         wxGetApp().app_config->set_recent_projects(recent_projects);
+        wxGetApp().app_config->set_project_times(m_recent_projects.GetFileOpenTimeVector());
         m_webview->SendRecentList(0);
     }
 }
@@ -4212,15 +4271,39 @@ std::wstring MainFrame::FileHistory::GetThumbnailUrl(int index) const
     return wss.str();
 }
 
+std::wstring MainFrame::FileHistory::GetFileOpenTime(int index) const
+{
+    if (m_file_open_time[index].empty()) return L"";
+
+    std::wstring wide_from = boost::nowide::widen(m_file_open_time[index]);
+    return wide_from;
+}
+
+static std::string getCurrentTime()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm = *std::localtime(&now_time_t);
+    std::stringstream ss;
+    ss << std::put_time(&now_tm, "%Y.%m.%d %H:%M:%S");
+    return ss.str();
+}
+
 void MainFrame::FileHistory::AddFileToHistory(const wxString &file)
 {
     if (this->m_fileMaxFiles == 0)
         return;
     wxFileHistory::AddFileToHistory(file);
     if (m_load_called)
+    {
         m_thumbnails.push_front(bbs_3mf_get_thumbnail(into_u8(file).c_str()));
+        m_file_open_time.push_front(getCurrentTime());
+    }
     else
+    {
         m_thumbnails.push_front("");
+        m_file_open_time.push_front("");
+    }
 }
 
 void MainFrame::FileHistory::RemoveFileFromHistory(size_t i)
@@ -4229,6 +4312,7 @@ void MainFrame::FileHistory::RemoveFileFromHistory(size_t i)
         return;
     wxFileHistory::RemoveFileFromHistory(i);
     m_thumbnails.erase(m_thumbnails.begin() + i);
+    m_file_open_time.erase(m_file_open_time.begin() + i);
 }
 
 size_t MainFrame::FileHistory::FindFileInHistory(const wxString & file)
@@ -4246,6 +4330,14 @@ void MainFrame::FileHistory::LoadThumbnails()
             }
         }
     });
+
+    std::vector<std::string> recent_project_times = wxGetApp().app_config->get_projects_open_time();
+    //std::reverse(recent_project_times.begin(), recent_project_times.end());
+    for (int j = 0; j < recent_project_times.size(); j++)
+    {
+        m_file_open_time[j] = recent_project_times[j];
+    }
+
     m_load_called = true;
 }
 
@@ -4255,6 +4347,11 @@ inline void MainFrame::FileHistory::SetMaxFiles(int max)
     size_t numFiles = m_fileHistory.size();
     while (numFiles > m_fileMaxFiles)
         RemoveFileFromHistory(--numFiles);
+}
+
+std::deque<std::string> MainFrame::FileHistory::GetFileOpenTimeVector()
+{
+    return this->m_file_open_time;
 }
 
 void MainFrame::get_recent_projects(boost::property_tree::wptree &tree, int images)
@@ -4267,7 +4364,8 @@ void MainFrame::get_recent_projects(boost::property_tree::wptree &tree, int imag
         boost::system::error_code ec;
         std::time_t t = boost::filesystem::last_write_time(proj, ec);
         if (!ec) {
-            std::wstring time = wxDateTime(t).FormatISOCombined(' ').ToStdWstring();
+            //std::wstring time = wxDateTime(t).FormatISOCombined(' ').ToStdWstring();
+            std::wstring time =  m_recent_projects.GetFileOpenTime(i);
             item.put(L"time", time);
             if (i <= images) {
                 auto thumbnail = m_recent_projects.GetThumbnailUrl(i);
@@ -4305,6 +4403,7 @@ void MainFrame::open_recent_project(size_t file_id, wxString const & filename)
                 recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
             }
             wxGetApp().app_config->set_recent_projects(recent_projects);
+            wxGetApp().app_config->set_project_times(m_recent_projects.GetFileOpenTimeVector());
             m_webview->SendRecentList(-1);
         }
     }
@@ -4328,6 +4427,7 @@ void MainFrame::remove_recent_project(size_t file_id, wxString const &filename)
         recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
     }
     wxGetApp().app_config->set_recent_projects(recent_projects);
+    wxGetApp().app_config->set_project_times(m_recent_projects.GetFileOpenTimeVector());
     m_webview->SendRecentList(-1);
 }
 
@@ -4419,11 +4519,22 @@ void MainFrame::update_side_preset_ui()
             if (bFirstUpdate) {
                 bFirstUpdate           = false;
                 std::string presetName = wxGetApp().preset_bundle->prints.get_selected_preset_name();
-                tab->select_preset(presetName);
+                if (wxGetApp().plater()->get_project_name() == _L("Untitled")) {
+                    tab->select_preset(presetName);
+                }
             }
         };
     }
 
+    if (wxGetApp().get_user().bLogin) {
+        static bool bFirstUpdate = true;
+        if (bFirstUpdate) {
+            bFirstUpdate = false;
+            if (wxGetApp().plater()->get_project_name() == _L("Untitled")) {
+                m_plater->sidebar().updateLastFilement(wxGetApp().preset_bundle->lastFilamentPresets);
+            }
+        }
+    }
     //BBS: update the preset
     m_plater->sidebar().update_presets(Preset::TYPE_PRINTER);
     m_plater->sidebar().update_presets(Preset::TYPE_FILAMENT);

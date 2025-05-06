@@ -626,6 +626,23 @@ void Transformation::reset_skew()
     m_matrix = get_offset_matrix() * Transform3d(svd.u) * scale_transform(new_scale_factor(svd.s)) * Transform3d(svd.v.transpose()) * svd.mirror_matrix();
 }
 
+const Transform3d &Transformation::get_matrix(bool dont_translate, bool dont_rotate, bool dont_scale, bool dont_mirror) const
+{
+    if (dont_translate == false && dont_rotate == false && dont_scale == false && dont_mirror == false) {
+        return m_matrix;
+    }
+    Transformation refence_tran(m_matrix);
+    if (dont_translate)
+        refence_tran.reset_offset();
+    if (dont_rotate)
+        refence_tran.reset_rotation();
+    if (dont_scale)
+        refence_tran.reset_scaling_factor();
+    if (dont_mirror)
+        refence_tran.reset_mirror();
+    m_temp_matrix = refence_tran.get_matrix();
+    return m_temp_matrix;
+}
 Transform3d Transformation::get_matrix_no_offset() const
 {
     Transformation copy(*this);
@@ -638,6 +655,24 @@ Transform3d Transformation::get_matrix_no_scaling_factor() const
     Transformation copy(*this);
     copy.reset_scaling_factor();
     return copy.get_matrix();
+}
+
+
+// Orca: Implement prusa's filament shrink compensation approach
+Transform3d Transformation::get_matrix_with_applied_shrinkage_compensation(const Vec3d& shrinkage_compensation) const
+{
+    const Transform3d shrinkage_trafo = Geometry::scale_transform(shrinkage_compensation);
+    const Vec3d       trafo_offset    = this->get_offset();
+    const Vec3d       trafo_offset_xy = Vec3d(trafo_offset.x(), trafo_offset.y(), 0.);
+
+    Transformation copy(*this);
+    copy.set_offset(Axis::X, 0.);
+    copy.set_offset(Axis::Y, 0.);
+
+    Transform3d trafo_after_shrinkage = (shrinkage_trafo * copy.get_matrix());
+    trafo_after_shrinkage.translation() += trafo_offset_xy;
+
+    return trafo_after_shrinkage;
 }
 
 Transformation Transformation::operator * (const Transformation& other) const

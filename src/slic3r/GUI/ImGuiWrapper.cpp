@@ -86,6 +86,7 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::FillButtonDarkIcon         , "fill_paint_dark"                    },
     {ImGui::HeightRangeDarkIcon        , "height_range_dark"                  },
     {ImGui::ConfirmDarkIcon            , "confirm_dark"                       },
+    {ImGui::ConfirmHoverDarkIcon       , "confirm_hover_dark"                 },
     {ImGui::GapFillDarkIcon            , "gap_fill_dark"                      },
     {ImGui::SphereButtonDarkIcon       , "toolbar_modifier_sphere_dark"       },
 
@@ -103,6 +104,18 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::ExpandArrowIcon,              "notification_expand"               },
     {ImGui::OpenArrowIcon,                "notification_arrow_open"           },
 };
+
+static const std::map<const wchar_t, std::string> font_icons_wide = {
+
+    // Boolean operations
+    {ImGui::UnionBooleanButton, "union_boolean"},
+    {ImGui::UnionBooleanDarkButton, "union_boolean_dark"},
+    {ImGui::IntersectionBooleanButton, "intersection_boolean"},
+    {ImGui::IntersectionBooleanDarkButton, "intersection_boolean_dark"},
+    {ImGui::DifferenceBooleanButton, "difference_boolean"},
+    {ImGui::DifferenceBooleanDarkButton, "difference_boolean_dark"},
+};
+
 static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::CloseNotifButton        , "notification_close"              },
     {ImGui::CloseNotifHoverButton   , "notification_close_hover"        },
@@ -516,7 +529,8 @@ void ImGuiWrapper::new_frame()
     }
 
     if (m_font_texture == 0) {
-        init_font(true);
+        //init_font(true);
+        init_font_all(true);
     }
 
     ImGui::NewFrame();
@@ -784,6 +798,52 @@ bool ImGuiWrapper::bbl_slider_float(const std::string& label, float* v, float v_
     return ret;
 }
 
+void ImGuiWrapper::set_draggable_window_pos(float x, float y, int flag, float pivot_x, float pivot_y, bool force)
+{
+    if (force || !m_is_drag_initialized) 
+    {
+        m_is_drag_initialized = true;
+        m_window_pos = ImVec2(x, y);
+    }
+    m_flag = flag;
+    m_pivot_x = pivot_x;
+    m_pivot_y = pivot_y;
+}
+
+bool ImGuiWrapper::begin_with_drag(const std::string& name, int flags)
+{
+    set_next_window_pos(m_window_pos.x, m_window_pos.y, m_flag, m_pivot_x, m_pivot_y);
+    bool result = ImGui::Begin(name.c_str(), nullptr, (ImGuiWindowFlags)flags);;
+    bool dragging = false;
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) 
+    {
+        if (m_is_dragging) {
+            ImVec2 new_pos = ImGui::GetMousePos();
+            m_window_pos.x += (new_pos.x - m_last_drag_pos.x);
+            m_window_pos.y += (new_pos.y - m_last_drag_pos.y);
+            m_last_drag_pos = new_pos;
+        }
+        if (ImGui::IsWindowHovered()) 
+        {
+            if (!m_is_dragging) {
+                m_last_drag_pos = ImGui::GetMousePos();
+                if (m_last_drag_pos.y - m_window_pos.y < 30)
+                    m_is_dragging   = true;
+            }
+        }
+    }
+    else
+    {
+        m_is_dragging = false;
+    }
+    return result;
+}
+
+bool ImGuiWrapper::begin_with_drag(const wxString& name, int flags) 
+{ 
+    return begin_with_drag(into_u8(name), flags); 
+}
+
 bool ImGuiWrapper::begin(const std::string &name, int flags)
 {
     return ImGui::Begin(name.c_str(), nullptr, (ImGuiWindowFlags)flags);
@@ -984,9 +1044,20 @@ void ImGuiWrapper::tooltip(const char *label, float wrap_width)
 {
     ImGui::BeginTooltip();
     ImGui::PushTextWrapPos(wrap_width);
-    //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
     ImGui::TextUnformatted(label);
-    //ImGui::PopStyleColor(1);
+    ImGui::PopStyleColor(1);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+void ImGuiWrapper::tooltip(const std::string& label, float wrap_width) 
+{
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(wrap_width);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::PopStyleColor(1);
     ImGui::PopTextWrapPos();
     ImGui::EndTooltip();
 }
@@ -2624,6 +2695,49 @@ void ImGuiWrapper::pop_radio_style()
     ImGui::PopStyleColor(1);
 }
 
+bool HasUnsupportedCharacters(const std::string& str, ImFont* font) {
+    if (!font) {
+        return false;
+    }
+
+    const char* p = str.c_str();
+    while (*p) {
+        unsigned int codepoint;
+        // 手动处理 UTF - 8 字符到 Unicode 码点的转换
+        if (*p < 0x80) {
+            // 单字节字符
+            codepoint = *p;
+            p += 1;
+        } else if ((*p & 0xE0) == 0xC0) {
+            // 双字节字符
+            if (p[1] == '\0') break;
+            codepoint = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+            p += 2;
+        } else if ((*p & 0xF0) == 0xE0) {
+            // 三字节字符
+            if (p[1] == '\0' || p[2] == '\0') break;
+            codepoint = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+            p += 3;
+        } else if ((*p & 0xF8) == 0xF0) {
+            // 四字节字符
+            if (p[1] == '\0' || p[2] == '\0' || p[3] == '\0') break;
+            codepoint = ((p[0] & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+            p += 4;
+        } else {
+            // 无效的 UTF - 8 序列
+            break;
+        }
+
+        // 使用 FindGlyph 检查字符是否在字体中
+        const ImFontGlyph* glyph = font->FindGlyph(static_cast<ImWchar>(codepoint));
+        if (!glyph) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void ImGuiWrapper::init_font(bool compress)
 {
     destroy_font();
@@ -2699,6 +2813,10 @@ void ImGuiWrapper::init_font(bool compress)
         m_custom_glyph_rects_ids[icon.first] =
         io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
     }
+    for (auto& icon : font_icons_wide) {
+        m_custom_glyph_rects_ids[icon.first] = 
+        io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz * 2.0, icon_sz, 3.0 * font_scale + icon_sz);
+    }
     for (auto& icon : font_icons_large) {
         m_custom_glyph_rects_ids[icon.first] =
         io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz * 2, icon_sz * 2, 3.0 * font_scale + icon_sz * 2);
@@ -2736,6 +2854,10 @@ void ImGuiWrapper::init_font(bool compress)
     for (auto icon : font_icons) {
         load_icon_from_svg(icon, icon_sz);
     }
+     
+    for (auto icon : font_icons_wide) {
+        load_icon_from_svg(icon, icon_sz);
+    }
 
     icon_sz *= 2; // default size of large icon is 32 px
     for (auto icon : font_icons_large) {
@@ -2765,7 +2887,228 @@ void ImGuiWrapper::init_font(bool compress)
 
     // Restore state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
+
 }
+
+void ImGuiWrapper::init_font_all(bool compress)
+{
+    destroy_font();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();
+
+    // Create ranges of characters from m_glyph_ranges, possibly adding some OS specific special characters.
+    ImVector<ImWchar>               ranges;
+    ImVector<ImWchar>               basic_ranges;
+    ImFontAtlas::GlyphRangesBuilder builder;
+    builder.AddRanges(m_glyph_ranges);
+
+    static const ImWchar ranges_latin2[] = {
+        0x0020, 0x00FF, // Basic Latin + Latin Supplement
+        0x0100, 0x017F, // Latin Extended-A
+        0,
+    };
+    static const ImWchar ranges_turkish[] = {
+        0x0020, 0x01FF, // Basic Latin + Latin Supplement
+        0x0100, 0x017F, // Latin Extended-A
+        0x0180, 0x01FF, // Turkish
+        0,
+    };
+    static const ImWchar ranges_vietnamese[] = {
+        0x0020, 0x00FF, // Basic Latin
+        0x0102, 0x0103, 0x0110, 0x0111, 0x0128, 0x0129, 0x0168, 0x0169, 0x01A0, 0x01A1, 0x01AF, 0x01B0, 0x1EA0, 0x1EF9, 0,
+    };
+    builder.AddRanges(ranges_latin2);
+    builder.AddRanges(ranges_turkish);
+    builder.AddRanges(ranges_vietnamese);
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesDefault());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesKorean());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesOthers());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesEnglish());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesThai());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesChineseSimplifiedCommon());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesJapanese());
+    builder.AddRanges(ImGui::GetIO().Fonts->GetGlyphRangesCyrillic());
+#ifdef __APPLE__
+    if (m_font_cjk)
+        // Apple keyboard shortcuts are only contained in the CJK fonts.
+        builder.AddRanges(ranges_keyboard_shortcuts);
+#endif
+    builder.BuildRanges(&ranges); // Build the final result (ordered ranges with all the unique characters submitted)
+
+    io.Fonts->Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight;
+    ImFontConfig cfg = ImFontConfig();
+    cfg.OversampleH = cfg.OversampleV = 1;
+    cfg.MergeMode                     = false;
+
+    // FIXME replace with io.Fonts->AddFontFromMemoryTTF(buf_decompressed_data, (int)buf_decompressed_size, m_font_size, nullptr,
+    // ranges.Data); https://github.com/ocornut/imgui/issues/220
+
+    // Orca: temp fix for Korean font
+    auto font_name_regular = "HarmonyOS_Sans_SC_Regular.ttf";
+    auto font_name_bold    = "HarmonyOS_Sans_SC_Bold.ttf";
+    default_font = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + font_name_regular).c_str(), m_font_size, &cfg,
+                                                ranges.Data);
+    if (default_font == nullptr) {
+        default_font = io.Fonts->AddFontDefault();
+        if (default_font == nullptr) {
+            throw Slic3r::RuntimeError("ImGui: Could not load deafult font");
+        }
+    }
+    font_name_regular = "NanumGothic-Regular.ttf";
+    cfg.MergeMode     = true;
+    default_font      = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + font_name_regular).c_str(), m_font_size, &cfg,
+                                                     ranges.Data);
+    if (default_font == nullptr) {
+        default_font = io.Fonts->AddFontDefault();
+        if (default_font == nullptr) {
+            throw Slic3r::RuntimeError("ImGui: Could not load deafult font");
+        }
+    }
+
+    cfg.MergeMode = false;
+    bold_font = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + font_name_bold).c_str(), m_font_size, &cfg, ranges.Data);
+    if (bold_font == nullptr) {
+        bold_font = io.Fonts->AddFontDefault();
+        if (bold_font == nullptr) {
+            throw Slic3r::RuntimeError("ImGui: Could not load deafult font");
+        }
+    }
+
+    cfg.MergeMode  = true;
+    font_name_bold = "NanumGothic-Bold.ttf";
+
+    bold_font = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + font_name_bold).c_str(), m_font_size, &cfg, ranges.Data);
+    if (bold_font == nullptr) {
+        bold_font = io.Fonts->AddFontDefault();
+        if (bold_font == nullptr) {
+            throw Slic3r::RuntimeError("ImGui: Could not load deafult font");
+        }
+    }
+
+#ifdef _WIN32
+    // Render the text a bit larger (see GLCanvas3D::_resize() and issue #3401), but only if the scale factor
+    // for the Display is greater than 300%.
+    if (wxGetApp().em_unit() > 30) {
+        default_font->Scale = 1.5f;
+        bold_font->Scale    = 1.5f;
+    }
+#endif
+
+#ifdef __APPLE__
+    ImFontConfig config;
+    config.MergeMode = true;
+    if (!m_font_cjk) {
+        // Apple keyboard shortcuts are only contained in the CJK fonts.
+        [[maybe_unused]] ImFont* font_cjk =
+            io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/HarmonyOS_Sans_SC_Regular.ttf").c_str(), m_font_size, &config,
+                                         ranges_keyboard_shortcuts);
+        assert(font_cjk != nullptr);
+    }
+#endif
+
+    float font_scale = m_font_size / 15;
+    int   icon_sz    = lround(16 * font_scale); // default size of icon is 16 px
+
+    int rect_id = io.Fonts->CustomRects.Size; // id of the rectangle added next
+    // add rectangles for the icons to the font atlas
+    for (auto& icon : font_icons) {
+        m_custom_glyph_rects_ids[icon.first] = io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz, icon_sz,
+                                                                                    3.0 * font_scale + icon_sz);
+    }
+
+    for (auto& icon : font_icons_wide) {
+        m_custom_glyph_rects_ids[icon.first] = io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz * 2.0, icon_sz,
+                                                                                3.0 * font_scale + icon_sz);
+    }
+
+    for (auto& icon : font_icons_large) {
+        m_custom_glyph_rects_ids[icon.first] = io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz * 2, icon_sz * 2,
+                                                                                3.0 * font_scale + icon_sz * 2);
+    }
+    for (auto& icon : font_icons_extra_large) {
+        m_custom_glyph_rects_ids[icon.first] = io.Fonts->AddCustomRectFontGlyph(default_font, icon.first, icon_sz * 4, icon_sz * 4,
+                                                                                3.0 * font_scale + icon_sz * 4);
+    }
+
+    // Build texture atlas
+    unsigned char* pixels;
+    int            width, height;
+    io.Fonts->GetTexDataAsRGBA32(
+        &pixels, &width,
+        &height); // Load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be
+                  // compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture
+                  // id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
+    BOOST_LOG_TRIVIAL(trace) << "Build default font texture done. width: " << width << ", height: " << height;
+
+    auto load_icon_from_svg = [this, &io, pixels, width, &rect_id](const std::pair<const wchar_t, std::string> icon, int icon_sz) {
+        if (const ImFontAtlas::CustomRect* rect = io.Fonts->GetCustomRectByIndex(rect_id)) {
+            //assert(rect->Width == icon_sz);
+            //assert(rect->Height == icon_sz);
+            assert(rect->Width % icon_sz == 0);
+            assert(rect->Height == icon_sz);
+            unsigned                   outwidth, outheight;
+            std::vector<unsigned char> raw_data = load_svg(icon.second, icon_sz, icon_sz, &outwidth, &outheight);
+            if (!raw_data.empty()) {
+                const ImU32* pIn = (ImU32*) raw_data.data();
+                for (unsigned y = 0; y < outheight; y++) {
+                    ImU32* pOut = (ImU32*) pixels + (rect->Y + y) * width + (rect->X);
+                    for (unsigned x = 0; x < outwidth; x++)
+                        *pOut++ = *pIn++;
+                }
+            }
+        }
+        rect_id++;
+    };
+
+    // Fill rectangles from the SVG-icons
+    for (auto icon : font_icons) {
+        load_icon_from_svg(icon, icon_sz);
+    }
+
+    for (auto& icon : font_icons_wide) {
+        load_icon_from_svg(icon, icon_sz);
+    }
+
+    icon_sz *= 2; // default size of large icon is 32 px
+    for (auto icon : font_icons_large) {
+        load_icon_from_svg(icon, icon_sz);
+    }
+
+    icon_sz *= 2; // default size of extra large icon is 64 px
+    for (auto icon : font_icons_extra_large) {
+        load_icon_from_svg(icon, icon_sz);
+    }
+
+    // Upload texture to graphics system
+    GLint last_texture;
+    glsafe(::glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
+    glsafe(::glGenTextures(1, &m_font_texture));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, m_font_texture));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    glsafe(::glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
+    if (compress && GLEW_EXT_texture_compression_s3tc)
+        glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels));
+    else
+        glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels));
+
+    // Store our identifier
+    io.Fonts->TexID = (ImTextureID) (intptr_t) m_font_texture;
+
+    // Restore state
+    glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
+
+    auto fonts = io.Fonts->Fonts;
+    for (auto font : fonts) {
+        if (HasUnsupportedCharacters("텍스트 양각", font)) {
+            BOOST_LOG_TRIVIAL(warning) << "Font does not support all characters";
+        }
+    }
+
+}
+
 
 void ImGuiWrapper::load_fonts_texture()
 {

@@ -167,6 +167,7 @@ protected:
 
     
     void moves_tick(bool manual);
+    ImVec2 draw_circle_frame(const char* label, const ImVec2& size_arg = ImVec2(0, 0));
 
 private:
     std::string get_label(int tick, LabelType label_type = ltHeightWithLayer);

@@ -221,8 +221,9 @@ public:
     // Has this profile been loaded?
     bool                loaded      = false;
 
-    bool  m_is_user_presets = true;
+    bool m_is_user_printer_hidden = true;   //true-ÏÔÊ¾  false-Òş²Ø
 
+    bool m_is_non_standard_printer = false; 
     // Configuration data, loaded from a file, or set from the defaults.
     DynamicPrintConfig  config;
 

@@ -33,6 +33,7 @@
 #include "format.hpp"
 #include "DailyTips.hpp"
 
+#include "slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoEmboss.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
@@ -197,7 +198,8 @@ void GLCanvas3D::LayersEditing::show_tooltip_information(const GLCanvas3D& canva
     caption_max += GImGui->Style.WindowPadding.x + imgui.scaled(1);
 
 	float  scale       = canvas.get_scale(); 
-    ImVec2 button_size = ImVec2(25 * scale, 25 * scale); // ORCA: Use exact resolution will prevent blur on icon
+    //ImVec2 button_size = ImVec2(25 * scale, 25 * scale); // ORCA: Use exact resolution will prevent blur on icon
+    ImVec2 button_size = ImVec2(21 * scale, 21 * scale); // ORCA: Use exact resolution will prevent blur on icon
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0}); // ORCA: Dont add padding
     ImGui::ImageButton3(normal_id, hover_id, button_size);
@@ -207,10 +209,12 @@ void GLCanvas3D::LayersEditing::show_tooltip_information(const GLCanvas3D& canva
         auto draw_text_with_caption = [this, &caption_max, &imgui](const wxString& caption, const wxString& text) {
             imgui.text_colored(ImGuiWrapper::COL_ACTIVE, caption);
             ImGui::SameLine(caption_max);
-            imgui.text_colored(ImGuiWrapper::COL_WINDOW_BG, text);
+            //imgui.text_colored(ImGuiWrapper::COL_WINDOW_BG, text);
+            imgui.text_colored(ImGuiWrapper::COL_CREALITY, text);
         };
 
-        for (const auto& caption_text : captions_texts) draw_text_with_caption(caption_text.first, caption_text.second);
+        for (const auto& caption_text : captions_texts) 
+            draw_text_with_caption(caption_text.first, caption_text.second);
 
         ImGui::EndTooltip();
     }
@@ -225,15 +229,21 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
     //const Size& cnv_size = canvas.get_canvas_size();
     //float left_pos = canvas.m_main_toolbar.get_item("layersediting")->render_left_pos;
     const float x  = canvas.get_input_window_render_left_pos(); //(1 + left_pos) * cnv_size.get_width() / 2;
-    imgui.set_next_window_pos(x, canvas.m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+
+    //imgui.set_next_window_pos(x, canvas.m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+    imgui.set_draggable_window_pos(x, canvas.m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
 
     imgui.push_toolbar_style(canvas.get_scale());
+    //ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f * canvas.get_scale(), 10.0f * canvas.get_scale()));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f * canvas.get_scale(), 10.0f * canvas.get_scale()));
     
+    //ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (30.0f * canvas.get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-                        ImVec2(8.0f, (30.0f * canvas.get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
-    imgui.begin(_L("Variable layer height"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
-    ImGui::PopStyleVar(1);
+                        ImVec2(20.0f, (30.0f * canvas.get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5);
+    imgui.begin_with_drag(_L("Variable layer height"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
+    ImGui::PopStyleVar(2);
 
     const float sliders_width = imgui.scaled(7.0f);
     const float input_box_width = 2.0 * imgui.get_slider_icon_size().x;
@@ -272,10 +282,11 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
     }
     ImGui::SameLine();
 
-    
+    ImVec4 normal_color(110 / 255.0, 110 / 255.0, 115 / 255.0, 1.0);
+
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(110/255.0, 110/255.0, 115/255.0, 1.0));
+    ImGui::PushStyleColor(ImGuiCol_Button, normal_color);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(20, 5));
     const float h  = ImGui::GetFrameHeight();
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, h * 0.5f);
@@ -286,8 +297,14 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor(3);
 
+    /* line */
+    ImGui::PushStyleColor(ImGuiCol_Separator, normal_color);
+    //ImGui::SetCursorPosX(50.0f);
+    ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - 100) * 0.5f); // ���м���
+    ImGui::SetNextItemWidth(200.0f);
     ImGui::Separator();
-    
+    ImGui::PopStyleColor();
+    /* line end */
 
     ImGui::PushItemWidth(max_text_size);
     ImGui::AlignTextToFramePadding();
@@ -331,7 +348,7 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
 
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(110 / 255.0, 110 / 255.0, 115 / 255.0, 1.0));
+    ImGui::PushStyleColor(ImGuiCol_Button, normal_color);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(20, 5));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, h * 0.5f);
 
@@ -410,7 +427,7 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
     imgui.bbl_checkbox("##keep_min", m_smooth_params.keep_min);
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
-    imgui.text(_L("Keep min"));
+    imgui.text(_L("Keep the minimum floor height constant"));
 
     //ImGui::Separator();
 
@@ -423,9 +440,18 @@ void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanv
         {_L("Mouse wheel:"), _L("Increase/decrease edit area")}
     };
     show_tooltip_information(canvas, captions_texts, x, get_cur_y);
+
     ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY);
+    ImGui::PushStyleColor(ImGuiCol_Button, normal_color);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(20, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, h * 0.5f);
     if (imgui.button(_L("Reset")))
         wxPostEvent((wxEvtHandler*)canvas.get_wxglcanvas(), SimpleEvent(EVT_GLCANVAS_RESET_LAYER_HEIGHT_PROFILE));
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(3);
 
     GLCanvas3D::LayersEditing::s_overlay_window_width = ImGui::GetWindowSize().x;
     imgui.end();
@@ -1246,6 +1272,7 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
     , m_main_toolbar(GLToolbar::Normal, "Main")
     , m_separator_toolbar(GLToolbar::Normal, "Separator")
     , m_assemble_view_toolbar(GLToolbar::Normal, "Assembly_View")
+    , m_assemble_view_internal_toolbar(GLToolbar::Normal, "Assembly_View_Internal")
     , m_return_toolbar()
     , m_canvas_type(ECanvasType::CanvasView3D)
     , m_gizmos(*this)
@@ -1841,6 +1868,7 @@ void GLCanvas3D::enable_select_plate_toolbar(bool enable)
 void GLCanvas3D::enable_assemble_view_toolbar(bool enable)
 {
     m_assemble_view_toolbar.set_enabled(enable);
+    m_assemble_view_internal_toolbar.set_enabled(enable);
 }
 
 void GLCanvas3D::enable_return_toolbar(bool enable)
@@ -2909,7 +2937,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 }
                 if (need_update) {
                     ConfigOptionFloat wt_x_opt(x);
-                    dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
+                    dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
                     need_update = false;
                 }
 
@@ -2923,7 +2951,8 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 }
                 if (need_update) {
                     ConfigOptionFloat wt_y_opt(y);
-                    dynamic_cast<ConfigOptionFloats *>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
+                    dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
+                    ppl.set_default_wipe_tower_pos_for_plate(plate_id);
                 }
 
                 int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
@@ -2933,6 +2962,14 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 int volume_idx_wipe_tower_old = volume_idxs_wipe_tower_old[plate_id];
                 if (volume_idx_wipe_tower_old != -1)
                     map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
+            }
+        } else if (filaments_count == 1) {
+            DynamicPrintConfig& proj_cfg = wxGetApp().preset_bundle->project_config;
+            ConfigOptionFloat   wt_x_opt(0);
+            ConfigOptionFloat   wt_y_opt(0);
+            for (int plate_id = 0; plate_id < n_plates; plate_id++) {
+                dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_x"))->set_at(&wt_x_opt, plate_id, 0);
+                dynamic_cast<ConfigOptionFloats*>(proj_cfg.option("wipe_tower_y"))->set_at(&wt_y_opt, plate_id, 0);
             }
         }
     }
@@ -3042,6 +3079,7 @@ void GLCanvas3D::set_shell_transparence(float alpha){
 //BBS: add only gcode mode
 void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors, bool only_gcode)
 {
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start";
 #if _DEBUG
     {
         Slic3r::DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();    
@@ -3091,6 +3129,8 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     m_gcode_viewer.refresh(gcode_result, str_tool_colors);
     set_as_dirty();
     request_extra_frame();
+
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end";
 }
 
 void GLCanvas3D::refresh_gcode_preview_render_paths()
@@ -3297,6 +3337,10 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
     if (m_gizmos.on_char(evt))
         return;
 
+    auto obj_list = wxGetApp().obj_list();
+    if (obj_list->on_char(evt))
+        return;
+
     if ((evt.GetModifiers() & ctrlMask) != 0) {
         // CTRL is pressed
         switch (keyCode) {
@@ -3438,7 +3482,6 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         default:            evt.Skip();
         }
     } else {
-        auto obj_list = wxGetApp().obj_list();
         switch (keyCode)
         {
         //case WXK_BACK:
@@ -3556,7 +3599,7 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         //    break;
         //}
         default:  {
-            //obj_list->on_char(evt);
+            obj_list->on_char(evt);
             evt.Skip(); break; }
         }
     }
@@ -3820,7 +3863,7 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                 }
                 else if (keyCode == WXK_CONTROL)
                     m_dirty = true;
-                else if (m_gizmos.is_enabled() && !m_selection.is_empty() && m_canvas_type != CanvasAssembleView) {
+                else if (m_gizmos.is_enabled() && !m_selection.is_empty() && m_canvas_type != CanvasAssembleView && !wxGetApp().obj_list()->get_object_list_window_focus()) {
                     auto _do_rotate = [this](double angle_z_rad) {
                         m_selection.setup_cache();
                         m_selection.rotate(Vec3d(0.0, 0.0, angle_z_rad), TransformationType(TransformationType::World_Relative_Joint));
@@ -3842,7 +3885,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                         IMSlider *m_layers_slider = get_gcode_viewer().get_layers_slider();
                         IMSlider *m_moves_slider  = get_gcode_viewer().get_moves_slider();
                         int increment = (evt.CmdDown() || evt.ShiftDown()) ? 5 : 1;
-                        if ((evt.CmdDown() || evt.ShiftDown()) && evt.GetKeyCode() == 'G') {
+                        if (wxGetApp().obj_list()->get_object_list_window_focus()) {
+                            wxGetApp().obj_list()->on_key(evt);
+                        }
+                        else if((evt.CmdDown() || evt.ShiftDown()) && evt.GetKeyCode() == 'G') {
                             m_layers_slider->show_go_to_layer(true);
                         }
                         else if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
@@ -3881,13 +3927,20 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
 
                         m_dirty = true;
                     }
-                } else if (m_gizmos.is_enabled() && m_selection.is_empty() && m_canvas_type == CanvasView3D) {
-                    if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
-                        IMSlider* cliper_slide = get_gcode_viewer().get_cliper_slider();
-                        int    higher       = cliper_slide->GetHigherValue();
-                        higher += ((keyCode == WXK_UP) ? 1 : -1);
-                        cliper_slide->SetHigherValue(higher);
-                        m_dirty = true;
+                } else if (m_gizmos.is_enabled() && m_canvas_type == CanvasView3D) {
+                    
+                    if (wxGetApp().obj_list()->get_object_list_window_focus()) {
+                        
+                        wxGetApp().obj_list()->on_key(evt);
+                        
+                    } else if (m_selection.is_empty()) {
+                        if (keyCode == WXK_UP || keyCode == WXK_DOWN) {
+                            IMSlider* cliper_slide = get_gcode_viewer().get_cliper_slider();
+                            int       higher       = cliper_slide->GetHigherValue();
+                            higher += ((keyCode == WXK_UP) ? 1 : -1);
+                            cliper_slide->SetHigherValue(higher);
+                            m_dirty = true;
+                        }
                     }
                 }
             }
@@ -4164,9 +4217,25 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // ignore left up events coming from imgui windows and not processed by them
         m_mouse.ignore_left_up = true;
     m_tooltip.set_in_imgui(false);
+    if (evt.LeftDown()) {
+        wxGetApp().obj_list()->set_object_list_window_focus(false);
+    }
     if (imgui->update_mouse_data(evt)) {
+        //click on some imgui widgets
         if ((evt.LeftDown() || (evt.Moving() && (evt.AltDown() || evt.ShiftDown()))) && m_canvas != nullptr)
+        {
             m_canvas->SetFocus();
+
+            ImGuiWindow* win = ImGui::FindWindowByName("##obj_tree");
+            if (win) {
+                ImRect rect;
+                rect.Min = win->Pos;
+                rect.Max = rect.Min + win->Size;
+                if (rect.Contains(ImVec2(evt.GetX(), evt.GetY()))) {
+                    wxGetApp().obj_list()->set_object_list_window_focus(true);
+                }
+            }
+        }
         m_mouse.position = evt.Leaving() ? Vec2d(-1.0, -1.0) : pos.cast<double>();
         m_tooltip.set_in_imgui(true);
         render();
@@ -4208,7 +4277,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
     }
 
     //BBS: GUI refactor: GLToolbar
-    if (m_assemble_view_toolbar.on_mouse(evt, *this)) {
+    if (m_assemble_view_toolbar.on_mouse(evt, *this) ||
+        m_assemble_view_internal_toolbar.on_mouse(evt, *this)) {
         if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp())
             mouse_up_cleanup();
         m_mouse.set_start_position_3D_as_invalid();
@@ -4316,6 +4386,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // Grab keyboard focus on any mouse click event.
         m_canvas->SetFocus();
 
+    auto LeftIsDownWithoutKey = [](wxMouseEvent& evt) { return evt.LeftIsDown() && !evt.ShiftDown();};
+
     if (evt.Entering()) {
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
@@ -4353,7 +4425,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         else
             post_event(SimpleEvent(EVT_GLCANVAS_SWITCH_TO_GLOBAL));
     }
-    else if (evt.Dragging() && evt.LeftIsDown() && !m_rectangle_selection.is_dragging() &&m_hover_volume_idxs.empty() && m_picking_enabled && m_layers_editing.state != LayersEditing::Editing)// start rectangle selection.
+    else if (evt.Dragging() && LeftIsDownWithoutKey(evt) && !m_rectangle_selection.is_dragging() &&m_hover_volume_idxs.empty() && m_picking_enabled && m_layers_editing.state != LayersEditing::Editing)// start rectangle selection.
     {
         auto t1 = evt.Dragging();
         auto t2 = evt.LeftIsDown();
@@ -4461,7 +4533,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
     }
-    else if (evt.Dragging() && evt.LeftIsDown() && m_mouse.drag.move_volume_idx != -1 && m_layers_editing.state == LayersEditing::Unknown) {
+    else if (evt.Dragging() && LeftIsDownWithoutKey(evt) && m_mouse.drag.move_volume_idx != -1 && m_layers_editing.state == LayersEditing::Unknown) {
         if (m_canvas_type != ECanvasType::CanvasAssembleView) {
             if (!m_mouse.drag.move_requires_threshold) {
                 m_mouse.dragging = true;
@@ -4511,13 +4583,15 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
     }
-    else if (evt.Dragging() && evt.LeftIsDown() && m_picking_enabled && m_rectangle_selection.is_dragging()) {
+#ifndef __APPLE__
+    else if (evt.Dragging() && LeftIsDownWithoutKey(evt) && m_picking_enabled && m_rectangle_selection.is_dragging()) {
         //BBS not in assemble view
         if (m_canvas_type != ECanvasType::CanvasAssembleView) {
             m_rectangle_selection.dragging(pos.cast<double>());
             m_dirty = true;
         }
     }
+#endif
     else if (evt.Dragging() || is_camera_rotate(evt) || is_camera_pan(evt)) {
         m_mouse.dragging = true;
 
@@ -4575,8 +4649,15 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                             else {
                                 if (!m_selection.is_empty())
                                     rotate_target = m_selection.get_bounding_box().center();
-                                else 
-                                    rotate_target = volumes_bounding_box(true).center();
+                                else
+                                    //rotate_target = volumes_bounding_box(true).center();
+                                {
+                                    PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_curr_plate();
+                                    if (plate)
+                                        rotate_target = plate->get_bounding_box().center();
+                                    else
+                                        rotate_target = volumes_bounding_box().center();
+                                }
                             }
 
                             if (!rotate_target.isZero())
@@ -4588,10 +4669,16 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
 
                 m_dirty = true;
+                m_mouse.ignore_right_up = true;
+            }
+            else
+            {
+                //only use right click
+                m_mouse.ignore_right_up = false;
             }
             m_camera_movement = true;
             m_mouse.drag.start_position_3D = Vec3d((double)pos(0), (double)pos(1), 0.0);
-            m_mouse.ignore_right_up = true;
+            
         }
         else if (is_camera_pan(evt)) {
             // If dragging over blank area with right button, pan.
@@ -4640,9 +4727,11 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_FINISHED));
         }
         else if (evt.LeftUp() && m_picking_enabled && m_rectangle_selection.is_dragging() && m_layers_editing.state != LayersEditing::Editing && !this->is_layers_editing_enabled()) {// stop rectangle selection.
-            //BBS: don't use alt as de-select
-            _update_selection_from_hover();
-            m_rectangle_selection.stop_dragging();
+            if (m_canvas_type != ECanvasType::CanvasAssembleView) {
+                // BBS: don't use alt as de-select
+                _update_selection_from_hover();
+                m_rectangle_selection.stop_dragging();
+            }
         }
         else if (evt.LeftUp() && !m_mouse.ignore_left_up && !m_mouse.dragging && m_hover_volume_idxs.empty() && m_hover_plate_idxs.empty() && !is_layers_editing_enabled()) {
             // deselect and propagate event through callback
@@ -4804,7 +4893,12 @@ bool GLCanvas3D::is_camera_rotate(const wxMouseEvent& evt) const
     if (m_is_touchpad_navigation) {
         return evt.Moving() && evt.AltDown() && !evt.ShiftDown();
     } else {
+#if __APPLE__
+        return evt.Dragging() && (evt.HasAnyModifiers() ? evt.ControlDown() : true) ;
+
+#else
         return evt.Dragging() && evt.RightIsDown();
+#endif
     }
 }
 
@@ -4813,7 +4907,11 @@ bool GLCanvas3D::is_camera_pan(const wxMouseEvent& evt) const
     if (m_is_touchpad_navigation) {
         return evt.Moving() && evt.ShiftDown() && !evt.AltDown();
     } else {
-        return evt.Dragging() && (evt.MiddleIsDown());
+#if __APPLE__
+        return (evt.RawControlDown() && evt.Dragging());
+#else
+        return (evt.Dragging() && (evt.MiddleIsDown())) || (evt.ShiftDown() && evt.LeftIsDown());
+#endif
     }
 }
 
@@ -5217,6 +5315,23 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
     post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
 
     m_dirty = true;
+}
+
+void GLCanvas3D::on_object_list_selected()
+{ 
+    
+    if (m_gizmos.get_current_type() == GLGizmosManager::EType::MeshBoolean) 
+    {
+        auto boolean_gizmo = dynamic_cast<GLGizmoMeshBoolean*>(m_gizmos.get_current());
+        bool needUpdate = false;
+        boolean_gizmo->handle_object_list_changed(m_selection, needUpdate);
+        if (needUpdate) 
+            update_gizmos_on_off_state();
+    } 
+    else 
+    {
+        update_gizmos_on_off_state();
+    }
 }
 
 void GLCanvas3D::update_gizmos_on_off_state()
@@ -5678,15 +5793,17 @@ bool GLCanvas3D::_render_orient_menu(float left, float right, float bottom, floa
     //const float x = (1 + left) * canvas_w / 2;
     const float x = get_input_window_render_left_pos();
     ImGuiWrapper::push_toolbar_style(get_scale());
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+    // imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+    imgui->set_draggable_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
 #else
     const float x = canvas_w - m_main_toolbar.get_width();
     const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
-    imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+    // imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+    imgui->set_draggable_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
 #endif
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (30.0f * get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
-    imgui->begin(_L("Auto Orientation options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    imgui->begin_with_drag(_L("Auto Orientation options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleVar(1);
 
     OrientSettings settings = get_orient_settings();
@@ -5917,22 +6034,27 @@ bool GLCanvas3D::_render_arrange_menu(float left, float right, float bottom, flo
     //BBS: GUI refactor: move main toolbar to the right
     //original use center as {0.0}, and top is (canvas_h/2), bottom is (-canvas_h/2), also plus inv_camera
     //now change to left_up as {0,0}, and top is 0, bottom is canvas_h
+    static bool is_init = false;
+    if (!is_init) {
+        is_init = true;
 #if BBS_TOOLBAR_ON_TOP
-    //float left_pos = m_main_toolbar.get_item("arrange")->render_left_pos;
-    const float x = get_input_window_render_left_pos(); //(1 + left_pos) * canvas_w / 2;
-    imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+        // float left_pos = m_main_toolbar.get_item("arrange")->render_left_pos;
+        const float x = get_input_window_render_left_pos(); //(1 + left_pos) * canvas_w / 2;
+        imgui->set_next_window_pos(x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
 
 #else
-    const float x = canvas_w - m_main_toolbar.get_width();
-    const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
-    imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+        const float x = canvas_w - m_main_toolbar.get_width();
+        const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
+        imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
 #endif
+    }
 
     //BBS
     ImGuiWrapper::push_toolbar_style(get_scale());
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (30.0f * get_scale() - ImGui::GetFontSize()) / 2.0)); // use for titlebar
-    imgui->begin(_L("Arrange options"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
+    // imgui->begin(_L("Arrange options"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
+    imgui->begin_with_drag(_L("Arrange options"), ImGuiWrapper::TOOLBAR_WINDOW_FLAGS);
     ImGui::PopStyleVar(1);
     
     ArrangeSettings settings = get_arrange_settings();
@@ -6405,40 +6527,11 @@ void GLCanvas3D::render_thumbnail_internal(ThumbnailData& thumbnail_data, const 
         Model& model = wxGetApp().plater()->model();
         auto   info  = model.plates_custom_gcodes[thumbnail_params.plate_id];
         if (!info.gcodes.empty()) {
-            std::vector<float> data;
-            auto hex_to_float = [](const std::string& hex_str) {
-                std::stringstream ss;
-                ss << std::hex << hex_str;
-                int result;
-                ss >> result;
-                return result / 255.0;
-            };
-
             const Slic3r::DynamicPrintConfig* config = &wxGetApp().preset_bundle->project_config;
-            if (config->has("filament_colour")) 
-            {
+            if (config->has("filament_colour")) {
                 std::vector<std::string> filament_colors = (config->option<ConfigOptionStrings>("filament_colour"))->values;
-                for (auto item : info.gcodes) {
-                    int extruder = item.extruder - 1;
-                    if (extruder >= filament_colors.size() || extruder < 0)
-                        continue;
-                    
-                    std::string color = filament_colors[extruder];
-                    if (color.size() != 7)
-                        continue;
-
-                    data.push_back(hex_to_float(color.substr(1, 2))); // r
-                    data.push_back(hex_to_float(color.substr(3, 2))); // g
-                    data.push_back(hex_to_float(color.substr(5, 2))); // b
-                    data.push_back(item.print_z);
-                }
-
+                GLVolumeCollection::apply_custom_gcode(shader, info, filament_colors);
             }
-            int count = data.size() / 4;
-            int id    = shader->get_uniform_location("specificColorLayers");
-            if (id >= 0)
-                glsafe(::glUniform4fv(id, count, static_cast<const GLfloat*>(data.data())));
-            shader->set_uniform("layersCount", count);
         } else {
             shader->set_uniform("layersCount", 0);
         }
@@ -7329,7 +7422,6 @@ bool GLCanvas3D::_update_imgui_select_plate_toolbar()
         IMToolbarItem* item = new IMToolbarItem();
         PartPlate* plate = plate_list.get_plate(i);
         if (plate && plate->thumbnail_data.is_valid()) {
-            PartPlate* plate = plate_list.get_plate(i);
             item->image_data = plate->thumbnail_data.pixels;
             item->image_width = plate->thumbnail_data.width;
             item->image_height = plate->thumbnail_data.height;
@@ -7380,22 +7472,44 @@ bool GLCanvas3D::_init_assemble_view_toolbar()
 
     m_assemble_view_toolbar.del_all_item();
 
-    GLToolbarItem::Data item;
-    item.name = "assembly_view";
-    item.icon_filename = m_is_dark ? "toolbar_assemble_dark.svg" : "toolbar_assemble.svg";
-    item.tooltip = _utf8(L("Assembly View"));
-    item.sprite_id = 1;
-    item.left.toggable = false;
-    item.left.action_callback = [this]() { if (m_canvas != nullptr) wxPostEvent(m_canvas, SimpleEvent(EVT_GLVIEWTOOLBAR_ASSEMBLE)); };
-    item.left.render_callback = GLToolbarItem::Default_Render_Callback;
-    item.visible = true;
-    item.visibility_callback = [this]()->bool { return true; };
-    item.enabling_callback = [this]()->bool {
-        return wxGetApp().plater()->has_assmeble_view();
-    };
-    if (!m_assemble_view_toolbar.add_item(item))
-        return false;
+    {
+        GLToolbarItem::Data item;
+        item.name                 = "assembly_view";
+        item.icon_filename        = m_is_dark ? "toolbar_assemble_dark.svg" : "toolbar_assemble.svg";
+        item.tooltip              = _utf8(L("Assembly View"));
+        item.sprite_id            = 1;
+        item.left.toggable        = false;
+        item.left.action_callback = [this]() {
+            if (m_canvas != nullptr)
+                wxPostEvent(m_canvas, SimpleEvent(EVT_GLVIEWTOOLBAR_ASSEMBLE));
+        };
+        item.left.render_callback = GLToolbarItem::Default_Render_Callback;
+        item.visible              = true;
+        item.visibility_callback  = [this]() -> bool { return true; };
+        item.enabling_callback    = [this]() -> bool { return wxGetApp().plater()->has_assmeble_view(); };
+        if (!m_assemble_view_toolbar.add_item(item))
+            return false;
+    }
 
+    {
+        GLToolbarItem::Data item;
+        GLGizmoBase* obj = m_gizmos.get_gizmo(GLGizmosManager::EType::MmuSegmentation);
+        if (obj) {
+            item.name          = obj->get_name(false);
+            item.icon_filename = obj->get_icon_filename();
+            item.tooltip       = obj->get_name(true);
+            item.sprite_id++;
+
+            item.enabling_callback    = [obj]() -> bool { return obj->is_activable(); };
+            item.left.action_callback = [this]() { 
+                m_gizmos.open_gizmo(GLGizmosManager::EType::MmuSegmentation); 
+            };
+            // item.visibility_callback  = [obj]() -> bool { return obj->is_activable(); };
+            item.visibility_callback = [obj]() -> bool { return true; };
+            if (!m_assemble_view_internal_toolbar.add_item(item))
+                return false;
+        }
+    }
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": Finished Successfully\n";
     return true;
 }
@@ -7433,8 +7547,11 @@ bool GLCanvas3D::_init_separator_toolbar()
     //BBS: assemble toolbar is at the top and right, we don't need the rounded-corner effect at the left side and the top side
     m_separator_toolbar.set_horizontal_orientation(GLToolbar::Layout::HO_Left);
     m_separator_toolbar.set_vertical_orientation(GLToolbar::Layout::VO_Top);
-    m_separator_toolbar.set_border(0.0f);
-    m_separator_toolbar.set_icons_size(20.0f);
+    m_separator_toolbar.set_border(1.0f);
+    //m_separator_toolbar.set_icons_size(20.0f);
+    m_separator_toolbar.set_separator_size(1.0f);
+    m_separator_toolbar.set_gap_size(10.0f);
+    
     m_separator_toolbar.del_all_item();
 
     GLToolbarItem::Data sperate_item;
@@ -8401,7 +8518,7 @@ void GLCanvas3D::_render_slice_control() const
     config.prepareWindow(DispConfig::e_wt_slice, windows, scale);
     config.processWindows("Slice", [&]() {
         static int s_sst = MainFrame::eSlicePlate;
-        std::vector<wxString> s_slice_string{ _L("Slice plate"),_L("Slice all")};
+            std::vector<std::string> s_slice_string{_u8L("Slice plate"), _u8L("Slice all")};
         bool                         enslice = wxGetApp().mainframe->m_slice_btn->IsEnabled();        
         if (config.normalButton(s_slice_string[s_sst], bigcfg,
                                 s_sst == MainFrame::eSliceAll && !wxGetApp().mainframe->plater()->only_gcode_mode() ? 2 :
@@ -8421,8 +8538,10 @@ void GLCanvas3D::_render_slice_control() const
     config.prepareWindow(DispConfig::e_wt_print, windows, scale);
     config.processWindows("Print", [&]() {
         static int s_pst = 0;
-        std::vector<wxString> s_print_string{_L("Send print"),
-            _L("Export plate sliced file"), _L("Export all sliced file"), _L("Upload to CrealityCloud")};
+            std::vector<std::string> s_print_string{_u8L("Send print"), 
+                                                    _u8L("Export plate sliced file"), 
+                                                    _u8L("Export all sliced file"),
+                                                    _u8L("Upload to CrealityCloud")};
 
         bool enprint = wxGetApp().mainframe->get_enable_print_status(false);
         if (config.normalButton(s_print_string[s_pst], bigcfg, enprint ? 2 : 1)) {
@@ -8444,20 +8563,20 @@ void GLCanvas3D::_render_slice_control() const
         if (ret >= 0)
         {
             s_pst = ret;
-            if(s_print_string[s_pst] == _L("Send print"))
+            if(s_print_string[s_pst] == _u8L("Send print"))
                 wxGetApp().mainframe->m_print_select = MainFrame::eSendToLocalNetPrinter;
             //else if (s_print_string[s_pst] == _L("Export to Local")) {
             //    wxGetApp().mainframe->m_print_select = MainFrame::eExportGcode;
             //}
-            else if (s_print_string[s_pst] == _L("Export plate sliced file"))
+            else if (s_print_string[s_pst] == _u8L("Export plate sliced file"))
             {
                 wxGetApp().mainframe->m_print_select = MainFrame::eExportSlicedFile;
             }
-            else if (s_print_string[s_pst] == _L("Export all sliced file"))
+            else if (s_print_string[s_pst] == _u8L("Export all sliced file"))
             {
                 wxGetApp().mainframe->m_print_select = MainFrame::eExportAllSlicedFile;
             }
-            else if (s_print_string[s_pst] == _L("Upload to CrealityCloud")) {
+            else if (s_print_string[s_pst] == _u8L("Upload to CrealityCloud")) {
                 wxGetApp().mainframe->m_print_select = MainFrame::eUploadGcode;
             }
             if (wxGetApp().mainframe) {
@@ -8567,7 +8686,8 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
         return;
     }
 
-    float scale = wxGetApp().toolbar_icon_scale();
+    //float scale = wxGetApp().toolbar_icon_scale();
+    float scale = sc;
     Size cnv_size = get_canvas_size();
 
     //BBS: GUI refactor: GLToolbar
@@ -8579,17 +8699,20 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
 
     // Set current size for all top toolbars. It will be used for next calculations
 #if ENABLE_RETINA_GL
-    const float sc_const = m_retina_helper->get_scale_factor() * scale;
+    const float sc_const = m_retina_helper->get_scale_factor();
     //BBS: GUI refactor: GLToolbar
     m_main_toolbar.set_scale(sc_const);
     m_assemble_view_toolbar.set_scale(sc_const);
     m_separator_toolbar.set_scale(sc_const);
-    collapse_toolbar.set_scale(sc_const / 2.0);
+    collapse_toolbar.set_scale(sc_const);
     size *= m_retina_helper->get_scale_factor();
 
-    auto* m_notification = wxGetApp().plater()->get_notification_manager();
-    m_notification->set_scale(sc_const);
+//    auto* m_notification = wxGetApp().plater()->get_notification_manager();
+//    m_notification->set_scale(sc_const);
     m_gizmos.set_overlay_scale(sc_const);
+
+    ProcessBar::GLToolbar& toolbar = wxGetApp().plater()->get_process_toolbar();
+    toolbar.set_scale(sc_const);
 #else
     //BBS: GUI refactor: GLToolbar
     m_main_toolbar.set_icons_size(size);
@@ -8658,13 +8781,16 @@ void GLCanvas3D::_render_overlays()
     _render_main_toolbar();
     _render_collapse_toolbar();
     _render_process_toolbar();
-    _render_assemble_view_toolbar();
+    //if (m_canvas_type == ECanvasType::CanvasView3D)
+        //_render_assemble_view_toolbar();
     //BBS: GUI refactor: GLToolbar
     _render_imgui_select_plate_toolbar();
     _render_return_toolbar();
     // BBS
     //_render_view_toolbar();
     _render_paint_toolbar();
+    //if (m_canvas_type == ECanvasType::CanvasAssembleView)
+        _render_assemble_view_toolbar();
 
     //BBS: GUI refactor: GLToolbar
     //move gizmos behind of main
@@ -8896,36 +9022,35 @@ void GLCanvas3D::_render_main_toolbar()
     const Size cnv_size = get_canvas_size();
     const float top = 0.5f * (float)cnv_size.get_height();
 
-    float start_x = get_main_toolbar_offset();
+    const float obj_list_panel_right = get_main_toolbar_offset();
+    float start_x = obj_list_panel_right;
     float start_y = 0.0f;
-    //To the right
-    const float left = -0.5f * cnv_size.get_width() + start_x; 
-    m_main_toolbar.set_position(top, left);
-    m_main_toolbar.render(*this, m_main_toolbar.get_scroll());
 
-    float space_width = cnv_size.get_width() - get_main_toolbar_offset();
+    float space_width   = cnv_size.get_width() - obj_list_panel_right;
     float toolbar_width = m_main_toolbar.get_width();
 
     float cur = m_main_toolbar.get_scroll();
-    if (cur < 0.0f && cur + toolbar_width < space_width) {
-        m_main_toolbar.set_scroll(std::min(space_width - toolbar_width, 0.0f));
-    }
+    
     if (toolbar_width > space_width) {
-        // display scroll arrow
+        
+        //left: display left arrow button
         const float toolbar_height = m_main_toolbar.get_height();
-        const ImVec2     arrow_button_size  = ImVec2(0.421f * toolbar_height, toolbar_height);
+        const ImVec2 arrow_button_size = ImVec2(floorf(0.421f * toolbar_height), toolbar_height);
+        space_width -= 2.0f * arrow_button_size.x;  //consider left & right arrow buttons
         const float  stride            = m_main_toolbar.get_scaled_icon_size();
         const float min_scroll               = 0.0f;
         const float max_scroll               = toolbar_width - space_width;
+
         ImGui::SetNextWindowPos(ImVec2(start_x, start_y), ImGuiCond_Always);
         ImGui::SetNextWindowSize(arrow_button_size);
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
                                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                                  ImGuiWindowFlags_NoBackground;
         
-        ImU32        left_arrow_button_color  = IM_COL32(0, 0, 0, 0.4f * 255);
-        ImU32        right_arrow_button_color = IM_COL32(0, 0, 0, 0.4f * 255);
-        ImU32        arrow_color              = IM_COL32(255, 255, 255, 255);
+        ImU32 left_arrow_button_color = m_is_dark ? IM_COL32(0, 0, 0, 0.5 * 255) : IM_COL32(0, 0, 0, 0.1 * 255);
+
+        ImU32        right_arrow_button_color = left_arrow_button_color;
+        ImU32         arrow_color              = m_is_dark ? IM_COL32(251, 251, 251, 255) : IM_COL32(65, 65, 65, 255);
         ImGuiContext& context                  = *GImGui;
         ImGuiWrapper& imgui                    = *wxGetApp().imgui();
 
@@ -8937,13 +9062,17 @@ void GLCanvas3D::_render_main_toolbar()
             ImDrawList*   draw_list         = ImGui::GetWindowDrawList();
             const ImRect left_arrow_button = ImRect(ImGui::GetCurrentWindow()->Pos, ImGui::GetCurrentWindow()->Pos + arrow_button_size);
             if (ImGui::IsMouseHoveringRect(left_arrow_button.Min, left_arrow_button.Max)) {
-                left_arrow_button_color = IM_COL32(0, 0, 0, 0.64f * 255);
+                //left_arrow_button_color = IM_COL32(0, 0, 0, 255);
+                if (context.IO.MouseDownDuration[ImGuiMouseButton_Left] > 0.15) {
+                    m_main_toolbar.set_scroll(-min_scroll);
+                }
                 if (context.IO.MouseClicked[ImGuiMouseButton_Left]) {
 
                     float cur = m_main_toolbar.get_scroll();
                     float x   = std::clamp(cur + stride, -max_scroll, -min_scroll);
                     m_main_toolbar.set_scroll(x);
                     //imgui.set_requires_extra_frame();
+                    schedule_extra_frame(200);
                 }
             }
             draw_list->AddRectFilled(left_arrow_button.Min, left_arrow_button.Max, left_arrow_button_color);
@@ -8953,7 +9082,18 @@ void GLCanvas3D::_render_main_toolbar()
             ImGui::End();
         }
         
+        // middel:main toolbar
+        {
+            if (cur < 0.0f && cur + toolbar_width < space_width) {
+                m_main_toolbar.set_scroll(std::min(space_width - toolbar_width, 0.0f));
+            }
+            const float left = -0.5f * cnv_size.get_width() + start_x + arrow_button_size.x;
+            m_main_toolbar.set_position(top, left);
+            m_main_toolbar.set_limit_width(space_width);
+            m_main_toolbar.render(*this, m_main_toolbar.get_scroll());
+        }
 
+        //right arrow button
         ImGui::SetNextWindowPos(ImVec2(cnv_size.get_width(), start_y), ImGuiCond_Always, ImVec2(1, 0));
         ImGui::SetNextWindowSize(arrow_button_size);
         if (ImGui::Begin("##scroll_buttn_right", nullptr, flags)) {
@@ -8962,11 +9102,15 @@ void GLCanvas3D::_render_main_toolbar()
             const ImRect right_arrow_button = ImRect(ImGui::GetCurrentWindow()->Pos + ImGui::GetWindowSize() - arrow_button_size,
                                                      ImGui::GetCurrentWindow()->Pos + ImGui::GetWindowSize());
             if (ImGui::IsMouseHoveringRect(right_arrow_button.Min, right_arrow_button.Max)) {
-                 right_arrow_button_color = IM_COL32(0, 0, 0, 0.64f * 255);
-                 if (context.IO.MouseClicked[ImGuiMouseButton_Left]) {
+                 //right_arrow_button_color = IM_COL32(0, 0, 0, 255);
+                if (context.IO.MouseDownDuration[ImGuiMouseButton_Left] > 0.15) {
+                    m_main_toolbar.set_scroll(-max_scroll);
+                }
+                if (context.IO.MouseClicked[ImGuiMouseButton_Left]) {
                      float cur = m_main_toolbar.get_scroll();
                      float x   = std::clamp(cur - stride, -max_scroll, -min_scroll);
                      m_main_toolbar.set_scroll(x);
+                     schedule_extra_frame(200);
                  }
              }
              draw_list->AddRectFilled(right_arrow_button.Min, right_arrow_button.Max, right_arrow_button_color);
@@ -8977,6 +9121,15 @@ void GLCanvas3D::_render_main_toolbar()
         }
 
         ImGui::PopStyleVar(1);
+
+
+    } else {
+        
+        m_main_toolbar.set_scroll(0.0f);
+        m_main_toolbar.set_limit_width(-1.0f);
+        const float left = -0.5f * cnv_size.get_width() + start_x;
+        m_main_toolbar.set_position(top + start_y, left);
+        m_main_toolbar.render(*this, m_main_toolbar.get_scroll());
     }
 
     if (m_toolbar_highlighter.m_render_arrow)
@@ -9070,7 +9223,7 @@ void GLCanvas3D::_render_imgui_select_plate_toolbar()
 #if ENABLE_RETINA_GL
     float f_scale  = m_retina_helper->get_scale_factor();
 #else
-    float f_scale  = 1.0;
+    float f_scale  = get_scale();
 #endif
     Size cnv_size = get_canvas_size();
     auto canvas_w = float(cnv_size.get_width());
@@ -9331,16 +9484,31 @@ void GLCanvas3D::_render_assemble_view_toolbar() const
     if (!m_assemble_view_toolbar.is_enabled())
         return;
 
-    const Size cnv_size = get_canvas_size();
-    const float gizmo_width = m_gizmos.get_scaled_total_width();
-    const float separator_width = m_separator_toolbar.get_width();
-    const float top = 0.5f * (float)cnv_size.get_height() - 5.0f;
-    const float main_toolbar_left = -0.5f * cnv_size.get_width() + get_main_toolbar_offset();
-    const float left              = main_toolbar_left + m_main_toolbar.get_width();
-    //const float left              = -0.5f * cnv_size.get_width() + m_main_toolbar.get_width();
+    if (m_canvas_type == CanvasAssembleView) 
+    {
+        const Size  cnv_size          = get_canvas_size();
+        const float gizmo_width       = m_gizmos.get_scaled_total_width();
+        const float separator_width   = m_separator_toolbar.get_width();
+        const float top               = 0.5f * (float) cnv_size.get_height() - 5.0f;
+        const float main_toolbar_left = -0.5f * cnv_size.get_width() + get_main_toolbar_offset();
+        const float left              = m_paint_toolbar_width / 2.0;
 
-    m_assemble_view_toolbar.set_position(top, left);
-    m_assemble_view_toolbar.render(*this);
+        m_assemble_view_internal_toolbar.set_position(top, left);
+        m_assemble_view_internal_toolbar.render(*this);
+    } 
+    else if (m_canvas_type == CanvasView3D) 
+    {
+        const Size  cnv_size          = get_canvas_size();
+        const float gizmo_width       = m_gizmos.get_scaled_total_width();
+        const float separator_width   = m_separator_toolbar.get_width();
+        const float top               = 0.5f * (float) cnv_size.get_height() - 5.0f;
+        const float main_toolbar_left = -0.5f * cnv_size.get_width() + get_main_toolbar_offset();
+        const float left              = main_toolbar_left + m_main_toolbar.get_width();
+
+        m_assemble_view_toolbar.set_position(top, left);
+        m_assemble_view_toolbar.render(*this);
+    }
+
 }
 
 void GLCanvas3D::_render_return_toolbar() const
@@ -9458,13 +9626,13 @@ void GLCanvas3D::_render_collapse_toolbar() const
 
     CollapseBar::GLToolbar& collapse_toolbar = plater.get_collapse_toolbar();
 
-    int margin_top = 113;
-    if(!plater.is_sidebar_collapsed())
-    {
-		wxPoint pos = wxGetApp().params_panel()->ClientToScreen(wxPoint(0, 0));
-		wxPoint sidebar_pos = plater.ClientToScreen(wxPoint(0, 0));
-		margin_top = pos.y - sidebar_pos.y;
-    }
+    int margin_top = 113 * get_scale();
+    //if (!plater.is_sidebar_collapsed())
+    //{
+    //    wxPoint pos = wxGetApp().params_panel()->ClientToScreen(wxPoint(0, 0));
+    //    wxPoint sidebar_pos = plater.ClientToScreen(wxPoint(0, 0));
+    //    margin_top = pos.y - sidebar_pos.y;
+    //}
 
     const Size cnv_size = get_canvas_size();
     const float top  = 0.5f * (cnv_size.get_height())-margin_top + collapse_toolbar.get_height()/2.0f;
@@ -9488,16 +9656,33 @@ void GLCanvas3D::_render_process_toolbar() const
         return;
     }
 
+    //侧边栏位置计算逻辑
+    //margin_top = 侧边栏垂直方向的插入位置
+    //1.margin_top = 屏幕左上角到右边栏“工艺”的坐标 - 屏幕左上角到软件左上角的的坐标 + 安全值80
+    //2.margin_bottom = 侧边栏底部剩余的高度
+    //3.margin_bottom = 软件的高度 - margin_top - 按钮的高度
+    //4.调整侧边栏底部高度，避开右下角的切片按钮。
+
 	ProcessBar::GLToolbar& toolbar = plater.get_process_toolbar();
 
 	wxPoint pos = wxGetApp().params_panel()->ClientToScreen(wxPoint(0, 0));
 	wxPoint sidebar_pos = plater.ClientToScreen(wxPoint(0, 0));
 	
-    int param_margin_top = 80;
+    int param_margin_top = 80 * get_scale();
     int margin_top = pos.y - sidebar_pos.y + param_margin_top;
 
 
 	const Size cnv_size = get_canvas_size();
+    float view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+    ImVec2 win_size = DispConfig().getWindowSize(DispConfig::e_wt_print,view_scale);
+    float bottom_space = win_size.y * 2 + 10;
+
+    int margin_bottom = cnv_size.get_height() - margin_top - toolbar.get_height();
+    if (margin_bottom < bottom_space)
+    {
+        margin_top = cnv_size.get_height() - bottom_space - toolbar.get_height();
+    }
+
 	const float top = 0.5f * (float)cnv_size.get_height() - margin_top;
 	const float left = sidebar_docking_dir == Sidebar::Right ? 0.5f * (float)cnv_size.get_width() - (float)toolbar.get_width() :
 		-0.5f * (float)cnv_size.get_width();
@@ -9712,7 +9897,7 @@ void GLCanvas3D::_render_assemble_control() const
 
     {
         ImGui::SameLine(window_padding.x + text_size_x + slider_width + item_spacing * 6 + value_size);
-        imgui->text(_L("Explosion Ratio"));
+        imgui->text(_u8L("Explosion Ratio"));
 
         ImGui::SameLine(window_padding.x + 2 * text_size_x + slider_width + item_spacing * 7 + value_size);
         ImGui::PushItemWidth(slider_width);
@@ -10594,7 +10779,7 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
             if (current_printer_technology() != ptSLA) {
                 unsigned int max_z_layer = m_gcode_viewer.get_layers_z_range().back();
                 if (warning == EWarning::ToolHeightOutside)  // check if max z_layer height exceed max print height
-                    show = m_gcode_viewer.has_data() && (m_gcode_viewer.get_layers_zs()[max_z_layer] - m_gcode_viewer.get_max_print_height() >= 1e-6);
+                    show = m_gcode_viewer.has_data() &&((m_gcode_viewer.get_layers_zs()[max_z_layer] - m_gcode_viewer.get_max_print_height() >= 1e-6) &&m_gcode_viewer.get_max_print_height() >= 1e-6);
                 else if (warning == EWarning::ToolpathOutside) { // check if max x,y coords exceed bed area
                     /*show = !m_gcode_viewer.is_contained_in_bed();*/
                     if (m_gcode_viewer.has_printable_area()) {
@@ -10607,7 +10792,16 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
                         show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed() &&
                                (m_gcode_viewer.get_max_print_height() - m_gcode_viewer.get_layers_zs()[max_z_layer] >= 1e-6);
                     }
- 
+                    
+                    
+                    if (m_gcode_viewer.get_extruders_count() > 1 && !show) 
+                    {
+                        GUI::PartPlate*      curr_plate = GUI::wxGetApp().plater()->get_partplate_list().get_selected_plate();
+                        bool                 is_multi_color;
+                        const BoundingBoxf3& exclude_area = curr_plate->color_bed_exclude_area(&is_multi_color);
+                        BoundingBoxf3 Previewbox     = m_gcode_viewer.get_paths_bounding_box_ex();
+                        show = exclude_area.intersects(Previewbox) || exclude_area.contains(Previewbox);
+                    }
                 }
                 else if (warning == EWarning::GCodeConflict)
                     show = m_gcode_viewer.has_data() && m_gcode_viewer.is_contained_in_bed() && m_gcode_viewer.m_conflict_result.has_value();
@@ -10693,6 +10887,17 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
     default:
         break;
     }
+#if AUTOMATION_TOOL
+
+#ifdef _WIN32 // ������־
+    if (AutomationMgr::enabled()) {
+        if (state) {
+            AutomationMgr::outputLog(text, 1);
+        }
+    }
+#endif // _WIN32
+
+#endif // AUTOMATION_TOOL
 }
 
 bool GLCanvas3D::_is_any_volume_outside() const
@@ -11045,6 +11250,11 @@ void GLCanvas3D::_render_printer_preset_and_obj_list()
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, tmp_color);
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, tmp_color);
 
+        ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, transparent);
+
         if (m_canvas_type == ECanvasType::CanvasView3D) {
             imgui.set_next_window_pos(0.0f, 0.0f, ImGuiCond_Always, 0.0f, 0.0f);
         } else {
@@ -11096,7 +11306,7 @@ void GLCanvas3D::_render_printer_preset_and_obj_list()
             }
         }
 
-        ImGui::PopStyleColor(9);
+        ImGui::PopStyleColor(12);
         ImGui::PopStyleVar(2);
     }
 }

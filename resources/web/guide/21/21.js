@@ -1,7 +1,7 @@
 function OnInit()
 {
 	//let strInput=JSON.stringify(cData);
-	//HandleStudio(strInput);
+	//handleStudioCmd(strInput);
 	
 	TranslatePage();
 	
@@ -19,7 +19,7 @@ function RequestProfile()
 	SendWXMessage( JSON.stringify(tSend) );
 }
 
-function HandleStudio( pVal )
+function handleStudioCmd( pVal )
 {
 //	alert(strInput);
 //	alert(JSON.stringify(strInput));

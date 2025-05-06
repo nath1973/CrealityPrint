@@ -535,7 +535,7 @@ void GLGizmoSimplify::apply_simplify() {
 
     auto plater = wxGetApp().plater();
     plater->take_snapshot(GUI::format("Simplify %1%", m_volume->name));
-    plater->clear_before_change_mesh(object_idx);
+    plater->clear_before_change_mesh(object_idx,true);
 
     ModelVolume* mv = get_model_volume(selection, wxGetApp().model());
     assert(mv == m_volume);

@@ -68,6 +68,7 @@ namespace GUI {
         int        isPresetExist(const FileData& fileData);
         virtual std::string  getTmpOutputName(const std::string& fileName);
         virtual std::string getCompatiblePrinters(const FileData& fileData);
+        void                setCompatiblePrinters(const std::vector<FileData>& vtFileName);
 
     protected:
         LastError m_lastError;

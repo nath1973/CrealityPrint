@@ -638,6 +638,59 @@ bool GLWipeTowerVolume::IsTransparent() {
     return false; 
 }
 
+void GLVolumeCollection::apply_custom_gcode(GLShaderProgram* shader, const CustomGCode::Info& gcode_info, const std::vector<std::string>& filament_std_colors)
+{
+    shader->set_uniform("layersCount", 0);
+    if (gcode_info.gcodes.empty())
+        return;
+
+    auto hex_to_float = [](const std::string& hex_str) {
+        std::stringstream ss;
+        ss << std::hex << hex_str;
+        int result;
+        ss >> result;
+        return result / 255.0;
+    };
+    std::vector<ColorRGBA> colors;
+    for (const std::string& color_str : filament_std_colors) {
+        ColorRGBA color;
+        color[0] = hex_to_float(color_str.substr(1, 2));
+        color[1] = hex_to_float(color_str.substr(3, 2));
+        color[2] = hex_to_float(color_str.substr(5, 2));
+        color[3] = 1.0;
+        colors.push_back(color);
+    }
+
+    GLVolumeCollection::apply_custom_gcode(shader, gcode_info, colors);
+}
+
+void GLVolumeCollection::apply_custom_gcode(GLShaderProgram* shader, const CustomGCode::Info& gcode_info, const std::vector<ColorRGBA>& filament_colors)
+{
+    shader->set_uniform("layersCount", 0);
+    if (gcode_info.gcodes.empty())
+        return;
+
+    std::vector<float> data;
+    for (auto item : gcode_info.gcodes) {
+        int extruder = item.extruder - 1;
+        if (extruder >= filament_colors.size() || extruder < 0 || CustomGCode::PausePrint == item.type || CustomGCode::Custom == item.type)
+            continue;
+
+        ColorRGBA color = filament_colors[extruder];
+        data.push_back(color[0]); // r
+        data.push_back(color[1]); // g
+        data.push_back(color[2]); // b
+        data.push_back(item.print_z);
+    }
+
+    int count = data.size() / 4;
+    int id    = shader->get_uniform_location("specificColorLayers");
+    if (id >= 0)
+        glsafe(::glUniform4fv(id, count, static_cast<const GLfloat*>(data.data())));
+    shader->set_uniform("layersCount", count);
+
+}
+
 std::vector<int> GLVolumeCollection::load_object(
     const ModelObject       *model_object,
     int                      obj_idx,
@@ -927,26 +980,30 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         shader->set_uniform("color_clip_plane", m_color_clip_plane);
         shader->set_uniform("uniform_color_clip_plane_1", m_color_clip_plane_colors[0]);
         shader->set_uniform("uniform_color_clip_plane_2", m_color_clip_plane_colors[1]);
-        //BOOST_LOG_TRIVIAL(info) << boost::format("set uniform_color to {%1%, %2%, %3%, %4%}, with_outline=%5%, selected %6%")
-        //    %volume.first->render_color[0]%volume.first->render_color[1]%volume.first->render_color[2]%volume.first->render_color[3]
-        //    %with_outline%volume.first->selected;
-
-        //BBS set print_volume to render volume
-        //shader->set_uniform("print_volume.type", static_cast<int>(m_render_volume.type));
-        //shader->set_uniform("print_volume.xy_data", m_render_volume.data);
-        //shader->set_uniform("print_volume.z_data", m_render_volume.zs);
 
         if (volume.first->partly_inside) {
             //only partly inside volume need to be painted with boundary check
             shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
             shader->set_uniform("print_volume.xy_data", m_print_volume.data);
             shader->set_uniform("print_volume.z_data", m_print_volume.zs);
-        }
+        } 
         else {
+            //shader->set_uniform("color_bed_exclude_area.enable", 0);
             //use -1 ad a invalid type
             shader->set_uniform("print_volume.type", -1);
         }
-        
+
+        GUI::PartPlate*      curr_plate = GUI::wxGetApp().plater()->get_partplate_list().get_selected_plate();
+        bool                 is_multi_color;
+        const BoundingBoxf3& exclude_area = curr_plate->get_color_bed_exclude_area_cache(&is_multi_color);
+        shader->set_uniform("color_bed_exclude_area.enable", static_cast<int>(is_multi_color));
+        if (is_multi_color) {
+            std::array<float, 4> xy_data{(float)exclude_area.min.x(), (float)exclude_area.min.y(), (float)exclude_area.max.x(), (float)exclude_area.max.y()};
+            shader->set_uniform("color_bed_exclude_area.xy_data", xy_data);
+            std::array<float, 2> zs{(float)exclude_area.min.z(), (float)exclude_area.max.z()};
+            shader->set_uniform("color_bed_exclude_area.z_data", zs);
+        }
+
         bool  enable_support;
         int   support_threshold_angle = get_selection_support_threshold_angle(enable_support);
     
@@ -1043,10 +1100,16 @@ bool GLVolumeCollection::check_outside_state(const BuildVolume &build_volume, Mo
     std::map<int64_t, ModelInstanceEPrintVolumeState> model_state;
 
     GUI::PartPlate* curr_plate = GUI::wxGetApp().plater()->get_partplate_list().get_selected_plate();
-    const Pointfs& pp_bed_shape = curr_plate->get_shape();
-    BuildVolume plate_build_volume(pp_bed_shape, build_volume.printable_height());
-    const std::vector<BoundingBoxf3>& exclude_areas = curr_plate->get_exclude_areas();
 
+    const Pointfs& pp_bed_shape = curr_plate->get_shape();    
+    double printable_height = build_volume.printable_height();
+    BuildVolume plate_build_volume = BuildVolume(pp_bed_shape, printable_height);
+    std::vector<BoundingBoxf3> exclude_areas = curr_plate->get_exclude_areas();
+    
+    //Creality
+    bool is_multi_color;
+    const BoundingBoxf3& exclude_area = curr_plate->get_color_bed_exclude_area_cache(&is_multi_color);
+    
     for (GLVolume* volume : this->volumes) 
     {
         if (! volume->is_modifier && (volume->shader_outside_printer_detection_enabled || (! volume->is_wipe_tower && volume->composite_id.volume_id >= 0))) {
@@ -1058,7 +1121,8 @@ bool GLVolumeCollection::check_outside_state(const BuildVolume &build_volume, Mo
                 switch (plate_build_volume.type()) {
                 case BuildVolume_Type::Rectangle:
                 //FIXME this test does not evaluate collision of a build volume bounding box with non-convex objects.
-                    state = plate_build_volume.volume_state_bbox(bb);
+                    if (!is_multi_color) state = plate_build_volume.volume_state_bbox(bb);
+                    else state = plate_build_volume.volume_state_bbox(bb, exclude_area);
                     break;
                 case BuildVolume_Type::Circle:
                 case BuildVolume_Type::Convex:

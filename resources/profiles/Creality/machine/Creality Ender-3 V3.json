@@ -9,5 +9,5 @@
     "hotend_model": "",
     "machine_tech": "FFF",
     "model_id": "Creality_Ender_3_V3",
-    "default_materials": "Generic TPU;Generic PETG;CR-PETG;Generic PLA-CF;Hyper PLA-CF;Generic PLA-Silk;Generic PLA;CR-Silk;CR-PLA;Hyper PLA"
+    "default_materials": "CR-ABS;Soleyin Ultra PLA;Hyper PETG;Hyper PLA-CF;Hyper PLA;Generic TPU;Generic PLA-Silk;Generic PLA-CF;Generic PLA;Generic PETG;CR-Silk;CR-PLA;CR-PETG"
 }

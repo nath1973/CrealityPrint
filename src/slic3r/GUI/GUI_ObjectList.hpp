@@ -204,6 +204,7 @@ private:
 
     ObjList_Texture m_texture;
     bool m_left_panel_fold {false};
+    bool m_obj_list_window_focus{false};
 
     struct dragged_item_data
     {
@@ -280,6 +281,16 @@ private:
         if (const auto &item = this->GetCurrentItem())
             this->EnsureVisible(item);
     }
+
+    struct ObjListTableData
+    {
+        float table_offset_y{-1.0f};
+        float table_height{-1.0f};
+        bool  valid() { return table_offset_y > 0.0f && table_height > 0.0f; }
+
+    } m_table_data;
+
+    void ensure_current_item_visible_imgui();
 
 public:
     ObjectList(wxWindow* parent);
@@ -521,7 +532,8 @@ public:
     void update_printable_state(int obj_idx, int instance_idx);
     void toggle_printable_state();
 
-    void on_char(wxKeyEvent& evt);
+    bool on_char(wxKeyEvent& evt);
+    void on_key(wxKeyEvent& evt);
 
     //BBS: remove const qualifier
     void set_extruder_for_selected_items(const int extruder);
@@ -548,7 +560,10 @@ public:
     void render_plate_tree_by_ImGui();
     void render_unfold_button();
 
-private:
+    bool get_object_list_window_focus();
+    void set_object_list_window_focus(bool f);
+
+ private:
 #ifdef __WXOSX__
 //    void OnChar(wxKeyEvent& event);
     wxAcceleratorTable m_accel;
@@ -581,6 +596,18 @@ private:
     void render_volume(ObjectDataViewModelNode* volume);
 
     void render_generic_columns(ObjectDataViewModelNode* node);
+
+    void select_node(ObjectDataViewModelNode* node, bool node_select_state);
+
+    //no use for plate select
+    void handle_obj_list_select_event(
+        bool left_clicked,
+        bool right_clicked,
+        bool left_draged, 
+        bool shift_press, 
+        bool node_selected, 
+        ObjectDataViewModelNode* node,
+        wxDataViewItemArray& selecteds);
 
     void render_current_device_name(const float max_right);
 };

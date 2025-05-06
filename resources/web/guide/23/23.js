@@ -43,7 +43,7 @@ function areFloatsEqual(float1, float2, epsilon = 0.001)
     return Math.abs(float1 - float2) < epsilon;
 }
 
-function HandleStudio(pVal)
+function handleStudioCmd(pVal)
 {
 	let strCmd=pVal['command'];
 	//alert(strCmd);
@@ -701,7 +701,7 @@ function TestCustomFilaments()
 	let strTest='{"command":"update_custom_filaments","data":[{"id":"P0c71f94","name":"AMOLEN ABS 222"},{"id":"P19cc6c5","name":"PrimaSelect PLA 231654"},{"id":"P93a5c3b","name":"3DJAKE PLA 111"}],"sequence_id":"2000"}';
 	let tItem=JSON.parse(strTest);
 	
-	HandleStudio(tItem);
+	handleStudioCmd(tItem);
 }
 
 function UpdateCustomFilaments( CFList )

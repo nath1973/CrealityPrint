@@ -89,7 +89,15 @@ static void trianglemesh_repair_on_import(stl_file &stl)
     BOOST_LOG_TRIVIAL(trace) << "\tstl_check_faces_exact";
 #endif /* SLIC3R_TRACE_REPAIR */
     assert(stl_validate(&stl));
+    auto start = std::chrono::high_resolution_clock::now();
     stl_check_facets_exact(&stl);
+    auto end = std::chrono::high_resolution_clock::now();
+    // 计算耗时
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    int spend_time = duration.count();
+    // 输出耗时
+    std::cout << "Function took " << spend_time << " seconds to execute." << std::endl;
+
     assert(stl_validate(&stl));
     stl.stats.facets_w_1_bad_edge = (stl.stats.connected_facets_2_edge - stl.stats.connected_facets_3_edge);
     stl.stats.facets_w_2_bad_edge = (stl.stats.connected_facets_1_edge - stl.stats.connected_facets_2_edge);
@@ -215,7 +223,7 @@ bool TriangleMesh::ReadSTLFile(const char *input_file, bool repair, ImportstlPro
     if (!stl_open(&stl, input_file, stlFn, custom_header_length))
         return false;
     return from_stl(stl, repair);
-}
+ }
 
 bool TriangleMesh::write_ascii(const char* output_file)
 {

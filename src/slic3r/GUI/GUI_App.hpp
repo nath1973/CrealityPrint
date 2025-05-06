@@ -108,6 +108,9 @@ enum FileType
     FT_CXPROJECT,
 
     FT_ONLY_GCODE,
+    FT_MESH_FILE,
+    FT_CAD_FILE,
+    FT_VIDEO,
 
     FT_SIZE,
 };
@@ -332,11 +335,14 @@ private:
     std::string     get_local_models_path();
     bool            OnInit() override;
     int             OnExit() override;
+    void            track_event(const std::string& event, const std::string& data);
+    void            OnUnhandledException()  override;
     bool            initialized() const { return m_initialized; }
     inline bool     is_enable_multi_machine() { return this->app_config&& this->app_config->get("enable_multi_machine") == "true"; }
     int             get_server_port() { return m_http_server.get_port(); }
+    HttpServer*     get_server() { return &m_http_server;}
     std::map<std::string, bool> test_url_state;
-
+    void            reinit_downloader();
     //BBS: remove GCodeViewer as seperate APP logic
     explicit GUI_App();
     //explicit GUI_App(EAppMode mode = EAppMode::Editor);
@@ -367,6 +373,8 @@ private:
 
     wxString get_inf_dialog_contect () {return m_info_dialog_content;};
 
+    bool send_app_message(const std::string& msg,bool bforce = false);
+    void reload_homepage();
     std::vector<std::string> split_str(std::string src, std::string separator);
     // To be called after the GUI is fully built up.
     // Process command line parameters cached in this->init_params,
@@ -380,7 +388,8 @@ private:
     bool            init_opengl();
 
     void            init_download_path();
-    void            post_openlink_cmd();  //CP
+    void            post_openlink_cmd(std::string link);  //CP
+    void            swith_community_sub_page(const std::string& pageName);
 #if wxUSE_WEBVIEW_EDGE
     void            init_webview_runtime();
 #endif
@@ -439,6 +448,7 @@ private:
     int             em_unit() const         { return m_em_unit; }
     bool            tabs_as_menu() const;
     wxSize          get_min_size() const;
+    wxSize          get_min_size_ex(wxWindow* display_win) const;
     float           toolbar_icon_scale(const bool is_limited = false) const;
     void            set_auto_toolbar_icon_scale(float scale) const;
     void            check_printer_presets();
@@ -447,7 +457,7 @@ private:
     void            system_info();
     void            keyboard_shortcuts();
     void            load_project(wxWindow *parent, wxString& input_file) const;
-    void            import_model(wxWindow *parent, wxArrayString& input_files) const;
+    void            import_model(wxWindow *parent, wxArrayString& input_files, bool Category_or_not = false) const;
     void            import_zip(wxWindow* parent, wxString& input_file) const;
     void            load_gcode(wxWindow* parent, wxString& input_file) const;
 
@@ -516,6 +526,7 @@ private:
     void            remove_user_presets();
     void            sync_preset(Preset* preset);
     void            start_sync_user_preset(bool with_progress_dlg = false);
+    bool            wait_cloud_token();
     void            stop_sync_user_preset();
     void            start_http_server();
     void            stop_http_server();
@@ -527,6 +538,8 @@ private:
     bool            check_privacy_update();
     void            check_privacy_version(int online_login = 0);
     void            check_track_enable();
+    void            check_creality_privacy_version();
+    void            save_privacy_version();
 
     static bool     catch_error(std::function<void()> cb, const std::string& err);
 
@@ -738,6 +751,7 @@ private:
     bool                    m_config_corrupted { false };
     std::string             m_open_method;
     bool                    need_exit_{false};
+    json                    privacyData;
     
     std::mutex                                                                         download_mtx_;
     std::list<std::tuple<wxString, wxString, wxString, wxString, wxString>> download_tasks_;

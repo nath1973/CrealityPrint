@@ -108,6 +108,7 @@ class ObjectDataViewModelNode
     bool                            m_color_enable = false;
     bool                            m_sink_enable = false;
     
+    bool                            m_open{true};    // for tree node open state
 
 public:
     PartPlate*                      m_part_plate;
@@ -310,6 +311,14 @@ public:
     bool        has_warning_icon() const { return !m_warning_icon_name.empty(); }
     std::string warning_icon_name() const { return m_warning_icon_name; }
     bool        has_lock() const { return m_has_lock; }
+
+    bool get_open() { return m_open; }
+    void set_open(bool open)
+    {
+        if (open != m_open) {
+            m_open = open;
+        }
+    }
 
 private:
     friend class ObjectDataViewModel;

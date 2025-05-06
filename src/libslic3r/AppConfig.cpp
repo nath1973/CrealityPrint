@@ -1335,6 +1335,20 @@ std::vector<std::string> AppConfig::get_recent_projects() const
     return ret;
 }
 
+std::vector<std::string> AppConfig::get_projects_open_time() const
+{
+    std::vector<std::string> ret;
+    const auto it = m_storage.find("recent_project_times");
+    if (it != m_storage.end())
+    {
+        for (const std::map<std::string, std::string>::value_type& item : it->second)
+        {
+            ret.push_back(item.second);
+        }
+    }
+    return ret;
+}
+
 void AppConfig::set_recent_projects(const std::vector<std::string>& recent_projects)
 {
     auto it = m_storage.find("recent_projects");
@@ -1347,6 +1361,21 @@ void AppConfig::set_recent_projects(const std::vector<std::string>& recent_proje
         auto n = std::to_string(i + 1);
         if (n.length() == 1) n = "0" + n;
         it->second[n] = recent_projects[i];
+    }
+}
+
+void AppConfig::set_project_times(const std::deque<std::string>& project_times)
+{
+    auto it = m_storage.find("recent_project_times");
+    if (it == m_storage.end())
+        it = m_storage.insert(std::map<std::string, std::map<std::string, std::string>>::value_type("recent_project_times", std::map<std::string, std::string>())).first;
+
+    it->second.clear();
+    for (unsigned int i = 0; i < (unsigned int)project_times.size(); ++i)
+    {
+        auto n = std::to_string(i + 1);
+        if (n.length() == 1) n = "0" + n;
+        it->second[n] = project_times[i];
     }
 }
 

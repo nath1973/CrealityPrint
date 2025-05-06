@@ -36,6 +36,7 @@
 #include "slic3r/GUI/print_manage/RemotePrinterManager.hpp"
 #include "slic3r/GUI/print_manage/MaterialMapPanel.hpp"
 #include "slic3r/GUI/Notebook.hpp"
+#include "data/DataCenter.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -57,40 +58,6 @@ static wxString extract_ip_address(const wxString& combo_selection)
         return wxString(match[1].str());
     }
     return "";
-}
-
-void UploadGcodeToCloudDialog::init_device_list_from_db()
-{
-    m_comboBox_printer->Clear();
-    int defaultSelectionIndex = wxNOT_FOUND;
-    int firstOnlineIndex      = wxNOT_FOUND;
-
-    for (size_t i = 0; i < RemotePrint::DeviceDB::getInstance().devices.size(); ++i) {
-        const auto& device              = RemotePrint::DeviceDB::getInstance().devices[i];
-        wxString    online_status       = device.online ? _L("Online") : _L("Offline");
-        wxString    printer_busy_status = device.deviceState ? _L("Busy") : _L("Ready");
-        m_comboBox_printer->Append(device.model + " (" + device.address + ")" + "                    " + online_status);
-
-        if (device.online) {
-            if (device.model == "F008" && defaultSelectionIndex == wxNOT_FOUND) {
-                defaultSelectionIndex = i;
-            }
-            if (firstOnlineIndex == wxNOT_FOUND) {
-                firstOnlineIndex = i;
-            }
-        }
-    }
-
-    if (defaultSelectionIndex != wxNOT_FOUND) {
-        m_comboBox_printer->SetSelection(defaultSelectionIndex);
-    } else if (firstOnlineIndex != wxNOT_FOUND) {
-        m_comboBox_printer->SetSelection(firstOnlineIndex);
-    }
-
-    // Manually trigger the selection changed event
-    wxCommandEvent event(wxEVT_COMBOBOX, m_comboBox_printer->GetId());
-    event.SetEventObject(m_comboBox_printer);
-    on_selection_changed(event);
 }
 
 void UploadGcodeToCloudDialog::stripWhiteSpace(std::string& str)
@@ -443,15 +410,6 @@ UploadGcodeToCloudDialog::UploadGcodeToCloudDialog(Plater* plater)
     // CenterOnParent();
     Centre(wxBOTH);
     wxGetApp().UpdateDlgDarkUI(this);
-    if (wxGetApp().mainframe->get_printer_mgr_view()) {
-        wxGetApp().mainframe->get_printer_mgr_view()->RegisterHandler("receive_color_match_info", [this](const nlohmann::json& json_data) {
-            this->handle_receive_color_match_info(json_data);
-        });
-
-        wxGetApp().mainframe->get_printer_mgr_view()->RegisterHandler("receive_device_list", [this](const nlohmann::json& json_data) {
-            this->handle_receive_device_list(json_data);
-        });
-    }
 }
 
 void UploadGcodeToCloudDialog::update_print_error_info(int code, std::string msg, std::string extra)
@@ -580,8 +538,12 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
       scrolledWindow->SetScrollRate(10, 10);*/
 
     m_panel_image = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(700), FromDIP(400)));
-    m_panel_image->SetBackgroundColour(wxColor(75, 75, 77));
-
+    // m_panel_image->SetBackgroundColour(wxColor(75, 75, 77));
+   if (wxGetApp().dark_mode()) {
+        m_panel_image->SetBackgroundColour(wxColour(75, 75, 73));
+    } else {
+        m_panel_image->SetBackgroundColour(wxColour(255, 255, 255));
+    }
     wxBoxSizer* innerSizer = new wxBoxSizer(wxHORIZONTAL);
     m_panel_image->SetSizer(innerSizer);
 
@@ -590,13 +552,27 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
     wxColor cardColor  = wxColor(45, 45, 49);
     if (!m_plater)
         return;
-    PartPlate* plate      = m_plater->get_partplate_list().get_plate(m_plater->get_partplate_list().get_curr_plate_index());
+
+    bool is_all_plates     = wxGetApp().plater()->get_preview_canvas3D()->is_all_plates_selected();
+    int  current_plate_idx = wxGetApp().plater()->get_partplate_list().get_curr_plate_index();
+    if (is_all_plates) {
+        current_plate_idx = 0;
+    }
+    PartPlate* plate = m_plater->get_partplate_list().get_plate(current_plate_idx);
     {
         ThumbnailData data;
+        GCodeProcessorResult* current_result = plate->get_slice_result();
+
+        int           maxIndex = current_result->image_data.size() - 1;
+        if (maxIndex >= 0) {
+            data.width  = current_result->image_data[maxIndex].first[0];
+            data.height = current_result->image_data[maxIndex].first[1];
+            data.pixels = current_result->image_data[maxIndex].second;
+        }
+
         wxImage image;
         if (m_plater->only_gcode_mode()) 
         {
-            data = m_plater->get_gcode_thumbnail();
             wxMemoryInputStream memStream(data.pixels.data(), data.pixels.size());
             wxImage pngImage(memStream, wxBITMAP_TYPE_PNG);
             image = pngImage;
@@ -627,12 +603,18 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
             wxSize   panelSize(FromDIP(690), FromDIP(320));
             wxSize  thumnailSize(FromDIP(320), FromDIP(282));
             wxPanel* panel = new wxPanel(m_panel_image, wxID_ANY, wxDefaultPosition, panelSize);
-            panel->SetBackgroundColour(cardColor);
+            // panel->SetBackgroundColour(cardColor);
+            if (wxGetApp().dark_mode()) {
+                    panel->SetBackgroundColour(cardColor);
+                } else {
+                    panel->SetBackgroundColour(wxColour(150, 150, 150));
+                }
             wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
             panel->SetSizer(sizer);
 
             //  右边信息
             wxPanel* infoPanel = new wxPanel(panel);
+            
             sizer->Add(infoPanel);
             wxBoxSizer* infoPanelSizer = new wxBoxSizer(wxVERTICAL);
             infoPanel->SetSizer(infoPanelSizer);
@@ -683,9 +665,28 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
             printWeightSizer->Add(m_stext_weight, 0, wxALL, FromDIP(5));
             //m_sizer_basic->Add(m_sizer_basic_time, 0, wxALIGN_CENTER, 0);
 
-            auto m_thumbnailPanel = new ThumbnailPanel(panel);
-            sizer->Add(m_thumbnailPanel, 0, wxEXPAND);
-            m_thumbnailPanel->set_force_draw_background(true);
+
+            wxPanel* panel2 = new wxPanel(panel, wxID_ANY);
+            if (wxGetApp().dark_mode()) {
+                    panel2->SetBackgroundColour(cardColor);
+                } else {
+                    panel2->SetBackgroundColour(wxColour(150, 150, 150));
+                }
+            panel2->SetMinSize(thumnailSize);
+            panel2->SetMaxSize(thumnailSize);
+            wxBoxSizer* panel2sizer = new wxBoxSizer(wxVERTICAL);
+            panel2->SetSizer(panel2sizer);
+            sizer->AddStretchSpacer();
+            sizer->Add(panel2, 0, wxALIGN_CENTER | wxALL, 0);
+            
+            auto m_thumbnailPanel = new ThumbnailPanel(panel2);
+            //sizer->Add(m_thumbnailPanel, 0, wxEXPAND | wxALL, 0);
+            if (wxGetApp().dark_mode()) {
+                    m_thumbnailPanel->SetBackgroundColour(cardColor);
+                } else {
+                    m_thumbnailPanel->SetBackgroundColour(wxColour(150, 150, 150));
+                }
+            //m_thumbnailPanel->set_force_draw_background(true);
             m_thumbnailPanel->set_background_size(thumnailSize);
             m_thumbnailPanel->SetSize(thumnailSize);
             m_thumbnailPanel->SetMinSize(thumnailSize);
@@ -695,6 +696,7 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
             infoPanelSizer->Layout();
 
             wrapSizer->Add(panel, 0, wxALL, 5);
+            sizer->Layout();
         }
 
         std::vector<int> plate_extruders = plate->get_extruders(true);
@@ -725,7 +727,7 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
     Centre();
     m_sizer_scrollable_region->Add(m_panel_image);
 
-    wxBoxSizer* m_sizer_material_list = new wxBoxSizer(wxHORIZONTAL);
+  /*  wxBoxSizer* m_sizer_material_list = new wxBoxSizer(wxHORIZONTAL);
 
     auto extruderSize = plate_extruder_colors_json.size();
     for (int i = 0; i < plate_extruder_colors_json.size(); i++) {
@@ -757,7 +759,7 @@ void UploadGcodeToCloudDialog::get_current_plate_color()
         sizer->Add(textBottom, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
         panel->SetSizer(sizer);
         m_sizer_material_list->Add(panel, 0, wxEXPAND | wxALL, 10);
-    }
+    }*/
 
     //m_sizer_material->Add(m_sizer_material_list);
 
@@ -917,7 +919,7 @@ std::string UploadGcodeToCloudDialog::build_switch_printer_details_page_cmd_info
         return "";
     }
 
-    auto printerData = RemotePrint::DeviceDB::getInstance().get_printer_data(ipAddress);
+    auto printerData = DM::DataCenter::Ins().get_printer_data(ipAddress);
 
     // Create top-level JSON object
     nlohmann::json top_level_json = {
@@ -1202,7 +1204,7 @@ void UploadGcodeToCloudDialog::on_selection_changed(wxCommandEvent& event)
     //    m_materialMapPanel->related_printer_ip = ipAddress;
     //}
 
-    if (RemotePrint::DeviceDB::getInstance().DeviceHasBoxColor(ipAddress)) {
+    if (DM::DataCenter::Ins().DeviceHasBoxColor(ipAddress)) {
         wxGetApp().mainframe->get_printer_mgr_view()->ExecuteScriptCommand(build_match_color_cmd_info());
     } else {
         //if (m_materialMapPanel) {
@@ -1212,7 +1214,7 @@ void UploadGcodeToCloudDialog::on_selection_changed(wxCommandEvent& event)
 
     // Get device data based on ipAddress
     {
-        auto device = RemotePrint::DeviceDB::getInstance().get_printer_data(ipAddress);
+        auto device = DM::DataCenter::Ins().get_printer_data(ipAddress);
         if (device.boxColorInfos.empty()) {
             m_checkbox_open_cfs->SetValue(false);
             m_checkbox_open_cfs->Hide();
@@ -1504,12 +1506,12 @@ void UploadGcodeToCloudDialog::set_plate_info(int plate_idx)
 
  if (m_plater->only_gcode_mode()) 
  {
-    
-    m_ssGCodeFilePath = m_plater->get_last_loaded_gcode().ToUTF8().data();
+    GCodeProcessorResult* current_result = m_plater->get_partplate_list().get_current_slice_result();
+    m_ssGCodeFilePath = current_result->filename;
     auto  plate_print_statistics = plate->get_slice_result()->print_statistics;
     m_printTime = wxString::Format("%s", short_time(get_time_dhms(plate_print_statistics.modes[0].time))).ToStdString();
     
-    GCodeProcessorResult* current_result = m_plater->get_partplate_list().get_current_slice_result();
+    
     double total_weight = 0.0;
     if (current_result) {
         auto&  ps         = current_result->print_statistics;
@@ -1528,7 +1530,7 @@ void UploadGcodeToCloudDialog::set_plate_info(int plate_idx)
         ::sprintf(weight, "%.2f g", total_weight);
     }
     m_printWeight = weight;
-    fs::path default_output_file = fs::path(std::string(m_plater->get_last_loaded_gcode().utf8_str()));// fs::path(m_plater->get_last_loaded_gcode().ToStdString());
+    fs::path default_output_file = fs::path(std::string(m_ssGCodeFilePath));// fs::path(m_plater->get_last_loaded_gcode().ToStdString());
     m_rename_text->SetLabelText(from_u8(default_output_file.filename().string()));
     return ;
 }
@@ -1637,7 +1639,12 @@ bool UploadGcodeToCloudDialog::Show(bool show)
     if (show) {
         wxGetApp().reset_to_active();
         if (wxGetApp().plater()) {
-            set_plate_info(wxGetApp().plater()->get_partplate_list().get_curr_plate_index());
+            bool is_all_plates     = wxGetApp().plater()->get_preview_canvas3D()->is_all_plates_selected();
+            int  current_plate_idx = wxGetApp().plater()->get_partplate_list().get_curr_plate_index();
+            if (is_all_plates) {
+                current_plate_idx = 0;
+            }
+            set_plate_info(current_plate_idx);
         }
         update_user_machine_list();
         get_current_plate_color();
@@ -1654,9 +1661,6 @@ bool UploadGcodeToCloudDialog::Show(bool show)
 
 int UploadGcodeToCloudDialog::doModel() { 
     wxGetApp().reset_to_active();
-    if (wxGetApp().plater()) {
-        set_plate_info(wxGetApp().plater()->get_partplate_list().get_curr_plate_index());
-    }
     update_user_machine_list();
     get_current_plate_color();
     update_3mf_info();
@@ -1667,66 +1671,6 @@ int UploadGcodeToCloudDialog::doModel() {
     CenterOnParent();
 
     return DPIDialog::ShowModal();
-}
-
-void UploadGcodeToCloudDialog::handle_receive_device_list(const nlohmann::json& json_data)
-{
-    RemotePrint::DeviceDB::getInstance().devices.clear();
-
-    // handle receive_device_list command
-    for (const auto& device : json_data["data"]) {
-        RemotePrint::DeviceDB::Data data;
-        data.address     = device["address"];
-        data.mac         = device["mac"];
-        data.model       = device["model"];
-        data.online      = device["online"];
-        data.deviceState = device["deviceState"];
-        data.name        = device["name"];
-        data.group       = device["group"];
-
-        // parse boxColorInfo
-        for (const auto& boxColorInfo : device["boxColorInfo"]) {
-            RemotePrint::DeviceDB::DeviceBoxColorInfo boxColor;
-            boxColor.color        = boxColorInfo["color"];
-            boxColor.boxId        = boxColorInfo["boxId"];
-            boxColor.materialId   = boxColorInfo["materialId"];
-            boxColor.filamentType = boxColorInfo["filamentType"];
-            data.boxColorInfos.push_back(boxColor);
-        }
-
-        RemotePrint::DeviceDB::getInstance().AddDevice(data);
-    }
-
-    // this->Show(true);
-
-    set_plate_info(m_print_plate_idx);
-}
-
-void UploadGcodeToCloudDialog::handle_receive_color_match_info(const nlohmann::json& json_data)
-{
-    const auto&                                                data = json_data["data"];
-    std::vector<RemotePrint::MaterialMapPanel::ColorMatchInfo> materialMapInfo;
-
-    std::vector<std::string> all_filament_types = get_all_filament_types();
-
-    for (const auto& matchInfo : data) {
-        RemotePrint::MaterialMapPanel::ColorMatchInfo tmpMatchInfo;
-        tmpMatchInfo.extruderId           = matchInfo["extruderId"];
-        tmpMatchInfo.extruderFilamentType = all_filament_types[tmpMatchInfo.extruderId - 1];
-        tmpMatchInfo.extruderColor        = RemotePrint::Utils::hex_string_to_wxcolour(matchInfo["extruderColor"].get<std::string>());
-        tmpMatchInfo.matchColor           = RemotePrint::Utils::hex_string_to_wxcolour(matchInfo["matchColor"].get<std::string>());
-        tmpMatchInfo.matchFilamentType    = matchInfo["matchFilamentType"];
-        tmpMatchInfo.materialId           = matchInfo["materialId"];
-        materialMapInfo.emplace_back(tmpMatchInfo);
-    }
-
-    //if (m_materialMapPanel) {
-    //    m_materialMapPanel->SetMaterialMapInfo(materialMapInfo);
-    //}
-
-    Layout();
-    Fit();
-    Thaw();
 }
 
 void UploadGcodeToCloudDialog::on_checkbox_open_cfs(wxCommandEvent& event)

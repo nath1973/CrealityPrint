@@ -567,6 +567,16 @@ Http& Http::remove_header(std::string name)
 	return *this;
 }
 
+Http& Http::clear_header()
+{
+    if(p){
+        curl_slist_free_all(p->headerlist);
+        p->headerlist = nullptr;
+    }
+    
+    return *this;
+}
+
 // Authorization by HTTP digest, based on RFC2617.
 Http& Http::auth_digest(const std::string &user, const std::string &password)
 {
@@ -576,6 +586,7 @@ Http& Http::auth_digest(const std::string &user, const std::string &password)
 
 	return *this;
 }
+
 
 Http& Http::auth_basic(const std::string &user, const std::string &password)
 {

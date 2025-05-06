@@ -13,7 +13,8 @@
 #include <wx/event.h>
 #include <wx/bitmap.h>
 #include <wx/string.h>
-
+#include "CrealityrintDump.hpp"
+#include "slic3r/Utils/ColorSpaceConvert.hpp"
 // Localization headers: include libslic3r version first so everything in this file
 // uses the slic3r/GUI version (the macros will take precedence over the functions).
 // Also, there is a check that the former is not included from slic3r module.
@@ -73,6 +74,7 @@
 #include "libslic3r/Color.hpp"
 #ifdef _WIN32
 #include "libslic3r/UnittestFlow.hpp"
+#include "libslic3r/AutomationMgr.hpp"
 #endif
 #include "GUI.hpp"
 #include "GUI_Utils.hpp"
@@ -118,7 +120,10 @@
 #include "PrivacyUpdateDialog.hpp"
 #include "ModelMall.hpp"
 #include "HintNotification.hpp"
-
+#include <boost/url.hpp>
+#include <boost/bind.hpp>
+#include <boost/thread.hpp>
+#include <boost/regex.hpp>
 #include <slic3r/GUI/print_manage/AccountDeviceMgr.hpp>
 //#ifdef WIN32
 //#include "BaseException.h"
@@ -159,8 +164,9 @@
 #include "print_manage/UploadGcodeToCloud.hpp"
 #include "print_manage/Upload3mfToCloud.hpp"
 #include "libslic3r/GlobalConfig.hpp"
-
-
+#include "SyncUserPresets.hpp"
+#include "print_manage/AppMgr.hpp"
+#include "UpdateParams.hpp"
 
 using namespace std::literals;
 namespace pt = boost::property_tree;
@@ -318,10 +324,10 @@ public:
             memDC.SetFont(m_action_font);
             memDC.SetTextForeground(StateColor::darkModeColorFor(wxColour(144, 144, 144)));
             int width = bitmap.GetWidth();
-            int text_height = memDC.GetTextExtent(text).GetHeight();
-            int text_width = memDC.GetTextExtent(text).GetWidth();
-            wxRect text_rect(wxPoint(0, m_action_line_y_position), wxPoint(width, m_action_line_y_position + text_height));
-            memDC.DrawLabel(text, text_rect, wxALIGN_CENTER);
+            //int text_height = memDC.GetTextExtent(text).GetHeight();
+            //int text_width = memDC.GetTextExtent(text).GetWidth();
+            //wxRect text_rect(wxPoint(0, m_action_line_y_position), wxPoint(width, m_action_line_y_position + text_height));
+            //memDC.DrawLabel(text, text_rect, wxALIGN_CENTER);
 
             memDC.SelectObject(wxNullBitmap);
             set_bitmap(bitmap);
@@ -423,7 +429,7 @@ public:
         const wxColor  font_color(100, 100, 100);
 
         // Official brief introduction
-        wxString official_brief_introduction = _L("Official brief introduction");
+        wxString official_brief_introduction = m_loading_info + "\n\n" + _L("Official brief introduction");
 
         wxRect rect(FromDIP(32), height * 0.50, FromDIP(210), FromDIP(100));
         wxFont font(11, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
@@ -526,10 +532,9 @@ private:
     wxStaticText* m_staticText_slicer_version;
     wxStaticBitmap* m_bitmap;
     wxStaticText* m_staticText_loading;
-
+    wxString        m_loading_info = _L("Loading configuration") + dots;
     wxBitmap    m_main_bitmap;
     wxFont      m_action_font;
-    int         m_action_line_y_position;
     float       m_scale {1.0};
 
     struct ConstantText
@@ -616,10 +621,10 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_GCODE */   { "G-code files"sv,    { ".gcode"sv, ".3mf"sv } },
 #ifdef __APPLE__
     /* FT_MODEL */
-    {"Supported files"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv, ".usd"sv, ".usda"sv, ".usdc"sv, ".usdz"sv, ".abc"sv, ".ply"sv}},
+    {"All"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv, ".usd"sv, ".usda"sv, ".usdc"sv, ".usdz"sv, ".abc"sv, ".ply"sv,".dae"sv,".3ds"sv,".off"sv}},
 #else
     /* FT_MODEL */
-    {"Supported files"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv}},
+    {"All"sv, {".3mf"sv, ".stl"sv, ".oltp"sv, ".stp"sv, ".step"sv, ".svg"sv, ".amf"sv, ".obj"sv, ".dae"sv, ".3ds"sv, ".ply"sv, ".off"sv}},
 #endif
     /* FT_ZIP */     { "ZIP files"sv,       { ".zip"sv } },
     /* FT_PROJECT */ { "Project files"sv,   { ".3mf"sv, ".cxprj"sv } },
@@ -631,6 +636,8 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv } },
     /* FT_CXPRJ */   { "Cxprj files"sv,     { ".cxprj"sv } },
     /* FT_ONLY_GCODE */   { "G-code files"sv,    { ".gcode"sv } },
+    /* FT_MESH_FILE */ { "Mesh files"sv,   { ".stl"sv, ".obj"sv, ".dae"sv, ".3ds"sv, ".off"sv, ".ply"sv, ".3mf"sv } },
+    /* FT_CAD_FILE */     { "CAD files"sv, { ".stp"sv, ".step"sv } },
 };
 
 // This function produces a Win32 file dialog file template mask to be consumed by wxWidgets on all platforms.
@@ -880,7 +887,99 @@ void GUI_App::toggle_show_gcode_window()
     m_show_gcode_window = !m_show_gcode_window;
     app_config->set_bool("show_gcode_window", m_show_gcode_window);
 }
+#ifdef _WIN32
+static std::list<HWND> l_creality_print_hwnds;
+static BOOL CALLBACK EnumWindowsProc(_In_ HWND   hwnd, _In_ LPARAM lParam)
+{
+		//checks for other instances of prusaslicer, if found brings it to front and return false to stop enumeration and quit this instance
+		//search is done by classname(wxWindowNR is wxwidgets thing, so probably not unique) and name in window upper panel
+		//other option would be do a mutex and check for its existence
+		//BOOST_LOG_TRIVIAL(error) << "ewp: version: " << l_version_wstring;
+		TCHAR 		 wndText[1000];
+		TCHAR 		 className[1000];
+		int          err;
+		err = GetClassName(hwnd, className, 1000);
+		if (err == 0)
+			return true;
+		err = GetWindowText(hwnd, wndText, 1000);
+		if (err == 0)
+			return true;
+		std::wstring classNameString(className);
+		std::wstring wndTextString(wndText);
+		if (wndTextString.find(L"CrealityPrint") != std::wstring::npos && classNameString == L"wxWindowNR") {
+			//check if other instances has same instance hash
+			//if not it is not same version(binary) as this version 
+			HANDLE   handle = GetProp(hwnd, L"Instance_Hash_Minor");
+			uint64_t other_instance_hash = PtrToUint(handle);
+			uint64_t other_instance_hash_major;
+			uint64_t my_instance_hash = GUI::wxGetApp().get_instance_hash_int();
+			handle = GetProp(hwnd, L"Instance_Hash_Major");
+			other_instance_hash_major = PtrToUint(handle);
+			other_instance_hash_major = other_instance_hash_major << 32;
+			other_instance_hash += other_instance_hash_major;
+            //All CrealityPrint instances send
+			//if(my_instance_hash == other_instance_hash) 
+			{
+				BOOST_LOG_TRIVIAL(debug) << "win enum - found correct instance";
+				l_creality_print_hwnds.push_back(hwnd);
+				return true;
+			}
+			BOOST_LOG_TRIVIAL(debug) << "win enum - found wrong instance";
+		}
+		return true;
+	}
+#endif
+void  GUI_App::reload_homepage()
+{
+    if (mainframe)
+    {
+        if(mainframe->m_webview)
+        {
+            mainframe->m_webview->Reload();
+        }
+    }
 
+}
+bool GUI_App::send_app_message(const std::string& msg,bool bforce)
+{
+    bool isActive = mainframe->IsActive();
+    if(!isActive && !bforce)
+    {
+        //only send message when the mainframe is active
+        return false;
+    }
+#ifdef _WIN32
+    l_creality_print_hwnds.clear();
+    EnumWindows(EnumWindowsProc, 0);
+    if (!l_creality_print_hwnds.empty()) {
+        std::wstring wstr = boost::nowide::widen(msg);
+        std::unique_ptr<LPWSTR> command_line_args = std::make_unique<LPWSTR>(const_cast<LPWSTR>(wstr.c_str()));
+        /*LPWSTR command_line_args = new wchar_t[wstr.size() + 1];
+        copy(wstr.begin(), wstr.end(), command_line_args);
+        command_line_args[wstr.size()] = 0;*/
+
+        //Create a COPYDATASTRUCT to send the information
+        //cbData represents the size of the information we want to send.
+        //lpData represents the information we want to send.
+        //dwData is an ID defined by us(this is a type of ID different than WM_COPYDATA).
+        COPYDATASTRUCT data_to_send = { 0 };
+        data_to_send.dwData = 1;
+        data_to_send.cbData = sizeof(TCHAR) * (wcslen(*command_line_args.get()) + 1);
+        data_to_send.lpData = *command_line_args.get();
+        for(auto hwnd : l_creality_print_hwnds)
+        {
+            if(hwnd != mainframe->GetHWND())
+            {
+                SendMessage(hwnd, WM_COPYDATA, 0, (LPARAM)&data_to_send);
+            }
+            
+        }
+        
+        return true;  
+    }
+#endif
+    return false;
+}
 
 std::vector<std::string> GUI_App::split_str(std::string src, std::string separator)
 {
@@ -901,12 +1000,11 @@ std::vector<std::string> GUI_App::split_str(std::string src, std::string separat
     }
     return result;
 }
-void GUI_App::post_openlink_cmd()
+void GUI_App::post_openlink_cmd(std::string link)
 {
-    if (m_openlink_url.length() > 0)
+    if (link.length() > 0)
     {
-        std::string url = m_openlink_url;
-        m_openlink_url = "";
+        std::string url = link;
         json m_Res = json::object();
         m_Res["command"] = "url_scheme";
         m_Res["url"] = url;
@@ -918,6 +1016,17 @@ void GUI_App::post_openlink_cmd()
 
     }
 }
+
+// param_set 参数集合页
+void GUI_App::swith_community_sub_page(const std::string& pageName)
+{
+    json m_Res       = json::object();
+    m_Res["command"] = "switch_sub_page";
+    m_Res["page_name"]     = pageName;
+    wxString strJS   = wxString::Format("window.handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
+    GUI::wxGetApp().run_script(strJS);
+}
+
 void GUI_App::post_init()
 {
     assert(initialized());
@@ -939,9 +1048,8 @@ void GUI_App::post_init()
 
     m_open_method = "double_click";
     bool switch_to_3d = false;
-
     if (!this->init_params->input_files.empty()) {
-
+        
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(", init with input files, size %1%, input_gcode %2%")
             %this->init_params->input_files.size() %this->init_params->input_gcode;
         const auto first_url = this->init_params->input_files.front();
@@ -953,21 +1061,7 @@ void GUI_App::post_init()
             m_openlink_url = first_url;
             m_open_method = "url";
             
-            wxTimer *m_timer = new wxTimer(this, wxID_ANY);
-            int x= 0;
-            // ʹ�� lambda ����ʽ�󶨶�ʱ���¼���������
-            Bind(wxEVT_TIMER, [=](wxTimerEvent& event) mutable {
-                m_openlink_url = first_url;
-                //if (x >= 3) {
-					//m_timer->Stop();
-				//}
-                post_openlink_cmd();
-                wxLogMessage("Timer triggered!");
-                //x++;
-                }, m_timer->GetId());
-
-            // ������ʱ�������Ϊ 1000 ���루1 �룩
-            m_timer->Start(5000,true);
+            
             
         } else {
             switch_to_3d = true;
@@ -984,13 +1078,19 @@ void GUI_App::post_init()
                 for (auto& file : this->init_params->input_files) {
                     input_files.push_back(wxString::FromUTF8(file));
                 }
+#if AUTOMATION_TOOL
+                if (AutomationMgr::enabled()) {
+                    input_files.clear();
+                }
+#endif // AUTOMATION_TOOL
+
                 this->plater()->set_project_filename(_L("Untitled"));
-                this->plater()->load_files(input_files);
+                //this->plater()->load_files(input_files);
                 try {
                     if (!input_files.empty()) {
                         std::string           file_path = input_files.front().ToStdString();
                         std::filesystem::path path(file_path);
-                        m_open_method = "file_" + path.extension().string();
+                        //m_open_method = "file_" + path.extension().string();
                     }
                 } catch (...) {
                     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ", file path exception!";
@@ -1122,6 +1222,7 @@ void GUI_App::post_init()
     // to popup a modal dialog on start without screwing combo boxes.
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
+    this->check_creality_privacy_version();
     if (this->preset_updater) { // G-Code Viewer does not initialize preset_updater.
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
@@ -1134,12 +1235,14 @@ void GUI_App::post_init()
 
             this->check_new_version_cx();
             if (is_user_login() && app_config->get("stealth_mode") == "false") {
-              // this->check_privacy_version(0);
+               //this->check_privacy_version(0);
               request_user_handle(0);
             }
 
             //  检测是否有5.x的配置需要加载
             mainframe->checkHaveOldPresetsNeedLoad();
+            //  检查是否有参数需要更新
+            UpdateParams::getInstance().checkParamsNeedUpdate();
 
         });
     }
@@ -1239,6 +1342,19 @@ void GUI_App::post_init()
     {
         Slic3r::BLCompareTestFlow::startBLTest(callback);
     }
+#if AUTOMATION_TOOL
+    if (AutomationMgr::enabled()) {
+        // change string to wstring
+        std::wstring _3mf_file = boost::locale::conv::to_utf<wchar_t>(AutomationMgr::get3mfPath(), "UTF-8");
+        if (!std::filesystem::exists(_3mf_file)) {
+            AutomationMgr::outputLog("can't found file, file is not exist!", 1);
+            AutomationMgr::endFunction();
+            return;
+        }
+        callback(AutomationMgr::get3mfPath());
+    }
+#endif // AUTOMATION_TOOL
+
 #endif
 }
 
@@ -2054,15 +2170,15 @@ void GUI_App::init_download_path()
     std::string down_path = app_config->get("download_path");
 
     if (down_path.empty()) {
-        std::string user_down_path = wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToUTF8().data();
-        app_config->set("download_path", user_down_path);
+        boost::filesystem::path user_down_path =  boost::filesystem::path(data_dir()) / "cloud_download_data";//wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToUTF8().data();
+        app_config->set("download_path", user_down_path.string());
     }
     else {
         fs::path dp(down_path);
         if (!fs::exists(dp)) {
 
-            std::string user_down_path = wxStandardPaths::Get().GetUserDir(wxStandardPaths::Dir_Downloads).ToUTF8().data();
-            app_config->set("download_path", user_down_path);
+            boost::filesystem::path user_down_path =  boost::filesystem::path(data_dir()) / "cloud_download_data";
+            app_config->set("download_path", user_down_path.string());
         }
     }
 }
@@ -2132,6 +2248,8 @@ void GUI_App::init_app_config()
 #else
     set_log_path_and_level(log_filename, 3);
 #endif
+
+    
 
     //BBS: remove GCodeViewer as seperate APP logic
 	if (!app_config)
@@ -2435,8 +2553,39 @@ void GUI_App::init_single_instance_checker(const std::string &name, const std::s
 bool GUI_App::OnInit()
 {
     try {
-        return on_init_inner();
-    } catch (const std::exception&) {
+        bool res = on_init_inner();
+        if (!this->init_params->input_files.empty())
+        {
+            const auto url = this->init_params->input_files.front();
+            if(boost::starts_with(url, "minidump://file=")) {
+                
+                const auto file = url.substr(16);
+                if (boost::filesystem::exists(file)) {
+                    m_http_server.stop();
+                    // BBS: if the file exists, we will show a error dialog and create a default config file.
+                    ErrorReportDialog* err_report_dialog = new ErrorReportDialog(nullptr, _L("Error Report"));
+                    err_report_dialog->Centre(wxBOTH);
+                    err_report_dialog->setDumpFilePath(file);
+                    int result = err_report_dialog->ShowModal();
+                    if (result == wxID_OK) {
+                        err_report_dialog->sendReport();
+                        err_report_dialog->Destroy();
+                        return true;
+                    }else{
+                        err_report_dialog->Destroy();
+                        return false;
+                    }
+                    
+                }
+            }
+        }
+        //test code
+         //int* p = nullptr;
+         //*p = 0;
+        
+        return res;
+    } catch (const std::exception &err) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__<<" got a generic exception, reason = " << err.what();
         generic_exception_handle();
         return false;
     }
@@ -2444,7 +2593,8 @@ bool GUI_App::OnInit()
 
 int GUI_App::OnExit()
 {
-    stop_sync_user_preset();
+    //stop_sync_user_preset();
+    SyncUserPresets::getInstance().shutdown();
 
     if (m_device_manager) {
         delete m_device_manager;
@@ -2490,6 +2640,18 @@ int GUI_App::OnExit()
     return wxApp::OnExit();
 }
 
+void GUI_App::OnUnhandledException()
+{
+#if AUTOMATION_TOOL
+    if (AutomationMgr::enabled()) {
+        AutomationMgr::outputLog("has catch exception", 1);
+        AutomationMgr::endFunction();
+        return;
+    }
+#endif // AUTOMATION_TOOL
+
+    wxApp::OnUnhandledException();
+}
 class wxBoostLog : public wxLog
 {
     void DoLogText(const wxString &msg) override {
@@ -2692,20 +2854,20 @@ bool GUI_App::on_init_inner()
         copy_older_config();
 
     if (is_editor()) {
-#ifdef __WXMSW__
-        if (app_config->get("associate_3mf") == "true")
-            associate_files(L"3mf");
-        if (app_config->get("associate_stl") == "true")
-            associate_files(L"stl");
-        if (app_config->get("associate_step") == "true") {
-            associate_files(L"step");
-            associate_files(L"stp");
-        }
-        associate_url(L"CrealityPrint");
+//#ifdef __WXMSW__
+        //if (app_config->get("associate_3mf") == "true")
+        //    associate_files(L"3mf");
+        //if (app_config->get("associate_stl") == "true")
+        //    associate_files(L"stl");
+        //if (app_config->get("associate_step") == "true") {
+        //    associate_files(L"step");
+        //    associate_files(L"stp");
+        //}
+        //associate_url(L"CrealityPrint");
 
-        if (app_config->get("associate_gcode") == "true")
-            associate_files(L"gcode");
-#endif // __WXMSW__
+        //if (app_config->get("associate_gcode") == "true")
+        //    associate_files(L"gcode");
+//#endif // __WXMSW__
 
         preset_updater = new PresetUpdater();
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
@@ -2835,6 +2997,18 @@ bool GUI_App::on_init_inner()
             // If there are substitutions in system profiles, then a "reconfigure" event shall be triggered, which will force
             // installation of a compatible system preset, thus nullifying the system preset substitutions.
             init_params->preset_substitutions = preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+        }catch(ConfigurationError &ex)
+        {
+            int ret = wxMessageBox(_L("Detected corruption in the Creality Print configuration file, attempted to rebuild, \nplease manually restart the software."), _L("Error"), wxOK | wxICON_ERROR);
+            if(ret == wxOK) {
+                boost::filesystem::path dir = (boost::filesystem::path(data_dir()) / PRESET_SYSTEM_DIR).make_preferred();
+                if (boost::filesystem::exists(dir)) {
+                    boost::filesystem::remove_all(dir);
+                }
+                wxExit();
+                return false;
+            }
+           
         }
         catch (const std::exception& ex) {
             show_error(nullptr, ex.what());
@@ -2970,8 +3144,10 @@ bool GUI_App::on_init_inner()
             update_publish_status();
         }
 
-        if (m_post_initialized && app_config->dirty())
+        if (m_post_initialized && app_config->dirty()) {
             app_config->save();
+            SyncUserPresets::getInstance().syncConfigToCXCloud();
+        }
 
     });
 
@@ -2992,21 +3168,18 @@ bool GUI_App::on_init_inner()
                        "configuration file.\nPlease note, application settings will be lost, but printer profiles will not be affected."));
     }
 
-    //  异步检测设备页是否已经准备好数据，如果已经准备好了，则选中准备页
-    std::shared_ptr<std::thread> spt = std::make_shared<std::thread>([&]() {
-        while (!mainframe->m_printer_mgr_view->hasFirstUpdateDevices()) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-        wxCommandEvent e = wxCommandEvent(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED);
-        e.SetId(1);
-
-        wxPostEvent(mainframe->m_topbar, e);
-    });
-    spt->detach();
+    //  启动同步预设线程
+    SyncUserPresets::getInstance().startup();
 
     return true;
 }
-
+void  GUI_App::track_event(const std::string& event, const std::string& data)
+{
+    if(mainframe)
+    {
+        mainframe->trackEvent(event, data);
+    }
+}
 void GUI_App::copy_network_if_available()
 {
     if (app_config->get("update_network_plugin") != "true")
@@ -3215,17 +3388,21 @@ unsigned GUI_App::get_colour_approx_luma(const wxColour &colour)
 bool GUI_App::dark_mode()
 {
 #ifdef SUPPORT_DARK_MODE
-#if __APPLE__
-    // The check for dark mode returns false positive on 10.12 and 10.13,
-    // which allowed setting dark menu bar and dock area, which is
-    // is detected as dark mode. We must run on at least 10.14 where the
-    // proper dark mode was first introduced.
-    return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
-#else
-    return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();
-    //const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-    //return luma < 128;
-#endif
+    #if __APPLE__
+        // The check for dark mode returns false positive on 10.12 and 10.13,
+        // which allowed setting dark menu bar and dock area, which is
+        // is detected as dark mode. We must run on at least 10.14 where the
+        // proper dark mode was first introduced.
+        return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
+    #elif __linux__
+        // return false;
+        return wxSystemSettings::GetAppearance().IsDark();
+        // return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : false;
+    #else 
+        return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();
+        //const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+        //return luma < 128;
+    #endif
 #else
     //BBS disable DarkUI mode
     return false;
@@ -3317,6 +3494,9 @@ static bool is_default(wxWindow* win)
 
 void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool just_font/* = false*/)
 {
+    if (m_is_dark_mode != dark_mode() )
+        m_is_dark_mode = dark_mode();   
+
     if (wxButton *btn = dynamic_cast<wxButton*>(window)) {
         if (btn->GetWindowStyleFlag() & wxBU_AUTODRAW)
             return;
@@ -3357,10 +3537,6 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
         if (btn->GetWindowStyleFlag() & wxBU_AUTODRAW)
             return;
     }
-
-
-    /*if (m_is_dark_mode != dark_mode() )
-        m_is_dark_mode = dark_mode();*/
 
     if (m_is_dark_mode) {
 
@@ -3410,6 +3586,7 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited/* = false*/, bool ju
         }
     }
 }
+
 
 // recursive function for scaling fonts for all controls in Window
 static void update_dark_children_ui(wxWindow* window, bool just_buttons_update = false)
@@ -3597,6 +3774,24 @@ bool GUI_App::tabs_as_menu() const
 wxSize GUI_App::get_min_size() const
 {
     return wxSize(120*m_em_unit, 49 * m_em_unit);
+}
+
+wxSize GUI_App::get_min_size_ex(wxWindow* display_win) const
+{
+    // be careful when setting "105 * m_em_unit", in some screen size when toggle the maximize button, could possibly hide the maximize and close button
+    wxSize min_size(105 * m_em_unit, 60 * m_em_unit);
+
+    //const wxDisplay display = wxDisplay(display_win);
+    //wxRect display_rect = display.GetGeometry();  // for example: 1920 * 1080
+    //display_rect.width *= 0.75;
+    //display_rect.height *= 0.75;
+
+    //if (min_size.x > display_rect.GetWidth())
+    //    min_size.x = display_rect.GetWidth();
+    //if (min_size.y > display_rect.GetHeight())
+    //    min_size.y = display_rect.GetHeight();
+
+    return min_size;
 }
 
 float GUI_App::toolbar_icon_scale(const bool is_limited/* = false*/) const
@@ -3934,8 +4129,15 @@ void GUI_App::load_project(wxWindow *parent, wxString& input_file) const
         input_file = dialog.GetPath();
 }
 
-void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
+void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files, bool Category_or_not) const
 {
+    wxString wildcard;
+    wildcard = file_wildcards(FT_MODEL);
+    if (Category_or_not)
+    {
+        wildcard = GUI::format_wxstr("%s|%s|%s", file_wildcards(FT_MODEL), file_wildcards(FT_MESH_FILE),file_wildcards(FT_CAD_FILE));
+    }
+
     input_files.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
 #ifdef __APPLE__
@@ -3944,7 +4146,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
         _L("Choose one or more files (3mf/step/stl/svg/obj/amf):"),
 #endif
         from_u8(app_config->get_last_dir()), "",
-        file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+        wildcard, wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
 
     if (dialog.ShowModal() == wxID_OK)
         dialog.GetPaths(input_files);
@@ -4193,6 +4395,9 @@ bool GUI_App::check_machine_list()
         json j;
         j["command"] = "update_preset_params";
         j["data"] = printer_version_list;
+        if(printer_version_list.empty()){
+            return true;
+        }
         std::stringstream ss;
         ss << j << std::endl;
         handle_web_request(ss.str());
@@ -4205,6 +4410,446 @@ bool GUI_App::check_machine_list()
 
     return true;
 }
+std::mutex mtx;
+bool UpdateParamPackage(pt::ptree v,json& profile_json,json& cache_json,json& materials_json)
+{
+        std::string printer_model  = v.get_child("name").data();
+        if(printer_model.find("Creality") == std::string::npos){
+            printer_model = "Creality " + printer_model;
+        }
+        std::string showVersion = v.get_child("showVersion").data();
+        std::string zipUrl      = v.get_child("zipUrl").data();
+        std::string thumbnail      = v.get_child("thumbnail").data();
+        std::vector<std::string> nozzleDiameters;
+        for (auto& nozzleDiameter : v.get_child("nozzleDiameter")) {
+            nozzleDiameters.emplace_back(nozzleDiameter.second.data());
+        }
+        int         start_pos = zipUrl.find_last_of("/");
+        fs::path tmp_path = fs::path(fs::temp_directory_path()).append(zipUrl.substr(start_pos + 1));
+        boost::regex pattern("^(https?://)?([^/]+)(.*)$");
+        boost::smatch matches;
+        if (boost::regex_search(zipUrl, matches, pattern)) {
+            // 提取域名
+            std::string domain = matches[2];
+            // 提取路径
+            std::string path = matches[3];
+            boost::replace_all(path, " ", "%20");
+            if(!download_file(domain, path, tmp_path.string()))
+            {
+                return false;
+            }                
+
+        }
+        if(!fs::exists(tmp_path))
+        {
+            return false;
+        }
+        bool bHasUpdateMachine = false;        
+        auto        old_machine_name = tmp_path.stem().string();
+        std::string nozzle           = nozzleDiameters.empty() ? "0.4" : nozzleDiameters[0];
+
+        mz_zip_archive archive_in;
+        mz_zip_zero_struct(&archive_in);
+
+        if (!open_zip_reader(&archive_in, tmp_path.string().c_str())) {
+            return false;
+        }
+        mz_uint                  num_entries = mz_zip_reader_get_num_files(&archive_in);
+        mz_zip_archive_file_stat stat;
+        std::string              machine_name;
+        std::string              out_machine_name = printer_model + " " + nozzle + " nozzle";
+        
+        auto updateProfile = [&](std::string type, json element) {
+            std::lock_guard<std::mutex> lock(mtx);
+            if(type=="machine_list"){
+                if (profile_json.contains("machine_list")) {
+                    //json machine_list = profile_json["machine_list"];
+                    //machine_list.push_back(element);
+                    profile_json["machine_list"].push_back(element);
+                } 
+            }else if(type=="process_list"){
+                    if (profile_json.contains("process_list")) {
+                        profile_json["process_list"].push_back(element);
+                    }
+            }else if(type=="filament_list"){
+                    if (profile_json.contains("filament_list")) {
+                        profile_json["filament_list"].push_back(element);
+                    }
+            }else if(type=="machine_model_list"){
+                if (profile_json.contains("machine_model_list")) {
+                    profile_json["machine_model_list"].push_back(element);
+                }
+            }
+        };
+        auto getDefaultMaterials = [=](json top_materials){
+            std::string materials = "";
+            if(materials_json["materials"].empty()){
+                return materials;
+            }
+            for (auto it = top_materials.begin(); it != top_materials.end();) {
+                if (it.value().is_string()) {
+                    for(auto material:materials_json["materials"]){
+                        std::string material_id = material["id"].get<std::string>();
+                        std::string top_material_id = it.value().get<std::string>();
+                        if(material_id==top_material_id){
+                            materials += material["name"].get<std::string>()+";";
+                            break;
+                        }
+                    }
+                }
+                it++;
+            }
+            return materials;
+        };
+        std::string default_materials = "";
+        for (mz_uint i = 0; i < num_entries; ++i) {
+            if (mz_zip_reader_file_stat(&archive_in, i, &stat)) {
+                try{
+                    std::string name(stat.m_filename);
+                    if (!boost::algorithm::iends_with(name, ".json")) {
+                        continue;
+                    }
+                    std::vector<unsigned char> buffer_input(stat.m_uncomp_size);
+                    std::replace(name.begin(), name.end(), '\\', '/');
+                    if (!mz_zip_reader_extract_to_mem(&archive_in, i, buffer_input.data(), buffer_input.size(), 0)) {
+                        continue;
+                    }
+                    json json_in = json::parse(reinterpret_cast<const char*>(buffer_input.data()),
+                                                    reinterpret_cast<const char*>(buffer_input.data() +
+                                                                                    buffer_input.size()));
+                    if (name.find('/') == name.npos) {
+                        json json_out;
+                        std::string default_bed_type = "High Temp Plate";
+                        json_out["type"] = "machine";
+                        json_out["from"] = "system";
+                        json_out["instantiation"] = "true";
+                        json_out["inherits"] = "fdm_creality_common";
+                        json_out["printer_structure"] = "i3";
+                        json_out.merge_patch(json_in["printer"]);
+                        json_out.merge_patch(json_in["extruders"][0]["engine_data"]);
+                        json_out["printer_model"]     = printer_model;
+                        std::string preferred_process = json_in["metadata"]["preferred_process"];
+                        auto top_material = json_in["metadata"]["top_material"];
+                        default_materials = getDefaultMaterials(top_material);
+                        auto index = preferred_process.find_last_of("@");
+                        if (index != std::string::npos) {
+                            preferred_process = preferred_process.substr(0, index);
+                        }
+                        json_out["default_print_profile"] = preferred_process + " @" + out_machine_name;
+
+                        json filament_array;
+                        filament_array.push_back("Hyper PLA @" + printer_model + " " + nozzle +
+                                                    " nozzle");
+                        json_out["default_filament_profile"] = filament_array;
+                        if (json_out.contains("nozzle_diameter")) {
+                            json nozzle_array;
+                            nozzle_array.push_back(json_out["nozzle_diameter"]);
+                            json_out["nozzle_diameter"] = nozzle_array;
+                        }
+                        if (json_out.contains("printer_variant")) {
+                            json_out["printer_variant"] = nozzle;
+                        }
+                        if (json_out.contains("material_flow_temp_graph")) {
+                            json_out.erase("material_flow_temp_graph");
+                        }
+                        if (json_out.contains("material_flow_dependent_temperature")) {
+                            json_out.erase("material_flow_dependent_temperature");
+                        }
+                        if (json_out.contains("curr_bed_type")) {
+                            default_bed_type = json_out["curr_bed_type"];
+                            json_out.erase("curr_bed_type");
+                        }
+                        json_out["name"] = out_machine_name;
+                        json_out["inherits"] = "fdm_creality_common";
+                        std::hash<std::string> hash_fn;
+                        json_out["setting_id"] = std::to_string(hash_fn(out_machine_name)).substr(1,6);
+                        json_out["support_multi_bed_types"] = "1";
+                        for (auto it = json_out.begin(); it != json_out.end(); ) {
+                            if (it.value().is_string()) {
+                                std::string str = it.value().get<std::string>();
+                                if (str.empty()) {
+                                    it = json_out.erase(it);
+                                    continue;
+                                }
+                            }
+                            ++it;
+                        }
+                        auto out_machine_model_json_file = fs::path(data_dir()).append("system")
+                                                                            .append("Creality")
+                                                                            .append("machine")
+                                                                            .append(printer_model + ".json")
+                                                                            .string();
+                        if(!fs::exists(out_machine_model_json_file)){
+                            json json_out;
+                            json_out["type"] = "machine_model";
+                            json_out["name"] = printer_model;
+                            json_out["nozzle_diameter"] = nozzle;
+                            json_out["bed_model"] = "fdm_creality_common";
+                            json_out["bed_texture"] = "";
+                            json_out["family"] = "Creality";
+                            json_out["hotend_model"] = "";
+                            json_out["machine_tech"] = "FFF";
+                            json_out["default_materials"] = default_materials;
+                            json_out["default_bed_type"] = default_bed_type;
+                            std::string new_printer_model = printer_model;
+                            boost::replace_all(new_printer_model, " ", "_");
+                            json_out["model_id"] = new_printer_model;
+                            boost::nowide::ofstream c;
+                            c.open(out_machine_model_json_file, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            json new_elem;
+                            new_elem["name"] = printer_model;
+                            new_elem["sub_path"] = "machine/" + printer_model + ".json";
+                            updateProfile("machine_model_list", new_elem);
+                        }else{
+                            std::string contents;
+                            boost::nowide::ifstream t(out_machine_model_json_file);
+                            std::stringstream buffer;
+                            buffer << t.rdbuf();
+                            contents=buffer.str();
+                            json json_in = json::parse(contents);
+                            auto nozzles = json_in["nozzle_diameter"].get<std::string>();
+                            if(nozzles.find(nozzle) == std::string::npos){
+                                nozzles = nozzles + ";" + nozzle;
+                                json_in["nozzle_diameter"] = nozzles;
+                            }
+                            std::vector<std::string> materials;
+                            boost::algorithm::split(materials, default_materials, boost::is_any_of(";"));
+                            for(std::string default_material:materials){
+                                if(json_in["default_materials"].get<std::string>().find(default_material) == std::string::npos){
+                                    json_in["default_materials"] = json_in["default_materials"].get<std::string>() + ";" + default_material;
+                                }
+                            }
+
+                            boost::nowide::ofstream c;
+                            c.open(out_machine_model_json_file, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_in << std::endl;
+                            c.close();
+
+                        }
+                        auto out_machine_json_file = fs::path(data_dir()).append("system")
+                                                            .append("Creality")
+                                                            .append("machine")
+                                                            .append(out_machine_name + ".json")
+                                                            .string();
+                        if(!fs::exists(out_machine_json_file)){
+                            boost::nowide::ofstream c;
+                            c.open(out_machine_json_file, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            json new_elem;
+                            new_elem["name"] = out_machine_name;
+                            new_elem["sub_path"] = "machine/" + out_machine_name + ".json";
+                            updateProfile("machine_list", new_elem);
+                            bHasUpdateMachine = true;
+                        }else{
+                            auto out_machine_json_file_tmp = out_machine_json_file+".tmp";
+                            boost::nowide::ofstream c;
+                            c.open(out_machine_json_file_tmp, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            fs::remove(out_machine_json_file);
+                            fs::rename(out_machine_json_file_tmp, out_machine_json_file);
+                        }
+                    } else if (boost::algorithm::istarts_with(name, "Materials")) {
+                        static std::set<std::string> array_keys = {"filament_type", "filament_vendor", "filament_start_gcode",
+                                                    "filament_end_gcode"};
+                        json json_out;
+                        json_out["type"]              = "filament";
+                        json_out["filament_id"]              = "GFB98";
+                        json_out["setting_id"]     = "GFSA04";
+                        json_out["name"]          = "Creality Generic ASA";
+                        json_out["from"]                     = "system";
+                        json_out["instantiation"]            = "true";
+                        json_out["inherits"]                 = "fdm_filament_common";
+                        json_out.merge_patch(json_in["engine_data"]);
+                        json_out["filament_id"] = json_in["metadata"]["id"];
+                        auto basename                = fs::path(name).stem().string();
+                        auto index = basename.find_last_of("-");
+                        if (index != std::string::npos) {
+                            basename = basename.substr(0, index);
+                        }
+                        basename = basename + " @" + printer_model + " " + nozzle + " nozzle";
+                        json_out["name"] = basename;
+                        json compatible_printers_array;
+                        compatible_printers_array.push_back(out_machine_name);
+                        json_out["compatible_printers"] = compatible_printers_array;
+                        json_out["inherits"]            = "fdm_filament_common";
+                        json_out["default_filament_colour"] = "\"\"";
+                        if (json_out.contains("material_flow_dependent_temperature")) {
+                            //json_out.erase("material_flow_dependent_temperature");
+                        }
+                        if (json_out.contains("material_flow_temp_graph")) {
+                            //json_out.erase("material_flow_temp_graph");
+                        }
+                        for (auto it = json_out.begin(); it != json_out.end();) {
+                            if (it.value().is_string()) {
+                                std::string str = it.value().get<std::string>();
+                                if (str.empty()) {
+                                    it = json_out.erase(it);
+                                    continue;
+                                } else if (array_keys.find(it.key()) != array_keys.cend()) {
+                                    json array;
+                                    array.push_back(str);
+                                    json_out[it.key()] = array;
+                                }
+                            }
+                            ++it;
+                        }
+                        auto out_filament_json_file = fs::path(data_dir())
+                                                            .append("system")
+                                                            .append("Creality")
+                                                            .append("filament")
+                                                            .append(basename + ".json")
+                                                            .string();
+                        if(!fs::exists(out_filament_json_file)){
+                            boost::nowide::ofstream c;
+                            c.open(out_filament_json_file, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            json new_elem;
+                            new_elem["name"] = basename;
+                            new_elem["sub_path"] = "filament/" + basename + ".json";
+                            updateProfile("filament_list", new_elem);
+                        }else{
+                            auto out_filament_json_file_tmp = out_filament_json_file+".tmp";
+                            boost::nowide::ofstream c;
+                            c.open(out_filament_json_file_tmp, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            fs::remove(out_filament_json_file);
+                            fs::rename(out_filament_json_file_tmp, out_filament_json_file);
+                        }
+                        //judge if the material is in the default materials list
+                        //auto* app_config = GUI::wxGetApp().app_config;
+                        //if(app_config->has_printer_settings(out_machine_name))
+                        //{
+                        //    std::string section_name = AppConfig::SECTION_FILAMENTS;
+                        //    if (app_config->has_section(section_name)) {
+                        //        const std::map<std::string, std::string> &installed = app_config->get_section(section_name);
+                        //        auto has = [&installed](const std::string &name) {
+                        //            auto it = installed.find(name);
+                        //            return it != installed.end() && ! it->second.empty();
+                        //        };
+                        //        bool is_visible = has(basename);
+                        //        if (!is_visible) {
+                        //            app_config->set(section_name, basename, "true");
+                        //        }
+                        //    } 
+                        //}
+                    } else if (boost::algorithm::istarts_with(name, "Processes")) {
+                        static std::set<std::string> array_keys = {"filament_colour",      "flush_multiplier",
+                                                                    "flush_volumes_matrix", "flush_volumes_vector",
+                                                                    "wipe_tower_x",         "wipe_tower_y",
+                                                                    "has_scarf_joint_seam",         "arc_tolerance"};
+                        json json_out;
+                        json_out["type"]          = "process";
+                        json_out["setting_id"]    = "GP004";
+                        json_out["name"]          = "0.08mm SuperDetail @Creality CR-6 0.2";
+                        json_out["from"]          = "system";
+                        json_out["instantiation"] = "true";
+                        json_out.merge_patch(json_in["engine_data"]);
+                        auto basename = fs::path(name).stem().string();
+                        auto index    = basename.find_last_of("@");
+                        if (index != std::string::npos) {
+                            basename = basename.substr(0, index);
+                        }
+                        boost::trim_right(basename);
+                        basename = basename + " @" + printer_model + " " + nozzle + " nozzle";
+                        json_out["name"] = basename;
+                        json compatible_printers_array;
+                        compatible_printers_array.push_back(out_machine_name);
+                        json_out["compatible_printers"] = compatible_printers_array;
+                        json_out["inherits"]            = "fdm_process_creality_common";
+                        if (json_out.contains("min_length_factor") && json_out["min_length_factor"].empty()) {
+                            json_out.erase("min_length_factor");
+                        }
+                        for (auto key : array_keys) {
+                            if (json_out.contains(key)) {
+                                json_out.erase(key);
+                            }
+                        }
+                        for (auto it = json_out.begin(); it != json_out.end();) {
+                            if (it.value().is_string()) {
+                                std::string str = it.value().get<std::string>();
+                                if (str.empty()) {
+                                    it = json_out.erase(it);
+                                    continue;
+                                }
+                            }
+                            ++it;
+                        }
+                        auto out_process_json_file = fs::path(data_dir())
+                                                            .append("system")
+                                                            .append("Creality")
+                                                            .append("process")
+                                                            .append(basename + ".json")
+                                                            .string();
+                        if(!fs::exists(out_process_json_file)){
+                            boost::nowide::ofstream c;
+                            c.open(out_process_json_file, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            json new_elem;
+                            new_elem["name"] = basename;
+                            new_elem["sub_path"] = "process/" + basename + ".json";
+                            updateProfile("process_list", new_elem);
+                        }else{
+                            auto out_process_json_file_tmp = out_process_json_file+".tmp";
+                            boost::nowide::ofstream c;
+                            c.open(out_process_json_file_tmp, std::ios::out | std::ios::trunc);
+                            c << std::setw(4) << json_out << std::endl;
+                            c.close();
+                            fs::remove(out_process_json_file);
+                            fs::rename(out_process_json_file_tmp, out_process_json_file);
+                        }
+                    }
+                }
+                catch (const std::exception& e) {
+                    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",  parse json failed, %1%.") % e.what();
+                    close_zip_reader(&archive_in);
+                    return false;
+                }
+            }
+                
+        }
+        if (!close_zip_reader(&archive_in)) {
+            return false;
+        }
+        std::lock_guard<std::mutex> lock(mtx);
+
+
+        try{
+            
+            if(fs::exists(tmp_path)){
+                fs::remove(tmp_path);
+            }
+            
+                std::vector<std::string> ec_a;
+                bool found = false;
+                for (auto& elem : cache_json["Creality"]) {
+                    if (elem["name"] == printer_model && elem["nozzleDiameter"][0] == nozzleDiameters[0]) {
+                        found = true;
+                        elem["showVersion"] = showVersion;
+                        elem["updating"] = false;
+                    }
+                }
+                if (!found) {
+                    json new_elem;
+                    new_elem["name"] = printer_model;
+                    new_elem["nozzleDiameter"] = nozzleDiameters;
+                    new_elem["showVersion"] = showVersion;
+                    new_elem["updating"] = false;
+                    cache_json["Creality"].push_back(new_elem);						
+                }
+        }catch(const std::exception& e)
+        {
+            return false;
+        }
+        return true;
+    }
+
 std::string GUI_App::handle_web_request(std::string cmd)
 {
     try {
@@ -4269,35 +4914,60 @@ std::string GUI_App::handle_web_request(std::string cmd)
                         mainframe->m_webview->SendRecentList(INT_MAX);
                     }
                 }
-            }
-            else if (command_str.compare("update_account_info") == 0) {
-                pt::ptree data_node = root.get_child("account");
+            } else if (command_str.compare("update_account_info") == 0) {
+                pt::ptree                data_node = root.get_child("account");
                 std::vector<std::string> input;
+                model_downloaders_.clear();
                 for (auto& v : data_node) {
                     input.emplace_back(v.second.data());
                 }
-                
-                if(4 <= input.size()){
-                    m_user.token = input[0];
+                bool old_login = m_user.bLogin;
+                if (4 <= input.size()) {
+                    m_user.token    = input[0];
                     m_user.nickName = input[1];
-                    m_user.avatar = input[2];
-                    m_user.userId = input[3];
-                    m_user.bLogin = true;
-//#ifdef _DEBUG
-//                    m_user.token = "646cdf54baefd02364b91193f75a6e176db1b4738ebaf9a1349eed5b9fbbfd62";
-//                    m_user.userId = "4135518419";
-//#endif // _DEBUG
+                    m_user.avatar   = input[2];
+                    m_user.userId   = input[3];
+                    m_user.bLogin   = true;
+                    // #ifdef _DEBUG
+                    //                     m_user.token = "646cdf54baefd02364b91193f75a6e176db1b4738ebaf9a1349eed5b9fbbfd62";
+                    //                     m_user.userId = "4135518419";
+                    // #endif // _DEBUG
 
-                }
-                else
-                {
+                } else {
                     m_user.token.clear();
                     m_user.nickName.clear();
                     m_user.avatar.clear();
                     m_user.userId.clear();
                     m_user.bLogin = false;
                 }
-                 app_config->set("cloud", "user_id", m_user.userId);
+                static bool first_update_preset  = true;
+                auto        double_click_handler = [=]() {
+                    if (!this->init_params->input_gcode && m_open_method == "double_click") {
+                        wxArrayString input_files;
+                        for (auto& file : this->init_params->input_files) {
+                            input_files.push_back(wxString::FromUTF8(file));
+                        }
+                        this->plater()->set_project_filename(_L("Untitled"));
+                        this->plater()->load_files(input_files);
+                        try {
+                            if (!input_files.empty()) {
+                                std::string           file_path = input_files.front().ToStdString();
+                                std::filesystem::path path(file_path);
+                                m_open_method = "file_" + path.extension().string();
+                            }
+                        } catch (...) {
+                            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ", file path exception!";
+                            m_open_method = "file";
+                        }
+                    }
+                };
+                if (first_update_preset && !m_user.bLogin) {
+                    first_update_preset = false;
+                    double_click_handler();
+                }
+                if (old_login == m_user.bLogin)
+                    return "";
+                app_config->set("cloud", "user_id", m_user.userId);
                 app_config->set("cloud", "token", m_user.token);
                 if (preset_bundle)
                     preset_bundle->remove_users_preset(*app_config);
@@ -4305,26 +4975,36 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     enable_user_preset_folder(true);
                      if (preset_bundle) {
                          preset_bundle->remove_users_preset(*app_config);
-                         preset_bundle->load_user_presets(m_user.userId, ForwardCompatibilitySubstitutionRule::Enable);
+                         preset_bundle->load_user_presets(m_user.userId, ForwardCompatibilitySubstitutionRule::Enable, true);
                      }
-                     if (mainframe)
+                     if (mainframe && wxGetApp().plater()->get_project_name() == _L("Untitled"))
                          mainframe->update_side_preset_ui();
                      if (app_config->get("sync_user_preset") == "true") {
                          start_sync_user_preset();
                      }
+                     CallAfter([this] {
+                        send_app_message("login");
+                     });
                  } else {
                      stop_sync_user_preset();
                      enable_user_preset_folder(false);
                      if (preset_bundle) {
-                         preset_bundle->remove_users_preset(*app_config);
-                         preset_bundle->load_user_presets(DEFAULT_USER_FOLDER_NAME, ForwardCompatibilitySubstitutionRule::Enable);
+                         //preset_bundle->remove_users_preset(*app_config);
+                         //preset_bundle->load_user_presets(DEFAULT_USER_FOLDER_NAME, ForwardCompatibilitySubstitutionRule::Enable);
+                         preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
                      }
                      if (mainframe)
                          mainframe->update_side_preset_ui();
+                         CallAfter([this] {
+                            send_app_message("logout");
+                         });
                  }
-                
-                if(mainframe->m_printer_mgr_view)
-                    mainframe->m_printer_mgr_view->PostUpdateUserInfo();
+
+                 DM::AppMgr::Ins().SystemUserChanged();
+                 if (first_update_preset) {
+                     first_update_preset = false;
+                     double_click_handler();
+                 }
             }
             // else if (command_str.compare("modelmall_model_advise_get") == 0) {
             //     if (mainframe && this->app_config->get("staff_pick_switch") == "true") {
@@ -4602,7 +5282,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 j["sequence_id"] = "";
                 j["command"]     = "get_preset_params";
 
-                auto cache_file = fs::path(data_dir()).append("profile_version.json");
+                auto cache_file = fs::path(data_dir()).append("system").append("Creality").append("profile_version.json");
                 if (!fs::exists(cache_file)) {
                     auto src = fs::path(resources_dir()).append("profiles").append("Creality").append("profile_version.json");
                     fs::copy_file(src, cache_file);
@@ -4643,6 +5323,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 ss << j << std::endl;
                 return ss.str();
             } else if (command_str.compare("get_user_preset_params") == 0) {
+                SyncUserPresets::getInstance().syncUserPresetsToFrontPage();
+                return "";
+
                 if(!m_user_syncing)
                     m_user_query_type = 1;
                 return "";
@@ -4680,7 +5363,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 std::string method = info_node.get_child("method").data();
                 if (method == "post") {
                     Http http = Http::post(Http::url_decode(base_url));
-                    http.set_post_body(j.dump())
+                    http.set_post_body(j.dump()).timeout_connect(5).timeout_max(15)
                         .on_complete([&](std::string body, unsigned status) { on_complete_func(body, status); })
                         .on_error([&](std::string body, std::string error, unsigned status) { on_error_func(body, error, status); })
                         .on_progress([&](Http::Progress progress, bool& cancel) {
@@ -4698,383 +5381,35 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 return "";
             } else if (command_str.compare("update_preset_params") == 0) {
                 pt::ptree data_node = root.get_child("data");
-                for (auto& v : data_node) {
-                    std::string printer_model  = v.second.get_child("name").data();
-                    if(printer_model.find("Creality") == std::string::npos){
-                        printer_model = "Creality " + printer_model;
-                    }
-                    std::string showVersion = v.second.get_child("showVersion").data();
-                    std::string zipUrl      = v.second.get_child("zipUrl").data();
-                    std::string thumbnail      = v.second.get_child("thumbnail").data();
-                    std::vector<std::string> nozzleDiameters;
-                    for (auto& nozzleDiameter : v.second.get_child("nozzleDiameter")) {
-                        nozzleDiameters.emplace_back(nozzleDiameter.second.data());
-                    }
-                    int         start_pos = zipUrl.find_last_of("/");
-                    fs::path tmp_path = fs::path(data_dir()).append(zipUrl.substr(start_pos + 1));
-                    bool bHasUpdateMachine = false;
-                    boost::replace_all(zipUrl, " ", url_encode(" "));
-                    auto http = Http::get(zipUrl);
-                    http.on_complete([&bHasUpdateMachine,tmp_path, printer_model, nozzleDiameters](std::string body, unsigned /* http_status */) {
-                            fs::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
-                            file.write(body.c_str(), body.size());
-                            file.close();
-                            auto        old_machine_name = tmp_path.stem().string();
-                            std::string nozzle           = nozzleDiameters.empty() ? "0.4" : nozzleDiameters[0];
-
-                            mz_zip_archive archive_in;
-                            mz_zip_zero_struct(&archive_in);
-
-                            if (!open_zip_reader(&archive_in, tmp_path.string().c_str())) {
-                                return;
-                            }
-                            mz_uint                  num_entries = mz_zip_reader_get_num_files(&archive_in);
-                            mz_zip_archive_file_stat stat;
-                            std::string              machine_name;
-                            std::string              out_machine_name = printer_model + " " + nozzle + " nozzle";
-                            json materials_json;
-                            auto filament_file = fs::path(data_dir()).append("system").append("Creality").append("materialList.json");
-                            if (fs::exists(filament_file)) {
-                                    boost::nowide::ifstream ifs(filament_file.string());
-                                    ifs >> materials_json;
-                                }
-                            auto updateProfile = [](std::string type, json element) {
-                                json profile_json;
-                                auto profile_file = fs::path(data_dir()).append("system").append("Creality.json");
-                                if (fs::exists(profile_file)) {
-                                    boost::nowide::ifstream ifs(profile_file.string());
-                                    ifs >> profile_json;
-                                }
-                                if(type=="machine_list"){
-                                    if (profile_json.contains("machine_list")) {
-                                        //json machine_list = profile_json["machine_list"];
-                                        //machine_list.push_back(element);
-                                        profile_json["machine_list"].push_back(element);
-                                    } 
-                                }else if(type=="process_list"){
-                                        if (profile_json.contains("process_list")) {
-                                            profile_json["process_list"].push_back(element);
-                                        }
-                                }else if(type=="filament_list"){
-                                        if (profile_json.contains("filament_list")) {
-                                            profile_json["filament_list"].push_back(element);
-                                        }
-                                }else if(type=="machine_model_list"){
-                                    if (profile_json.contains("machine_model_list")) {
-                                        profile_json["machine_model_list"].push_back(element);
+                auto filament_file = fs::path(data_dir()).append("system").append("Creality").append("materialList.json");
+                
+                if (!fs::exists(filament_file)) {
+                    std::string base_url              = get_cloud_api_url();
+                    auto        material_profile_url = "/api/cxy/v2/slice/profile/official/materialList";
+                    Http http2 = Http::post(base_url + material_profile_url);
+                    json        j2;
+                    j2["engineVersion"]  = "3.0.0";
+                    j2["pageSize"] = 1000;
+                    boost::uuids::uuid uuid = boost::uuids::random_generator()();
+                    http2.header("Content-Type", "application/json").header("__CXY_REQUESTID_", to_string(uuid)).set_post_body(j2.dump()).on_complete([=](std::string body, unsigned status) {
+                                    if(status!=200){
+                                        return false;
                                     }
-                                }
-                                boost::nowide::ofstream c;
-                                c.open(profile_file.string(), std::ios::out | std::ios::trunc);
-                                c << std::setw(4) << profile_json << std::endl;
-                                c.close();
-                            };
-                            auto getDefaultMaterials = [=](json top_materials){
-                                std::string materials = "";
-                                if(materials_json["materials"].empty()){
-                                    return materials;
-                                }
-                                for (auto it = top_materials.begin(); it != top_materials.end();) {
-                                    if (it.value().is_string()) {
-                                        for(auto material:materials_json["materials"]){
-                                            std::string material_id = material["id"].get<std::string>();
-                                            std::string top_material_id = it.value().get<std::string>();
-                                            if(material_id==top_material_id){
-                                                materials += material["name"].get<std::string>()+";";
-                                                break;
-                                            }
+                                     json j = json::parse(body);
+                                        json printer_list = j["result"]["list"];
+                                        if(printer_list.empty()){
+                                            return false;
                                         }
-                                    }
-                                    it++;
-                                }
-                                return materials;
-                            };
-                            std::string default_materials = "";
-                            for (mz_uint i = 0; i < num_entries; ++i) {
-                                if (mz_zip_reader_file_stat(&archive_in, i, &stat)) {
-                                    std::string name(stat.m_filename);
-                                    if (!boost::algorithm::iends_with(name, ".json")) {
-                                        continue;
-                                    }
-                                    std::vector<unsigned char> buffer_input(stat.m_uncomp_size);
-                                    std::replace(name.begin(), name.end(), '\\', '/');
-                                    if (!mz_zip_reader_extract_to_mem(&archive_in, i, buffer_input.data(), buffer_input.size(), 0)) {
-                                        continue;
-                                    }
-                                    json json_in = json::parse(reinterpret_cast<const char*>(buffer_input.data()),
-                                                                    reinterpret_cast<const char*>(buffer_input.data() +
-                                                                                                  buffer_input.size()));
-                                    if (name.find('/') == name.npos) {
-                                        json json_out;
-                                        std::string default_bed_type = "High Temp Plate";
-                                        json_out["type"] = "machine";
-                                        json_out["from"] = "system";
-                                        json_out["instantiation"] = "true";
-                                        json_out["inherits"] = "fdm_creality_common";
-                                        json_out["printer_structure"] = "i3";
-                                        json_out.merge_patch(json_in["printer"]);
-                                        json_out.merge_patch(json_in["extruders"][0]["engine_data"]);
-                                        json_out["printer_model"]     = printer_model;
-                                        std::string preferred_process = json_in["metadata"]["preferred_process"];
-                                        auto top_material = json_in["metadata"]["top_material"];
-                                        default_materials = getDefaultMaterials(top_material);
-                                        auto index = preferred_process.find_last_of("@");
-                                        if (index != std::string::npos) {
-											preferred_process = preferred_process.substr(0, index);
-										}
-                                        json_out["default_print_profile"] = preferred_process + " @" + out_machine_name;
-
-                                        json filament_array;
-                                        filament_array.push_back("Hyper PLA @" + printer_model + " " + nozzle +
-                                                                 " nozzle");
-                                        json_out["default_filament_profile"] = filament_array;
-                                        if (json_out.contains("nozzle_diameter")) {
-                                            json nozzle_array;
-                                            nozzle_array.push_back(json_out["nozzle_diameter"]);
-                                            json_out["nozzle_diameter"] = nozzle_array;
-                                        }
-                                        if (json_out.contains("printer_variant")) {
-                                            json_out["printer_variant"] = nozzle;
-                                        }
-                                        if (json_out.contains("material_flow_temp_graph")) {
-                                            json_out.erase("material_flow_temp_graph");
-                                        }
-                                        if (json_out.contains("material_flow_dependent_temperature")) {
-                                            json_out.erase("material_flow_dependent_temperature");
-                                        }
-                                        if (json_out.contains("curr_bed_type")) {
-                                            default_bed_type = json_out["curr_bed_type"];
-                                            json_out.erase("curr_bed_type");
-                                        }
-                                        json_out["name"] = out_machine_name;
-                                        json_out["inherits"] = "fdm_creality_common";
-                                        std::hash<std::string> hash_fn;
-                                        json_out["setting_id"] = std::to_string(hash_fn(out_machine_name)).substr(1,6);
-                                        json_out["support_multi_bed_types"] = "1";
-                                        for (auto it = json_out.begin(); it != json_out.end(); ) {
-                                            if (it.value().is_string()) {
-                                                std::string str = it.value().get<std::string>();
-                                                if (str.empty()) {
-                                                    it = json_out.erase(it);
-                                                    continue;
-                                                }
-                                            }
-                                            ++it;
-                                        }
-                                        auto out_machine_model_json_file = fs::path(data_dir()).append("system")
-                                                                                           .append("Creality")
-                                                                                           .append("machine")
-                                                                                           .append(printer_model + ".json")
-                                                                                           .string();
-                                        if(!fs::exists(out_machine_model_json_file)){
-                                            json json_out;
-                                            json_out["type"] = "machine_model";
-                                            json_out["name"] = printer_model;
-                                            json_out["nozzle_diameter"] = nozzle;
-                                            json_out["bed_model"] = "fdm_creality_common";
-                                            json_out["bed_texture"] = "";
-                                            json_out["family"] = "Creality";
-                                            json_out["hotend_model"] = "";
-                                            json_out["machine_tech"] = "FFF";
-                                            json_out["default_materials"] = default_materials;
-                                            json_out["default_bed_type"] = default_bed_type;
-                                            std::string new_printer_model = printer_model;
-                                            boost::replace_all(new_printer_model, " ", "_");
-                                            json_out["model_id"] = new_printer_model;
-                                            boost::nowide::ofstream c;
-                                            c.open(out_machine_model_json_file, std::ios::out | std::ios::trunc);
-                                            c << std::setw(4) << json_out << std::endl;
-                                            c.close();
-                                            json new_elem;
-                                            new_elem["name"] = printer_model;
-							                new_elem["sub_path"] = "machine/" + printer_model + ".json";
-                                            updateProfile("machine_model_list", new_elem);
-                                        }else{
-                                            std::string contents;
-                                            boost::nowide::ifstream t(out_machine_model_json_file);
-                                            std::stringstream buffer;
-                                            buffer << t.rdbuf();
-                                            contents=buffer.str();
-                                            json json_in = json::parse(contents);
-                                            auto nozzles = json_in["nozzle_diameter"].get<std::string>();
-                                            if(nozzles.find(nozzle) == std::string::npos){
-                                                nozzles = nozzles + ";" + nozzle;
-                                                json_in["nozzle_diameter"] = nozzles;
-                                                boost::nowide::ofstream c;
-                                                c.open(out_machine_model_json_file, std::ios::out | std::ios::trunc);
-                                                c << std::setw(4) << json_in << std::endl;
-                                                c.close();
-                                            }
-                                            std::vector<std::string> materials;
-                                            boost::algorithm::split(materials, default_materials, boost::is_any_of(";"));
-                                            for(std::string default_material:materials){
-                                                if(json_in["default_materials"].get<std::string>().find(default_material) == std::string::npos){
-                                                    json_in["default_materials"] = json_in["default_materials"].get<std::string>() + ";" + default_material;
-                                                }
-                                            }
-
-                                        }
-                                        auto out_machine_json_file = fs::path(data_dir()).append("system")
-                                                                         .append("Creality")
-                                                                         .append("machine")
-                                                                         .append(out_machine_name + ".json")
-                                                                         .string();
-                                        if(!fs::exists(out_machine_json_file)){
-                                            json new_elem;
-                                            new_elem["name"] = out_machine_name;
-							                new_elem["sub_path"] = "machine/" + out_machine_name + ".json";
-                                            updateProfile("machine_list", new_elem);
-                                            bHasUpdateMachine = true;
-                                        }
+                                        json list;
+                                        list["materials"] = printer_list;
                                         boost::nowide::ofstream c;
-                                        c.open(out_machine_json_file, std::ios::out | std::ios::trunc);
-                                        c << std::setw(4) << json_out << std::endl;
+                                        c.open(filament_file.string(), std::ios::out | std::ios::trunc);
+                                        c << std::setw(4) << list << std::endl;
                                         c.close();
-                                    } else if (boost::algorithm::istarts_with(name, "Materials")) {
-                                        static std::set<std::string> array_keys = {"filament_type", "filament_vendor", "filament_start_gcode",
-                                                                    "filament_end_gcode"};
-                                        json json_out;
-                                        json_out["type"]              = "filament";
-                                        json_out["filament_id"]              = "GFB98";
-                                        json_out["setting_id"]     = "GFSA04";
-                                        json_out["name"]          = "Creality Generic ASA";
-                                        json_out["from"]                     = "system";
-                                        json_out["instantiation"]            = "true";
-                                        json_out["inherits"]                 = "fdm_filament_common";
-                                        json_out.merge_patch(json_in["engine_data"]);
-                                        json_out["filament_id"] = json_in["metadata"]["id"];
-                                        auto basename                = fs::path(name).stem().string();
-                                        auto index = basename.find_last_of("-");
-                                        if (index != std::string::npos) {
-                                            basename = basename.substr(0, index);
-										}
-                                        basename = basename + " @" + printer_model + " " + nozzle + " nozzle";
-                                        json_out["name"] = basename;
-                                        json compatible_printers_array;
-                                        compatible_printers_array.push_back(out_machine_name);
-                                        json_out["compatible_printers"] = compatible_printers_array;
-                                        json_out["inherits"]            = "fdm_filament_common";
-                                        json_out["default_filament_colour"] = "\"\"";
-                                        if (json_out.contains("material_flow_dependent_temperature")) {
-                                            json_out.erase("material_flow_dependent_temperature");
-                                        }
-                                        if (json_out.contains("material_flow_temp_graph")) {
-                                            json_out.erase("material_flow_temp_graph");
-                                        }
-                                        for (auto it = json_out.begin(); it != json_out.end();) {
-                                            if (it.value().is_string()) {
-                                                std::string str = it.value().get<std::string>();
-                                                if (str.empty()) {
-                                                    it = json_out.erase(it);
-                                                    continue;
-                                                } else if (array_keys.find(it.key()) != array_keys.cend()) {
-													json array;
-													array.push_back(str);
-                                                    json_out[it.key()] = array;
-												}
-                                            }
-                                            ++it;
-                                        }
-                                        auto out_filament_json_file = fs::path(data_dir())
-                                                                          .append("system")
-                                                                          .append("Creality")
-                                                                          .append("filament")
-                                                                          .append(basename + ".json")
-                                                                          .string();
-                                        if(!fs::exists(out_filament_json_file)){
-                                            json new_elem;
-                                            new_elem["name"] = basename;
-							                new_elem["sub_path"] = "filament/" + basename + ".json";
-                                            updateProfile("filament_list", new_elem);
-                                        }
-                                        boost::nowide::ofstream c;
-                                        c.open(out_filament_json_file, std::ios::out | std::ios::trunc);
-                                        c << std::setw(4) << json_out << std::endl;
-                                        c.close();
-                                        //judge if the material is in the default materials list
-                                        auto* app_config = GUI::wxGetApp().app_config;
-                                        if(app_config->has_printer_settings(out_machine_name))
-                                        {
-                                            std::string section_name = AppConfig::SECTION_FILAMENTS;
-                                            if (app_config->has_section(section_name)) {
-                                                const std::map<std::string, std::string> &installed = app_config->get_section(section_name);
-                                                auto has = [&installed](const std::string &name) {
-                                                    auto it = installed.find(name);
-                                                    return it != installed.end() && ! it->second.empty();
-                                                };
-                                                bool is_visible = has(basename);
-                                                if (!is_visible) {
-                                                    app_config->set(section_name, basename, "true");
-                                                }
-                                            } 
-                                        }
-                                    } else if (boost::algorithm::istarts_with(name, "Processes")) {
-                                        static std::set<std::string> array_keys = {"filament_colour",      "flush_multiplier",
-                                                                                   "flush_volumes_matrix", "flush_volumes_vector",
-                                                                                   "wipe_tower_x",         "wipe_tower_y",
-                                                                                   "has_scarf_joint_seam",         "arc_tolerance"};
-                                        json json_out;
-                                        json_out["type"]          = "process";
-                                        json_out["setting_id"]    = "GP004";
-                                        json_out["name"]          = "0.08mm SuperDetail @Creality CR-6 0.2";
-                                        json_out["from"]          = "system";
-                                        json_out["instantiation"] = "true";
-                                        json_out.merge_patch(json_in["engine_data"]);
-                                        auto basename = fs::path(name).stem().string();
-                                        auto index    = basename.find_last_of("@");
-                                        if (index != std::string::npos) {
-                                            basename = basename.substr(0, index);
-                                        }
-                                        basename = basename + " @" + printer_model + " " + nozzle + " nozzle";
-                                        json_out["name"] = basename;
-                                        json compatible_printers_array;
-                                        compatible_printers_array.push_back(out_machine_name);
-                                        json_out["compatible_printers"] = compatible_printers_array;
-                                        json_out["inherits"]            = "fdm_process_creality_common";
-                                        if (json_out.contains("min_length_factor") && json_out["min_length_factor"].empty()) {
-											json_out.erase("min_length_factor");
-										}
-                                        for (auto key : array_keys) {
-											if (json_out.contains(key)) {
-                                                json_out.erase(key);
-											}
-                                        }
-                                        for (auto it = json_out.begin(); it != json_out.end();) {
-                                            if (it.value().is_string()) {
-                                                std::string str = it.value().get<std::string>();
-                                                if (str.empty()) {
-                                                    it = json_out.erase(it);
-                                                    continue;
-                                                }
-                                            }
-                                            ++it;
-                                        }
-                                        auto out_process_json_file = fs::path(data_dir())
-                                                                          .append("system")
-                                                                          .append("Creality")
-                                                                          .append("process")
-                                                                          .append(basename + ".json")
-                                                                          .string();
-                                        if(!fs::exists(out_process_json_file)){
-                                            json new_elem;
-                                            new_elem["name"] = basename;
-							                new_elem["sub_path"] = "process/" + basename + ".json";
-                                            updateProfile("process_list", new_elem);
-                                        }
-                                        boost::nowide::ofstream c;
-                                        c.open(out_process_json_file, std::ios::out | std::ios::trunc);
-                                        c << std::setw(4) << json_out << std::endl;
-                                        c.close();
-                                    }
-                                }
-                            }
-                            if (!close_zip_reader(&archive_in)) {
-                                return;
-                            }
-                            fs::remove(tmp_path);
-                        })
-                        .perform_sync();
-                    if(true){
+                                        return true;
+                                }).perform_sync();
+                }
+                if(true){
                         std::string base_url              = get_cloud_api_url();
                         auto        preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";
                         Http::set_extra_headers(get_extra_header());
@@ -5099,94 +5434,64 @@ std::string GUI_App::handle_web_request(std::string cmd)
                                         boost::nowide::ofstream c;
                                         c.open(out_printer_list_file, std::ios::out | std::ios::trunc);
                                         c << std::setw(4) << printer_list << std::endl;
+                                        c.close();
                                     }catch(...){
                                         return;
                                     }
                                 }).perform_sync();
                         
                     }
-                    auto* app_config = GUI::wxGetApp().app_config;
-                    GUI::wxGetApp().preset_bundle->load_presets(*app_config,
-                                                                ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
-                    GUI::wxGetApp().load_current_presets();
-                    GUI::wxGetApp().plater()->set_bed_shape();
-                    auto cache_file = fs::path(data_dir()).append("profile_version.json");
-                    json cache_json;
-                    if (fs::exists(cache_file)) {
-                        boost::nowide::ifstream ifs(cache_file.string());
-                        ifs >> cache_json;
+                json profile_json;
+                auto profile_file = fs::path(data_dir()).append("system").append("Creality.json");
+                if (fs::exists(profile_file)) {
+                    boost::nowide::ifstream ifs(profile_file.string());
+                    ifs >> profile_json;
+                    ifs.close();
+                }
+                auto cache_file = fs::path(data_dir()).append("system").append("Creality").append("profile_version.json");
+                json cache_json;
+                if (fs::exists(cache_file)) {
+                    boost::nowide::ifstream ifs(cache_file.string());
+                    ifs >> cache_json;
+                    ifs.close();
+                }
+                json materials_json;
+                
+                if (fs::exists(filament_file)) {
+                        boost::nowide::ifstream ifs(filament_file.string());
+                        ifs >> materials_json;
                         ifs.close();
-                        std::vector<std::string> ec_a;
-                        bool found = false;
-                        for (auto& elem : cache_json["Creality"]) {
-                            if (elem["name"] == printer_model && elem["nozzleDiameter"][0] == nozzleDiameters[0]) {
-                                found = true;
-                                elem["showVersion"] = showVersion;
-                                elem["updating"] = false;
-                            }
-                        }
-                        if (!found) {
-                        	json new_elem;
-							new_elem["name"] = printer_model;
-							new_elem["nozzleDiameter"] = nozzleDiameters;
-							new_elem["showVersion"] = showVersion;
-							new_elem["updating"] = false;
-							cache_json["Creality"].push_back(new_elem);						
-                        }
-
-                        boost::nowide::ofstream c;
-                        c.open(cache_file.string(), std::ios::out | std::ios::trunc);
-                        c << std::setw(4) << cache_json << std::endl;
-                        c.close();
-                    } else {
-						json new_elem;
-						new_elem["name"] = printer_model;
-						new_elem["nozzleDiameter"] = nozzleDiameters;
-						new_elem["showVersion"] = showVersion;
-						new_elem["updating"] = false;
-						cache_json["Creality"].push_back(new_elem);
-						boost::nowide::ofstream c;
-						c.open(cache_file.string(), std::ios::out | std::ios::trunc);
-						c << std::setw(4) << cache_json << std::endl;
-						c.close();
+                    }else{
+                        return "";
                     }
-                }
-            }
-            else if (command_str.compare("forward_device_detail") == 0) {
-                try {
-                    std::string ipAddress = root.get_child("ip").data();
-                    std::string name      = root.get_child("name").data();
-                    if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                        wxGetApp().mainframe->get_printer_mgr_view()->handle_request_switch_device_details_page(ipAddress, name);
-                    }
+                //下载机器参数包
+                //std::vector<std::pair<std::string, std::string>> download_list;
+                std::vector<boost::thread> threads;
+                for(auto &v:data_node)
+                {
 
-                } catch (...) {
-                    BOOST_LOG_TRIVIAL(trace) << "forward_device_detail, parse json cmd failed " << cmd;
+                    threads.emplace_back(UpdateParamPackage, v.second,boost::ref(profile_json),boost::ref(cache_json),boost::ref(materials_json));
                 }
-            }
-            else if (command_str.compare("sync_device_filament") == 0) {
-                std::string deviceMac = root.get_child("device_id").data();
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->handle_sync_device_filament_cmd_from_worlshop(deviceMac);
-                }
+                
+                
 
-            }
-            else if (command_str.compare("set_current_device") == 0) {
-                std::string deviceMac = root.get_child("device_id").data();
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->handle_set_current_device_cmd_from_workshop(deviceMac);
+                // 等待所有线程完成
+                for (auto& thread : threads) {
+                    thread.join();
                 }
-            }
-            else if (command_str.compare("request_device_info") == 0) {
-                std::string deviceMac = root.get_child("device_id").data();
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->handle_request_current_device_info_from_workshop(deviceMac);
-                }
-            }
-            else if (command_str.compare("active_request_device_info") == 0) {
-                if (wxGetApp().mainframe->get_printer_mgr_view()) {
-                    wxGetApp().mainframe->get_printer_mgr_view()->request_device_info_for_workshop();
-                }
+                boost::nowide::ofstream c;
+                c.open(profile_file.string(), std::ios::out | std::ios::trunc);
+                c << std::setw(4) << profile_json << std::endl;
+                c.close();
+                c.open(cache_file.string(), std::ios::out | std::ios::trunc);
+                c << std::setw(4) << cache_json << std::endl;
+                c.close();
+                auto* app_config = GUI::wxGetApp().app_config;
+                GUI::wxGetApp().preset_bundle->load_presets(*app_config,
+                                                                ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
+                GUI::wxGetApp().load_current_presets();
+                GUI::wxGetApp().plater()->set_bed_shape();
+                UpdateParams::getInstance().hasUpdateParams();
             }
             else if(command_str.compare("refresh_all_device") == 0){
                 if (wxGetApp().mainframe->get_printer_mgr_view()) {
@@ -5534,6 +5839,9 @@ void GUI_App::check_new_version_cx(bool show_tips, int by_user)
     #ifdef __LINUX__
         palform_ = 2;
     #endif
+    #if defined(__aarch64__) || defined(_M_ARM64)
+        palform_ = 4;
+    #endif
     bool       check_stable_only = app_config->get_bool("check_stable_update_only");
     std::string base_url = get_cloud_api_url();
     auto        preupload_profile_url = "/api/cxy/search/softwareSearch";
@@ -5737,10 +6045,21 @@ void GUI_App::set_skip_version(bool skip)
 void GUI_App::show_check_privacy_dlg(wxCommandEvent& evt)
 {
     int online_login = evt.GetInt();
-    PrivacyUpdateDialog privacy_dlg(this->mainframe, wxID_ANY, _L("Privacy Policy Update"));
+    
+    PrivacyUpdateDialog privacy_dlg(this->mainframe, wxID_ANY, _L("User Experience Improvement Program"));
     privacy_dlg.Bind(EVT_PRIVACY_UPDATE_CONFIRM, [this, online_login](wxCommandEvent &e) {
-        app_config->set("privacy_version", privacy_version_info.version_str);
-        app_config->set_bool("privacy_update_checked", true);
+        std::string version = std::string(CREALITYPRINT_VERSION);
+        if (privacyData.contains("list") && !privacyData["list"].is_null()) {
+            for (auto& v : privacyData["list"]) {
+                if (v["version"] == version) {
+                    v["check"] = true;
+                    break;
+                } 
+            }
+        }
+        save_privacy_version();
+       /* app_config->set("privacy_version", privacy_version_info.version_str);
+        app_config->set_bool("privacy_update_checked", true);*/
         request_user_handle(online_login);
         });
     privacy_dlg.Bind(EVT_PRIVACY_UPDATE_CANCEL, [this](wxCommandEvent &e) {
@@ -5752,6 +6071,16 @@ void GUI_App::show_check_privacy_dlg(wxCommandEvent& evt)
 
     privacy_dlg.set_text(privacy_version_info.description);
     privacy_dlg.on_show();
+}
+
+ void GUI_App::save_privacy_version()
+{
+
+    boost::filesystem::path device_file = boost::filesystem::path(Slic3r::data_dir()) / "privacyInfo.json";
+    boost::nowide::ofstream c;
+    c.open(device_file.string(), std::ios::out | std::ios::trunc);
+    c << std::setw(4) << privacyData << std::endl;
+
 }
 
 void GUI_App::on_show_check_privacy_dlg(int online_login)
@@ -5778,7 +6107,15 @@ bool GUI_App::check_privacy_update()
     }
     return false;
 }
-
+void GUI_App::reinit_downloader()
+{
+    std::string user_id = m_user.userId;
+    if(user_id.empty())
+        return;
+    if (model_downloaders_.find(user_id) != model_downloaders_.cend()) {
+        model_downloaders_[user_id]->init();
+    }
+}
 void GUI_App::on_check_privacy_update(wxCommandEvent& evt)
 {
     int online_login = evt.GetInt();
@@ -5837,6 +6174,47 @@ void GUI_App::check_privacy_version(int online_login)
             request_user_handle(online_login);
             BOOST_LOG_TRIVIAL(error) << "check privacy version error" << body;
     }).perform();
+}
+
+void GUI_App::check_creality_privacy_version()
+{ 
+    bool                    needUpdate  = true;
+    boost::filesystem::path device_file = boost::filesystem::path(Slic3r::data_dir()) / "privacyInfo.json";
+    std::string             version     = std::string(CREALITYPRINT_VERSION);
+    if (!boost::filesystem::exists(device_file)) {
+        save_privacy_version();  
+        if (privacyData.is_null()) {
+            privacyData["list"] = nlohmann::json::array();
+        }
+       
+    } else {
+        boost::nowide::ifstream t(device_file.string());
+        std::stringstream       buffer;
+        buffer << t.rdbuf();
+
+        privacyData = json::parse(buffer);
+        if (privacyData.contains("list")) {
+            for (auto& v : privacyData["list"]) {
+                if (v["version"] == version) {
+                    needUpdate = false;
+                    break;
+                } else {
+                    needUpdate = true;
+                }
+            }
+        }
+     needUpdate = false; // 不跟版本走了，只弹一次
+    }
+    if (needUpdate) {
+        nlohmann::json item;
+        item["version"] = version;
+        item["check"]   = false;
+        privacyData["list"].push_back(item);
+    }
+    save_privacy_version();
+    if (needUpdate) {
+        on_show_check_privacy_dlg();
+    }
 }
 
 void GUI_App::no_new_version()
@@ -6507,18 +6885,41 @@ void GUI_App::sync_preset(Preset* preset)
     }
 
 }
-
+bool GUI_App::wait_cloud_token()
+{
+    auto token = app_config->get("cloud", "token");
+    int wait_time = 160; // 16s
+    while(token== app_config->get("cloud", "token"))
+    {
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+        wait_time--;
+         if (wait_time <= 0) {
+            return false;
+        }
+    }
+    return true;
+}
 void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 {
-    if (!is_login())
+    if (!is_login()) {
+        BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset login is false";
         return;
-    if (app_config->get("stealth_mode") == "true")
+    }
+    if (app_config->get("stealth_mode") == "true") {
+        BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset stealth_mode is true";
         return;
+    }
 
     auto token = app_config->get("cloud", "token");
-    if (token.empty())
+    if (token.empty()) {
+        BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset token is empty";
         return;
+    }
     auto user_id = app_config->get("cloud", "user_id");
+
+    SyncUserPresets::getInstance().startSync();
+    SyncUserPresets::getInstance().syncUserPresetsToLocal();
+    return;
 
     // has already start sync
     if (m_user_sync_token) return;
@@ -6792,6 +7193,9 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 
 void GUI_App::stop_sync_user_preset()
 {
+    SyncUserPresets::getInstance().stopSync();
+    return;
+
     if (!m_user_sync_token)
         return;
 
@@ -8263,6 +8667,17 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     if (strFinish == "false" || strFinish.empty())
         pStyle = wxCAPTION | wxTAB_TRAVERSAL;
 
+
+    const Preset& preset = preset_bundle->printers.get_selected_preset();
+    if ((start_page == ConfigWizard::SP_FILAMENTS) && (preset.m_is_non_standard_printer))
+    {
+        MessageDialog msg(nullptr, _L("Selected model not a system model; no system consumables"), _L("Information"), wxOK);
+        if (msg.ShowModal())
+        {
+            return false;
+        }
+    }
+
     GuideFrame wizard(this, pStyle);
     auto page = start_page == ConfigWizard::SP_WELCOME ? GuideFrame::BBL_WELCOME :
                 start_page == ConfigWizard::SP_FILAMENTS ? GuideFrame::BBL_FILAMENT_ONLY :
@@ -8565,6 +8980,7 @@ static bool del_win_registry(HKEY hkeyHive, const wchar_t *pszVar, const wchar_t
 
 void GUI_App::associate_files(std::wstring extend)
 {
+    return ;
 #ifdef WIN32
     wchar_t app_path[MAX_PATH];
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
@@ -8590,7 +9006,9 @@ void GUI_App::associate_files(std::wstring extend)
 
 void GUI_App::disassociate_files(std::wstring extend)
 {
+    
 #ifdef WIN32
+    return;
     wchar_t app_path[MAX_PATH];
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
 
@@ -8624,6 +9042,7 @@ bool GUI_App::check_url_association(std::wstring url_prefix, std::wstring& reg_b
 {
     reg_bin = L"";
 #ifdef WIN32
+    return false;
     wxRegKey key_full(wxRegKey::HKCU, "Software\\Classes\\" + url_prefix + "\\shell\\open\\command");
     if (!key_full.Exists()) {
         return false;
@@ -8641,6 +9060,7 @@ bool GUI_App::check_url_association(std::wstring url_prefix, std::wstring& reg_b
 void GUI_App::associate_url(std::wstring url_prefix)
 {
 #ifdef WIN32
+    return ;
     boost::filesystem::path binary_path(boost::filesystem::canonical(boost::dll::program_location()));
     // the path to binary needs to be correctly saved in string with respect to localized characters
     wxString wbinary = wxString::FromUTF8(binary_path.string());
@@ -8668,6 +9088,7 @@ void GUI_App::associate_url(std::wstring url_prefix)
 void GUI_App::disassociate_url(std::wstring url_prefix)
 {
 #ifdef WIN32
+    return ;
     wxRegKey key_full(wxRegKey::HKCU, "Software\\Classes\\" + url_prefix + "\\shell\\open\\command");
     if (!key_full.Exists()) {
         return;
@@ -8679,9 +9100,23 @@ void GUI_App::disassociate_url(std::wstring url_prefix)
 
 void GUI_App::start_download(std::string url)
 {
+    std::cout << "start_download: "<<url;
     if (!plater_) {
         BOOST_LOG_TRIVIAL(error) << "Could not start URL download: plater is nullptr.";
         return;
+    }
+    if(boost::starts_with(url, "crealityprintlink://open?code=")||boost::starts_with(url, "crealityprintlink://open/?code="))
+    {
+            wxTimer *m_timer = new wxTimer(this, wxID_ANY);
+           
+            Bind(wxEVT_TIMER, [=](wxTimerEvent& event) mutable {
+
+                post_openlink_cmd(url);
+
+                }, m_timer->GetId());
+
+            m_timer->Start(5000,true);
+            return;
     }
     //lets always init so if the download dest folder was changed, new dest is used
     boost::filesystem::path dest_folder(app_config->get("download_path"));

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-01-15 15:51+0800\n"
+"POT-Creation-Date: 2025-04-15 14:59+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,6 +19,12 @@ msgstr ""
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
 msgid "Assembly"
+msgstr ""
+
+msgid "SendReport"
+msgstr ""
+
+msgid "Cancel"
 msgstr ""
 
 msgid "Undefined"
@@ -343,9 +349,6 @@ msgstr ""
 msgid "Variable layer height is not supported with Organic supports."
 msgstr ""
 
-msgid "Overhang Optimization is not supported with Organic supports."
-msgstr ""
-
 msgid ""
 "Different nozzle diameters and different filament diameters is not allowed "
 "when prime tower is enabled."
@@ -452,6 +455,37 @@ msgid "The flush multiplier setting is too low, value is %.2f"
 msgstr ""
 
 msgid ""
+"Setting the jerk speed too low could lead to artifacts on curved surfaces"
+msgstr ""
+
+msgid ""
+"The jerk setting exceeds the printer's maximum jerk (machine_max_jerk_x/"
+"machine_max_jerk_y).\n"
+"CrealityPrint will automatically cap the jerk speed to ensure it doesn't "
+"surpass the printer's capabilities.\n"
+"You can adjust the maximum jerk setting in your printer's configuration to "
+"get higher speeds."
+msgstr ""
+
+msgid ""
+"The acceleration setting exceeds the printer's maximum acceleration "
+"(machine_max_acceleration_extruding).\n"
+"CrealityPrint will automatically cap the acceleration speed to ensure it "
+"doesn't surpass the printer's capabilities.\n"
+"You can adjust the machine_max_acceleration_extruding value in your "
+"printer's configuration to get higher speeds."
+msgstr ""
+
+msgid ""
+"The travel acceleration setting exceeds the printer's maximum travel "
+"acceleration (machine_max_acceleration_travel).\n"
+"CrealityPrint will automatically cap the travel acceleration speed to ensure "
+"it doesn't surpass the printer's capabilities.\n"
+"You can adjust the machine_max_acceleration_travel value in your printer's "
+"configuration to get higher speeds."
+msgstr ""
+
+msgid ""
 "Filament shrinkage will not be used because filament shrinkage for the used "
 "filaments differs significantly."
 msgstr ""
@@ -478,6 +512,9 @@ msgid ""
 "Unprintable area in XY plane. For example, X1 Series printers use the front "
 "left corner to cut filament during filament change. The area is expressed as "
 "polygon by points in following format: \"XxY, XxY, ...\""
+msgstr ""
+
+msgid "Color bed exclude area"
 msgstr ""
 
 msgid "Bed custom texture"
@@ -3797,6 +3834,12 @@ msgstr ""
 msgid "XY separation between an object and its support"
 msgstr ""
 
+msgid "Support/object first layer gap"
+msgstr ""
+
+msgid "XY separation between an object and its support at the first layer."
+msgstr ""
+
 msgid "Small Overhang Area"
 msgstr ""
 
@@ -3926,7 +3969,7 @@ msgstr ""
 msgid "Speed of support interface"
 msgstr ""
 
-msgid "Base pattern"
+msgid "Base pattern(Normal)"
 msgstr ""
 
 msgid "Line pattern of support"
@@ -3939,6 +3982,9 @@ msgid "Hollow"
 msgstr ""
 
 msgid "Zig Zag"
+msgstr ""
+
+msgid "Base pattern(Tree)"
 msgstr ""
 
 msgid "Interface pattern"
@@ -4119,10 +4165,13 @@ msgid ""
 "double walls."
 msgstr ""
 
-msgid "Support wall loops"
+msgid "Support wall loops(Normal)"
 msgstr ""
 
 msgid "This setting specify the count of walls around support"
+msgstr ""
+
+msgid "Support wall loops(Tree)"
 msgstr ""
 
 msgid "Tree support with infill"
@@ -4249,6 +4298,9 @@ msgstr ""
 msgid ""
 "The actual flushing volumes is equal to the flush multiplier multiplied by "
 "the flushing volumes in the table."
+msgstr ""
+
+msgid "Flush Volumes Changed"
 msgstr ""
 
 msgid "Prime volume"
@@ -4577,9 +4629,6 @@ msgid "Invalid value when spiral vase mode is enabled: "
 msgstr ""
 
 msgid "too large line width "
-msgstr ""
-
-msgid " not in range "
 msgstr ""
 
 msgid "Minimum save"
@@ -4941,6 +4990,12 @@ msgid ""
 msgstr ""
 
 msgid "Optimizing toolpath"
+msgstr ""
+
+msgid "Empty layers around bottom are replaced by nearest normal layers."
+msgstr ""
+
+msgid "The model has too many empty layers."
 msgstr ""
 
 msgid "Slicing mesh"
@@ -5592,9 +5647,6 @@ msgstr ""
 
 #, possible-boost-format
 msgid "Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"
-msgstr ""
-
-msgid "Cancel"
 msgstr ""
 
 msgid "Check the reason"
@@ -8114,6 +8166,9 @@ msgstr ""
 msgid "Invalid format. Expected vector format: \"%1%\""
 msgstr ""
 
+msgid "Print temperature"
+msgstr ""
+
 msgid "Click to edit preset"
 msgstr ""
 
@@ -8303,7 +8358,7 @@ msgstr ""
 msgid "Adaptive"
 msgstr ""
 
-msgid "Keep min"
+msgid "Keep the minimum floor height constant"
 msgstr ""
 
 msgid "Left mouse button:"
@@ -8554,9 +8609,6 @@ msgstr ""
 msgid "Creality3DSlicer got an unhandled exception: %1%"
 msgstr ""
 
-msgid "Untitled"
-msgstr ""
-
 msgid "Downloading Bambu Network Plug-in"
 msgstr ""
 
@@ -8577,6 +8629,9 @@ msgid ""
 msgstr ""
 
 msgid "WebView2 Runtime"
+msgstr ""
+
+msgid "Error Report"
 msgstr ""
 
 #, possible-c-format, possible-boost-format
@@ -8643,6 +8698,9 @@ msgstr ""
 msgid "User logged out"
 msgstr ""
 
+msgid "Untitled"
+msgstr ""
+
 msgid "new or open project file is not allowed during the slicing process!"
 msgstr ""
 
@@ -8684,6 +8742,12 @@ msgid "Stop them and continue anyway?"
 msgstr ""
 
 msgid "Ongoing uploads"
+msgstr ""
+
+msgid "Selected model not a system model; no system consumables"
+msgstr ""
+
+msgid "Information"
 msgstr ""
 
 msgid "Select a G-code file:"
@@ -9067,6 +9131,9 @@ msgstr ""
 msgid "Simplify Model"
 msgstr ""
 
+msgid "F3"
+msgstr ""
+
 msgid "Center"
 msgstr ""
 
@@ -9116,6 +9183,16 @@ msgstr ""
 msgid "Add height range"
 msgstr ""
 
+
+msgid "Display height range from bottom"
+msgstr ""
+
+msgid "Place input box near mouse"
+msgstr ""
+
+msgid "Bottom:"
+msgstr ""
+
 msgid "Fila."
 msgstr ""
 
@@ -9140,7 +9217,7 @@ msgid_plural "%1$d non-manifold edges"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Right click the icon to fix model object"
+msgid "Left click the icon to fix model object"
 msgstr ""
 
 msgid "Right button click the icon to drop the object settings"
@@ -9448,6 +9525,9 @@ msgstr ""
 msgid "Delete Filament Change"
 msgstr ""
 
+msgid "Right click to show more operation"
+msgstr ""
+
 msgid "Keyboard Shortcuts"
 msgstr ""
 
@@ -9721,6 +9801,18 @@ msgstr ""
 msgid "Select the object/part and mouse click to change the name"
 msgstr ""
 
+msgid "Alt"
+msgstr ""
+
+msgid "Mouse clicks can select parts in the assembly model"
+msgstr ""
+
+msgid "F5"
+msgstr ""
+
+msgid "Center selected"
+msgstr ""
+
 msgid "Objects List"
 msgstr ""
 
@@ -9758,6 +9850,17 @@ msgid "End"
 msgstr ""
 
 msgid "Horizontal slider - Move to last position"
+msgstr ""
+
+msgid "login status has expired, please log in again?"
+msgstr ""
+
+msgid "Not logged in yet, unable to map user filament preset"
+msgstr ""
+
+msgid ""
+"The current account does not match the device account, and cannot map the "
+"user filament preset"
 msgstr ""
 
 msgid "New Window"
@@ -10412,9 +10515,6 @@ msgstr ""
 msgid "Virtual camera initialize failed (%s)!"
 msgstr ""
 
-msgid "Information"
-msgstr ""
-
 msgid "Playing..."
 msgstr ""
 
@@ -10551,6 +10651,9 @@ msgid "Latest Version: "
 msgstr ""
 
 msgid "Not for now"
+msgstr ""
+
+msgid "Login"
 msgstr ""
 
 msgid "Idle"
@@ -10697,6 +10800,9 @@ msgstr ""
 msgid "Log Info"
 msgstr ""
 
+msgid "Tips:"
+msgstr ""
+
 msgid "Error:"
 msgstr ""
 
@@ -10751,6 +10857,9 @@ msgstr ""
 msgid "Serious warning:"
 msgstr ""
 
+msgid "Immediate Update"
+msgstr ""
+
 msgid " (Repair)"
 msgstr ""
 
@@ -10764,9 +10873,6 @@ msgid "Your model needs support ! Please make support material enable."
 msgstr ""
 
 msgid "Gcode path overlap"
-msgstr ""
-
-msgid "Login"
 msgstr ""
 
 msgid "Authorizing..."
@@ -11345,7 +11451,7 @@ msgstr ""
 msgid "Save project"
 msgstr ""
 
-msgid "Succeeded to save the project."
+msgid "Saved successfully. Open Local Folder"
 msgstr ""
 
 msgid "Importing Model"
@@ -11443,9 +11549,6 @@ msgstr ""
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr ""
 
-msgid "Saved successfully. Open Local Folder"
-msgstr ""
-
 msgid "Save Sliced file as:"
 msgstr ""
 
@@ -11494,6 +11597,12 @@ msgstr ""
 msgid "Abnormal print file data. Please slice again"
 msgstr ""
 
+msgid "Non-manifold edges detected. Repair now?"
+msgstr ""
+
+msgid "Non-manifold edges be caused by "
+msgstr ""
+
 msgid ""
 "Print By Object: \n"
 "Suggest to use auto-arrange to avoid collisions when printing."
@@ -11503,6 +11612,9 @@ msgid "Send G-code"
 msgstr ""
 
 msgid "Send to printer"
+msgstr ""
+
+msgid "Custom supports and color painting were removed before simplified."
 msgstr ""
 
 msgid "Custom supports and color painting were removed before repairing."
@@ -11548,9 +11660,6 @@ msgstr ""
 
 #, possible-boost-format
 msgid "Triangles: %1%\n"
-msgstr ""
-
-msgid "Tips:"
 msgstr ""
 
 msgid ""
@@ -12548,6 +12657,24 @@ msgstr ""
 msgid "Face the camera"
 msgstr ""
 
+#, possible-c-format, possible-boost-format
+msgid ""
+"The cloud printer preset [%s] has been deleted. \n"
+"Do you want to delete the local printer preset?"
+msgstr ""
+
+#, possible-c-format, possible-boost-format
+msgid ""
+"The cloud filament preset [%s] has been deleted. \n"
+"Do you want to delete the local filament preset?"
+msgstr ""
+
+#, possible-c-format, possible-boost-format
+msgid ""
+"The cloud process preset [%s] has been deleted. \n"
+"Do you want to delete the local process preset?"
+msgstr ""
+
 msgid "System Information"
 msgstr ""
 
@@ -12767,9 +12894,6 @@ msgid "Recommended nozzle temperature range of this filament. 0 means no set"
 msgstr ""
 
 msgid "Print chamber temperature"
-msgstr ""
-
-msgid "Print temperature"
 msgstr ""
 
 msgid "Nozzle temperature when printing"
@@ -13153,6 +13277,10 @@ msgid "No updates available."
 msgstr ""
 
 msgid "The configuration is up to date."
+msgstr ""
+
+msgid ""
+"Detected a new parameter package to update, would you like to update it?"
 msgstr ""
 
 msgid "Model:"
@@ -13778,7 +13906,7 @@ msgstr ""
 msgid "Embossed text cannot contain only white spaces."
 msgstr ""
 
-msgid "Text contains character glyph (represented by '?') unknown by font."
+msgid "The text includes unknown character glyphs(which have been replaced)."
 msgstr ""
 
 msgid "Text input doesn't show font skew."
@@ -15089,39 +15217,6 @@ msgstr ""
 msgid "EXT"
 msgstr ""
 
-msgid "Ready"
-msgstr ""
-
-msgid "Send to LocalNet Printer"
-msgstr ""
-
-msgid "Enable Calibration"
-msgstr ""
-
-msgid "Open CFS"
-msgstr ""
-
-msgid "Printer Details"
-msgstr ""
-
-msgid "Send gcode and print"
-msgstr ""
-
-msgid "Printer is offline"
-msgstr ""
-
-msgid "Filament can not match"
-msgstr ""
-
-msgid "Printer is busy, can send gcode only"
-msgstr ""
-
-msgid "Send to Lan Printer"
-msgstr ""
-
-msgid "Unknown model"
-msgstr ""
-
 msgid "Upload type"
 msgstr ""
 
@@ -15143,6 +15238,12 @@ msgstr ""
 msgid "Sliced"
 msgstr ""
 
+msgid "Printer is offline"
+msgstr ""
+
+msgid "Printer is busy, can send gcode only"
+msgstr ""
+
 msgid "Upload fail"
 msgstr ""
 
@@ -15154,6 +15255,12 @@ msgstr ""
 
 #, possible-c-format, possible-boost-format
 msgid "Upload failed(%s): %s"
+msgstr ""
+
+msgid "Send to Lan Printer"
+msgstr ""
+
+msgid "Unknown model"
 msgstr ""
 
 msgid "?"
@@ -15664,4 +15771,32 @@ msgid ""
 "Compared with the default profile of a 0.8 mm nozzle, it has a smaller layer "
 "height, and results in less but still apparent layer lines and slightly "
 "higher printing quality, but longer printing time in some printing cases."
+msgstr ""
+
+msgid ""
+"We sincerely invite you to join Creality Print's \" User Experience Improvement Program\" "
+"to help us optimize printing efficiency, improve printing performance and software experience by "
+"anonymously collecting data such as slicing parameters, settings and usage logs. We will not collect any "
+"personally identifiable information, and all data will be protected in accordance with the"
+msgstr ""
+
+msgid " Privacy Policy "
+msgstr ""
+
+msgid ". You can turn off this feature in the settings at any time."
+msgstr ""
+
+msgid "Join in"
+msgstr ""
+
+msgid "User Experience Improvement Program"
+msgstr ""
+
+msgid "(Content of the collected data)"
+msgstr ""
+
+msgid "User Experience Program"
+msgstr ""
+
+msgid "Detected corruption in the Creality Print configuration file, attempted to rebuild, \nplease manually restart the software."
 msgstr ""

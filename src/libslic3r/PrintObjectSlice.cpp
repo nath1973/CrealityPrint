@@ -463,7 +463,7 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                 }
             });
     }
-
+#if 0
     // SoftFever: ported from SuperSlicer
     // filament shrink
     for (const std::unique_ptr<PrintRegion>& pr : print_object_regions.all_regions) {
@@ -471,15 +471,18 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
             std::vector<ExPolygons>& region_polys = slices_by_region[pr->print_object_region_id()];
             const size_t extruder_id = pr->extruder(FlowRole::frPerimeter) - 1;
             double scale = print_config.filament_shrink.values[extruder_id] * 0.01;
+#ifndef CLOUD_SKIP_MESHBOOLEAN
+//just skip shrink for cloud slicing, because scale != 1 will failed in linux
             if (scale != 1) {
                 scale = 1 / scale;
                 for (ExPolygons& polys : region_polys)
                     for (ExPolygon& poly : polys)
                         poly.scale(scale);
             }
+#endif
         }
     }
-
+#endif
     return slices_by_region;
 }
 
@@ -674,7 +677,7 @@ void reGroupingLayerPolygons(std::vector<groupedVolumeSlices>& gvss, ExPolygons 
     }
 }
 
-/*
+
 std::string fix_slicing_errors(PrintObject* object, LayerPtrs &layers, const std::function<void()> &throw_if_canceled, int &firstLayerReplacedBy)
 {
     std::string error_msg;//BBS
@@ -796,7 +799,7 @@ std::string fix_slicing_errors(PrintObject* object, LayerPtrs &layers, const std
 
     return error_msg;
 }
-*/
+
 
 void groupingVolumesForBrim(PrintObject* object, LayerPtrs& layers, int firstLayerReplacedBy)
 {
@@ -819,6 +822,7 @@ void groupingVolumesForBrim(PrintObject* object, LayerPtrs& layers, int firstLay
 // Resulting expolygons of layer regions are marked as Internal.
 void PrintObject::slice()
 {
+    //DEFINE_PERFORMANCE_TEST("Slicing mesh 5%");
     if (! this->set_started(posSlice))
         return;
     //BBS: add flag to reload scene for shell rendering
@@ -850,22 +854,29 @@ void PrintObject::slice()
     m_print->throw_if_canceled();
     int firstLayerReplacedBy = 0;
     
-#if 0
+#if 1
     // Fix the model.
     //FIXME is this the right place to do? It is done repeateadly at the UI and now here at the backend.
     std::string warning = fix_slicing_errors(this, m_layers, [this](){ m_print->throw_if_canceled(); }, firstLayerReplacedBy);
     m_print->throw_if_canceled();
     //BBS: send warning message to slicing callback
-    if (!warning.empty()) {
-        BOOST_LOG_TRIVIAL(info) << warning;
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning, PrintStateBase::SlicingReplaceInitEmptyLayers);
-    }
+    //if (!warning.empty()) {
+    //    BOOST_LOG_TRIVIAL(info) << warning;
+    //    this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning, PrintStateBase::SlicingReplaceInitEmptyLayers);
+   // }
 #endif
 
     // Detect and process holes that should be converted to polyholes
     begin_debug_hole_to_polyhole(m_print, this);
     this->_transform_hole_to_polyholes();
     end_debug_hole_to_polyhole(m_print, this);
+
+#if AUTOMATION_TOOL
+    if (m_layers.size() == 0 && AutomationMgr::enabled()) {
+        AutomationMgr::outputLog("m_layers is empty", 1);
+        AutomationMgr::endFunction();
+    }
+#endif // AUTOMATION_TOOL
 
     // BBS: the actual first layer slices stored in layers are re-sorted by volume group and will be used to generate brim
     groupingVolumesForBrim(this, m_layers, firstLayerReplacedBy);

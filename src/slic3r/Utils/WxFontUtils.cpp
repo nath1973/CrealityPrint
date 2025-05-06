@@ -136,7 +136,8 @@ EmbossStyle WxFontUtils::create_emboss_style(const wxFont &font, const std::stri
     font_prop.size_in_mm = font.GetPointSize(); // *0.3528f;
 
     WxFontUtils::update_property(font_prop, font);
-    return { name_item, fontDesc, type, font_prop };
+
+    return {name_item, fontDesc, type, font_prop};
 }
 
 // NOT working on linux GTK2

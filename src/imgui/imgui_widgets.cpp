@@ -48,6 +48,7 @@ Index of this file:
 #include <stddef.h>     // intptr_t
 #else
 #include <stdint.h>     // intptr_t
+#include <string>
 #endif
 
 //-------------------------------------------------------------------------
@@ -2156,7 +2157,7 @@ bool ImGui::BeginCombo(const char* label, const char* preview_value, ImGuiComboF
     }
     return true;
 }
-bool ImGui::BBLBeginCombo(const char *label, const char *preview_value, ImGuiComboFlags flags)
+bool ImGui::BBLBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags, float contentWidth, float offset)
 {
     // Always consume the SetNextWindowSizeConstraint() call in our early return paths
     ImGuiContext &g = *GImGui;
@@ -2192,9 +2193,11 @@ bool ImGui::BBLBeginCombo(const char *label, const char *preview_value, ImGuiCom
     const ImGuiID popup_id = ImHashStr("##ComboPopup", 0, id);
     bool popup_open = IsPopupOpen(popup_id, ImGuiPopupFlags_None);
 
-    const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+    const ImU32 frame_col = GetColorU32(ImGuiCol_FrameBg);
     const float value_x2 = ImMax(frame_bb.Min.x, frame_bb.Max.x - arrow_size);
     RenderNavHighlight(frame_bb, id);
+
+
     if (!(flags & ImGuiComboFlags_NoArrowButton)) {
         ImU32 bg_col   = GetColorU32((popup_open || hovered) ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
         ImU32 text_col = GetColorU32(ImGuiCol_Text);
@@ -2202,15 +2205,18 @@ bool ImGui::BBLBeginCombo(const char *label, const char *preview_value, ImGuiCom
         if (value_x2 + arrow_size - style.FramePadding.x <= frame_bb.Max.x)
             BBLRenderArrow(window->DrawList, ImVec2(frame_bb.Min.x + style.FramePadding.y, frame_bb.Min.y + style.FramePadding.y), text_col, ImGuiDir_Down, 1.0f);
     }
+    ImVec2 max_rec = ImVec2(frame_bb.Max.x + offset, frame_bb.Max.y);
     if (!(flags & ImGuiComboFlags_NoPreview))
-        window->DrawList->AddRectFilled(ImVec2(frame_bb.Min.x + arrow_size, frame_bb.Min.y), frame_bb.Max, frame_col, style.FrameRounding,(flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
+        window->DrawList->AddRectFilled(ImVec2(frame_bb.Min.x, frame_bb.Min.y), max_rec, frame_col, style.FrameRounding,(flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll : ImDrawFlags_RoundCornersRight);
     RenderFrameBorder(frame_bb.Min, frame_bb.Max, style.FrameRounding);
     if (preview_value != NULL && !(flags & ImGuiComboFlags_NoPreview)) {
         ImVec2 preview_pos = ImVec2(frame_bb.Min.x + arrow_size, frame_bb.Min.y) + style.FramePadding;
         if (g.LogEnabled) LogSetNextTextDecoration("{", "}");
-        RenderTextClipped(preview_pos,frame_bb.Max, preview_value, NULL, NULL, ImVec2(0.0f, 0.0f));
+
+        RenderTextClipped(preview_pos, max_rec, preview_value, NULL, NULL, ImVec2(0.0f, .0f));
     }
-    if (label_size.x > 0) RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), label);
+    if (label_size.x > 0) 
+        RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), label);
 
     if ((pressed || g.NavActivateId == id) && !popup_open) {
         if (window->DC.NavLayerCurrent == 0) window->NavLastIds[0] = id;
@@ -2276,7 +2282,7 @@ void ImGui::EndCombo()
 }
 
 
-bool ImGui::CPBBLBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags) 
+bool ImGui::CPBBLBeginCombo(const char* label, const char* preview_value, ImGuiComboFlags flags, float contentWidth, float offset) 
 { 
     // Always consume the SetNextWindowSizeConstraint() call in our early return paths
     ImGuiContext& g                          = *GImGui;
@@ -2315,7 +2321,7 @@ bool ImGui::CPBBLBeginCombo(const char* label, const char* preview_value, ImGuiC
     const ImGuiID popup_id   = ImHashStr("##ComboPopup", 0, id);
     bool          popup_open = IsPopupOpen(popup_id, ImGuiPopupFlags_None);
 
-    const ImU32 frame_col = GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+    const ImU32 frame_col = GetColorU32(ImGuiCol_FrameBg);
     const float value_x2  = ImMax(frame_bb.Min.x, frame_bb.Max.x - arrow_size);
     RenderNavHighlight(frame_bb, id);
     if (!(flags & ImGuiComboFlags_NoArrowButton)) {
@@ -2327,8 +2333,9 @@ bool ImGui::CPBBLBeginCombo(const char* label, const char* preview_value, ImGuiC
             BBLRenderArrow(window->DrawList, ImVec2(frame_bb.Min.x + style.FramePadding.y, frame_bb.Min.y + style.FramePadding.y), text_col,
                            ImGuiDir_Down, 1.0f);
     }
+    ImVec2 max_rec = ImVec2(frame_bb.Max.x + offset, frame_bb.Max.y);
     if (!(flags & ImGuiComboFlags_NoPreview))
-        window->DrawList->AddRectFilled(ImVec2(frame_bb.Min.x + arrow_size, frame_bb.Min.y), frame_bb.Max, frame_col, style.FrameRounding,
+        window->DrawList->AddRectFilled(ImVec2(frame_bb.Min.x + arrow_size, frame_bb.Min.y), max_rec, frame_col, style.FrameRounding,
                                         (flags & ImGuiComboFlags_NoArrowButton) ? ImDrawFlags_RoundCornersAll :
                                                                                   ImDrawFlags_RoundCornersRight);
     RenderFrameBorder(frame_bb.Min, frame_bb.Max, style.FrameRounding);
@@ -2337,7 +2344,8 @@ bool ImGui::CPBBLBeginCombo(const char* label, const char* preview_value, ImGuiC
         if (g.LogEnabled)
             LogSetNextTextDecoration("{", "}");
         // RenderTextClipped(preview_pos, frame_bb.Max, preview_value, NULL, NULL, ImVec2(0.0f, 0.0f));
-        RenderTextClippedEx(window->DrawList, preview_pos, frame_bb.Max, preview_value, preview_value + strlen(preview_value), NULL);
+        RenderTextClippedEx(window->DrawList, preview_pos, max_rec, preview_value, preview_value + strlen(preview_value),
+                            NULL);
     }
     if (label_size.x > 0)
         RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), label);

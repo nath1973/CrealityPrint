@@ -31,7 +31,6 @@
 #include "libslic3r/FlushVolCalc.hpp"
 #include "GLToolbarCollapse.h"
 #include "GLToolbarProcess.h"
-#include "print_manage/DeviceDB.hpp"
 
 #define FILAMENT_SYSTEM_COLORS_NUM      16
 
@@ -114,8 +113,8 @@ wxDECLARE_EVENT(EVT_ADD_CUSTOM_FILAMENT, ColorEvent);
 wxDECLARE_EVENT(EVT_RE_SYNC_ALL, wxCommandEvent);
 wxDECLARE_EVENT(EVT_DEVICE_LIST_UPDATED, wxCommandEvent);
 wxDECLARE_EVENT(EVT_NOTIFY_PLATE_THUMBNAIL_UPDATE, wxCommandEvent);
-wxDECLARE_EVENT(EVT_CURRENT_DEVICE_CHANGED, Slic3r::GUI::DeviceDataEvent);
-wxDECLARE_EVENT(EVT_AUTO_SYNC_CURRENT_DEVICE_FILAMENT, Slic3r::GUI::DeviceDataEvent);
+wxDECLARE_EVENT(EVT_CURRENT_DEVICE_CHANGED, wxCommandEvent);
+wxDECLARE_EVENT(EVT_AUTO_SYNC_CURRENT_DEVICE_FILAMENT, wxCommandEvent);
 wxDECLARE_EVENT(EVT_ON_MAPPING_DEVICE_FILAMENT, wxCommandEvent);
 wxDECLARE_EVENT(EVT_ON_SHOW_BOX_COLOR_SELECTION, wxCommandEvent);
 
@@ -144,6 +143,7 @@ public:
     void update_presets(Slic3r::Preset::Type preset_type);
     //BBS
     void update_presets_from_to(Slic3r::Preset::Type preset_type, std::string from, std::string to);
+    void updateLastFilement(const std::vector<std::string>& presetName);
 
     void change_top_border_for_mode_sizer(bool increase_border);
     void msw_rescale();
@@ -206,8 +206,8 @@ public:
     Search::OptionsSearcher&        get_searcher();
     std::string&                    get_search_line();
     void on_re_sync_all_filaments(const std::string& selected_device_ip);
-    void on_current_device_changed(Slic3r::GUI::DeviceDataEvent& event);
-    void on_auto_sync_current_device_filament(Slic3r::GUI::DeviceDataEvent& event);
+    void on_current_device_changed(wxCommandEvent& event);
+    void on_auto_sync_current_device_filament(wxCommandEvent& event);
     void show_box_filament_content(bool bShow);
     void on_mapping_device_filament(wxCommandEvent& event);
     void on_show_box_color_selection(wxCommandEvent& event);
@@ -220,6 +220,39 @@ private:
     ComboBox* m_bed_type_list = nullptr;
     ScalableButton* connection_btn = nullptr;
     HoverBorderIcon* ams_btn = nullptr;
+};
+
+class GCodeLoadingGuard
+{
+private:
+    bool& m_flagRef;      // 引用 Plater 的标志位成员
+    bool  m_acquiredLock; // 标记是否成功获取了锁
+
+public:
+    // 构造函数：尝试获取锁
+    explicit GCodeLoadingGuard(bool& flag) : m_flagRef(flag), m_acquiredLock(false)
+    {
+        if (!m_flagRef) {          // 如果锁当前未被持有
+            m_flagRef      = true; // 获取锁
+            m_acquiredLock = true; // 标记已成功获取
+        }
+        // 如果锁已被持有，m_acquiredLock 保持 false
+    }
+
+    // 析构函数：如果构造时成功获取了锁，则释放锁
+    ~GCodeLoadingGuard()
+    {
+        if (m_acquiredLock) { // 只有成功获取了锁，才需要释放
+            m_flagRef = false;
+        }
+    }
+
+    // 提供一个方法来检查是否成功获取了锁
+    bool IsLockAcquired() const { return m_acquiredLock; }
+
+    // 禁止拷贝和赋值，Guard 对象不应该被复制
+    GCodeLoadingGuard(const GCodeLoadingGuard&)            = delete;
+    GCodeLoadingGuard& operator=(const GCodeLoadingGuard&) = delete;
 };
 
 class Plater: public wxPanel
@@ -268,7 +301,7 @@ public:
     // BBS: check snapshot
     bool up_to_date(bool saved, bool backup);
 
-    bool open_3mf_file(const fs::path &file_path);
+    bool open_3mf_file(const fs::path &file_path,bool isModelAndConfig = false);
     int  get_3mf_file_count(std::vector<fs::path> paths);
     void add_file();
     void add_model(bool imperial_units = false, std::string fname = "");
@@ -304,6 +337,7 @@ public:
     bool only_gcode_mode() { return m_only_gcode; }
     void set_only_gcode(bool only_gcode) { m_only_gcode = only_gcode; }
     std::vector<int> get_gcode_extruders_in_only_gcode_mode();
+    void check_sidebar_state_in_only_gcode_mode();
 
     //BBS: add only gcode mode
     bool using_exported_file() { return m_exported_file; }
@@ -331,6 +365,7 @@ public:
     bool load_files(const wxArrayString& filenames);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
+    const fs::path& get_last_loaded_3mf() const { return m_last_loaded_3mf; }
 
     void update(bool conside_update_flag = false, bool force_background_processing_update = false);
     //BBS
@@ -462,7 +497,7 @@ public:
     void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
-    void clear_before_change_mesh(int obj_idx);
+    void clear_before_change_mesh(int obj_idx,bool simplify=false);
     void changed_mesh(int obj_idx);
 
     void changed_object(ModelObject &object);
@@ -484,6 +519,8 @@ public:
     void open_platesettings_dialog(wxCommandEvent& evt);
     void on_change_color_mode(SimpleEvent& evt);
 	void eject_drive();
+
+    void check_object_need_repair(int obj_idx, const wxString& op_name = wxEmptyString);
 
     void take_snapshot(const std::string &snapshot_name);
     //void take_snapshot(const wxString &snapshot_name);
@@ -858,6 +895,9 @@ private:
     std::string m_preview_only_filename;
     int m_valid_plates_count { 0 };
 
+    bool m_isLoadingGCode{false};
+    fs::path m_last_loaded_3mf;
+    void     reset_last_loaded_3mf();
     void suppress_snapshots();
     void allow_snapshots();
     // BBS: single snapshot
@@ -875,6 +915,7 @@ private:
 
     friend class SuppressBackgroundProcessingUpdate;
     friend class PlaterDropTarget;
+    std::time_t m_startTime;
 };
 
 class SuppressBackgroundProcessingUpdate

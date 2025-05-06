@@ -25,6 +25,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Layer.hpp"
 #include "Widgets/ProgressDialog.hpp"
+#include "NotificationManager.hpp"
 
 #include <imgui/imgui_internal.h>
 
@@ -463,7 +464,17 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
     //BBS: GUI refactor: add canvas size from parameters
-    imgui.set_next_window_pos(0.5f * static_cast<float>(canvas_width), static_cast<float>(canvas_height), ImGuiCond_Always, 0.5f, 1.0f);
+
+    const float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+    float left_widgets_width = (90 + 300) * scale; // thumbs + gcode viewer
+    ImGuiWindow* win = ImGui::FindWindowByName("gcode_legend");
+    if (win) {
+        left_widgets_width = std::max(win->Pos.x + win->SizeFull.x, left_widgets_width);
+    }
+    const float right_widgets_width = (215 + 10) * scale; // slicer buttons
+    const float remaining_space     = canvas_width - left_widgets_width - right_widgets_width;
+       
+    imgui.set_next_window_pos(left_widgets_width + remaining_space / 2.0, static_cast<float>(canvas_height), ImGuiCond_Always, 0.5f, 1.0f);
     imgui.push_toolbar_style(m_scale);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0, 4.0 * m_scale));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0 * m_scale, 6.0 * m_scale));
@@ -486,7 +497,7 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
     std::string fanspeed = ImGui::ColorMarkerStart + _u8L("Fan: ") + ImGui::ColorMarkerEnd;
     std::string temperature = ImGui::ColorMarkerStart + _u8L("Temperature: ") + ImGui::ColorMarkerEnd;
     std::string acceleration = ImGui::ColorMarkerStart + _u8L("Acceleration") + ": " + ImGui::ColorMarkerEnd;
-    const float item_size = imgui.calc_text_size(std::string_view{"X: 000.000  "}).x;
+    const float item_size = imgui.calc_text_size(std::string_view{"X: 000.000000  "}).x;
     const float item_spacing = imgui.get_item_spacing().x;
     const float window_padding = ImGui::GetStyle().WindowPadding.x;
 
@@ -645,7 +656,7 @@ void GCodeViewer::GCodeWindow::reset()
     m_filename.shrink_to_fit();
 }
 
-void GCodeViewer::GCodeWindow::renderGcode(uint64_t curr_line_id, int canvas_width, int canvas_height)
+void GCodeViewer::GCodeWindow::renderGcode(uint64_t curr_line_id, int canvas_width, int canvas_height, bool isReduceHeight)
 {
     if (!wxGetApp().show_gcode_window() 
         || m_filename.empty() 
@@ -655,8 +666,22 @@ void GCodeViewer::GCodeWindow::renderGcode(uint64_t curr_line_id, int canvas_wid
 
     auto pos = ImGui::GetCursorPos();
     auto siz = ImGui::GetWindowSize();
+
+    float wnd_height ;
+    float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+    auto screenPoxY = ImGui::GetCursorScreenPos().y;
+    float canvas_h = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size().get_height();
+    if (isReduceHeight)
+    {
+        wnd_height = canvas_h - screenPoxY - GCODE_REDUCE_HEIGHT*scale;
+    }
+    else
+    {
+        wnd_height = canvas_h - screenPoxY;
+    }
+
     const float zoom = 0.8f;
-    float wnd_height = siz.y - pos.y;
+    //float wnd_height = siz.y - pos.y;
     const float text_height = ImGui::CalcTextSize("0").y* zoom;
     const ImGuiStyle& style = ImGui::GetStyle();
     uint64_t lines_count = static_cast<uint64_t>((wnd_height - 2.0f * style.WindowPadding.y + style.ItemSpacing.y) / (text_height + style.ItemSpacing.y));
@@ -1052,6 +1077,8 @@ std::vector<int> GCodeViewer::get_plater_extruder()
 void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& print, const BuildVolume& build_volume,
                 const std::vector<BoundingBoxf3>& exclude_bounding_box, ConfigOptionMode mode, bool only_gcode)
 {
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start";
+
     // avoid processing if called with the same gcode_result
     if (m_last_result_id == gcode_result.id) {
         //BBS: add logs
@@ -1164,8 +1191,11 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     bool only_gcode_3mf = false;
     PartPlate* current_plate = wxGetApp().plater()->get_partplate_list().get_curr_plate();
     bool current_has_print_instances = current_plate->has_printable_instances();
-    if (current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances)
+    if (current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances) {
         only_gcode_3mf = true;
+        wxGetApp().plater()->set_only_gcode(true);
+        wxGetApp().plater()->check_sidebar_state_in_only_gcode_mode();
+    }
     m_layers_slider->set_menu_enable(!(only_gcode || only_gcode_3mf));
     m_layers_slider->set_as_dirty();
     m_moves_slider->set_as_dirty();
@@ -1178,6 +1208,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     gcode_result.unlock();
     //BBS: add logs
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": finished, m_buffers size %1%!")%m_buffers.size();
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " error";
 }
 
 void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
@@ -2097,6 +2128,8 @@ void GCodeViewer::export_toolpaths_to_obj(const char* filename) const
 
 void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const BuildVolume& build_volume, const std::vector<BoundingBoxf3>& exclude_bounding_box)
 {
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start memory info " << log_memory_info();
+
     // max index buffer size, in bytes
     static const size_t IBUFFER_THRESHOLD_BYTES = 64 * 1024 * 1024;
 
@@ -2424,7 +2457,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     m_extruders_count = gcode_result.extruders_count;
 
     unsigned int progress_count = 0;
-    static const unsigned int progress_threshold = 1000;
+    unsigned int progress_threshold = m_moves_count/100;
     //BBS: add only gcode mode
     ProgressDialog *          progress_dialog    = m_only_gcode_in_preview ?
         new ProgressDialog(_L("Loading G-codes"), "...",
@@ -2432,6 +2465,18 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
     wxBusyCursor busy;
 
+    PartPlateList& partplate_list = wxGetApp().plater()->get_partplate_list();
+    PartPlate* current_plate = partplate_list.get_curr_plate();
+
+    m_contained_in_bed = (current_plate->get_slice_result()->toolpath_outside == false);
+    m_paths_bounding_box = current_plate->get_gcode_path_bounding_box();
+
+    // set approximate max bounding box (take in account also the tool marker)
+    m_max_bounding_box = m_paths_bounding_box;
+    m_max_bounding_box.merge(m_paths_bounding_box.max + marker.get_bounding_box().size().z() * Vec3d::UnitZ());
+
+    // move the path bounding box calculation to partplate after slicing process complete
+    /*
     //BBS: use convex_hull for toolpath outside check
     Points pts;
 
@@ -2504,6 +2549,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         }
         (const_cast<GCodeProcessorResult&>(gcode_result)).toolpath_outside = !m_contained_in_bed;
     }
+    */
 
     m_sequential_view.gcode_ids.clear();
     for (size_t i = 0; i < gcode_result.moves.size(); ++i) {
@@ -2523,6 +2569,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     size_t seams_count = 0;
     std::vector<size_t> biased_seams_ids;
 
+     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " load indices start";
     // toolpaths data -> extract vertices from result
     for (size_t i = 0; i < m_moves_count; ++i) {
         const GCodeProcessorResult::MoveVertex& curr = gcode_result.moves[i];
@@ -2561,14 +2608,82 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         }*/
 
         // ensure there is at least one vertex buffer
-        if (v_multibuffer.empty())
-            v_multibuffer.push_back(VertexBuffer());
+        if (v_multibuffer.empty()) {
+            BOOST_LOG_TRIVIAL(warning) << "v_multibuffer.empty(),  v_multibuffer.push_back(VertexBuffer())";
+            v_multibuffer.push_back(VertexBuffer());        
+        }
+
 
         // if adding the vertices for the current segment exceeds the threshold size of the current vertex buffer
         // add another vertex buffer
         // BBS: get the point number and then judge whether the remaining buffer is enough
         size_t points_num = curr.is_arc_move_with_interpolation_points() ? curr.interpolation_points.size() + 1 : 1;
         size_t vertices_size_to_add = (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::BatchedModel) ? t_buffer.model.data.vertices_size_bytes() : points_num * t_buffer.max_vertices_per_segment_size_bytes();
+        if (v_multibuffer.empty()) { // <--- 只在这里添加日志逻辑
+            // --- 检测到致命错误：即将访问空 vector 的 back() ---
+            std::ostringstream error_msg;
+            // 获取尽可能多的相关上下文信息
+            const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1]; // 确保 i > 0
+            error_msg << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+                      << __FUNCTION__ << ": IMMINENT CRASH DETECTED!"<< ")\n"
+                      << "Reason: v_multibuffer is unexpectedly EMPTY right before accessing back().size()!\n"
+                      << "This contradicts earlier logic that should ensure it's not empty.\n"
+                      << "Suspect memory corruption or subtle logic/optimization error.\n"
+                      << "Allowing crash to proceed for reporting purposes after logging.\n"
+                      << "---------------- Context Information -----------------\n"
+                      << "Loop Index (i): " << i
+                      << "\n"
+                      // << "Move ID (move_id): " << move_id << "\n" // 如果 move_id 在此作用域可用
+                      << "Buffer ID (id): " << (int) id << "\n"
+                      << "Overall State: vertices.size()=" << vertices.size() << ", m_buffers.size()=" << m_buffers.size()
+                      << "\n"
+                      // << "Target TBuffer Info: render_primitive_type=" << static_cast<int>(t_buffer.render_primitive_type) << "\n" //
+                      // 如果 t_buffer 可用
+                      // << "Calculated vertices_size_to_add: " << vertices_size_to_add << "\n" // 如果 vertices_size_to_add 可用
+                      << "--- Current Move (curr) ---\n"
+                      << "  Type: " << static_cast<int>(curr.type) << " (" << buffer_id(curr.type) << ")\n"
+                      << "  Position: (" << curr.position.x() << ", " << curr.position.y() << ", " << curr.position.z() << ")\n"
+                      << "  Extruder ID: " << curr.extruder_id << ", G-code Line ID: " << curr.gcode_id << "\n"
+                      << "--- Previous Move (prev) ---\n"
+                      << "  Type: " << static_cast<int>(prev.type) << " (" << buffer_id(prev.type) << ")\n"
+                      << "  Position: (" << prev.position.x() << ", " << prev.position.y() << ", " << prev.position.z() << ")\n"
+                      << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+
+            // 1. 使用日志库记录错误 (FATAL 级别)
+            BOOST_LOG_TRIVIAL(error) << error_msg.str();
+
+            // 2. 强制刷新日志库缓冲区 (关键步骤)
+            BOOST_LOG_TRIVIAL(warning) << "Attempting to flush logs before expected crash...";
+            try {
+                boost::log::core::get()->flush();
+                BOOST_LOG_TRIVIAL(warning) << "Log flush initiated successfully.";
+            } catch (const std::exception& e) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Error: " << e.what();
+            } catch (...) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Unknown exception.";
+            }
+
+            // 3. 短暂延迟，给日志写入留出时间 (不阻塞后台日志线程)
+            const int delay_ms = 1000;
+            BOOST_LOG_TRIVIAL(info) << "Introducing " << delay_ms << "ms delay to aid log writing...";
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            BOOST_LOG_TRIVIAL(info) << "Delay finished. Proceeding to expected crash point...";
+           
+            BOOST_LOG_TRIVIAL(warning) << "Attempting to flush logs before expected crash...";
+            try {
+                boost::log::core::get()->flush();
+                BOOST_LOG_TRIVIAL(warning) << "Log flush initiated successfully.";
+            } catch (const std::exception& e) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Error: " << e.what();
+            } catch (...) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Unknown exception.";
+            }
+
+            // 4. 不做任何阻止，让代码自然执行到下一行导致崩溃
+            BOOST_LOG_TRIVIAL(error) << ">>> Now executing the line expected to crash <<<";
+
+        }   
+        
         if (v_multibuffer.back().size() * sizeof(float) > t_buffer.vertices.max_size_bytes() - vertices_size_to_add) {
             v_multibuffer.push_back(VertexBuffer());
             if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::Triangle) {
@@ -2611,6 +2726,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
                 options_zs.emplace_back(curr.position[2]);
         }
     }
+
+
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " load indices end";
 
     /*for (size_t b = 0; b < vertices.size(); ++b) {
         MultiVertexBuffer& v_multibuffer = vertices[b];
@@ -2852,6 +2970,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     }
 
     // send vertices data to gpu, where needed
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " send vertices data to gpu, where needed start";
+
     for (size_t i = 0; i < m_buffers.size(); ++i) {
         TBuffer& t_buffer = m_buffers[i];
         if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
@@ -2895,6 +3015,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
             }
         }
     }
+
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " send vertices data to gpu, where needed end";
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto smooth_vertices_time = std::chrono::high_resolution_clock::now();
@@ -3198,6 +3320,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
     if (progress_dialog != nullptr)
         progress_dialog->Destroy();
+
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end memory info " << log_memory_info();
 }
 
 void GCodeViewer::load_shells(const Print& print, bool initialized, bool force_previewing)
@@ -4154,7 +4278,7 @@ void GCodeViewer::render_shells(int canvas_width, int canvas_height)
     if ((!m_shells.previewing && !m_shells.visible) || m_shells.volumes.empty())
         return;
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_preview");
     if (shader == nullptr)
         return;
 
@@ -4162,7 +4286,16 @@ void GCodeViewer::render_shells(int canvas_width, int canvas_height)
 
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
-    const Camera& camera = wxGetApp().plater()->get_camera();
+    Plater* plater = wxGetApp().plater();
+    const Camera& camera = plater->get_camera();
+    Model& model = plater->model();
+    const CustomGCode::Info& info = model.plates_custom_gcodes[model.curr_plate_index];
+    const Slic3r::DynamicPrintConfig* config = &wxGetApp().preset_bundle->project_config;
+    if (config->has("filament_colour")) 
+    {
+        std::vector<std::string> filament_colors = (config->option<ConfigOptionStrings>("filament_colour"))->values;
+        GLVolumeCollection::apply_custom_gcode(shader, info, filament_colors);
+    }
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, false, camera.get_view_matrix(), camera.get_projection_matrix());
     shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
@@ -4192,7 +4325,7 @@ void GCodeViewer::render_all_plates_stats(const std::vector<const GCodeProcessor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(340.f * m_scale * imgui.scaled(1.0f / 15.0f), 0));
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), 0, ImVec2(0.5f, 0.5f));
-    ImGui::Begin(_L("Statistics of All Plates").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin(_u8L("Statistics of All Plates").c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
     std::vector<float> filament_diameters = gcode_result_list.front()->filament_diameters;
@@ -4536,7 +4669,7 @@ public:
              koef = imperial_units ? GizmoObjectManipulation::in_to_mm : 1000.0;
     }
 
-    DispConfig::WindowConfig prepare(bool fold) {
+    DispConfig::WindowConfig prepare(bool fold, float contentWidth) {
         std::string btn_name = fold ? ">>" : "<<";
         auto btnsz = ImGui::CalcTextSize(">>");
         auto wsz = config.getWindowSize(DispConfig::e_wt_gcode, wxGetApp().plater()->get_current_canvas3D()->get_scale());
@@ -4552,7 +4685,16 @@ public:
         ImVec2 bias = ImVec2(pos.x, pos.y + size.y + 8);
 
         ImGui::SetNextWindowPos(bias, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(wsz);
+
+        if (fold || contentWidth < (wsz.x - 2 * window_padding))
+        {
+            ImGui::SetNextWindowSize(wsz);
+        }
+        else
+        {
+            float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+            ImGui::SetNextWindowSize(ImVec2(400 * scale, -1));
+        }
 
         DispConfig::WindowConfig wcfg;
         wcfg.padding = { window_padding,window_padding };
@@ -4701,14 +4843,14 @@ public:
         cfg.boldScale = 1.2;
         cfg.size      = {100 * view_scale, 30 * view_scale};
         ImGui::Dummy(ImVec2(0, 5));
-        if (config.normalButton(_L("Color Show"), cfg, showcolor ? 2 : 0))
+        if (config.normalButton(_u8L("Color Show"), cfg, showcolor ? 2 : 0))
             showcolor = true;
         ImGui::SameLine();
-        if (config.normalButton(_L("G-code"), cfg, showcolor ? 0 : 2))
+        if (config.normalButton(_u8L("G-code"), cfg, showcolor ? 0 : 2))
             showcolor = false;
     }
 
-    void showColorHeader( GCodeViewer::EViewType m_view_type) {
+    void showColorHeader( GCodeViewer::EViewType m_view_type,float& contentWidth) {
         initColorData();
         ImGui::Dummy({ window_padding, window_padding });
         ImGui::SameLine();
@@ -4806,7 +4948,8 @@ public:
 
             std::vector<std::pair<std::string, std::vector<::string>>> title_columns;
             if (displayed_columns & ColumnData::Model) {
-                title_columns.push_back({ _u8L("Filament"), {""} });
+                //title_columns.push_back({ _u8L("Filament"), {""} });
+                title_columns.push_back({ _u8L("Filament"), total_filaments });
                 title_columns.push_back({ _u8L("Model"), total_filaments });
             }
             if (displayed_columns & ColumnData::Support) {
@@ -4821,6 +4964,10 @@ public:
             if ((displayed_columns & ~ColumnData::Model) > 0) {
                 title_columns.push_back({ _u8L("Total"), total_filaments });
             }
+
+            //checkbox 占位
+            title_columns.push_back({ _u8L(""), total_filaments });
+
             auto offsets_ = calculate_offsets(title_columns, icon_size);
             std::vector<std::pair<std::string, float>> title_offsets;
             for (int i = 0; i < offsets_.size(); i++) {
@@ -4828,6 +4975,8 @@ public:
                 color_print_offsets[title_columns[i].first] = offsets_[i];
             }
             append_headers(title_offsets);
+
+            contentWidth = offsets_.empty() ? 0.0f : offsets_.back();
 
             break;
         }
@@ -4842,8 +4991,8 @@ public:
 
         switch (m_view_type)
         {
-        case Slic3r::GUI::GCodeViewer::EViewType::FeatureType: {
-            
+        case Slic3r::GUI::GCodeViewer::EViewType::FeatureType: 
+        {
             for (size_t i = 0; i < m_roles.size(); ++i) {
                 ExtrusionRole role = m_roles[i];
                 if (role >= erCount)
@@ -5104,7 +5253,8 @@ private:
     std::vector<float> calculate_offsets(const std::vector<std::pair<std::string, std::vector<::string>>>& title_columns, float extra_size = 0.0f) {
         const ImGuiStyle& style = ImGui::GetStyle();
         std::vector<float> offsets;
-        offsets.push_back(max_width(title_columns[0].second, title_columns[0].first, extra_size) + 3.0f * style.ItemSpacing.x);
+        //offsets.push_back(max_width(title_columns[0].second, title_columns[0].first, extra_size) + 3.0f * style.ItemSpacing.x);
+        offsets.push_back(max_width(title_columns[0].second, title_columns[0].first, extra_size) + style.ItemSpacing.x + icon_size);
         for (size_t i = 1; i < title_columns.size() - 1; i++)
             offsets.push_back(offsets.back() + max_width(title_columns[i].second, title_columns[i].first) + style.ItemSpacing.x);
         if (title_columns.back().first == _u8L("Percent")) {
@@ -5303,7 +5453,7 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
             ,m_print_statistics,m_extruder_ids
             ,m_filament_diameters,m_filament_densities);
 
-        auto wcfg = helper.prepare(m_fold);
+        auto wcfg = helper.prepare(m_fold,m_contentWidth);
         //wcfg.bgalpha = 5/100.f;
         DispConfig().processWindows("gcode_legend", [&]() {
             bool old = m_fold;
@@ -5313,6 +5463,19 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
             }
             if (m_fold)
                 return;
+
+            bool isReduceHeight = false;
+            auto* notificationManager = wxGetApp().plater()->get_notification_manager();
+            if (notificationManager)
+            {
+                size_t notificationNum = notificationManager->get_warning_and_error_notification_count();
+                if (notificationNum > 0)
+                {
+                    isReduceHeight = true;
+                }
+            }
+
+
             helper.showOption(m_showMark, m_showBed, m_showColor);
             if (m_showColor) {
                 ImGui::Dummy(ImVec2(0, 5));
@@ -5326,7 +5489,8 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                 }
 
-                helper.showColorHeader(m_view_type);
+                m_contentWidth = -1.0f;
+                helper.showColorHeader(m_view_type,m_contentWidth);
                 if (m_user_mode != wxGetApp().get_mode()) {
                     update_by_mode(wxGetApp().get_mode());
                     m_user_mode = wxGetApp().get_mode();
@@ -5345,9 +5509,13 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
                 float pos_y    = ImGui::GetCursorScreenPos().y;
                 float canvas_h = wxGetApp().plater()->get_current_canvas3D()->get_canvas_size().get_height();
 
-                const bool child_is_visible = ImGui::BeginChild(child_id, ImVec2(-1.0f, canvas_h - pos_y - 20.0f),
-                                                                false, child_flags);
-            
+
+                float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
+                float reduceHeight = isReduceHeight ? GCODE_REDUCE_HEIGHT*scale : 20.0f;
+
+                const bool child_is_visible = ImGui::BeginChild(child_id, ImVec2(-1.0f, canvas_h - pos_y - reduceHeight),
+                    false, child_flags);
+
                 helper.showColorTable(m_view_type, m_custom_gcode_per_print_z, m_tools
                     , [this]() {
                         refresh_render_paths(false, false);
@@ -5368,7 +5536,7 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
             else if (!m_no_render_path)
             {
                 auto line = m_sequential_view.gcode_ids[m_sequential_view.current.last];
-                gcode_window.renderGcode(line, canvas_width, canvas_height);
+                gcode_window.renderGcode(line, canvas_width, canvas_height,isReduceHeight);
             }
             }, wcfg);
 
@@ -5488,7 +5656,7 @@ void GCodeViewer::render_statistics()
 
 void GCodeViewer::log_memory_used(const std::string& label, int64_t additional) const
 {
-    if (Slic3r::get_logging_level() >= 5) {
+    if (Slic3r::get_logging_level() >= 0) {
         int64_t paths_size = 0;
         int64_t render_paths_size = 0;
         for (const TBuffer& buffer : m_buffers) {
@@ -5501,7 +5669,8 @@ void GCodeViewer::log_memory_used(const std::string& label, int64_t additional) 
         }
         int64_t layers_size = SLIC3R_STDVEC_MEMSIZE(m_layers.get_zs(), double);
         layers_size += SLIC3R_STDVEC_MEMSIZE(m_layers.get_endpoints(), Layers::Endpoints);
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format("paths_size %1%, render_paths_size %2%,layers_size %3%, additional %4%\n")
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " " << label << " "
+                                 << boost::format("paths_size %1%, render_paths_size %2%,layers_size %3%, additional %4%\n")
             %paths_size %render_paths_size %layers_size %additional;
         BOOST_LOG_TRIVIAL(trace) << label
             << "(" << format_memsize_MB(additional + paths_size + render_paths_size + layers_size) << ");"

@@ -336,7 +336,7 @@ int DownPluginFrame::ShowPluginStatus(int status, int percent, bool &cancel)
     m_Res["sequence_id"] = "10001";
     m_Res["data"]    = m_Data;
 
-    wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
+    wxString strJS = wxString::Format("handleStudioCmd(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
 
     wxGetApp().CallAfter([this, strJS] { RunScript(strJS); });
 

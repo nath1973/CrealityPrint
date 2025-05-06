@@ -18,6 +18,7 @@
 #include <vector>
 #include <deque>
 #include <unordered_set>
+#include <unordered_map>
 
 namespace Slic3r {
 namespace GUI {
@@ -177,6 +178,7 @@ public:
         SeriousWarningNotificationLevel,
 		// Error, no fade-out. Top most position.
 		ErrorNotificationLevel,
+        NormalNotificationLevel,
 	};
 
 	NotificationManager(wxEvtHandler* evt_handler);
@@ -206,10 +208,13 @@ public:
 	void upload_job_notification_show_error(int id, const std::string& filename, const std::string& host);
     void push_slicing_serious_warning_notification(const std::string &text, std::vector<ModelObject const *> objs);
     void close_slicing_serious_warning_notification(const std::string &text);
+    // update params tip
+    void push_update_params_tip(const std::string& tipInfo);
+    void close_update_params_tip(const std::string& tipInfo);
 	// Creates Slicing Error notification with a custom text and no fade out.
     void push_slicing_error_notification(const std::string &text, std::vector<ModelObject const *> objs);
 	// Creates Slicing Warning notification with a custom text and no fade out.
-    void push_slicing_warning_notification(const std::string &text, bool gray, ModelObject const *obj, ObjectID oid, int warning_step, int warning_msg_id, NotificationLevel level = NotificationLevel::WarningNotificationLevel);
+    void push_slicing_warning_notification(const std::string &text, bool gray, ModelObject const *obj, ObjectID oid, int warning_step, int warning_msg_id, int current_plate_index, NotificationLevel level = NotificationLevel::WarningNotificationLevel);
 	// marks slicing errors as gray
 	void set_all_slicing_errors_gray(bool g);
 	// marks slicing warings as gray
@@ -302,6 +307,7 @@ public:
 	// returns number of all notifications shown
 	size_t get_notification_count() const;
 
+    size_t get_warning_and_error_notification_count() const;
 
 	//BBS Notice
 
@@ -556,6 +562,13 @@ private:
 	};
 
 
+	class ObjectInfoNotification : public PopNotification
+	{
+    public:
+        ObjectInfoNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler)
+            : PopNotification(n, id_provider, evt_handler){};
+        virtual void render(GLCanvas3D& canvas, float& initial_y, bool move_from_overlay, float overlay_width) override;
+	};
 
 	class ObjectIDNotification : public PopNotification
 	{
@@ -943,8 +956,17 @@ private:
 			//{NotificationType::DeviceEjected, NotificationLevel::RegularNotificationLevel, 10,  _u8L("Removable device has been safely ejected")} // if we want changeble text (like here name of device), we need to do it as CustomNotification
 	};
 public:
+	void check_plate_critical_slicing_notification(int plate_index);
+	void close_plate_critical_slicing_notification(int plate_index, bool clear = false);
+	void clear_all_plate_critical_slicing_notification();
     void set_scale(float scale = 1.0);
 	float m_scale = 1.0f;
+
+private:
+	std::unordered_map<int, std::unique_ptr< NotificationManager::ObjectIDNotification > > m_plate_critical_slicing_notifications;
+
+	void push_critical_slicing_notification_data(const NotificationData& notification_data, const ObjectID& obj_id, int warning_step, int plate_index);
+
 };
 
 }//namespace GUI

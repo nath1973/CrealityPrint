@@ -439,7 +439,7 @@ public:
     std::vector<Polygons>       slice_support_enforcers() const { return this->slice_support_volumes(ModelVolumeType::SUPPORT_ENFORCER); }
 
     // Helpers to project custom facets on slices
-    void project_and_append_custom_facets(bool seam, EnforcerBlockerType type, std::vector<Polygons>& expolys) const;
+    void project_and_append_custom_facets(bool seam, EnforcerBlockerType type, std::vector<Polygons>& expolys, std::vector<std::pair<Vec3f,Vec3f>>* vertical_points=nullptr) const;
 
     //BBS
     BoundingBox get_first_layer_bbox(float& area, float& layer_height, std::string& name);
@@ -456,6 +456,7 @@ public:
 
     // BBS: returns 1-based indices of extruders used to print the first layer wall of objects
     std::vector<int>            object_first_layer_wall_extruders;
+    bool             has_variable_layer_heights = false;
 
     // SoftFever
     size_t get_id() const { return m_id; }
@@ -846,6 +847,9 @@ public:
     ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
 
     void                process(long long *time_cost_with_cache = nullptr, bool use_cache = false) override;
+
+    bool PreSliceForDetermineSupport(long long* time_cost_with_cache, bool use_cache);
+
     // Exports G-code into a file name based on the path_template, returns the file path of the generated G-code file.
     // If preview_data is not null, the preview_data is filled in for the G-code visualization (not used by the command line Slic3r).
     std::string         export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);
@@ -874,9 +878,11 @@ public:
     Flow                brim_flow() const;
     Flow                skirt_flow() const;
 
+    std::vector<unsigned int> object_used_extruders() const;
     std::vector<unsigned int> object_extruders() const;
     std::vector<unsigned int> support_material_extruders() const;
     std::vector<unsigned int> extruders(bool conside_custom_gcode = false) const;
+    std::vector<unsigned int> multi_filament_check_extruders() const;
     double              max_allowed_layer_height() const;
     bool                has_support_material() const;
     // Make sure the background processing has no access to this model_object during this call!
@@ -994,6 +1000,10 @@ public:
      Vec3d shrinkage_compensation() const;
 
     std::tuple<float, float> object_skirt_offset(double margin_height = 0) const;
+
+    bool has_critical_warning_status() const { 
+        return has_critical_warnings();
+    }
 
 protected:
     // Invalidates the step, and its depending steps in Print.

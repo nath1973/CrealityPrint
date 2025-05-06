@@ -34,6 +34,7 @@ namespace Slic3r {
 static std::vector<std::string> s_project_options {
     "flush_volumes_vector",
     "flush_volumes_matrix",
+    "flush_volumes_changed",
     // BBS
     "filament_colour",
     "wipe_tower_x",
@@ -256,6 +257,7 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     } else {
         load_user_presets(dir_user_presets, substitution_rule);
     }
+    this->load_user_printer_state(config);
 
     this->update_multi_material_filament_presets();
     this->update_compatible(PresetSelectCompatibleType::Never);
@@ -330,7 +332,7 @@ Semver PresetBundle::get_vendor_profile_version(std::string vendor_name)
 
 VendorType PresetBundle::get_current_vendor_type()
 {
-    auto        t      = VendorType::Unknown;
+    auto        t      = VendorType::VendorType_Unknown;
     auto        config = &printers.get_edited_preset().config;
     std::string vendor_name;
     for (auto vendor_profile : vendors) {
@@ -593,7 +595,7 @@ std::string PresetBundle::get_hotend_model_for_printer_model(std::string model_n
     return out;
 }
 
-PresetsConfigSubstitutions PresetBundle::load_user_presets(std::string user, ForwardCompatibilitySubstitutionRule substitution_rule)
+PresetsConfigSubstitutions PresetBundle::load_user_presets(std::string user, ForwardCompatibilitySubstitutionRule substitution_rule,bool userConfigPreset/* = false*/)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << __LINE__ << " entry and user is: " << user;
     PresetsConfigSubstitutions substitutions;
@@ -612,6 +614,8 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(std::string user, For
         std::string print_selected_preset_name = prints.get_selected_preset().name;
         if (!m_curProcessPresetName.empty() && print_selected_preset_name == "Default Setting") {
             print_selected_preset_name = m_curProcessPresetName;
+        } else if (userConfigPreset && !m_curProcessPresetName.empty()) {
+            print_selected_preset_name = m_curProcessPresetName;
         }
         this->prints.load_presets(dir_user_presets, PRESET_PRINT_NAME, substitutions, substitution_rule);
         prints.select_preset_by_name(print_selected_preset_name, false);
@@ -622,6 +626,8 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(std::string user, For
         std::string filament_selected_preset_name = filaments.get_selected_preset().name;
         if (!m_curFilamentPresetName.empty() && filament_selected_preset_name == "Default Filament") {
             filament_selected_preset_name = m_curFilamentPresetName;
+        } else if (userConfigPreset && !m_curFilamentPresetName.empty()) {
+            filament_selected_preset_name = m_curFilamentPresetName;
         }
         this->filaments.load_presets(dir_user_presets, PRESET_FILAMENT_NAME, substitutions, substitution_rule);
         filaments.select_preset_by_name(filament_selected_preset_name, false);
@@ -631,6 +637,8 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(std::string user, For
     try {
         std::string printer_selected_preset_name = printers.get_selected_preset().name;
         if (!m_curPrinterPresetName.empty() && printer_selected_preset_name == "Default Printer") {
+            printer_selected_preset_name = m_curPrinterPresetName;
+        } else if (userConfigPreset && !m_curPrinterPresetName.empty()) {
             printer_selected_preset_name = m_curPrinterPresetName;
         }
         this->printers.load_presets(dir_user_presets, PRESET_PRINTER_NAME, substitutions, substitution_rule);
@@ -857,6 +865,10 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Preset already present, not loading: " << name;
             return false;
         }
+        if (overwrite == -1) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cancel load, not loading: " << name;
+            return false;
+        }
         /*
         if (bHasFoundPreset && overwrite == 4) {
             std::string new_name;
@@ -897,12 +909,12 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             new_config = inherit_preset->config;
         } else {
             // We support custom root preset now
-            auto inherits_config2 = dynamic_cast<ConfigOptionString *>(inherits_config);
+            /* auto inherits_config2 = dynamic_cast<ConfigOptionString*>(inherits_config);
             if (inherits_config2 && !inherits_config2->value.empty()) {
                 // we should skip this preset here
                 BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format(", can not find inherit preset for user preset %1%, just skip") % name;
                 return false;
-            }
+            }*/
             // Find a default preset for the config. The PrintPresetCollection provides different default preset based on the "printer_technology" field.
             const Preset &default_preset = collection->default_preset_for(config);
             new_config                   = default_preset.config;
@@ -923,7 +935,19 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             }
         }
 
-        Preset &preset     = collection->load_preset(collection->path_from_name(name, inherit_preset == nullptr), name, std::move(new_config), false);
+        bool detach = false;
+        if (inherit_preset == nullptr) {
+            if (config.has(BBL_JSON_KEY_INHERITS)) {
+                const ConfigOption* opt = config.option(BBL_JSON_KEY_INHERITS);
+                if (opt != nullptr) {
+                    std::string value = opt->serialize();
+                    if (value.empty())
+                        detach = true;
+                }
+            }
+        }
+
+        Preset &preset     = collection->load_preset(collection->path_from_name(name, detach), name, std::move(new_config), false);
         if (key_values.find(BBL_JSON_KEY_FILAMENT_ID) != key_values.end())
             preset.filament_id = key_values[BBL_JSON_KEY_FILAMENT_ID];
         preset.is_external = true;
@@ -1022,15 +1046,23 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
 
     std::list<STOverrideConfirmFile*> lstOverrideConfirmFile;
     for (auto& file : files) {
+        for (auto item : lstOverrideConfirmFile) {
+            delete item;
+        }
+        lstOverrideConfirmFile.clear();
+
         STOverrideConfirmFile* pSTOverrideConfirmFile = new STOverrideConfirmFile;
         lstOverrideConfirmFile.push_back(pSTOverrideConfirmFile);
         boost::filesystem::path path     = boost::filesystem::path(file);
         pSTOverrideConfirmFile->fileName = path.filename().string();
         if (Slic3r::is_json_file(file)) {
             STGetJsonFileInfo stJsonFileInfo;
-            bool              b = getJsonFileInfo(file, stJsonFileInfo);
-            if (!b)
-                return substitutions;
+            int              n = getJsonFileInfo(file, stJsonFileInfo);
+            if (n < 0) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " getJsonFileInfo failed.ret=" << n;
+                continue;
+                //return substitutions;
+            }
             if (stJsonFileInfo.type == 1) {
                 pSTOverrideConfirmFile->lstPrinterPreset.push_back(stJsonFileInfo.name);
             } else if (stJsonFileInfo.type == 2) {
@@ -1038,7 +1070,9 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
             } else if (stJsonFileInfo.type == 3) {
                 pSTOverrideConfirmFile->lstProcessPreset.push_back(stJsonFileInfo.name);
             } else {
-                return substitutions;
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " getJsonFileInfo failed.type=" << stJsonFileInfo.type;
+                continue;
+                //return substitutions;
             }
             import_json_presets(substitutions, file, [&](std::string const& name) { 
                 return override_confirm(lstOverrideConfirmFile);
@@ -1124,9 +1158,13 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
                             STGetJsonFileInfo stJsonFileInfo;
                             int nRet = getJsonFileInfo(target_file_path, stJsonFileInfo);
                             if (nRet == -2) {
+                                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to getJsonFileInfo ret=" << nRet << ",file=" << target_file_path;
                                 continue;
-                            } else if (nRet != 0 && nRet != 1)
-                                return substitutions;
+                            } else if (nRet != 0 && nRet != 1) {
+                                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to getJsonFileInfo ret=" << nRet << ",file=" << target_file_path;
+                                continue;
+                            }
+                                //return substitutions;
                             if (stJsonFileInfo.hasSamePreset) {
                                 hasSamePreset = true;
                                 if (stJsonFileInfo.type == 1) {
@@ -1136,7 +1174,9 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
                                 } else if (stJsonFileInfo.type == 3) {
                                     pSTOverrideConfirmFile->lstProcessPreset.push_back(stJsonFileInfo.name);
                                 } else {
-                                    return substitutions;
+                                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to getJsonFileInfo ret=" << nRet << ",type=" << stJsonFileInfo.type <<",file=" << target_file_path;
+                                    continue;
+                                    //return substitutions;
                                 }
                             }
                         }
@@ -1146,6 +1186,10 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
 
                 if (hasSamePreset) {
                     override = override_confirm(lstOverrideConfirmFile);
+                    if (override == -1) {
+                        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cancel load, not loading: " << file;
+                        continue;
+                    }
                 }
             }
 
@@ -1163,8 +1207,9 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
             FILE* zipFile = boost::nowide::fopen(file.c_str(), "rb");
             status        = mz_zip_reader_init_cfile(&zip_archive, zipFile, 0, MZ_ZIP_FLAG_CASE_SENSITIVE | MZ_ZIP_FLAG_IGNORE_PATH);
             if (MZ_FALSE == status) {
-                BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Failed to initialize reader ZIP archive";
-                return substitutions;
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to initialize reader ZIP archive,file=" << file;
+                continue;
+                //return substitutions;
             } else {
                 BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Success to initialize reader ZIP archive";
             }
@@ -1618,7 +1663,9 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_system_pre
                         }
                     }
                 }
-            } catch (const std::runtime_error &err) {
+            } catch(ConfigurationError &err){
+                throw err;
+            }catch (const std::runtime_error &err) {
                 if (validation_mode)
                     throw err;
                 else {
@@ -1804,6 +1851,13 @@ void PresetBundle::load_installed_printers(const AppConfig &config)
     for (auto &preset : printers)
     {
         preset.set_visible_from_appconfig(config);
+    }
+}
+
+void PresetBundle::load_user_printer_state(const AppConfig &config)
+{
+    for (auto &preset : printers)
+    {
         preset.set_user_presets_from_appconfig(config);
     }
 }
@@ -2073,6 +2127,7 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
     // The possibly excessive filament names will be later removed with this->update_multi_material_filament_presets()
     // once the FFF technology gets selected.
     this->filament_presets = { filaments.get_selected_preset_name() };
+    this->lastFilamentPresets    = {config.get_printer_setting(initial_printer_profile_name, "filament")};
     for (unsigned int i = 1; i < 1000; ++ i) {
         char name[64];
         sprintf(name, "filament_%02u", i);
@@ -2080,6 +2135,7 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
         if (f_name.empty())
             break;
         this->filament_presets.emplace_back(remove_ini_suffix(f_name));
+        this->lastFilamentPresets.emplace_back(remove_ini_suffix(f_name));
     }
     std::vector<std::string> filament_colors;
     auto f_colors = config.get_printer_setting(initial_printer_profile_name, "filament_colors");

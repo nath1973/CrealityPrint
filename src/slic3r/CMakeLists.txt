@@ -151,7 +151,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmoMmuSegmentation.hpp
     #GUI/Gizmos/GLGizmoFaceDetector.cpp
     #GUI/Gizmos/GLGizmoFaceDetector.hpp
-    GUI/Gizmos/GLGizmoMeasure.cpp
+	GUI/Gizmos/GLGizmoMeasure.cpp
     GUI/Gizmos/GLGizmoMeasure.hpp
     GUI/Gizmos/GLGizmoSeam.cpp
     GUI/Gizmos/GLGizmoSeam.hpp
@@ -288,28 +288,28 @@ set(SLIC3R_GUI_SOURCES
     GUI/PrinterWebView.hpp
     GUI/print_manage/PrinterMgr.cpp
     GUI/print_manage/PrinterMgr.hpp
-    GUI/print_manage/PrinterMgrView.cpp
-    GUI/print_manage/PrinterMgrView.hpp
-    GUI/print_manage/LanPrinterInterface.hpp
-    GUI/print_manage/LanPrinterInterface.cpp
-    GUI/print_manage/Klipper4408Interface.hpp
-    GUI/print_manage/Klipper4408Interface.cpp
-    GUI/print_manage/KlipperCXInterface.hpp
-    GUI/print_manage/KlipperCXInterface.cpp
-    GUI/print_manage/KlipperInterface.hpp
-    GUI/print_manage/KlipperInterface.cpp
-    GUI/print_manage/OctoPrintInterface.hpp
-    GUI/print_manage/OctoPrintInterface.cpp
+    GUI/print_manage/App/PrinterMgrView.cpp
+    GUI/print_manage/App/PrinterMgrView.hpp
+    GUI/print_manage/Device/LanPrinterInterface.hpp
+    GUI/print_manage/Device/LanPrinterInterface.cpp
+    GUI/print_manage/Device/Klipper4408Interface.hpp
+    GUI/print_manage/Device/Klipper4408Interface.cpp
+    GUI/print_manage/Device/KlipperCXInterface.hpp
+    GUI/print_manage/Device/KlipperCXInterface.cpp
+    GUI/print_manage/Device/KlipperInterface.hpp
+    GUI/print_manage/Device/KlipperInterface.cpp
+    GUI/print_manage/Device/OctoPrintInterface.hpp
+    GUI/print_manage/Device/OctoPrintInterface.cpp
     GUI/print_manage/RemotePrinterManager.hpp
     GUI/print_manage/RemotePrinterManager.cpp
     GUI/print_manage/utils/mdns.h
     GUI/print_manage/utils/mdns.c
     GUI/print_manage/utils/cxmdns.h
     GUI/print_manage/utils/cxmdns.cpp
-    GUI/print_manage/DeviceDB.hpp
-    GUI/print_manage/DeviceDB.cpp
-    GUI/print_manage/DataCenter.hpp
-    GUI/print_manage/DataCenter.cpp
+    GUI/print_manage/data/DataType.hpp
+    GUI/print_manage/data/DataType.cpp
+    GUI/print_manage/data/DataCenter.hpp
+    GUI/print_manage/data/DataCenter.cpp
     GUI/print_manage/AppMgr.hpp
     GUI/print_manage/AppMgr.cpp
     GUI/print_manage/Routes/Routes.hpp
@@ -325,8 +325,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/print_manage/TypeDefine.hpp
     GUI/print_manage/AppUtils.hpp
     GUI/print_manage/AppUtils.cpp
-    GUI/print_manage/SendToLocalNetPrinter.hpp
-    GUI/print_manage/SendToLocalNetPrinter.cpp
     GUI/print_manage/Upload3mfToCloud.hpp
     GUI/print_manage/Upload3mfToCloud.cpp
     GUI/print_manage/UploadGcodeToCloud.hpp
@@ -335,13 +333,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/print_manage/Utils.cpp
     GUI/print_manage/MaterialMapPanel.hpp
     GUI/print_manage/MaterialMapPanel.cpp
-    GUI/print_manage/SendToPrinter.hpp
-    GUI/print_manage/SendToPrinter.cpp
+    GUI/print_manage/App/SendToPrinter.hpp
+    GUI/print_manage/App/SendToPrinter.cpp
     GUI/print_manage/AccountDeviceMgr.hpp
     GUI/print_manage/AccountDeviceMgr.cpp
     GUI/print_manage/PrinterBoxFilamentPanel.hpp
     GUI/print_manage/PrinterBoxFilamentPanel.cpp
-    GUI/print_manage/CustomEvent.hpp
     GUI/WebDownPluginDlg.hpp
     GUI/WebDownPluginDlg.cpp
     GUI/WebGuideDialog.hpp
@@ -657,6 +654,14 @@ set(SLIC3R_GUI_SOURCES
 	GUI/LoadOldPresets.cpp
 	GUI/LoadOldPresetsFromFolder.hpp
 	GUI/LoadOldPresetsFromFolder.cpp
+	GUI/SyncUserPresets.hpp
+	GUI/SyncUserPresets.cpp
+	GUI/CommunicateWithCXCloud.hpp
+	GUI/CommunicateWithCXCloud.cpp
+	GUI/UpdateParams.hpp
+	GUI/UpdateParams.cpp
+	GUI/LoginTip.hpp
+	GUI/LoginTip.cpp
     Config/OptionConfig.h
     Config/OptionConfig.cpp
 )
@@ -713,7 +718,9 @@ target_link_libraries(libslic3r_gui libslic3r cereal::cereal imgui imguizmo mini
 if(WIN32)
     target_link_libraries(libslic3r_gui iphlpapi)
 endif()
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(libslic3r_gui webrtc_video)
+endif()
 if (MSVC)
     target_link_libraries(libslic3r_gui Setupapi.lib)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")

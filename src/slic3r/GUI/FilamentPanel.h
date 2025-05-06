@@ -11,7 +11,10 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "PresetComboBoxes.hpp"
 #include "Widgets/Label.hpp"
-#include "slic3r/GUI/print_manage/DeviceDB.hpp"
+#include "print_manage/data/DataType.hpp"
+
+#define FILAMENT_BTN_WIDTH  110
+#define FILAMENT_BTN_HEIGHT 41
 
 namespace Slic3r { 
 
@@ -75,6 +78,7 @@ public:
 	void update_sync_box_state(bool sync, const wxString& box_filament_name = "");
 	void update_child_button_color(const wxColour& color);
     void resetCFS(bool bCFS);
+	void update_child_button_size();
 
 protected:
 
@@ -116,7 +120,9 @@ class FilamentPopPanel : public PopupWindow
 public:
 	FilamentPopPanel(wxWindow* parent, int index);
 	~FilamentPopPanel();
-
+#ifdef __APPLE__
+	void OnMouseLeave(wxMouseEvent& event);
+#endif
 	void Popup(wxPoint position = wxDefaultPosition);
 	void Dismiss();
     void sys_color_changed();
@@ -127,8 +133,8 @@ public:
 	Slic3r::GUI::PlaterPresetComboBox* m_filamentCombox;
     ScalableButton* m_img_extruderTemp;
     ScalableButton* m_img_bedTemp;
-    Label* m_lb_extruderTemp;
-    Label* m_lb_bedTemp;
+    Label*                             m_lb_extruderTemp = nullptr;
+    Label*                             m_lb_bedTemp      = nullptr;
 
     ScalableButton* m_edit_btn;
 	wxColour m_bg_color;
@@ -150,7 +156,7 @@ public:
         bool small_state = false;
     };
 public:
-    FilamentItem(wxWindow* parent, const Data&data, const wxSize&size=wxSize(110, 41));
+    FilamentItem(wxWindow* parent, const Data&data, const wxSize&size=wxSize(FILAMENT_BTN_WIDTH, FILAMENT_BTN_HEIGHT));
 
     void set_checked(bool checked = true);
     bool is_checked();
@@ -166,6 +172,7 @@ public:
 	void update_box_sync_state(bool sync, const wxString& box_filament_name = "");
 	void update_box_sync_color(const std::string& sync_color);
     void resetCFS(bool bCFS);
+	void update_button_size();
 	
 private:
     wxBoxSizer* m_sizer;
@@ -212,9 +219,11 @@ public:
     void msw_rescale();
     size_t size();
 	void on_re_sync_all_filaments(const std::string& selected_device_ip);
-	void on_auto_mapping_filament(const RemotePrint::DeviceDB::Data& deviceData);
+	void on_auto_mapping_filament(const DM::Device& deviceData);
 	void update_box_filament_sync_state(bool sync);
 	void reset_filament_sync_state();
+    void resetFilamentToCFS();
+    void updateLastFilament(const std::vector<std::string>& presetName);
 	void on_sync_one_filament(int filament_index, const std::string& new_filament_color, const std::string& new_filament_name, const wxString& sync_label);
 	void backup_extruder_colors();
 	void restore_prev_extruder_colors();
@@ -225,7 +234,7 @@ private:
     bool LoadFile(std::string jPath, std::string& sContent);
     int LoadProfileFamily(std::string strVendor, std::string strFilePath);
     int GetFilamentInfo(std::string VendorDirectory, json& pFilaList, std::string filepath, std::string& sVendor, std::string& sType);
-    void SetFilamentProfile(std::vector<std::pair<int, RemotePrint::DeviceDB::Material>>& validMaterials);
+    void SetFilamentProfile(std::vector<std::pair<int, DM::Material>>& validMaterials);
 
 protected:
 	void paintEvent(wxPaintEvent& evt);
@@ -252,13 +261,14 @@ public:
     void SetColor(const wxColour& color);
     wxColour GetColor();
 
-    void update_item_info_by_material(int box_id, const RemotePrint::DeviceDB::Material& material_info);
+    void update_item_info_by_material(int box_id, const DM::Material& material_info);
     void set_sync_state(bool bSync);
 	bool get_sync_state();
     void set_is_ext(bool is_ext);
 	wxString get_filament_type_label();
 	wxString get_material_index_info();
 	std::string get_filament_name();
+    std::string getUserMaterial();
 
 protected:
     void OnPaint(wxPaintEvent& event);
@@ -274,6 +284,7 @@ private:
     int m_border_width = 1;
     bool m_sync = false;
     bool m_is_ext = false;
+    std::string m_userMaterial;
 };
 
 
@@ -287,8 +298,9 @@ public:
 	~BoxColorPopPanel();
 
 	void set_filament_item_index(int index);
-	void init_by_device_data(const RemotePrint::DeviceDB::Data& device_data);
+	void init_by_device_data(const DM::Device& device_data);
 	void select_first_on_show();
+	void on_left_down(wxMouseEvent &evt);
 
 protected:
     void OnMouseEnter(wxMouseEvent& event);
@@ -303,7 +315,7 @@ private:
     wxPanel* m_secondColumnPanel;
 
 	int m_filament_item_index = 0;
-	RemotePrint::DeviceDB::Data m_device_data;
+	DM::Device m_device_data;
 
     wxDECLARE_EVENT_TABLE();
 

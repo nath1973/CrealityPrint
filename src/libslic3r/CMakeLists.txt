@@ -25,6 +25,11 @@ endif ()
 
 set(OpenVDBUtils_SOURCES "")
 
+set(AUTOMATION_TOOL OFF)
+#if(${PROJECT_VERSION_EXTRA} STREQUAL "Alpha")
+#    set(AUTOMATION_TOOL ON)
+#endif()
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libslic3r_version.h.in ${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h)
 
 if (TARGET openvdb_libs)
     set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp)
@@ -167,6 +172,8 @@ set(lisbslic3r_sources
     Format/svg.cpp
     Format/ZipperArchiveImport.hpp
     Format/ZipperArchiveImport.cpp
+	Format/AssimpModel.cpp
+    Format/AssimpModel.hpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/CoolingBuffer.cpp
@@ -328,31 +335,45 @@ set(lisbslic3r_sources
     SlicesToTriangleMesh.cpp
     SlicingAdaptive.cpp
     SlicingAdaptive.hpp
-    Support/SupportCommon.cpp
-    Support/SupportCommon.hpp
-    Support/SupportDebug.cpp
-    Support/SupportDebug.hpp
-    Support/SupportLayer.hpp
+    #Support/SupportCommon.cpp
+    #Support/SupportCommon.hpp
+    #Support/SupportDebug.cpp
+    #Support/SupportDebug.hpp
+    #Support/SupportLayer.hpp
     # Support/SupportMaterial.cpp
     # Support/SupportMaterial.hpp
-    Support/SupportParameters.cpp
-    Support/SupportParameters.hpp
-    Support/OrganicSupport.cpp
-    Support/OrganicSupport.hpp
-    Support/TreeSupport.cpp
-    Support/TreeSupport.hpp
-    Support/TreeSupportCommon.cpp
-    Support/TreeSupportCommon.hpp
-    Support/TreeModelVolumes.cpp
-    Support/TreeModelVolumes.hpp
-    SupportMaterial.cpp
-    SupportMaterial.hpp
+    #Support/SupportParameters.cpp
+    #Support/SupportParameters.hpp
+    #Support/OrganicSupport.cpp
+    #Support/OrganicSupport.hpp
+    #Support/TreeSupport.cpp
+    #Support/TreeSupport.hpp
+    #Support/TreeSupportCommon.cpp
+    #Support/TreeSupportCommon.hpp
+    #Support/TreeModelVolumes.cpp
+    #Support/TreeModelVolumes.hpp
+    #SupportMaterial.cpp
+    #SupportMaterial.hpp
+	support_new/SupportCommon.cpp
+	support_new/SupportCommon.hpp
+	support_new/SupportLayer.hpp
+	support_new/SupportMaterial.cpp
+	support_new/SupportMaterial.hpp
+	support_new/SupportParameters.hpp
+	support_new/TreeModelVolumes.cpp
+	support_new/TreeModelVolumes.hpp
+	support_new/TreeSupport.cpp
+	support_new/TreeSupport.hpp
+	support_new/TreeSupport3D.cpp
+	support_new/TreeSupport3D.hpp
+	support_new/TreeSupportCommon.hpp
+	
     PrincipalComponents2D.cpp
     PrincipalComponents2D.hpp
-    SupportSpotsGenerator.cpp
-    SupportSpotsGenerator.hpp
-    TreeSupport.hpp 
-    TreeSupport.cpp
+    #SupportSpotsGenerator.cpp
+    #SupportSpotsGenerator.hpp
+    #TreeSupport.hpp 
+    #TreeSupport.cpp
     MinimumSpanningTree.hpp
     MinimumSpanningTree.cpp
     Surface.cpp
@@ -496,6 +517,8 @@ if(WIN32)
         baselineorcinput.cpp
         UnittestFlow.cpp
         UnittestFlow.hpp
+        AutomationMgr.hpp
+        AutomationMgr.cpp
     )
 endif()
 
@@ -525,13 +548,18 @@ find_package(CGAL REQUIRED)
 find_package(OpenCV REQUIRED core)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC 
-    CutSurface.hpp CutSurface.cpp
-    IntersectionPoints.hpp IntersectionPoints.cpp
-    MeshBoolean.hpp MeshBoolean.cpp
-    TryCatchSignal.hpp TryCatchSignal.cpp
-    Triangulation.hpp Triangulation.cpp
-)
+set(lisbslic3r_cgal_sources    CutSurface.hpp CutSurface.cpp
+            IntersectionPoints.hpp IntersectionPoints.cpp
+            TryCatchSignal.hpp TryCatchSignal.cpp
+            Triangulation.hpp Triangulation.cpp)
+if(BUILD_CLOUD_SLICER)
+    add_definitions(-DCLOUD_SKIP_MESHBOOLEAN)
+else()
+    list(APPEND lisbslic3r_cgal_sources MeshBoolean.hpp MeshBoolean.cpp)
+endif()    
+
+add_library(libslic3r_cgal STATIC ${lisbslic3r_cgal_sources})
+
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options
@@ -646,10 +674,12 @@ if(TARGET openssl::openssl)
     target_link_libraries(libslic3r openssl::openssl)
 endif()
 
-if(NOT WIN32)
-    target_link_libraries(libslic3r freetype)
-    if (NOT APPLE)
-        target_link_libraries(libslic3r fontconfig)
+if(NOT BUILD_CLOUD_SLICER)
+    if(NOT WIN32)
+        target_link_libraries(libslic3r freetype)
+        if (NOT APPLE)
+            target_link_libraries(libslic3r fontconfig)
+        endif()
     endif()
 endif()
 

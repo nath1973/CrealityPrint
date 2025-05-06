@@ -36,6 +36,7 @@
 #include "slic3r/GUI/print_manage/RemotePrinterManager.hpp"
 #include "slic3r/GUI/print_manage/MaterialMapPanel.hpp"
 #include "slic3r/GUI/Notebook.hpp"
+#include "data/DataCenter.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -57,40 +58,6 @@ static wxString extract_ip_address(const wxString& combo_selection)
         return wxString(match[1].str());
     }
     return "";
-}
-
-void Upload3mfToCloudDialog::init_device_list_from_db()
-{
-    m_comboBox_printer->Clear();
-    int defaultSelectionIndex = wxNOT_FOUND;
-    int firstOnlineIndex      = wxNOT_FOUND;
-
-    for (size_t i = 0; i < RemotePrint::DeviceDB::getInstance().devices.size(); ++i) {
-        const auto& device              = RemotePrint::DeviceDB::getInstance().devices[i];
-        wxString    online_status       = device.online ? _L("Online") : _L("Offline");
-        wxString    printer_busy_status = device.deviceState ? _L("Busy") : _L("Ready");
-        m_comboBox_printer->Append(device.model + " (" + device.address + ")" + "                    " + online_status);
-
-        if (device.online) {
-            if (device.model == "F008" && defaultSelectionIndex == wxNOT_FOUND) {
-                defaultSelectionIndex = i;
-            }
-            if (firstOnlineIndex == wxNOT_FOUND) {
-                firstOnlineIndex = i;
-            }
-        }
-    }
-
-    if (defaultSelectionIndex != wxNOT_FOUND) {
-        m_comboBox_printer->SetSelection(defaultSelectionIndex);
-    } else if (firstOnlineIndex != wxNOT_FOUND) {
-        m_comboBox_printer->SetSelection(firstOnlineIndex);
-    }
-
-    // Manually trigger the selection changed event
-    wxCommandEvent event(wxEVT_COMBOBOX, m_comboBox_printer->GetId());
-    event.SetEventObject(m_comboBox_printer);
-    on_selection_changed(event);
 }
 
 void Upload3mfToCloudDialog::stripWhiteSpace(std::string& str)
@@ -569,15 +536,7 @@ Upload3mfToCloudDialog::Upload3mfToCloudDialog(Plater* plater)
     // CenterOnParent();
     Centre(wxBOTH);
     wxGetApp().UpdateDlgDarkUI(this);
-    if (wxGetApp().mainframe->get_printer_mgr_view()) {
-        // wxGetApp().mainframe->get_printer_mgr_view()->RegisterHandler("receive_color_match_info", [this](const nlohmann::json& json_data) {
-        //     this->handle_receive_color_match_info(json_data);
-        // });
 
-        // wxGetApp().mainframe->get_printer_mgr_view()->RegisterHandler("receive_device_list", [this](const nlohmann::json& json_data) {
-        //     this->handle_receive_device_list(json_data);
-        // });
-    }
     m_scrolledWindow->SetSizer(m_sizer_main);
     m_scrolledWindow->FitInside();
     m_scrolledWindow->SetScrollRate(10, 10);
@@ -721,6 +680,22 @@ int findNumberForMultipleOfThree(int n)
     return m;
 }
 
+
+static bool ShouldDark(const wxColour& bgColor)
+{
+    int brightness = (bgColor.Red() * 299 + bgColor.Green() * 587 + bgColor.Blue() * 114) / 1000;
+    return brightness > 50;
+}
+
+static wxColour GetTextColorBasedOnBackground(const wxColour& bgColor)
+{
+    if (ShouldDark(bgColor)) {
+        return *wxBLACK;
+    } else {
+        return *wxWHITE;
+    }
+}
+
 void Upload3mfToCloudDialog::get_current_plate_color()
 {
     m_sizer_material->Clear(true);
@@ -796,13 +771,13 @@ void Upload3mfToCloudDialog::get_current_plate_color()
                                                             wxBORDER_NONE | wxBU_AUTODRAW);
             wxString        tipStr     = "";
             if (plate->is_slice_result_valid()) {
-                wxBitmap bmp = create_scaled_bitmap("plate_sliced", this, FromDIP(18));
+                wxBitmap bmp = create_scaled_bitmap("plate_sliced", this, 20);
                 iconButton   = new wxBitmapButton(panel, wxID_ANY, bmp, wxDefaultPosition, wxSize(FromDIP(20), FromDIP(20)),
                                                   wxBORDER_NONE | wxBU_AUTODRAW);
                 tipStr       = _L("Sliced");
             }
             if (plate->empty()) {
-                wxBitmap bmp = create_scaled_bitmap("plate_empty", this, FromDIP(18));
+                wxBitmap bmp = create_scaled_bitmap("plate_empty", this, 20);
                 iconButton   = new wxBitmapButton(panel, wxID_ANY, bmp, wxDefaultPosition, wxSize(FromDIP(20), FromDIP(20)),
                                                   wxBORDER_NONE | wxBU_AUTODRAW);
                 tipStr       = _L("Empty");
@@ -813,6 +788,7 @@ void Upload3mfToCloudDialog::get_current_plate_color()
             sizer->Add(iconButton, 0, wxALIGN_RIGHT | wxALIGN_BOTTOM | wxALL, 5);
             sizer->Layout();
             wrapSizer->Add(panel, 0, wxALL, 5);
+            Layout();
         }
 
         std::vector<int> plate_extruders = plate->get_extruders(true);
@@ -887,21 +863,27 @@ void Upload3mfToCloudDialog::get_current_plate_color()
 
         wxStaticText* textTop = new wxStaticText(panel, wxID_ANY, wxExtruderIdStr, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER);
         textTop->SetFont(font);
-        textTop->SetForegroundColour(*wxBLACK);
+
+        textTop->SetForegroundColour(GetTextColorBasedOnBackground(wxColor));
         wxStaticText* textBottom = new wxStaticText(panel, wxID_ANY, wxType, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER);
-        textBottom->SetForegroundColour(*wxBLACK);
+        textBottom->SetForegroundColour(GetTextColorBasedOnBackground(wxColor));
         textBottom->SetFont(font);
         wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
         sizer->Add(textTop, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
         sizer->Add(textBottom, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
         panel->SetSizer(sizer);
-        m_sizer_material_list->Add(panel, 0, wxEXPAND | wxALL, 10);
+        m_sizer_material_list->Add(panel, 0, wxEXPAND | wxALL, FromDIP(10));
     }
 
     m_sizer_material->Add(m_sizer_material_list);
 
     m_sizer_material->Layout();
+    Layout();
 };
+
+
+
+
 
 void Upload3mfToCloudDialog::update_3mf_info()
 {
@@ -1050,7 +1032,7 @@ std::string Upload3mfToCloudDialog::build_switch_printer_details_page_cmd_info()
         return "";
     }
 
-    auto printerData = RemotePrint::DeviceDB::getInstance().get_printer_data(ipAddress);
+    auto printerData = DM::DataCenter::Ins().get_printer_data(ipAddress);
 
     // Create top-level JSON object
     nlohmann::json top_level_json = {
@@ -1281,7 +1263,7 @@ void Upload3mfToCloudDialog::on_selection_changed(wxCommandEvent& event)
         m_materialMapPanel->related_printer_ip = ipAddress;
     }
 
-    if (RemotePrint::DeviceDB::getInstance().DeviceHasBoxColor(ipAddress)) {
+    if (DM::DataCenter::Ins().DeviceHasBoxColor(ipAddress)) {
         wxGetApp().mainframe->get_printer_mgr_view()->ExecuteScriptCommand(build_match_color_cmd_info());
     } else {
         if (m_materialMapPanel) {
@@ -1291,7 +1273,7 @@ void Upload3mfToCloudDialog::on_selection_changed(wxCommandEvent& event)
 
     // Get device data based on ipAddress
     {
-        auto device = RemotePrint::DeviceDB::getInstance().get_printer_data(ipAddress);
+        auto device = DM::DataCenter::Ins().get_printer_data(ipAddress);
         if (device.boxColorInfos.empty()) {
             m_checkbox_open_cfs->SetValue(false);
             m_checkbox_open_cfs->Hide();
@@ -1678,66 +1660,6 @@ bool Upload3mfToCloudDialog::Show(bool show)
         CenterOnParent();
     }
     return DPIDialog::Show(show);
-}
-
-void Upload3mfToCloudDialog::handle_receive_device_list(const nlohmann::json& json_data)
-{
-    RemotePrint::DeviceDB::getInstance().devices.clear();
-
-    // handle receive_device_list command
-    for (const auto& device : json_data["data"]) {
-        RemotePrint::DeviceDB::Data data;
-        data.address     = device["address"];
-        data.mac         = device["mac"];
-        data.model       = device["model"];
-        data.online      = device["online"];
-        data.deviceState = device["deviceState"];
-        data.name        = device["name"];
-        data.group       = device["group"];
-
-        // parse boxColorInfo
-        for (const auto& boxColorInfo : device["boxColorInfo"]) {
-            RemotePrint::DeviceDB::DeviceBoxColorInfo boxColor;
-            boxColor.color        = boxColorInfo["color"];
-            boxColor.boxId        = boxColorInfo["boxId"];
-            boxColor.materialId   = boxColorInfo["materialId"];
-            boxColor.filamentType = boxColorInfo["filamentType"];
-            data.boxColorInfos.push_back(boxColor);
-        }
-
-        RemotePrint::DeviceDB::getInstance().AddDevice(data);
-    }
-
-    // this->Show(true);
-
-    set_plate_info(m_print_plate_idx);
-}
-
-void Upload3mfToCloudDialog::handle_receive_color_match_info(const nlohmann::json& json_data)
-{
-    const auto&                                                data = json_data["data"];
-    std::vector<RemotePrint::MaterialMapPanel::ColorMatchInfo> materialMapInfo;
-
-    std::vector<std::string> all_filament_types = get_all_filament_types();
-
-    for (const auto& matchInfo : data) {
-        RemotePrint::MaterialMapPanel::ColorMatchInfo tmpMatchInfo;
-        tmpMatchInfo.extruderId           = matchInfo["extruderId"];
-        tmpMatchInfo.extruderFilamentType = all_filament_types[tmpMatchInfo.extruderId - 1];
-        tmpMatchInfo.extruderColor        = RemotePrint::Utils::hex_string_to_wxcolour(matchInfo["extruderColor"].get<std::string>());
-        tmpMatchInfo.matchColor           = RemotePrint::Utils::hex_string_to_wxcolour(matchInfo["matchColor"].get<std::string>());
-        tmpMatchInfo.matchFilamentType    = matchInfo["matchFilamentType"];
-        tmpMatchInfo.materialId           = matchInfo["materialId"];
-        materialMapInfo.emplace_back(tmpMatchInfo);
-    }
-
-    if (m_materialMapPanel) {
-        m_materialMapPanel->SetMaterialMapInfo(materialMapInfo);
-    }
-
-    Layout();
-    Fit();
-    Thaw();
 }
 
 void Upload3mfToCloudDialog::on_checkbox_open_cfs(wxCommandEvent& event)

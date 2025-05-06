@@ -83,6 +83,12 @@ void hollow_mesh(TriangleMesh &mesh, const Interior &interior, int flags = 0);
 void remove_inside_triangles(TriangleMesh &mesh, const Interior &interior,
                              const std::vector<bool> &exclude_mask = {});
 
+enum class HollowMeshResult { Ok = 0, FaultyMesh = 1, FaultyHoles = 2, DrillingFailed = 4 };
+
+// Return HollowMeshResult codes OR-ed.
+int hollow_mesh_and_drill(
+    TriangleMesh& mesh, TriangleMesh& mesh_hole, std::vector<TriangleMesh>& mesh_result);
+
 double get_distance(const Vec3f &p, const Interior &interior);
 
 template<class T>

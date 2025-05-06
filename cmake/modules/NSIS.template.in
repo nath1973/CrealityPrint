@@ -1,5 +1,5 @@
 ﻿; CPack install script designed for a nmake build
-
+RequestExecutionLevel admin
 ;--------------------------------
 ; You must define these values
   @CPACK_PACKAGE_UNICODE@
@@ -10,6 +10,7 @@
   !define APP_NAME  "@CPACK_NSIS_PACKAGE_NAME@"
   !define WebView2Installer "@CPACK_WEBVIEW2_NAME@"
   !define VCREDIST_X64Installer "@CPACK_VCREDIST_X64_NAME@"
+  !define STLTHUMB_X64Installer "@CPACK_STLTHUMB_NAME@"
 ;--------------------------------
 ;Variables
 
@@ -634,6 +635,57 @@ FunctionEnd
   LicenseLangString LNG_License ${LANG_SIMPCHINESE} "@CPACK_RESOURCE_FILE_LICENSE@"
   LicenseLangString LNG_License ${LANG_TRADCHINESE} "@CPACK_RESOURCE_FILE_LICENSE_TD@"
 
+  LicenseLangString LNG_License ${LANG_ALBANIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_ARABIC} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_BASQUE} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_BELARUSIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_BOSNIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_BRETON} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_BULGARIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_CROATIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_CZECH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_DANISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_DUTCH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_ESTONIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_FARSI} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_FINNISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_FRENCH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_GERMAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_GREEK} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_HEBREW} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_HUNGARIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_ICELANDIC} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_INDONESIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_IRISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_ITALIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_JAPANESE} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_KOREAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_KURDISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_LATVIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_LITHUANIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_LUXEMBOURGISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_MACEDONIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_MALAY} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_MONGOLIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_NORWEGIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_POLISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_PORTUGUESE} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_PORTUGUESEBR} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_ROMANIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_RUSSIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_SERBIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_SERBIANLATIN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_SLOVAK} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_SLOVENIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_SPANISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_SWEDISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_THAI} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_TURKISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_UKRAINIAN} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+  LicenseLangString LNG_License ${LANG_WELSH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
+
+
+  
 ;--------------------------------
 ;Reserve Files
 
@@ -667,10 +719,12 @@ Section "-Core installation"
 
   ExecWait '"$INSTDIR\\${WebView2Installer}" /silent /install'
   ExecWait '"$INSTDIR\\${VCREDIST_X64Installer}" /silent /install'
-  
+  ;ExecWait '"$INSTDIR\\${STLTHUMB_X64Installer}" /silent /install'
+  ;ExecWait 'msiexec /i ""$INSTDIR\\${STLTHUMB_X64Installer}" /fa /qn / REBOOT=Suppress' 
+
   ;Store installation folder
   WriteRegStr SHCTX "Software\@CPACK_PACKAGE_VENDOR@\@CPACK_PACKAGE_INSTALL_REGISTRY_KEY@" "" $INSTDIR
-
+  WriteRegStr HKCU "Software\Microsoft\DirectX\UserGpuPreferences" "$INSTDIR\${PROCESS_NAME}" "GpuPreference=2;"
   ;Create uninstaller
   WriteUninstaller "$INSTDIR\@CPACK_NSIS_UNINSTALL_NAME@.exe"
   Push "DisplayName"
@@ -755,6 +809,13 @@ WriteRegStr HKCR "3mf_cxsw\shell\open\command" "" '"$INSTDIR\${PROCESS_NAME}" "%
 WriteRegStr HKCR "cxprj_cxsw\shell\open\command" "" '"$INSTDIR\${PROCESS_NAME}" "%1"'
 System::Call "Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)"
 
+  ;add stl thumb
+  ExecWait '"regsvr32" /s "$INSTDIR\STLThumbWinShellExtension.dll"'
+  WriteRegStr HKCR ".stl\shellex\{e357fccd-a995-4576-b01f-234630154e96}" "" "{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}"
+  WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}" "" "STLThumbWinShellExtension.STLThumbnailProvider Class"
+  WriteRegDWORD HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}" "DisableProcessIsolation" 1
+  WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}\InprocServer32" "" "$INSTDIR\STLThumbWinShellExtension.dll"
+  WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}\InprocServer32" "ThreadingModel" "Apartment"
 SectionEnd
 
 Section "-Add to path"
@@ -875,6 +936,13 @@ Section "Un.${APP_NAME}"
   Delete "$INSTDIR\AddRemove.exe"
 !endif
 
+  ; Remove stl thumb
+   ExecWait '"regsvr32" /s /u "$INSTDIR\STLThumbWinShellExtension.dll"'
+   Delete "$INSTDIR\stl-thumb.exe"
+   Delete "$INSTDIR\STLThumbWinShellExtension.dll"
+   DeleteRegKey HKCR ".stl\shellex\{e357fccd-a995-4576-b01f-234630154e96}"
+   DeleteRegKey HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}"
+
   ;Remove the uninstaller itself.
   Delete "$INSTDIR\@CPACK_NSIS_UNINSTALL_NAME@.exe"
   DeleteRegKey SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\@CPACK_PACKAGE_INSTALL_REGISTRY_KEY@"
@@ -954,7 +1022,7 @@ Push $0
   Abort
   delePro:
   ${nsProcess::KillProcess} "${PROCESS_NAME}" $R0
-  StrCmp $0 "" checkUninstall
+  StrCmp $R0 0 checkUninstall
 
 checkUninstall:
   ReadRegStr $0 HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@CPACK_PACKAGE_INSTALL_REGISTRY_KEY@" "UninstallString"
@@ -963,9 +1031,13 @@ checkUninstall:
   StrCmp $0 "" inst instbefore
 
 instbefore:
+  Push $1 
+  StrLen $1 "\Uninstall.exe"
+  StrCpy $INSTDIR $0 -$1
   MessageBox MB_YESNOCANCEL|MB_ICONEXCLAMATION \
   "@CPACK_NSIS_PACKAGE_NAME@ $(DESC_installed)$\n$\n$(DESC_old_version)" \
   /SD IDYES IDYES uninst IDNO uninstall_end
+  Pop $1 
   Abort
 
 ;Run the uninstaller
@@ -975,6 +1047,7 @@ Push $3
   ClearErrors
   StrLen $2 "\Uninstall.exe"
   StrCpy $3 $0 -$2 # remove "\Uninstall.exe" from UninstallString to get path
+  
   ExecWait '"$0" /S _?=$3' ;Do not copy the uninstaller to a temp file
   ;IfErrors uninst_failed inst
 ;uninst_failed:
@@ -992,6 +1065,7 @@ inst:
   ; the install directory by comparing it to the
   ; install directory that is expected to be the
   ; default
+  RMDir /r "@CPACK_LOCAL_APPDATA@\Creality\EBWebView"
   StrCpy $IS_DEFAULT_INSTALLDIR 0
   StrCmp "$INSTDIR" "@CPACK_NSIS_INSTALL_ROOT@\@CPACK_PACKAGE_INSTALL_DIRECTORY@" 0 +2
     StrCpy $IS_DEFAULT_INSTALLDIR 1
