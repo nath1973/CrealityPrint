@@ -1,9 +1,18 @@
 name: Check locale
 
 on: 
+    push:
+      branches: 
+       - main
+       - master 
+       - windows
+      paths:
+       - 'localization/**'
+       - ".github/workflows/check_locale.yml"
     pull_request:
       branches: 
-       - main 
+       - main
+       - master 
       paths:
        - 'localization/**'
        - ".github/workflows/check_locale.yml"
@@ -11,34 +20,19 @@ on:
 jobs:
   check_translation:
     name: Check translation
-    runs-on: ubuntu-latest
+    runs-on: 'windows-latest'
     steps:  
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install gettext 
+      - name: Install polib 
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gettext
-
-      # don't call ./run_gentext.sh as most translators never sync with main branch...
+          pip install polib
+      
       - name: Check translation format
+        working-directory: ${{ github.workspace }}
         run: |
           echo $PWD
-          pot_file="./localization/i18n/OrcaSlicer.pot"
-          for dir in ./localization/i18n/*/
-          do
-              dir=${dir%*/}      # remove the trailing "/"
-              lang=${dir##*/}    # extract the language identifier
-          
-              if [ -f "$dir/OrcaSlicer_${lang}.po" ]; then
-                  mkdir -p ./resources/i18n/${lang}/
-                  msgfmt --check-format -o ./resources/i18n/${lang}/OrcaSlicer.mo $dir/OrcaSlicer_${lang}.po
-                  # Check the exit status of the msgfmt command
-                  if [ $? -ne 0 ]; then
-                      echo "Error encountered with msgfmt command for language ${lang}."
-                      exit 1  # Exit the script with an error status
-                  fi
-              fi
-          done
+          curl -LJO https://github.com/CrealityOfficial/CrealityPrint/releases/download/tools/check_po_format.py
+          python check_po_format.py $PWD\localization\i18n
         
