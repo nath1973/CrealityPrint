@@ -65,6 +65,48 @@
             ]
         },
         {
+            "name": "Creality GS-02",
+            "showVersion": "V3.1.0",
+            "nozzleDiameter": [
+                "0.4"
+            ]
+        },
+        {
+            "name": "Creality GS-01",
+            "showVersion": "V3.1.0",
+            "nozzleDiameter": [
+                "0.4"
+            ]
+        },
+        {
+            "name": "Creality GS-03",
+            "showVersion": "V3.0.0",
+            "nozzleDiameter": [
+                "0.8"
+            ]
+        },
+        {
+            "name": "Creality GS-03",
+            "showVersion": "V3.0.0",
+            "nozzleDiameter": [
+                "0.6"
+            ]
+        },
+        {
+            "name": "Creality GS-03",
+            "showVersion": "V3.0.0",
+            "nozzleDiameter": [
+                "0.4"
+            ]
+        },
+        {
+            "name": "Creality GS-03",
+            "showVersion": "V3.0.0",
+            "nozzleDiameter": [
+                "0.2"
+            ]
+        },
+        {
             "name": "Creality Hi",
             "showVersion": "V3.9.0",
             "nozzleDiameter": [
@@ -80,7 +122,7 @@
         },
         {
             "name": "Creality Hi",
-            "showVersion": "V3.10.0",
+            "showVersion": "V3.11.0",
             "nozzleDiameter": [
                 "0.4"
             ]
@@ -192,7 +234,7 @@
         },
         {
             "name": "Creality Ender-5 Plus",
-            "showVersion": "V3.1.0",
+            "showVersion": "V3.0.0",
             "nozzleDiameter": [
                 "0.4"
             ]

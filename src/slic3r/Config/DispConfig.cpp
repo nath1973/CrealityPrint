@@ -2,7 +2,7 @@
 #include "../GUI/GLTexture.hpp"
 #include "../GUI/GUI_App.hpp"
 #include "libslic3r/Utils.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 
 namespace GUI {
@@ -92,6 +92,7 @@ void DispConfig::setDarkMode(bool dark)
         }
     }
     s_isDark = dark;
+    Slic3r::CxBuildInfo::setDarkMode(dark);
 }
 
 void* DispConfig::getTextureId(TextureType tt, bool hover, bool sel) {
@@ -112,12 +113,12 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
         //tuple2:needHover
         //tuple3:needSel
         static std::map<TextureType, std::tuple<std::string,bool,bool,bool>> s_names = {
-            {e_tt_home,{"home.png",true,true,false}},
+            {e_tt_home,{"home.svg",true,true,false}},
             {e_tt_collapse,{"collapse_bk.svg",true,false,false}},
             {e_tt_collapse_item,{"collapse.svg",true,true,true}},
             {e_tt_bed_custom,{"custom.png",false,false,false}},
             {e_tt_bed_texture,{"texture.png",false,false,false}},
-            {e_tt_bed_smooth,{"smooth.svg",false,false,false}},
+            {e_tt_bed_smooth,{Slic3r::CxBuildInfo::isCusotmized() ? "smooth.png"  : "smooth.svg", false, false, false }},
             {e_tt_layer,{"layer.svg",false,true,false}},
             {e_tt_edit,{"edit.png",true,true,true}},
             {e_tt_close,{"close.png",true,true,true}},
@@ -187,12 +188,17 @@ bool DispConfig::normalButton(const std::string& name, ButtonConfig cfg,int en) 
         ImGui::PushStyleColor(ImGuiCol_Border, fg);
     else
         ImGui::PushStyleColor(ImGuiCol_BorderActive, fg);
+
+    if (en == 2) {
+        ImGui::PushStyleColor(ImGuiCol_Text, getColor(e_ct_white));
+    }
+    
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, cfg.border);
     Loc_pushBoldStyle(cfg.boldScale);
     bool active = ImGui::BBLButton(name.c_str(), cfg.size);
     Loc_popBoldStyle(cfg.boldScale);
     ImGui::PopStyleVar(1);
-    ImGui::PopStyleColor(4);
+    ImGui::PopStyleColor(en == 2 ? 5 : 4);
     if (!cfg.tips.empty()&&ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
         ImGui::TextUnformatted(cfg.tips.c_str());
@@ -253,7 +259,7 @@ ImVec2 DispConfig::getWindowSize(WindowType tp, float scale) {
         winsize = { 20, 17 };
         break;
     case DispConfig::e_wt_slice:
-        winsize = { 215, 55 };
+        winsize = { 202, 82 };
         break;
     case DispConfig::e_wt_msg:
         winsize = { 300, 85 };
@@ -262,13 +268,13 @@ ImVec2 DispConfig::getWindowSize(WindowType tp, float scale) {
         winsize = { 405, 85 };
         break;
     case DispConfig::e_wt_slice_list:
-        winsize = { 215, 95 };
+        winsize = { 202, 82 };
         break;
     case DispConfig::e_wt_print:
         winsize = { 215, 55 };
         break;
     case DispConfig::e_wt_print_list:
-        winsize = { 215, 175 };
+        winsize = { 202, 150 };
         break;
     case DispConfig::e_wt_slider:
         winsize = { 50,400 };
@@ -296,20 +302,20 @@ ImVec2 DispConfig::getWindowBias(WindowType tp, float scale) {
         bias = { 0, 0 };
         break;
     case DispConfig::e_wt_slice:
-        bias = { -10, -60 };
+        bias = { -6, -6 };
         break;
     case DispConfig::e_wt_msg:
     case DispConfig::e_wt_error:
         bias = { 5, -5 };
         break;
     case DispConfig::e_wt_slice_list:
-        bias = { -10, -115 };
+        bias = { -6, -88 };
         break;
     case DispConfig::e_wt_print:
         bias = { -10, -5 };
         break;
     case DispConfig::e_wt_print_list:
-        bias = { -10, -58 };
+        bias = { -6, -40 };
         break;
     case DispConfig::e_wt_slider:
         bias = { -70,165 };
@@ -357,7 +363,7 @@ void DispConfig::processWindows(const wxString& name,CreateFn fn, WindowConfig s
     if (name == "gcode_legend") {
         if(!s_isDark)
         {
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4{ 255 / 255.f,255 / 255.f,255 / 255.f,1.0f });
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4{ 0.f, 0.f, 0.f, 0.05f });
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 51 / 255.f,51 / 255.f,51 / 255.f,1.f });
             colornum += 2;
         }

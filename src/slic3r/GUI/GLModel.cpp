@@ -737,6 +737,143 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 }
 
+void GLModel::release_instance_data_from_gpu()
+{
+    // release gpu memory
+    if (m_render_data.instance_vbo_id > 0) {
+        glsafe(::glDeleteBuffers(1, &m_render_data.instance_vbo_id));
+        m_render_data.instance_vbo_id = 0;
+    }
+
+    m_render_data.instance_count = 0;
+}
+
+void GLModel::render_instanced_ex()
+{
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+
+    if(0 == m_render_data.instance_vbo_id)
+        return;
+
+    // vertex attributes
+    const GLint position_id = shader->get_attrib_location("v_position");
+    const GLint normal_id = shader->get_attrib_location("v_normal");
+    if (position_id == -1 || normal_id == -1)
+        return;
+
+    // instance attributes
+    const GLint offset_id = shader->get_attrib_location("i_offset");
+    if (offset_id == -1)
+        return;
+
+    if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
+            return;
+    }
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.instance_vbo_id));
+    const size_t instance_stride = 3 * sizeof(float);
+    glsafe(::glVertexAttribPointer(offset_id, 3, GL_FLOAT, GL_FALSE, instance_stride, (const void*)0));
+    glsafe(::glEnableVertexAttribArray(offset_id));
+    glsafe(::glVertexAttribDivisor(offset_id, 1));
+
+    const Geometry& data = m_render_data.geometry;
+
+    const GLenum mode = get_primitive_mode(data.format);
+    const GLenum index_type = get_index_type(data);
+
+    const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
+    const bool position = Geometry::has_position(data.format);
+    const bool normal = Geometry::has_normal(data.format);
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
+
+    if (position) {
+        glsafe(::glVertexAttribPointer(position_id, Geometry::position_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
+        glsafe(::glEnableVertexAttribArray(position_id));
+    }
+
+    if (normal) {
+        glsafe(::glVertexAttribPointer(normal_id, Geometry::normal_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
+        glsafe(::glEnableVertexAttribArray(normal_id));
+    }
+
+    //shader->set_uniform("uniform_color", data.color);
+
+    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
+    glsafe(::glDrawElementsInstanced(mode, m_render_data.indices_count, index_type, (const void*)0, m_render_data.instance_count));
+    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+    if (normal)
+        glsafe(::glDisableVertexAttribArray(normal_id));
+    if (position)
+        glsafe(::glDisableVertexAttribArray(position_id));
+
+    glsafe(::glDisableVertexAttribArray(offset_id));
+    glsafe(::glVertexAttribDivisor(offset_id, 0));
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+}
+
+void GLModel::render_single(const Vec3f& single_offset)
+{
+    GLShaderProgram* shader = wxGetApp().get_current_shader();
+    if (shader == nullptr)
+        return;
+
+    // vertex attributes
+    const GLint position_id = shader->get_attrib_location("v_position");
+    const GLint normal_id = shader->get_attrib_location("v_normal");
+    if (position_id == -1 || normal_id == -1)
+        return;
+
+    const GLint offset_loc = shader->get_uniform_location("u_offset");
+    if (offset_loc != -1)
+        glsafe(::glUniform3fv(offset_loc, 1, single_offset.data()));
+    else
+        return;
+
+    if (m_render_data.vbo_id == 0 || m_render_data.ibo_id == 0) {
+            return;
+    }
+
+    const Geometry& data = m_render_data.geometry;
+
+    const GLenum mode = get_primitive_mode(data.format);
+    const GLenum index_type = get_index_type(data);
+
+    const size_t vertex_stride_bytes = Geometry::vertex_stride_bytes(data.format);
+    const bool position = Geometry::has_position(data.format);
+    const bool normal = Geometry::has_normal(data.format);
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.vbo_id));
+
+    if (position) {
+        glsafe(::glVertexAttribPointer(position_id, Geometry::position_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::position_offset_bytes(data.format)));
+        glsafe(::glEnableVertexAttribArray(position_id));
+    }
+
+    if (normal) {
+        glsafe(::glVertexAttribPointer(normal_id, Geometry::normal_stride_floats(data.format), GL_FLOAT, GL_FALSE, vertex_stride_bytes, (const void*)Geometry::normal_offset_bytes(data.format)));
+        glsafe(::glEnableVertexAttribArray(normal_id));
+    }
+
+    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
+
+    glsafe(::glDrawElements(mode, m_render_data.indices_count, index_type, nullptr));
+
+    glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+    if (normal)
+        glsafe(::glDisableVertexAttribArray(normal_id));
+    if (position)
+        glsafe(::glDisableVertexAttribArray(position_id));
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+}
+
 bool GLModel::send_to_gpu()
 {
     if (m_render_data.vbo_id > 0 || m_render_data.ibo_id > 0) {
@@ -791,6 +928,23 @@ bool GLModel::send_to_gpu()
     data.indices = std::vector<unsigned int>();
 
     return true;
+}
+
+bool GLModel::send_instance_data_to_gpu(const std::vector<Vec3f>& instances_offsets)
+{
+    if(m_render_data.instance_vbo_id == 0) {
+        glsafe(::glGenBuffers(1, &m_render_data.instance_vbo_id));
+    }
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data.instance_vbo_id));
+    glsafe(::glBufferData(GL_ARRAY_BUFFER, instances_offsets.size() * sizeof(Vec3f), instances_offsets.data(), GL_STATIC_DRAW));
+
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+    m_render_data.instance_count = instances_offsets.size();
+
+    return true;
+
 }
 
 template<typename Fn>

@@ -293,6 +293,7 @@ public:
     // BBS: save & backup
     void load_project(wxString const & filename = "", wxString const & originfile = "-");
     int  save_project(bool saveAs = false, FileType ft = FileType::FT_3MF, En3mfType type_3mf = En3mfType::From_Creality);
+    int  save_project_nogcode(bool saveAs = false, FileType ft = FileType::FT_3MF, En3mfType type_3mf = En3mfType::From_Creality);
     //BBS download project by project id
     void import_model_id(wxString download_info);
     void download_project(const wxString& project_id);
@@ -581,6 +582,7 @@ public:
     void arrange();
     void orient();
     void find_new_position(const ModelInstancePtrs  &instances);
+    void arrange_loaded_object_to_new_position(ModelInstance* new_instance,const std::vector<ModelInstance*>& ignore_insts = std::vector <ModelInstance*>());
     //BBS: add job state related functions
     void set_prepare_state(int state);
     int get_prepare_state();

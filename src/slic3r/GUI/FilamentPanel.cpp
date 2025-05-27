@@ -244,6 +244,7 @@ void FilamentButton::OnChildButtonPaint(wxPaintEvent& event)
     // Draw the label in the left half
     if (!m_sync_filament_label.IsEmpty()) {
         int textWidth, textHeight;
+        dc.SetFont(Label::Body_12);
         dc.GetTextExtent(m_sync_filament_label, &textWidth, &textHeight);
 
         int textX = leftRect.GetX() + (leftRect.GetWidth() - textWidth) / 2;
@@ -444,9 +445,7 @@ void FilamentButton::doRender(wxDC& dc)
 
 	this->SetSize(wxSize(400 * em, 28 * em));
     
-   #ifdef __APPLE__
-    Bind(wxEVT_LEAVE_WINDOW, &FilamentPopPanel::OnMouseLeave, this);
-   #endif
+  
 
 	m_sizer_main = new wxBoxSizer(wxHORIZONTAL);
 	{
@@ -461,12 +460,11 @@ void FilamentButton::doRender(wxDC& dc)
                 m_pFilamentItem->resetCFS(true);
                 }
             });
-#ifdef __APPLE__
-        m_filamentCombox->Bind(wxEVT_COMBOBOX_CLOSEUP, [this](wxCommandEvent& event) {
-            this->Dismiss();
-            event.Skip();
-        });
-#endif
+        m_filamentCombox->Bind(wxEVT_COMBOBOX_DROPDOWN, [this](wxCommandEvent& e) { 
+        #if __APPLE__
+            this->Hide();
+        #endif
+		});
 		// filament combox
         wxSizerItem* item = m_sizer_main->Add(m_filamentCombox, 1, wxUP | wxDOWN | wxRIGHT, 1);
         item->SetProportion(wxEXPAND);
@@ -590,37 +588,46 @@ void FilamentButton::doRender(wxDC& dc)
             m_sizer_main->Add(m_edit_btn, wxSizerFlags().Border(wxUP | wxDOWN | wxRIGHT | wxLEFT, 1));
 		}
 	}
-
+#if __APPLE__
+    Bind(wxEVT_LEFT_DOWN, &FilamentPopPanel::on_left_down, this); 
+#endif
     Slic3r::GUI::wxGetApp().UpdateDarkUIWin(this);
 	SetSizer(m_sizer_main);
 	Layout();
 	Thaw();
 }
 
+void FilamentPopPanel::on_left_down(wxMouseEvent &evt)
+{
+    
+    auto pos = ClientToScreen(evt.GetPosition());
+    auto firstChildren = m_sizer_main->GetChildren();
+    for(wxSizerItem* firstItem: firstChildren)
+    {   
+        wxWindow* item = firstItem->GetWindow();
+        auto p_rect = item->ClientToScreen(wxPoint(0, 0));
+        if (pos.x > p_rect.x && pos.y > p_rect.y && pos.x < (p_rect.x + item->GetSize().x) && pos.y < (p_rect.y + item->GetSize().y)) {
+            wxMouseEvent event = evt;
+            auto new_pos = pos - p_rect;
+		    event.SetEventObject(item);
+            event.SetPosition(new_pos);
+            item->GetEventHandler()->ProcessEvent(event);
+            
+        }
+    }
+
+}
+
 FilamentPopPanel::~FilamentPopPanel() {}
 
-#ifdef __APPLE__
-void FilamentPopPanel::OnMouseLeave(wxMouseEvent& event)
-{
-    // 如果鼠标离开窗口，则关闭弹窗
-    bool isDropDown = m_filamentCombox->is_drop_down();
-    if (!isDropDown)
-    {
-        Dismiss();
-    }
-   
-    event.Skip();
-}
-#endif
+
 
 void FilamentPopPanel::Popup(wxPoint position /*= wxDefaultPosition*/)
 {
 	SetPosition(position);
-#ifdef __APPLE__
-    PopupWindow::Show();
-#else
+
 	PopupWindow::Popup();
-#endif
+
 }
 
 void FilamentPopPanel::Dismiss()
@@ -798,6 +805,7 @@ FilamentItem::FilamentItem(wxWindow* parent, const Data& data, const wxSize& siz
 	m_popPanel->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent& e) { 
 		Slic3r::GUI::wxGetApp().sidebar().GetEventHandler()->ProcessEvent(e);
 		});
+        
 }
 
 void FilamentItem::set_checked(bool checked /*= true*/)
@@ -1066,7 +1074,7 @@ FilamentPanel::FilamentPanel(wxWindow* parent,
 	m_sizer = new wxWrapSizer(wxHORIZONTAL);
 	m_box_sizer = new wxBoxSizer(wxVERTICAL);
 	this->SetSizer(m_box_sizer);
-	m_box_sizer->Add(m_sizer);
+    m_box_sizer->Add(m_sizer, 0, wxLEFT | wxRIGHT, FromDIP(6));
     m_box_sizer->AddSpacer(FromDIP(8));
 #ifdef __APPLE__
 	m_box_sizer->AddSpacer(FromDIP(20));
@@ -1100,7 +1108,7 @@ bool FilamentPanel::add_filament()
 		});
 
 	m_vt_filament.push_back(filament);
-	m_sizer->Add(filament, wxSizerFlags().Border(wxALL, FromDIP(2)));
+	m_sizer->Add(filament, wxSizerFlags().Border(wxALL, FromDIP(4)));
 	m_sizer->Layout();
 	this->GetParent()->Layout();
 
@@ -1425,7 +1433,7 @@ int FilamentPanel::LoadProfileFamily(std::string strVendor, std::string strFileP
     return 0;
 }
 
-int FilamentPanel::LoadFilamentProfile()
+int FilamentPanel::LoadFilamentProfile(bool isCxVedor)
 {
     m_FilamentProfileJson = json::parse("{}");
     m_FilamentProfileJson["filament"] = json::object();
@@ -1462,9 +1470,20 @@ int FilamentPanel::LoadFilamentProfile()
             strVendor = strVendor.AfterLast('\\');
             strVendor = strVendor.AfterLast('\/');
             wxString strExtension = Slic3r::GUI::from_u8(iter->path().string()).AfterLast('.').Lower();
-
-            if (w2s(strVendor) == Slic3r::PresetBundle::BBL_BUNDLE && strExtension.CmpNoCase("json") == 0)
-                LoadProfileFamily(w2s(strVendor), iter->path().string());
+            if(isCxVedor)
+            {
+                if(strVendor == "Creality")
+                {
+                    if (w2s(strVendor) == Slic3r::PresetBundle::BBL_BUNDLE && strExtension.CmpNoCase("json") == 0)
+                        LoadProfileFamily(w2s(strVendor), iter->path().string());
+                }
+            }else{
+                if(strVendor != "Creality")
+                {
+                    if (w2s(strVendor) == Slic3r::PresetBundle::BBL_BUNDLE && strExtension.CmpNoCase("json") == 0)
+                        LoadProfileFamily(w2s(strVendor), iter->path().string());
+                }
+            }
         }
     }
 
@@ -1485,9 +1504,22 @@ int FilamentPanel::LoadFilamentProfile()
             strVendor = strVendor.AfterLast('\\');
             strVendor = strVendor.AfterLast('\/');
             wxString strExtension = Slic3r::GUI::from_u8(iter->path().string()).AfterLast('.').Lower();
-
-            if (w2s(strVendor) != Slic3r::PresetBundle::BBL_BUNDLE && strExtension.CmpNoCase("json") == 0)
-                LoadProfileFamily(w2s(strVendor), iter->path().string());
+            if(isCxVedor)
+            {
+                if(strVendor == "Creality")
+                {
+                    if (w2s(strVendor) != Slic3r::PresetBundle::BBL_BUNDLE && strExtension.CmpNoCase("json") == 0)
+                        LoadProfileFamily(w2s(strVendor), iter->path().string());
+                }
+                
+            }else{
+                if(strVendor != "Creality")
+                {
+                    if (w2s(strVendor) != Slic3r::PresetBundle::BBL_BUNDLE && strExtension.CmpNoCase("json") == 0)
+                        LoadProfileFamily(w2s(strVendor), iter->path().string());
+                }
+            }
+            
         }
     }
 
@@ -1589,7 +1621,7 @@ void FilamentPanel::on_auto_mapping_filament(const DM::Device& deviceData)
     //2.遍历选中的耗材，查看是否有新增的。
     //3.有-更改内存，写入conf中。保存。
     //4.更新presetBundle,更新PlaterPresetComboBox
-    int iNum = LoadFilamentProfile();
+    int iNum = LoadFilamentProfile(Slic3r::GUI::wxGetApp().preset_bundle->is_cx_vendor());
     if (iNum)
     {
         SetFilamentProfile(validMaterials);
@@ -1887,7 +1919,7 @@ BoxColorPopPanel::BoxColorPopPanel(wxWindow* parent)
 
 	    // Set background color
     SetBackgroundColour(wxColour(54, 54, 56)); // Light grey background color
-	SetSize(FromDIP(200), FromDIP(150));
+	SetSize(FromDIP(200), FromDIP(200));
 
     // Create a panel for the second column and add it to the main sizer
     m_secondColumnPanel = new wxPanel(this);
@@ -1992,54 +2024,88 @@ void BoxColorPopPanel::OnFirstColumnButtonClicked(wxCommandEvent& event)
         button->Refresh();
 
         // 使用 std::intptr_t 来存储指针值
+        
         std::intptr_t boxId = reinterpret_cast<std::intptr_t>(button->GetClientData());
 
         const DM::MaterialBox* material_box_info = nullptr;
+        const DM::MaterialBox* ext_material_box_info = nullptr;
+    
         for (const auto& box_info : m_device_data.materialBoxes) {
             if (box_info.box_id == boxId) {
                 material_box_info = &box_info;
-                break;
+                //break;
+            }
+            if (box_info.box_type == 1) {
+                ext_material_box_info = &box_info;
             }
         }
+        
 
-        if (!material_box_info) return;
+        if (!material_box_info && !ext_material_box_info ) return;
 
         int  material_id        = 0;
+        int  box_id        = 0;
+        bool is_ext_material = false;
         bool has_exact_material = false;
+        
+        for (int i = -1; i < 4; i++) {
 
-        for (int i = 0; i < 4; i++) {
-
-            material_id = i;
-
-            FilamentColorSelectionItem* filament_item = new FilamentColorSelectionItem(m_secondColumnPanel, wxSize(FromDIP(120), FromDIP(24)));
+            FilamentColorSelectionItem* filament_item = new FilamentColorSelectionItem(m_secondColumnPanel, wxSize(FromDIP(120), FromDIP(20)));
             assert(filament_item);
 
             try {
-                // check whether the array has the exact material
                 has_exact_material = false;
-                for (const auto& material : material_box_info->materials) {
-                    if (material.material_id == material_id && material_box_info->box_type == 0 && !material.color.empty()) {
-                        filament_item->set_sync_state(true);
-                        filament_item->set_is_ext(false);
-                        filament_item->update_item_info_by_material(material_box_info->box_id, material);
-                        has_exact_material = true;
+                if(i==-1)
+                {
+                    if(ext_material_box_info)
+                    {
+                        box_id = ext_material_box_info->box_id;
+                        is_ext_material = true;
+                        for (const auto& material : ext_material_box_info->materials) {
+                            if (material.material_id == material_id && ext_material_box_info->box_type == 1 && !material.color.empty()) {
+                                filament_item->set_sync_state(true);
+                                filament_item->set_is_ext(is_ext_material);
+                                filament_item->update_item_info_by_material(ext_material_box_info->box_id, material);
+                                has_exact_material = true;
+                                break;
+                            }
+                        }
+                    }
+                }else{
+                    material_id = i;
+                    // check whether the array has the exact material
+                    if(material_box_info)
+                    {
+                        box_id = material_box_info->box_id;
+                        is_ext_material = false;
+                        for (const auto& material : material_box_info->materials) {
+                            if (material.material_id == material_id && material_box_info->box_type == 0 && !material.color.empty()) {
+                                filament_item->set_sync_state(true);
+                                filament_item->set_is_ext(is_ext_material);
+                                filament_item->update_item_info_by_material(material_box_info->box_id, material);
+                                has_exact_material = true;
+                                break;
+                            }
+                        }
+                    }else{
+                        delete filament_item;
                         break;
                     }
                 }
-
                 if (!has_exact_material) {
                     DM::Material tmp_material;
                     tmp_material.material_id = material_id;
                     tmp_material.color      = "#808080"; // grey
+                    tmp_material.type       = "?";
                     filament_item->set_sync_state(false);
-                    filament_item->set_is_ext(false);
-                    filament_item->update_item_info_by_material(material_box_info->box_id, tmp_material);
+                    filament_item->set_is_ext(is_ext_material);
+                    filament_item->update_item_info_by_material(box_id, tmp_material);
                 }
 
                 // Bind the click event for the second column items
                 filament_item->Bind(wxEVT_BUTTON, &BoxColorPopPanel::OnSecondColumnItemClicked, this);
 
-                m_secondColumnSizer->Add(filament_item, 0, wxALL, 5);
+                m_secondColumnSizer->Add(filament_item, 0, wxALL, 3);
             }
             catch (const std::exception& ex) {
                 if(filament_item)
@@ -2118,6 +2184,8 @@ void BoxColorPopPanel::init_by_device_data(const DM::Device& device_data)
 	m_secondColumnSizer->Clear(true);
 
     int cfsBoxSize = 0;
+    
+    //add cfs1, cfs2, cfs3, cfs4 to first column
     for (const auto& material_box_info : m_device_data.materialBoxes) {
 
 		if (0 == material_box_info.box_type) {  // normal multi-color box
@@ -2134,21 +2202,30 @@ void BoxColorPopPanel::init_by_device_data(const DM::Device& device_data)
     } 
 
     }
+    if(cfsBoxSize == 0)
+    {
+        //add ext to first column
+        wxButton* button = new wxButton(this, wxID_ANY, "EXT", wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+        button->SetMinSize(wxSize(FromDIP(50), FromDIP(24)));
+        button->SetMaxSize(wxSize(FromDIP(50), FromDIP(24)));
+        button->SetClientData(reinterpret_cast<void*>(-1)); // Set the box_id to -1 for EXT
+        m_firstColumnSizer->Add(button, 0, wxALL, 5);
+    }
 
-    if (cfsBoxSize == 1) {
+    if (cfsBoxSize <= 1) {
         m_firstColumnSizer->Hide(size_t(0));
         m_mainSizer->Hide(size_t(0));
         m_mainSizer->Hide(size_t(1));
         m_mainSizer->Layout();
         this->SetMinSize(wxSize(FromDIP(128), FromDIP(150)));
-        this->SetMaxSize(wxSize(FromDIP(128), FromDIP(150)));
+        this->SetMaxSize(wxSize(FromDIP(128), FromDIP(200)));
     } else {
         m_firstColumnSizer->Show(size_t(0));
         m_mainSizer->Show(size_t(0));
         m_mainSizer->Show(size_t(1));
         m_mainSizer->Layout();
         this->SetMinSize(wxSize(FromDIP(200), FromDIP(150)));
-        this->SetMaxSize(wxSize(FromDIP(200), FromDIP(150)));
+        this->SetMaxSize(wxSize(FromDIP(200), FromDIP(200)));
     }
 
 	Layout();

@@ -36,6 +36,7 @@
 #if defined(__linux__) || defined(__LINUX__)
 #include "video/WebRTCDecoder.h"
 #endif
+#include "buildinfo.h"
 
 namespace pt = boost::property_tree;
 
@@ -78,15 +79,20 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
     std::string version = std::string(CREALITYPRINT_VERSION);
     std::string os = wxGetOsDescription().ToStdString();
     int port = wxGetApp().get_server_port();
+    int customized = 0;
+    #ifdef CUSTOMIZED
+        customized = 1;
+    #endif
 //#define _DEBUG1
 #ifdef _DEBUG1
-        wxString url = wxString::Format("http://localhost:5173/?version=%s&port=%d&os=%s", version, port,os);
+     wxString url = wxString::Format("http://localhost:5173/?version=%s&port=%d&os=%s&customized=%d", version, port, os, customized);
         this->load_url(url, wxString());
          m_browser->EnableAccessToDevTools();
      #else
         //wxString url = wxString::Format("http://localhost:%d/deviceMgr/index.html", wxGetApp().get_server_port());
         
-        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s&port=%d&os=%s", from_u8(resources_dir()), version,port,os);
+        wxString url = wxString::Format("%s/web/deviceMgr/index.html?version=%s&port=%d&os=%s&customized=%d", from_u8(resources_dir()),
+                                        version, port, os, customized);
         url.Replace(wxT("\\"), wxT("/"));
         url.Replace(wxT("#"), wxT("%23"));
         wxURI uri(url);
@@ -98,12 +104,28 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
         m_browser->EnableAccessToDevTools();
 
      #endif
+    
+    #ifdef __WXGTK__
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    SetDoubleBuffered(true);
+    m_freshTimer = new wxTimer();
+    m_freshTimer->SetOwner(this);
+    m_freshTimer->Start(500);
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&){
+        this->Refresh();
+    });
+    #endif
     DM::AppMgr::Ins().Register(m_browser);
     DM::AppMgr::Ins().RegisterEvents(m_browser, std::vector<std::string>{DM::EVENT_SET_CURRENT_DEVICE, DM::EVENT_FORWARD_DEVICE_DETAIL});
  }
 
 PrinterMgrView::~PrinterMgrView()
 {
+#ifdef __WXGTK__
+    m_freshTimer->Stop();
+    m_browser->Stop();
+    m_browser->RemoveScriptMessageHandler("wx");
+#endif
     DM::AppMgr::Ins().UnRegister(m_browser);
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Start";
     SetEvtHandlerEnabled(false);
@@ -213,8 +235,9 @@ void PrinterMgrView::OnLoaded(wxWebViewEvent &evt)
 
 void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
 {
-    try {
-        
+    try
+    {
+
         if (DM::AppMgr::Ins().Invoke(m_browser, evt.GetString().ToUTF8().data()))
         {
             return;
@@ -222,54 +245,63 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
 
         wxString strInput = evt.GetString();
         BOOST_LOG_TRIVIAL(trace) << "DeviceDialog::OnScriptMessage;OnRecv:" << strInput.c_str();
-        json     j        = json::parse(strInput);
+        json     j = json::parse(strInput);
 
         wxString strCmd = j["command"];
         BOOST_LOG_TRIVIAL(trace) << "DeviceDialog::OnScriptMessage;Command:" << strCmd;
 
-        if (strCmd == "send_gcode") {
+        if (strCmd == "send_gcode")
+        {
             int plateIndex = j["plateIndex"];
-            wxString ipAddress  = j["ipAddress"];
+            wxString ipAddress = j["ipAddress"];
             wxString uploadName = j["uploadName"];
 
             PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(plateIndex);
-            if (plate) {
+            if (plate)
+            {
                 std::string gcodeFilePath = plate->get_tmp_gcode_path();
-                if (wxGetApp().plater()->only_gcode_mode()) {
+                if (wxGetApp().plater()->only_gcode_mode())
+                {
                     gcodeFilePath = wxGetApp().plater()->get_last_loaded_gcode().ToStdString();
                 }
 
                 RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(ipAddress.ToStdString(), uploadName.ToStdString(), gcodeFilePath,
-                    [this](std::string ip, float progress) {
+                    [this](std::string ip, float progress, double speed) {
                         // BOOST_LOG_TRIVIAL(info) << "Progress: " << progress << "% for IP: " << ip;
 
-                        wxString jsCode = wxString::Format("window.updateProgress('%s', %f);", ip, progress);
+                        wxString jsCode = wxString::Format("window.updateProgress('%s', %f ,%f);", ip, progress, speed);
 
                         wxTheApp->CallAfter([this, jsCode]() {
-                            if (m_browser->IsBusy()) {
+                            if (m_browser->IsBusy())
+                            {
                                 BOOST_LOG_TRIVIAL(trace) << "Browser is busy, delaying script execution.";
                                 // Optionally, you can queue the script to run later
-                            } else {
+                            }
+                            else
+                            {
                                 bool result = WebView::RunScript(m_browser, jsCode);
                                 BOOST_LOG_TRIVIAL(trace) << "RunScript result: " << result;
                             }
-                        });
+                            });
                     },
                     [this](std::string ip, int statusCode) {
 
                         wxString statusJsCode = wxString::Format("window.uploadStatus('%s', %d);", ip, statusCode);
 
                         wxTheApp->CallAfter([this, statusJsCode]() {
-                            if (m_browser->IsBusy()) {
+                            if (m_browser->IsBusy())
+                            {
                                 BOOST_LOG_TRIVIAL(trace) << "Browser is busy, delaying script execution.";
                                 // Optionally, you can queue the script to run later
-                            } else {
+                            }
+                            else
+                            {
                                 bool result = WebView::RunScript(m_browser, statusJsCode);
                                 BOOST_LOG_TRIVIAL(trace) << "RunScript result: " << result;
                             }
-                        });
+                            });
                     }
-                );
+                    );
             }
         }else if(strCmd == "down_files")
         {
@@ -293,28 +325,32 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
             
 
         }
-        else if(strCmd == "down_file")
+        else if (strCmd == "down_file")
         {
-           std::string url = j["url"];
-           std::string name = j["name"];
-           std::string file_type = j["file_type"];
+            std::string url = j["url"];
+            std::string name = j["name"];
+            std::string file_type = j["file_type"];
 
-           this->down_file(url, name, file_type);
-        } else if (strCmd.compare("common_openurl") == 0) {
+            this->down_file(url, name, file_type);
+        }
+        else if (strCmd.compare("common_openurl") == 0)
+        {
             boost::optional<std::string> path = j["url"];
-            if (path.has_value()) {
+            if (path.has_value())
+            {
                 wxLaunchDefaultBrowser(path.value());
             }
-        } 
+        }
         else if (strCmd == "scan_device")
         {
             scan_device();
         }
-        
-        else if (m_commandHandlers.find(strCmd.ToStdString()) != m_commandHandlers.end()) {
+
+        else if (m_commandHandlers.find(strCmd.ToStdString()) != m_commandHandlers.end())
+        {
             m_commandHandlers[strCmd.ToStdString()](j);
         }
-        else if(strCmd == "req_device_move_direction")
+        else if (strCmd == "req_device_move_direction")
         {
             std::string presetName = j["preset_name"];
             std::string address = j["address"];
@@ -322,31 +358,38 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
             int machine_LED_light_exist = 0;
             int auxiliary_fan = 0;
             int support_air_filtration = 0;
+            int machine_ptc_exist = 0;
             Preset*     preset = Slic3r::GUI::wxGetApp().preset_bundle->printers.find_preset(presetName);
             if (preset != nullptr) {
                 if(preset->config.has("machine_platform_motion_enable"))
                 {
                     const ConfigOption* option = preset->config.option("machine_platform_motion_enable");
                     bool b = option->getBool();
-                    direction     = b ? 1 : 0;
+                    direction = b ? 1 : 0;
                 }
-                if(preset->config.has("support_air_filtration"))
+                if (preset->config.has("support_air_filtration"))
                 {
                     const ConfigOption* option = preset->config.option("support_air_filtration");
                     bool b = option->getBool();
-                    support_air_filtration     = b ? 1 : 0;
+                    support_air_filtration = b ? 1 : 0;
                 }
-                if(preset->config.has("machine_LED_light_exist"))
+                if (preset->config.has("machine_LED_light_exist"))
                 {
                     const ConfigOption* option = preset->config.option("machine_LED_light_exist");
                     bool b = option->getBool();
-                    machine_LED_light_exist     = b ? 1 : 0;
+                    machine_LED_light_exist = b ? 1 : 0;
                 }
-                if(preset->config.has("auxiliary_fan"))
+                if (preset->config.has("auxiliary_fan"))
                 {
                     const ConfigOption* option = preset->config.option("auxiliary_fan");
                     bool b = option->getBool();
-                    auxiliary_fan     = b ? 1 : 0;
+                    auxiliary_fan = b ? 1 : 0;
+                }
+                if(preset->config.has("machine_ptc_exist"))
+                {
+                    const ConfigOption* option = preset->config.option("machine_ptc_exist");
+                    bool b = option->getBool();
+                    machine_ptc_exist     = b ? 1 : 0;
                 }
                 nlohmann::json commandJson;
                 nlohmann::json  dataJson;
@@ -355,6 +398,7 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
                 dataJson["machine_LED_light_exist"]  = machine_LED_light_exist;
                 dataJson["auxiliary_fan"]  = auxiliary_fan;
                 dataJson["support_air_filtration"]  = support_air_filtration;
+                dataJson["machine_ptc_exist"]  = machine_ptc_exist;
                 
                 dataJson["address"]    = address;
                 commandJson["data"]    = dataJson;
@@ -362,7 +406,7 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
                 run_script(strJS.ToStdString());
             }
         }
-        else if(strCmd == "get_machine_list")
+        else if (strCmd == "get_machine_list")
         {
             load_machine_preset_data();
         }else if(strCmd == "switch_webrtc_source")
@@ -373,13 +417,37 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
             WebRTCDecoder::GetInstance()->startPlay(video_url); 
 #endif
         }
-        else {
+        else if (strCmd == "get_file_List_from_lan_device")
+        {
+            std::string strIp = j["url"];
+            getFileListFromLanDevice(strIp);
+        }
+        else if (strCmd == "delete_file_from_lan_device")
+        {
+            std::string strIp = j["url"];
+            std::string strName = j["name"];
+
+            deleteFileListFromLanDevice(strIp,strName);
+        }
+        else if (strCmd == "uploade_file_oldPrinter")
+        {
+            std::string strIp = j["url"];
+
+            int num = uploadeFileLanDevice(strIp);
+            nlohmann::json commandJson;
+            commandJson["data"] = num;
+            commandJson["command"] = "uploade_file_oldPrinter";
+            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump());
+            run_script(strJS.ToStdString());
+        }
+        else
+        {
             BOOST_LOG_TRIVIAL(trace) << "PrinterMgrView::OnScriptMessage;Unknown Command:" << strCmd;
         }
-        
-
-    } catch (std::exception &e) {
-       // wxMessageBox(e.what(), "json Exception", MB_OK);
+    }
+    catch (std::exception& e)
+    {
+        // wxMessageBox(e.what(), "json Exception", MB_OK);
         BOOST_LOG_TRIVIAL(trace) << "DeviceDialog::OnScriptMessage;Error:" << e.what();
     }
 
@@ -520,17 +588,17 @@ void PrinterMgrView::run_script(std::string content)
     WebView::RunScript(m_browser, content);
 }
 std::string getFileNameFromURL(const std::string& url) {
-    // 使用std::istringstream来分割URL
+    // ???std::istringstream?????URL
     std::istringstream iss(url);
     std::string segment;
     std::string fileName;
  
-    // 查找最后一个'/'字符的位置
+    // ??????????'/'?????��??
     size_t lastIndex = url.find_last_of("/\\");
     if (lastIndex != std::string::npos) {
-        fileName = url.substr(lastIndex + 1); // 从最后一个'/'或'\\'之后开始获取文件名
+        fileName = url.substr(lastIndex + 1); // ????????'/'??'\\'????????????
     } else {
-        // 如果URL中没有'/'，则整个URL可能是文件名
+        // ???URL?????'/'????????URL???????????
         fileName = url;
     }
  
@@ -691,15 +759,28 @@ void PrinterMgrView::scan_device()
             prefix.push_back("CXSWBox");
             prefix.push_back("creality");
             prefix.push_back("Creality");
-            std::vector<std::string> vtIp;
+            std::vector<std::string> vtIp,vtBoxIp;
             auto vtDevice = cxnet::syncDiscoveryService(prefix);
             for (auto& item : vtDevice) {
-                vtIp.push_back(item.machineIp);
+
+                std::string answer = item.answer;
+                if (answer.substr(0, 8) == "_CXSWBox")
+                {
+                    vtBoxIp.push_back(item.machineIp);
+                }
+                else
+                {
+                    vtIp.push_back(item.machineIp);
+                }
             }
+
+            nlohmann::json dataJson;
+            dataJson["servers"] = vtIp;  
+            dataJson["boxs"] = vtBoxIp;   
 
             nlohmann::json commandJson;
             commandJson["command"] = "scan_device";
-            commandJson["data"]    = vtIp;
+            commandJson["data"]    = dataJson;
 
             wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump()));           
             wxGetApp().CallAfter([this, strJS] { run_script(strJS.ToStdString()); });            
@@ -908,6 +989,7 @@ int PrinterMgrView::load_machine_preset_data()
             nlohmann::json commandJson;
             commandJson["command"] = "get_machine_list";
             commandJson["data"]    = pmodels;
+            wxString strTmp = wxString::Format("handleStudioCmd('%s')",pmodels.dump(-1,' ',true));
             wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
             run_script(strJS.ToStdString());
         }catch (nlohmann::detail::parse_error &err) {
@@ -966,6 +1048,207 @@ int PrinterMgrView::load_machine_preset_data()
 
     return 0;
 }
+
+int PrinterMgrView::getFileListFromLanDevice(const std::string strIp)
+{
+    if (strIp.empty())
+    {
+        return -1;
+    }
+
+    CURL* curl = curl_easy_init();
+    if (!curl)
+    {
+        return -1;
+    }
+
+    // RAII����CURL���
+    struct CurlGuard
+    {
+        CURL* handle;
+        ~CurlGuard()
+        {
+            if (handle) curl_easy_cleanup(handle);
+        }
+    } guard{ curl };
+
+    std::string ftpUrl = "ftp://" + strIp + "/mmcblk0p1/creality/gztemp/";
+    curl_easy_setopt(curl, CURLOPT_URL, ftpUrl.c_str());
+    curl_easy_setopt(curl, CURLOPT_USERPWD, "anonymous:");
+    curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_NONE);
+
+    // ������ʱ�ļ��洢FTP��Ӧ
+    std::string tempFilePath = "/tmp/ftp_listing_temp"; // Linux/Mac��ʱ·��
+#if defined(_WIN32)
+    tempFilePath = std::tmpnam(nullptr); // Windows��ʱ�ļ�
+#endif
+
+    FILE* fd = nullptr;
+#if defined(_MSC_VER) || defined(__MINGW64__)
+    fd = boost::nowide::fopen(tempFilePath.c_str(), "wb+");
+#elif defined(__GNUC__) && defined(_LARGEFILE64_SOURCE)
+    fd = fopen64(tempFilePath.c_str(), "wb+");
+#else
+    fd = fopen(tempFilePath.c_str(), "wb+");
+#endif
+
+    if (fd == nullptr)
+    {
+        return -1;
+    }
+
+    // RAII�����ļ����
+    struct FileGuard
+    {
+        FILE* fd;
+        std::string filePath;
+        ~FileGuard()
+        {
+            if (fd) fclose(fd);
+            // ɾ����ʱ�ļ�
+            remove(filePath.c_str());
+        }
+    } fileGuard{ fd, tempFilePath };
+
+    //������д���ļ�
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fd);
+
+    // ͬ��ִ������
+    CURLcode res = curl_easy_perform(curl);
+
+    std::vector<std::string> FileInfoList;
+
+    if (res == CURLE_OK)
+    {
+        // �����ļ�ָ�뵽��ͷ
+        rewind(fd);
+
+        //��ȡ�ļ����ݲ�����
+        char buffer[1024];
+        while (fgets(buffer, sizeof(buffer), fd))
+        {
+            std::string line(buffer);
+
+            // �Ƴ����л��з��ͻس���
+            line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+            line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+
+            FileInfoList.push_back(line);
+        }
+
+        nlohmann::json commandJson;
+        nlohmann::json dataJson;
+
+        dataJson["address"] = strIp;
+        if(FileInfoList.empty())
+            dataJson["fileList"] = nlohmann::json::array();
+        else
+            dataJson["fileList"] = FileInfoList;
+        commandJson["command"] = "get_file_List_from_lan_device";
+        commandJson["data"] = dataJson;
+
+        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+        run_script(strJS.ToStdString());
+    }
+    return 0;
+}
+
+int PrinterMgrView::deleteFileListFromLanDevice(const std::string strIp, const std::string strName)
+{
+    if (strIp.empty() || strName.empty())
+    {
+        return -1;
+    }
+
+    CURL* curl = curl_easy_init();
+    if (!curl)
+    {
+        return -1;
+    }
+
+    // RAII����CURL���
+    struct CurlGuard
+    {
+        CURL* handle;
+        ~CurlGuard()
+        {
+            if (handle) curl_easy_cleanup(handle);
+        }
+    } guard{ curl };
+
+    std::string fullPath = "ftp://" + strIp + "/mmcblk0p1/creality/gztemp/";
+    curl_easy_setopt(curl, CURLOPT_URL, fullPath.c_str());
+
+    std::string deleteCmd = "DELE /mmcblk0p1/creality/gztemp/" + strName;
+    struct curl_slist *CMDlist = nullptr;
+    CMDlist = curl_slist_append(CMDlist, deleteCmd.c_str()); 
+    curl_easy_setopt(curl, CURLOPT_POSTQUOTE, CMDlist);
+
+    // ͬ��ִ��FTPɾ������
+    CURLcode res = curl_easy_perform(curl);
+
+    curl_slist_free_all(CMDlist);
+
+    if (res != CURLE_OK)
+    {
+       
+        return -1;
+    }
+
+
+    return 0;
+}
+
+int PrinterMgrView::uploadeFileLanDevice(const std::string strIp)
+{
+    wxString input_file;
+
+    input_file.Clear();
+    wxFileDialog dialog(this,
+        _L("Choose files"),
+        "", "",
+        file_wildcards(FT_ONLY_GCODE), wxFD_OPEN);
+
+    if (dialog.ShowModal() == wxID_OK)
+        input_file = dialog.GetPath();
+    else
+        return 0;
+
+    //�Ƿ�Ϊgcode�ļ���
+    if (!is_gcode_file(into_u8(input_file)))
+    {
+        return -1;
+    }
+
+    {
+        //�������
+        nlohmann::json commandJson;
+        commandJson["data"] = 30;
+        commandJson["command"] = "uploade_file_oldPrinter_progress";
+        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump());
+        run_script(strJS.ToStdString());
+    }
+
+    fs::path path = into_u8(input_file);
+    fs::path name = path.filename();
+
+   float outProgress = 0;
+    RemotePrint::RemotePrinterManager::getInstance().uploadFileByLan(strIp,name.string(),path.string(),
+        [&outProgress](float progress,double speed) {
+                outProgress  = progress;
+            });
+
+    if ((outProgress<101) && (outProgress>99))
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 
 } // GUI
 } // Slic3r

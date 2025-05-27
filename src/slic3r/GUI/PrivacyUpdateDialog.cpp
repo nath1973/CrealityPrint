@@ -5,7 +5,7 @@
 #include <slic3r/GUI/I18N.hpp>
 #include <wx/html/htmlwin.h>
 #include "format.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 
 namespace Slic3r { namespace GUI {
 
@@ -42,7 +42,7 @@ void PrivacyUpdateDialog::onLinkClicked(wxHtmlLinkEvent& event)
 PrivacyUpdateDialog::PrivacyUpdateDialog(wxWindow* parent, wxWindowID id, const wxString& title, enum ButtonStyle btn_style, const wxPoint& pos, const wxSize& size, long style)
     :DPIDialog(parent, id, title, pos, size, style)
 {
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     SetBackgroundColour(*wxWHITE);
@@ -173,7 +173,7 @@ PrivacyUpdateDialog::PrivacyUpdateDialog(wxWindow* parent, wxWindowID id, const 
         m_button_cancel->Show();
 
     wxBoxSizer* sizer_button_container = new wxBoxSizer(wxHORIZONTAL);
-    sizer_button_container->AddStretchSpacer(1); // �������������ť�Ƶ��������м�
+    sizer_button_container->AddStretchSpacer(1); // ?????????????????????????��?
     sizer_button_container->Add(m_button_cancel, 0, wxRIGHT, FromDIP(10));
     sizer_button_container->Add(m_button_ok, 0, wxLEFT, FromDIP(10));
 

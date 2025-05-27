@@ -135,11 +135,13 @@ void update_selected_items_inflation(ArrangePolygons& selected, const DynamicPri
 void update_unselected_items_inflation(ArrangePolygons& unselected, const DynamicPrintConfig* print_cfg, const ArrangeParams& params)
 {
     float exclusion_gap = 1.f;
-    if (params.is_seq_print) {
+    if (params.is_seq_print) 
+    {
         // bed_shrink_x is typically (-params.cleareance_radius / 2+5) for seq_print
         exclusion_gap = std::max(exclusion_gap, params.cleareance_radius / 2 + params.bed_shrink_x + 1.f);  // +1mm gap so the exclusion region is not too close
         // dont forget to move the excluded region
-        for (auto& region : unselected) {
+        for (auto& region : unselected) 
+        {
             if (region.is_virt_object) region.poly.translate(scaled(params.bed_shrink_x), scaled(params.bed_shrink_y));
         }
     }
@@ -312,6 +314,7 @@ void fill_config(PConf& pcfg, const ArrangeParams &params) {
     // BBS: nonprefered regions in BBS bed
     for (auto& poly : params.nonprefered_regions)
         process_arrangeable(poly, pcfg.m_nonprefered_regions);
+
     for (auto& itm : pcfg.m_excluded_regions) {
         itm.markAsFixedInBin(0);
         itm.inflate(scaled(-2. * EPSILON));
@@ -702,7 +705,7 @@ public:
     {
         m_bin_area = abs(sl::area(bin));  // due to clockwise or anti-clockwise, the result of sl::area may be negative
         m_norm = std::sqrt(m_bin_area);
-        fill_config(m_pconf, params);
+        fill_config(m_pconf, params);//填充排版参数  主要是参数pcfg.alignment = PConf::Alignment::DONT_ALIGN
         this->params = params;
 
         // if best object center is not bed center, specify starting point here
@@ -980,10 +983,9 @@ void _arrange(
 
     AutoArranger<BinT> arranger{corrected_bin, mod_params, progressfn, stopfn};
 
-    remove_large_items(excludes, corrected_bin);
-
+    //remove_large_items(shapes, corrected_bin);
     // If there is something on the plate
-    if (!excludes.empty()) arranger.preload(excludes);
+    //if (!excludes.empty()) arranger.preload(excludes);
 
     std::vector<std::reference_wrapper<Item>> inp;
     inp.reserve(shapes.size() + excludes.size());
@@ -1052,8 +1054,7 @@ static CircleBed to_circle(const Point &center, const Points& points) {
 }
 
 // Create Item from Arrangeable
-static void process_arrangeable(const ArrangePolygon &arrpoly,
-                                std::vector<Item> &   outp)
+static void process_arrangeable(const ArrangePolygon& arrpoly, std::vector<Item> &outp)
 {
     Polygon        p        = arrpoly.poly.contour;
     const Vec2crd &offs     = arrpoly.translation;
@@ -1075,13 +1076,34 @@ static void process_arrangeable(const ArrangePolygon &arrpoly,
     item.height = arrpoly.height;
     item.name = arrpoly.name;
     //BBS: add virtual object logic
-    item.is_virt_object = arrpoly.is_virt_object;
+    item.is_virt_object = arrpoly.is_virt_object;//虚拟对象（打印床之外的对象）
     item.is_wipe_tower = arrpoly.is_wipe_tower;
     item.bed_temp = arrpoly.first_bed_temp;
     item.print_temp = arrpoly.print_temp;
     item.vitrify_temp = arrpoly.vitrify_temp;
     item.inflation(arrpoly.inflation);
     item.filament_temp_type = arrpoly.filament_temp_type;
+}
+
+template<class BedT> bool isSmallBox(const Item& item, const BedT& bed)
+{
+    const auto& ibox    = sl::boundingBox(item.transformedShape());
+    const auto& icenter = ibox.center();
+    const auto& bbin    = to_nestbin(bed);
+    auto        bbox    = sl::boundingBox(bbin);
+    const auto& bcenter = bbox.center();
+
+    const auto& imin    = ibox.minCorner() - icenter + bcenter;
+    const auto& imax    = ibox.maxCorner() - icenter + bcenter;
+
+    const auto& bmin    = bbox.minCorner();
+    const auto& bmax    = bbox.maxCorner();
+
+    if (imax.x() <= bmax.x() && imax.y() && bmax.y() && imin.x() >= bmin.x() && imin.y() >= bmin.y()) {
+        return true;//is in the box
+    }
+    
+    return false;
 }
 
 template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
@@ -1123,26 +1145,73 @@ void arrange(ArrangePolygons &      arrangables,
 {
     namespace clppr = Slic3r::ClipperLib;
 
-    std::vector<Item> items, fixeditems;
+    std::vector<Item> items, fixeditems, bigArrangables;
     items.reserve(arrangables.size());
+    fixeditems.reserve(excludes.size());
 
-    for (ArrangePolygon &arrangeable : arrangables)
+    for (ArrangePolygon& arrangeable : arrangables) {
         process_arrangeable(arrangeable, items);
+        Item& item_ = items.back();
+        if (!isSmallBox(item_, bed))
+        {
+            bigArrangables.emplace_back(items.back());
+            items.pop_back();
+        }
+    }
 
-    for (const ArrangePolygon &fixed: excludes)
+    //盘外的并不会被选中
+    for (const ArrangePolygon& fixed : excludes) 
+    {
         process_arrangeable(fixed, fixeditems);
+        fixeditems.back().markAsFixedInBin(fixed.bed_idx);
+  
+        /*Item& item_ = fixeditems.back();
+        item_.translate(bb.center());
+        if (sl::isInside(item_.transformedShape(), bbin)) 
+        {
+            bigitems.emplace_back(fixeditems.back());
+            fixeditems.pop_back();
+        }*/
+    }
 
     for (Item &itm : fixeditems) itm.inflate(scaled(-2. * EPSILON));
 
     _arrange(items, fixeditems, to_nestbin(bed), params, params.progressind, params.stopcondition);
 
-    for(size_t i = 0; i < items.size(); ++i) {
-        Point tr = items[i].translation();
-        arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
-        arrangables[i].rotation    = items[i].rotation();
-        arrangables[i].bed_idx     = items[i].binId();
-        arrangables[i].itemid      = items[i].itemId();  // arrange order is useful for sequential printing
+    if (bigArrangables.size() < 1) {
+        for (size_t i = 0; i < items.size(); ++i) {
+            Point tr                   = items[i].translation();
+            arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+            arrangables[i].rotation    = items[i].rotation();
+            arrangables[i].bed_idx     = items[i].binId();
+            arrangables[i].itemid      = items[i].itemId(); // arrange order is useful for sequential printing
+        }
+    } else {
+        for (size_t i = 0; i < arrangables.size(); ++i) {
+            for (size_t j = 0; j < items.size(); ++j)
+                if (arrangables[i].itemid == items[j].itemId()) {
+                Point tr                   = items[j].translation();
+                arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+                arrangables[i].rotation    = items[j].rotation();
+                arrangables[i].bed_idx     = items[j].binId();
+            }
+            for (size_t j = 0; j < bigArrangables.size(); ++j) 
+                if (arrangables[i].itemid == bigArrangables[j].itemId()) {
+                Point tr                   = bigArrangables[j].translation();
+                arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+                arrangables[i].rotation    = bigArrangables[j].rotation();
+                arrangables[i].bed_idx     = -1;
+            }
+        }
+        
     }
+    //for (size_t i = 0; i < bigitems.size(); ++i) {
+    //    //Point tr                   = bigitems[i].translation();
+    //    //arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+    //    //arrangables[i].rotation    = bigitems[i].rotation();
+    //    arrangables[i].bed_idx     = -1;
+    //    arrangables[i].itemid      = bigitems[i].itemId(); // arrange order is useful for sequential printing
+    //}
 }
 
 template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const BoundingBox &bed, const ArrangeParams &params);

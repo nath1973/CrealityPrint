@@ -118,13 +118,13 @@ GLGizmosManager::EType GLGizmosManager::get_gizmo_from_mouse(const Vec2d &mouse_
 
 void GLGizmosManager::switch_gizmos_icon_filename()
 {
-    m_background_texture.metadata.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
+    /*m_background_texture.metadata.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
     m_background_texture.metadata.left = 16;
     m_background_texture.metadata.top = 16;
     m_background_texture.metadata.right = 16;
     m_background_texture.metadata.bottom = 16;
     if (!m_background_texture.metadata.filename.empty())
-        m_background_texture.texture.load_from_png_file(resources_dir() + "/images/" + m_background_texture.metadata.filename, false, GLTexture::SingleThreaded, false);
+        m_background_texture.texture.load_from_png_file(resources_dir() + "/images/" + m_background_texture.metadata.filename, false, GLTexture::SingleThreaded, false);*/
 
     for (auto& gizmo : m_gizmos) {
         gizmo->on_change_color_mode(m_is_dark);
@@ -179,7 +179,7 @@ bool GLGizmosManager::init()
     bool result = init_icon_textures();
     if (!result) return result;
 
-    m_background_texture.metadata.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
+    /*m_background_texture.metadata.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
     m_background_texture.metadata.left = 16;
     m_background_texture.metadata.top = 16;
     m_background_texture.metadata.right = 16;
@@ -189,7 +189,7 @@ bool GLGizmosManager::init()
     {
         if (!m_background_texture.texture.load_from_png_file(resources_dir() + "/images/" + m_background_texture.metadata.filename, false, GLTexture::SingleThreaded, false))
             return false;
-    }
+    }*/
 
     // Order of gizmos in the vector must match order in EType!
     //BBS: GUI refactor: add obj manipulation
@@ -538,8 +538,8 @@ void GLGizmosManager::render_overlay()
     if (!m_enabled)
         return;
 
-    if (m_icons_texture_dirty)
-        generate_icons_texture();
+    /*if (m_icons_texture_dirty)
+        generate_icons_texture();*/
 
     do_render_overlay();
 }

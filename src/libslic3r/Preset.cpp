@@ -918,7 +918,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "default_print_profile", "inherits",
     "silent_mode","curr_bed_type",
     // Creality
-    "color_bed_exclude_area",
+    "color_bed_exclude_area","machine_ptc_exist",
     // BBS
     "scan_first_layer", "machine_load_filament_time", "machine_unload_filament_time", "machine_tool_change_time","time_cost", "machine_pause_gcode", "template_custom_gcode",
     "nozzle_type", "nozzle_hrc","auxiliary_fan", "nozzle_volume","upward_compatible_machine", "z_hop_types","travel_slope", "retract_lift_enforce","support_chamber_temp_control","support_air_filtration","printer_structure",
@@ -3752,7 +3752,7 @@ namespace PresetUtils {
         const VendorProfile::PrinterModel* pm = PresetUtils::system_printer_model(preset);
         if (pm != nullptr && !pm->bed_model.empty()) {
             out = Slic3r::data_dir() + "/vendor/" + preset.vendor->id + "/";
-            out += (preset.vendor->id == "Creality") ? "creality_k1_buildplate_model.stl": pm->bed_model;
+            out += (preset.vendor->id == "Creality") ? "creality_k1_buildplate_model.stl" : pm->bed_model;
             if (!boost::filesystem::exists(boost::filesystem::path(out))) {
                 out = Slic3r::resources_dir() + "/profiles/" + preset.vendor->id + "/";
                 out += (preset.vendor->id == "Creality") ? "creality_k1_buildplate_model.stl": pm->bed_model;

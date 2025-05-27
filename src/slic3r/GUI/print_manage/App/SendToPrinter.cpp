@@ -40,6 +40,7 @@
 #if defined(__linux__) || defined(__LINUX__)
 #include "video/WebRTCDecoder.h"
 #endif
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
 namespace pt = boost::property_tree;
@@ -82,7 +83,7 @@ CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater)
     //SetBackgroundColour(m_colour_def_color);
 
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
@@ -117,6 +118,7 @@ CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater)
     wxURI uri(url);
     wxString encodedUrl = uri.BuildURI();
     encodedUrl = wxT("file://")+encodedUrl;
+    //encodedUrl = "http://localhost:5173/";
     this->load_url(encodedUrl, wxString());
     m_browser->EnableAccessToDevTools();
 #endif
@@ -694,11 +696,11 @@ void CxSentToPrinterDialog::handle_send_3mf(const nlohmann::json& json_data)
     m_uploadingIp = ipAddress;
     RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(
         ipAddress.ToStdString(), upload3mfName, tmp_3mf_path,
-        [this](std::string ip, float progress) {
+        [this](std::string ip, float progress,double speed) {
             nlohmann::json top_level_json;
             top_level_json["printer_ip"] = ip;
             top_level_json["progress"]   = progress;
-
+            top_level_json["speed"]   = speed;
             std::string json_str = top_level_json.dump();
 
             // create command to send to the webview
@@ -801,7 +803,14 @@ void CxSentToPrinterDialog::handle_send_gcode(const nlohmann::json& json_data)
     int      plateIndex = json_data["plateIndex"];
     wxString ipAddress  = json_data["ipAddress"];
     std::string uploadName = json_data["uploadName"];  // convert from wxString to std::string would cause exception
-    
+    bool oldPrinter = json_data["oldPrinter"];
+
+    if (oldPrinter)
+    {
+        std::string strIpAddr = ipAddress.ToStdString();
+        RemotePrint::RemotePrinterManager::getInstance().setOldPrinterMap(strIpAddr);
+    }
+
     PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(plateIndex);
     if (plate) {
         std::string gcodeFilePath;
@@ -824,11 +833,12 @@ void CxSentToPrinterDialog::handle_send_gcode(const nlohmann::json& json_data)
         m_uploadingIp = ipAddress;
         RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(
             ipAddress.ToStdString(), uploadName, gcodeFilePath,
-            [this](std::string ip, float progress) {
+            [this](std::string ip, float progress,double speed) {
 
                 nlohmann::json top_level_json;
                 top_level_json["printer_ip"] = ip;
                 top_level_json["progress"]  = progress;
+                top_level_json["speed"]  = round(speed);
 
                 std::string json_str = top_level_json.dump();
 
@@ -1036,14 +1046,31 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
         {
             printer_name = current_result->printer_model;
             nozzle_diameter = current_result->nozzle_diameter;
-
+            int color_index = 0;
             for (auto color : current_result->creality_default_extruder_colors) {
-                colors_json.push_back(color);
-                m_backup_extruder_colors.push_back(color);
+                if(colors_json.size()<=color_index)
+                {
+                    colors_json.push_back(color);
+                    m_backup_extruder_colors.push_back(color);
+                }
+                else
+                {
+                    if(color!="")
+                    {
+                        colors_json[color_index] = color;
+                        m_backup_extruder_colors[color_index] = color;
+                    }
+                        
+                }
+                    
+                color_index++;
             }
             // filament_types_json
-            for (auto filament_type : current_result->creality_extruder_types) {
-                filament_types_json.push_back(filament_type);
+            if(filament_types_json.size() ==0)
+            {
+                for (auto filament_type : current_result->creality_extruder_types) {
+                    filament_types_json.push_back(filament_type);
+                }
             }
             int            size    = 0;
             unsigned char* imgdata = nullptr;
@@ -1084,6 +1111,41 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
             json_data["total_weight"] = total_weight_str.ToStdString();
             json_data["print_time"]   = print_time_str.ToStdString();
 
+            json_array.push_back(json_data);
+        }else if (!current_result->filename.empty()){
+            if (plate && plate->thumbnail_data.is_valid()) {
+                wxImage image(plate->thumbnail_data.width, plate->thumbnail_data.height);
+                image.InitAlpha();
+                for (unsigned int r = 0; r < plate->thumbnail_data.height; ++r) {
+                    unsigned int rr = (plate->thumbnail_data.height - 1 - r) * plate->thumbnail_data.width;
+                    for (unsigned int c = 0; c < plate->thumbnail_data.width; ++c) {
+                        unsigned char* px = (unsigned char*) plate->thumbnail_data.pixels.data() + 4 * (rr + c);
+                        image.SetRGB((int) c, (int) r, px[0], px[1], px[2]);
+                        image.SetAlpha((int) c, (int) r, px[3]);
+                    }
+                }
+                wxImage resized_image = image.Rescale(256, 256, wxIMAGE_QUALITY_HIGH);
+
+                wxMemoryOutputStream mem_stream;
+                if (!resized_image.SaveFile(mem_stream, wxBITMAP_TYPE_PNG)) {
+                    wxLogError("Failed to save image to memory stream.");
+                }
+
+                auto size = mem_stream.GetSize();
+                auto imgdata = new unsigned char[size];
+                mem_stream.CopyTo(imgdata, size);
+
+                std::size_t encoded_size = boost::beast::detail::base64::encoded_size(size);
+                std::string img_base64_data(encoded_size, '\0');
+                boost::beast::detail::base64::encode(&img_base64_data[0], imgdata, size);
+
+                json_data["image"]       = "data:image/png;base64," + std::move(img_base64_data);
+            }
+           
+            json_data["plate_index"] = plate->get_index();
+            json_data["plate_extruders"] = nlohmann::json::array();
+            json_data["total_weight"] = "";
+            json_data["print_time"]   = "";
             json_array.push_back(json_data);
         }
     }
@@ -1266,7 +1328,7 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
     top_level_json["plates"]          = std::move(json_array);
 
     bool is_all_plates = wxGetApp().plater()->get_preview_canvas3D()->is_all_plates_selected();
-    int cur_plate_index = is_all_plates ? 0 : m_plater->get_partplate_list().get_curr_plate_index();
+    int cur_plate_index = m_plater->get_partplate_list().get_curr_plate_index();
     top_level_json["current_plate_index"] = cur_plate_index;
     
     std::string printer_name = Slic3r::GUI::wxGetApp().preset_bundle->printers.get_selected_preset_name();

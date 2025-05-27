@@ -123,6 +123,11 @@ public:
     bool bbl_slider_float(const std::string &label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {});
     bool bbl_slider_float_style(const std::string &label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {});
 
+    bool bbl_slider_int_style(
+        const std::string& label, int* v, int v_min, int v_max, const char* format, bool clamp, const wxString& tooltip);
+    bool bbl_slider_int(
+        const std::string& label, int* v, int v_min, int v_max, const char* format, bool clamp, const wxString& tooltip);
+
     /* dragable window */
     void set_draggable_window_pos(float x, float y, int flag, float pivot_x, float pivot_y, bool force = false);
     bool begin_with_drag(const std::string& name, int flags = 0);

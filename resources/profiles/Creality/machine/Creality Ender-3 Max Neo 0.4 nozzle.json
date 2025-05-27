@@ -86,7 +86,7 @@
     "use_relative_e_distances": "1",
     "z_offset": "0",
     "default_filament_profile": [
-        "Hyper PLA @Creality Ender-3 Max Neo 0.4 nozzle"
+        "Generic PLA @Creality Ender-3 Max Neo 0.4 nozzle"
     ],
     "deretraction_speed": "40",
     "extruder_colour": "#FCE94F",
@@ -115,5 +115,5 @@
     "z_hop": "0.4",
     "z_hop_types": "Normal Lift",
     "name": "Creality Ender-3 Max Neo 0.4 nozzle",
-    "setting_id": "79803"
+    "setting_id": "45033"
 }

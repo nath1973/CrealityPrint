@@ -21,6 +21,7 @@
 #include "Plater.hpp"
 #include "BitmapCache.hpp"
 #include "BindDialog.hpp"
+#include "libslic3r/common_header/common_header.h"
 
 namespace Slic3r { namespace GUI {
 
@@ -1272,7 +1273,7 @@ void AmsReplaceMaterialDialog::create()
     SetMaxSize(wxSize(FromDIP(445), -1));
 
     // set icon for dialog
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     m_main_sizer = new wxBoxSizer(wxVERTICAL);

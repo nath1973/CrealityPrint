@@ -44,7 +44,7 @@ static const constexpr int UNARRANGED = -1;
 /// The bed_idx field will indicate the logical bed into which the
 /// polygon belongs: UNARRANGED means no place for the polygon
 /// (also the initial state before arrange), 0..N means the index of the bed.
-/// Zero is the physical bed, larger than zero means a virtual bed.
+/// Zero is the physical bed, larger than zero means a virtual bed.  参数bed_idx大于0是虚拟床(即打印床外的空间)
 struct ArrangePolygon {
     ExPolygon poly;                 /// The 2D silhouette to be arranged
     Vec2crd   translation{0, 0};    /// The translation of the poly
@@ -70,6 +70,7 @@ struct ArrangePolygon {
     int       vitrify_temp{ 0 };   // max bed temperature for material compatibility, which is usually the filament vitrification temp
     int       itemid{ 0 };         // item id in the vector, used for accessing all possible params like extrude_id
     int       is_applied{ 0 };     // transform has been applied
+    int       instance_id{0};      // instance id in the vector, used for extra logic
     double    height{ 0 };         // item height
     double    brim_width{ 0 };     // brim width
     std::string name;
@@ -109,6 +110,9 @@ struct ArrangeParams {
     /// The minimum distance which is allowed for any
     /// pair of items on the print bed in any direction.
     coord_t min_obj_distance = 0;
+
+    float itemGap    = 1.0f;
+    float binItemGap = 1.0f;
 
     /// The accuracy of optimization.
     /// Goes from 0.0 to 1.0 and scales performance as well

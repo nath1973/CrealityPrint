@@ -15,7 +15,7 @@ public:
     std::future<void> sendFileToDevice(const std::string&         strIp,
                                        const std::string&         fileName,
                                        const std::string&         filePath,
-                                       std::function<void(float)> callback,
+                                       std::function<void(float,double)> callback,
                                        std::function<void(int)>   errorCallback, std::function<void(std::string)> onCompleteCallback);
 
 private:

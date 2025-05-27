@@ -324,6 +324,8 @@ void GLGizmoPainterBase::render_cursor_height_range(const Transform3d& trafo) co
     }
     m_volumes_index = 0;
     for (const ModelVolume* mv : model_object->volumes) {
+        if (mv->type() != ModelVolumeType::MODEL_PART)
+            continue;
         TriangleMesh vol_mesh = mv->mesh();
         if (m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView) {
             Transform3d temp = mi->get_assemble_transformation().get_matrix() * mv->get_matrix();

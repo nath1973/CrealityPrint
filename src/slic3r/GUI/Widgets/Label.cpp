@@ -142,24 +142,34 @@ public:
                     break;
                 }
 
-                wxArrayInt widths;
-                if (!dc.GetFont().IsOk()) {
-                    BOOST_LOG_TRIVIAL(error) << "dc.GetFont().IsOk() is false!!!";
-                    BOOST_LOG_TRIVIAL(warning) << "Attempting to flush logs before expected crash...";
-                    try {
+                auto DiagnoseDCCriticalState = [](const wxDC& dc, const wxString& text, const char* caller = nullptr) {
+                    const wxString logText = text.empty() ? wxString("(empty)") : text.SubString(0, 50);
+
+                    // ===== 1. DC State Check =====
+                    if (!dc.IsOk()) {
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Invalid DC state [text=" << logText << "]";
                         boost::log::core::get()->flush();
-                        BOOST_LOG_TRIVIAL(warning) << "Log flush initiated successfully.";
-                    } catch (const std::exception& e) {
-                        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Error: " << e.what();
-                    } catch (...) {
-                        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": FAILED TO INITIATE LOG FLUSH! Unknown exception.";
+                        return;
                     }
 
-                    const int delay_ms = 200;
-                    BOOST_LOG_TRIVIAL(info) << "Introducing " << delay_ms << "ms delay to aid log writing...";
-                    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-                    BOOST_LOG_TRIVIAL(info) << "Delay finished. Proceeding to expected crash point...";
-                }
+                    // ===== 2. Font State Check =====
+                    if (!dc.GetFont().IsOk()) {
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Invalid font [text=" << logText << "]";
+                        boost::log::core::get()->flush();
+                    }
+
+                    // ===== 3. Windows HDC Check =====
+                    #ifdef __WXMSW__
+                    if (dc.GetHDC() == nullptr) {
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Null HDC [text=" << logText << "]";
+                        boost::log::core::get()->flush();
+                    }
+                    #endif
+                };
+
+                DiagnoseDCCriticalState(dc, text, __FUNCTION__);
+
+                wxArrayInt widths;               
                 dc.GetPartialTextExtents(line, widths);
 
                 const size_t posEnd = std::lower_bound(widths.begin(), widths.end(), widthMax) - widths.begin();

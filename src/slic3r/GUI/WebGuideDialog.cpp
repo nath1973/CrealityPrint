@@ -34,7 +34,8 @@
 
 #include <slic3r/GUI/Tab.hpp>
 #include "UpdateParams.hpp"
-
+#include "buildinfo.h"
+#include "libslic3r/common_header/common_header.h"
 using namespace nlohmann;
 
 namespace Slic3r { namespace GUI {
@@ -187,7 +188,11 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     // Connect the idle events
     // Bind(wxEVT_IDLE, &GuideFrame::OnIdle, this);
     // Bind(wxEVT_CLOSE_WINDOW, &GuideFrame::OnClose, this);
+#if !CUSTOM_CXCLOUD
+#if UPDATE_ONLINE_MACHINES
     GUI::wxGetApp().check_machine_list();
+#endif
+#endif
     LoadProfile();
 
     // UI
@@ -254,6 +259,11 @@ wxString GuideFrame::SetStartPage(GuidePage startpage, bool load)
     }
 
     wxString strlang = wxGetApp().app_config->get("language");
+    bool     customized = 0;
+#ifdef CUSTOMIZED
+    customized = 1;
+#endif
+    std::string customer_name = customized == 1 ? "Morandi" : "";
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(", strlang=%1%") % into_u8(strlang);
     if (strlang != "")
         TargetUrl = wxString::Format("%s?lang=%s", TargetUrl, strlang);
@@ -262,7 +272,6 @@ wxString GuideFrame::SetStartPage(GuidePage startpage, bool load)
     TargetUrl.Replace("#", "%23");
     wxURI uri(TargetUrl);
     wxString encodedUrl = uri.BuildURI();
-
     int port = wxGetApp().get_server_port();
     if (startpage == BBL_FILAMENT_ONLY) {
         wxString url = wxString::Format("http://localhost:%d/homepage/index.html?lang=%s&isScale=false#/Guide/createFilament", port, strlang);
@@ -270,10 +279,12 @@ wxString GuideFrame::SetStartPage(GuidePage startpage, bool load)
         // 本地调试
         // TargetUrl    = "http://localhost:9090/#/Guide/createFilament?lang=zh_CN&isScale=false";
     } else if (startpage == BBL_MODELS_ONLY) {
-        wxString url = wxString::Format("http://localhost:%d/homepage/index.html?lang=%s&isScale=false#/Guide/addPrinter", port, strlang);
+        wxString url = wxString::Format(
+            "http://localhost:%d/homepage/index.html?lang=%s&isScale=false&customized=%d&customer_name=%s#/Guide/addPrinter", port, strlang,
+            customized, customer_name);
          TargetUrl    = url;
         // 本地调试
-        // TargetUrl    = "http://localhost:9090/#/Guide/addPrinter?lang=zh_CN&isScale=false";
+         //TargetUrl    = "http://localhost:9090/index.html?lang=zh_CN&isScale=false&debug=false#/Guide/addPrinter";
     }
     else {
         TargetUrl = "file://" + encodedUrl;
@@ -1317,7 +1328,9 @@ bool GuideFrame::run()
         //app.obj_manipul()->update_ui_from_settings();
         BOOST_LOG_TRIVIAL(info) << "GuideFrame applied";
         this->Close();
+#if CUSTOM_CXCLOUD
         UpdateParams::getInstance().checkParamsNeedUpdate();
+#endif
         return true;
     } else if (result == wxID_CANCEL) {
         BOOST_LOG_TRIVIAL(info) << "GuideFrame cancelled";
@@ -1490,12 +1503,18 @@ int GuideFrame::LoadProfile()
         //init m_MachineJson
         m_MachineJson             = json::parse("{}");
         m_MachineJson["machine"]    = json::array();
-        boost::filesystem::path machinepath = vendor_dir;
-        if (!boost::filesystem::exists((vendor_dir /"Creality"/"machineList").replace_extension(".json")))
-        {
-            machinepath = rsrc_vendor_dir;
-        }
-        LoadMachineJson("machineList", (machinepath /"Creality"/"machineList.json").string());
+    boost::filesystem::path machinepath = vendor_dir;
+#ifdef CUSTOMIZED
+    std::string g_vendor_name = std::string(SLIC3R_APP_KEY);
+#else 
+    std::string g_vendor_name = "Creality";
+#endif
+    //g_vendor_name = "Creality";
+    if (!boost::filesystem::exists((vendor_dir / g_vendor_name / "machineList").replace_extension(".json")))
+    {
+        machinepath = rsrc_vendor_dir;
+    }
+    LoadMachineJson("machineList", (machinepath / g_vendor_name / "machineList.json").string());
 
         //load BBL bundle from user data path
         string                                targetPath = bbl_bundle_path.make_preferred().string();

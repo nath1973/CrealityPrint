@@ -195,14 +195,14 @@ int UploadFile::uploadGcodeToCXCloud(const std::string& name, const std::string&
     return nRet;
 }
 
-void UploadFile::setProcessCallback(std::function<void(int)> funcProcessCb)
+void UploadFile::setProcessCallback(std::function<void(int,double)> funcProcessCb)
 {
     m_funcProcessCb = funcProcessCb;
 }
 void UploadFile::ProgressCallback(size_t increment, int64_t transfered, int64_t total, void* userData) {
     int i = (int)((transfered * 1.0 / total * 1.0) * 100);
     if (m_funcProcessCb != nullptr) {
-        m_funcProcessCb(i);
+        m_funcProcessCb(i,0);
     }
 }
 

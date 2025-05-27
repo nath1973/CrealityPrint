@@ -467,6 +467,47 @@ wxBitmap create_scaled_bitmap(  const std::string& bmp_name_in,
     return *bmp;
 }
 
+wxBitmap create_scaled_bitmap3(const std::string&         bmp_name_in,
+                              wxWindow*                  win /* = nullptr*/,
+                              const int                  px_cnt /* = 16*/,
+                              const wxSize                 imgSize,
+                              const bool                 grayscale /* = false*/,
+                              const std::string&         new_color /* = std::string()*/, // color witch will used instead of orange
+                              const bool                 menu_bitmap /* = false*/,
+                              const bool                 resize /* = false*/,
+                              const bool                 bitmap2 /* = false*/,
+                              const vector<std::string>& array_new_color /* = vector<std::string>*/) // used for semi transparent material)
+{
+    static Slic3r::GUI::BitmapCache cache;
+    if (bitmap2) {
+        return create_scaled_bitmap2(bmp_name_in, cache, win, px_cnt, grayscale, resize, array_new_color);
+    }
+    unsigned int width  = imgSize.GetWidth();
+    unsigned int height = imgSize.GetHeight();
+
+    std::string bmp_name = bmp_name_in;
+    boost::replace_last(bmp_name, ".png", "");
+
+    bool dark_mode =
+#ifdef _WIN32
+        menu_bitmap ? Slic3r::GUI::check_dark_mode() :
+#endif
+                      Slic3r::GUI::wxGetApp().dark_mode();
+
+    // Try loading an SVG first, then PNG if SVG is not found:
+    wxBitmap* bmp = cache.load_svg(bmp_name, width, height, grayscale, dark_mode, new_color, resize ? em_unit(win) * 0.1f : 0.f);
+    if (bmp == nullptr) {
+        bmp = cache.load_png(bmp_name, width, height, grayscale, resize ? win->FromDIP(10) * 0.1f : 0.f);
+    }
+
+    if (bmp == nullptr) {
+        // Neither SVG nor PNG has been found, raise error
+        throw Slic3r::RuntimeError("Could not load bitmap: " + bmp_name);
+    }
+
+    return *bmp;
+}
+
 wxBitmap create_scaled_bitmap2(const std::string& bmp_name_in, Slic3r::GUI::BitmapCache& cache, wxWindow* win/* = nullptr*/ ,
     const int px_cnt/* = 16*/, const bool grayscale/* = false*/ , const bool resize/* = false*/ ,
     const vector<std::string>& array_new_color/* = vector<std::string>()*/) // color witch will used instead of orange

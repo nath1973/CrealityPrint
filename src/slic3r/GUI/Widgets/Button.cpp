@@ -1,5 +1,6 @@
 #include "Button.hpp"
 #include "Label.hpp"
+#include "slic3r/GUI/GUI_App.hpp"
 
 #include <wx/dcgraph.h>
 
@@ -343,6 +344,90 @@ WXLRESULT Button::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam)
     return wxWindow::MSWWindowProc(nMsg, wParam, lParam);
 }
 #endif
+
+ RoundedButton::RoundedButton(wxWindow*          parent,
+              wxWindowID         id,
+              const wxString&    label,
+              const wxPoint&     pos,
+              const wxSize&      size,
+              long               style,
+              const wxValidator& validator,
+              const wxString&    name)
+    : wxButton(parent, id, label, pos, size, style, validator, name)
+{
+    Bind(wxEVT_PAINT, &RoundedButton::OnPaint, this);
+    wxColour default_btn_bg = Slic3r::GUI::wxGetApp().dark_mode() ? wxColour("#010101") : wxColour(214, 214, 220);
+    wxButton::SetBackgroundColour(default_btn_bg);
+    // SetBackgroundColour(GetParent()->GetBackgroundColour());
+}
+
+void RoundedButton::SetCornerRadius(int radius)
+{
+    m_cornerRadius = radius;
+    Refresh();
+}
+
+void RoundedButton::SetBackgroundColor(const wxColour& color)
+{
+    m_bgColor = color;
+    Refresh();
+}
+void RoundedButton::SetTextColor(const wxColour& color)
+{
+    m_textColor = color;
+    Refresh();
+}
+void RoundedButton::SetIcon(const wxBitmap& icon)
+{
+    m_icon = icon;
+    Refresh();
+}
+
+void RoundedButton::Render(wxDC& dc)
+{
+    wxGraphicsContext* gc = wxGraphicsContext::CreateFromUnknownDC(dc);
+    if (gc) {
+        wxRect rect = GetClientRect();
+
+        // 清除默认背景
+        wxColour default_btn_bg = Slic3r::GUI::wxGetApp().dark_mode() ? wxColour("#010101") : wxColour(214, 214, 220);
+        wxButton::SetBackgroundColour(default_btn_bg);
+
+        // 绘制圆角背景
+        gc->SetBrush(wxBrush(m_bgColor));
+        gc->SetPen(*wxTRANSPARENT_PEN);
+        gc->DrawRoundedRectangle(rect.x, rect.y, rect.width, rect.height, m_cornerRadius);
+
+        // 绘制图标（如果存在）
+        if (m_icon.IsOk()) {
+            wxDouble iconWidth  = m_icon.GetWidth();
+            wxDouble iconHeight = m_icon.GetHeight();
+            wxDouble iconX      = rect.x + (rect.width - iconWidth) / 2;
+            wxDouble iconY      = rect.y + (rect.height - iconHeight) / 2;
+            gc->DrawBitmap(m_icon, iconX, iconY, iconWidth, iconHeight);
+        }
+
+        // 绘制文字
+        wxFont font = GetFont();
+        gc->SetFont(font, m_textColor);
+        wxDouble textWidth, textHeight;
+        gc->GetTextExtent(GetLabel(), &textWidth, &textHeight);
+
+        wxDouble x = rect.x + (rect.width - textWidth) / 2;
+        wxDouble y = rect.y + (rect.height - textHeight) / 2;
+        gc->DrawText(GetLabel(), x, y);
+
+        delete gc;
+    }
+}
+
+void RoundedButton::OnPaint(wxPaintEvent& event)
+{
+    wxPaintDC dc(this);
+    Render(dc);
+    event.StopPropagation();
+}
+
 RoundedPanel::RoundedPanel(wxWindow* parent, wxWindowID id,
     const wxPoint& pos,
     const wxSize& size,

@@ -1510,11 +1510,12 @@ void BaselineOrcaInput::_BuildEntityFacetsAnnotation(nlohmann::json& json_object
 {
     auto& support_facets = facets.get_data();
     std::vector<int> support_facet_group;
-    for (int i = 0; i < support_facets.first.size(); ++i)
+    
+    for (int i = 0; i < support_facets.triangles_to_split.size(); ++i)
     {
-        support_facet_group.emplace_back(support_facets.first[i].first);
-        support_facet_group.emplace_back(support_facets.first[i].second);
-        support_facet_group.emplace_back(support_facets.second[i] ? 1 : 0);
+        support_facet_group.emplace_back(support_facets.triangles_to_split[i].triangle_idx);
+        support_facet_group.emplace_back(support_facets.triangles_to_split[i].bitstream_start_idx);
+        support_facet_group.emplace_back(support_facets.bitstream[i] ? 1 : 0);
     }
     _BuildObjectGroup(json_object_group, support_facet_group);
 }
@@ -1530,28 +1531,28 @@ bool BaselineOrcaInput::_CompareEntityFacetsAnnotation(const nlohmann::json& jso
     }
 
     auto& support_facets = facets.get_data();
-    uint64_t size = support_facets.first.size();
+    uint64_t size = support_facets.triangles_to_split.size();
     uint64_t json_size = json_object.size(); 
-    if (json_object.size() != support_facets.first.size() * 3)
+    if (json_object.size() != support_facets.triangles_to_split.size() * 3)
     {
-        log.LogError("The baseline support_facets size is " + std::to_string(json_object.size()) + " while the group size is " + std::to_string(support_facets.first.size()));
+        log.LogError("The baseline support_facets size is " + std::to_string(json_object.size()) + " while the group size is " + std::to_string(support_facets.triangles_to_split.size()));
         BLReturnBoolen(false);
     }
 
     bool err = true;
-    for (int i = 0; i < support_facets.first.size(); ++i)
+    for (int i = 0; i < support_facets.triangles_to_split.size(); ++i)
     {
         int value0 = json_object.at(i).at(0);
         int value1 = json_object.at(i).at(1);
         bool value2 = json_object.at(i).at(2);
-        if (_CompareValue(value0, support_facets.first[i].first)
-         || _CompareValue(value1, support_facets.first[i].second)
-         || _CompareValue(value2, support_facets.second[i]))
+        if (_CompareValue(value0, support_facets.triangles_to_split[i].triangle_idx) ||
+            _CompareValue(value1, support_facets.triangles_to_split[i].bitstream_start_idx)
+         || _CompareValue(value2, support_facets.bitstream[i]))
         {
             log.LogError("The baseline support_facet is " +
                 std::to_string(value0) + ", " + std::to_string(value1) + ", " + std::to_string(value2) +
                 " while the group size is " +
-                std::to_string(support_facets.first[i].first) + ", " + std::to_string(support_facets.first[i].second) + ", " + std::to_string(support_facets.second[i]));
+                std::to_string(support_facets.triangles_to_split[i].triangle_idx) + ", " + std::to_string(support_facets.triangles_to_split[i].bitstream_start_idx) + ", " + std::to_string(support_facets.bitstream[i]));
             err &= false;
         }
     }

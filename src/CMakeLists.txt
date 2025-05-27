@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
-project(CrealityPrint-native)
+# project(CrealityPrint-native)
 
-include("../version.inc")
 add_subdirectory(build-utils)
 add_subdirectory(admesh)
 # add_subdirectory(avrdude)
@@ -34,6 +33,7 @@ if(CMAKE_VLD_ENABLED)
 endif()
 #
 message(STATUS "Before CGAL_ENABLE_VLD=${CGAL_ENABLE_VLD}")
+message("bbbbSLIC3R_APP_NAME=${SLIC3R_APP_NAME}")
 add_subdirectory(libslic3r)
 
 if (SLIC3R_GUI)
@@ -55,13 +55,13 @@ if (SLIC3R_GUI)
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
-        # if (SLIC3R_WX_STABLE)
-        #     find_package(wxWidgets 3.0 REQUIRED COMPONENTS base core adv html gl aui net media webview)
-        # else ()
-        find_package(wxWidgets 3.1.5 REQUIRED COMPONENTS base core adv html gl aui net media webview)
-        # endif ()
+        if (SLIC3R_WX_STABLE)
+            find_package(wxWidgets 3.0 REQUIRED COMPONENTS base core adv html gl aui net media webview)
+        else ()
+            find_package(wxWidgets 3.1 REQUIRED COMPONENTS base core adv html gl aui net media webview)
+        endif ()
     else ()
-        find_package(wxWidgets 3.1.5 REQUIRED COMPONENTS html adv gl core base webview aui net media)
+        find_package(wxWidgets 3.1 REQUIRED COMPONENTS html adv gl core base webview aui net media)
     endif ()
 
     if(UNIX)
@@ -134,14 +134,21 @@ endif()
 
 # Create a slic3r executable
 # Process mainfests for various platforms.
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/CrealityPrint.rc.in ${CMAKE_CURRENT_BINARY_DIR}/CrealityPrint.rc @ONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/CrealityPrint.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/CrealityPrint.manifest @ONLY)
+if (NOT ${CUSTOM_TYPE} STREQUAL "")
+    __build_rc_config()
+    __build_manifest_config()
+else()
+    #customized module_info.cmake
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/CrealityPrint.rc.in ${CMAKE_CURRENT_BINARY_DIR}/CrealityPrint.rc @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/msw/CrealityPrint.manifest.in ${CMAKE_CURRENT_BINARY_DIR}/CrealityPrint.manifest @ONLY)
+endif()
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/platform/osx/Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
-set(PROJECT_DLL CrealityPrint_Slicer)
+message("PROJECT_DLL_NAME_WIN32=${PROJECT_DLL_NAME_WIN32}")
+set(PROJECT_DLL ${PROJECT_DLL_NAME_WIN32})
 if(WIN32)
-set(PROJECT_DLL CrealityPrint_Slicer)
+set(PROJECT_DLL ${PROJECT_DLL_NAME_WIN32})
 elseif(APPLE)
-set(PROJECT_DLL CrealityPrint)
+set(PROJECT_DLL ${PROCESS_NAME})
 endif()
 if (WIN32)
     add_library(${PROJECT_DLL} SHARED CrealityPrint.cpp CrealityPrint.hpp BaseException.cpp BaseException.h StackWalker.cpp StackWalker.h CxMiniDump.h CxMiniDump.cpp CrealityrintDump.hpp CrealityrintDump.cpp)
@@ -173,6 +180,7 @@ if(ENABLE_BREAKPAD)
 else()
     target_link_libraries(${PROJECT_DLL} libslic3r cereal::cereal)
 endif()
+
 
 if(CGAL_ENABLE_VLD AND VLD_LIBRARY)
     message("------vld found, ${VLD_LIBRARY}------")   
@@ -292,6 +300,14 @@ if (WIN32)
                 COMMENT "Symlinking the resources directory into the build tree"
                 VERBATIM
             )
+            
+            # add_custom_command(TARGET ${PROJECT_DLL} PRE_BUILD
+            #     COMMAND ${CMAKE_COMMAND} -E make_directory ${WIN_RESOURCES_SYMLINK}
+    		# 	COMMAND ${CMAKE_COMMAND} -E copy_directory
+    		# 	${CMAKE_SOURCE_DIR}/resources/
+    		# 	"$<TARGET_FILE_DIR:${PROJECT_DLL}>/resources/"
+            #     COMMENT "TARGET_FILE_DIR :$<TARGET_FILE_DIR:${PROJECT_DLL}>/resources/"
+    		# 	)
         endforeach ()
 
         if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -307,14 +323,14 @@ if (WIN32)
     else ()
         file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/resources" WIN_RESOURCES_SYMLINK)
         message(STATUS "SLIC3R_RESOURCES_DIR_WIN222=${SLIC3R_RESOURCES_DIR_WIN}")
+
+        
         add_custom_command(TARGET ${PROJECT_DLL} POST_BUILD
             COMMAND if not exist "${WIN_RESOURCES_SYMLINK}" "(" mklink /J "${WIN_RESOURCES_SYMLINK}" "${SLIC3R_RESOURCES_DIR_WIN}" ")"
             COMMENT "Symlinking the resources directory into the build tree"
             VERBATIM
         )
     endif ()
-
-
 else ()
     if (APPLE AND NOT CMAKE_MACOSX_BUNDLE)
         # On OSX, the name of the binary matches the name of the Application.

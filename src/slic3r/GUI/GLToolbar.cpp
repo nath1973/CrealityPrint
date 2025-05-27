@@ -702,8 +702,17 @@ bool GLToolbar::on_mouse(wxMouseEvent& evt, GLCanvas3D& parent)
             m_mouse_capture.left = true;
             m_mouse_capture.parent = &parent;
             processed = true;
+
             if (item_id != -2 && !m_items[item_id]->is_separator() && !m_items[item_id]->is_disabled() &&
                 (m_pressed_toggable_id == -1 || m_items[item_id]->get_last_action_type() == GLToolbarItem::Left)) {
+
+                if (item_id != get_item_id("arrange")) {
+                    // try to close arrange menu first
+                    GLToolbarItem* arrange_item = get_item("arrange");
+                    arrange_item->set_visible(false);
+                    force_right_action(get_item_id("arrange"), parent);
+                }
+
                 // mouse is inside an icon
                 do_action(GLToolbarItem::Left, item_id, parent, true);
                 parent.set_as_dirty();
@@ -1949,6 +1958,31 @@ Vec2f GLToolbar::get_separator_position(int separator_idx)
     }
 
     return Vec2f(FLT_MAX, FLT_MAX); 
+}
+
+void GLToolbar::on_set_virtual_item(const std::string& item_name) 
+{
+    if (item_name.empty()) {
+        m_pressed_toggable_id = -1;
+        GLToolbarItem* virtual_clone_item = get_item("virtual-clone-item");
+        if (virtual_clone_item) {
+            virtual_clone_item->set_state(GLToolbarItem::Normal);
+        }
+
+        GLToolbarItem* virtual_fillbed_item = get_item("virtual-fill-bed-item");
+        if (virtual_fillbed_item) {
+            virtual_fillbed_item->set_state(GLToolbarItem::Normal);
+        }
+
+        return;
+    }
+
+    int item_id           = get_item_id(item_name);
+    if (item_id >= 0) {
+        m_pressed_toggable_id = item_id;
+        GLToolbarItem* item   = m_items[item_id];
+        item->set_state(GLToolbarItem::Pressed);
+    }
 }
 
 } // namespace GUI

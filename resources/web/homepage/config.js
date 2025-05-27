@@ -17,6 +17,8 @@ window.$t = {};
 
 window.$message = {};
 
+window.$theme = 'dark';
+
 window.$getColor = () => {
     return {};
 };

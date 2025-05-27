@@ -8,7 +8,7 @@
 #include <vector>
 #include <set>
 
-#include "../../buildinfo.h"
+#include "buildinfo.h"
 
 namespace Slic3r {
 namespace Utils {

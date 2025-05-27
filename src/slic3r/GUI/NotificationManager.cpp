@@ -273,12 +273,16 @@ void NotificationManager::PopNotification::bbl_render_block_notification(
 	{
         bg_color = ImVec4(210.0 / 255.0, 148.0 / 255.0, 0.0, 0.8f);
 	} break;
+
+    case Slic3r::GUI::NotificationManager::NotificationLevel::WarningNotificationLevel: {
+        bg_color = ImVec4(0.7, 0.51, 0.04, 0.8f);
+    } break;
+
     case Slic3r::GUI::NotificationManager::NotificationLevel::HintNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::RegularNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::PrintInfoNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::ImportantNotificationLevel: break;
-    case Slic3r::GUI::NotificationManager::NotificationLevel::WarningNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::SeriousWarningNotificationLevel: break;
     default: break;
     }
@@ -292,11 +296,13 @@ void NotificationManager::PopNotification::bbl_render_block_notification(
     ImGui::PopStyleVar();
     ImGui::PopStyleColor(2);
 
-        if (ImGui::IsMouseHoveringRect(win_pos, win_pos + win_size))
-            set_hovered();
-        bbl_render_block_notif_left_sign(imgui, win_size.x, win_size.y, win_pos.x, win_pos.y);
-        bbl_render_block_notif_text(imgui, win_size.x, win_size.y, win_pos.x, win_pos.y);
-        bbl_render_block_notif_buttons(imgui, win_size, win_pos);
+    if (ImGui::IsMouseHoveringRect(win_pos, win_pos + win_size))
+        set_hovered();
+
+    bbl_render_block_notif_left_sign(imgui, win_size.x, win_size.y, win_pos.x, win_pos.y);
+    bbl_render_block_notif_text(imgui, win_size.x, win_size.y, win_pos.x, win_pos.y);
+    bbl_render_block_notif_buttons(imgui, win_size, win_pos);
+
 		//ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 	ImGui::EndChild();
 	//});
@@ -311,7 +317,7 @@ void NotificationManager::PopNotification::count_spaces()
 
 	m_window_width_offset = m_left_indentation + m_line_height * 3.f;
 
-    if (m_data.level != NotificationLevel::ErrorNotificationLevel
+    if (m_data.level != NotificationLevel::ErrorNotificationLevel && m_data.level != NotificationLevel::WarningNotificationLevel
         && m_data.level != NotificationLevel::SeriousWarningNotificationLevel
 		&& m_data.level != NotificationLevel::NormalNotificationLevel) {
 		m_line_height += 5;
@@ -712,7 +718,7 @@ void NotificationManager::PopNotification::bbl_render_block_notif_left_sign(
 	, const float win_pos_x, const float win_pos_y)
 {	
 	ImTextureID img;
-	if (m_data.level == NotificationLevel::ErrorNotificationLevel)
+	if (m_data.level == NotificationLevel::ErrorNotificationLevel || m_data.level == NotificationLevel::WarningNotificationLevel)
 		img = DispConfig().getTextureId(DispConfig::e_tt_warning);
     else if (m_data.level == NotificationLevel::NormalNotificationLevel)
         img = DispConfig().getTextureId(DispConfig::e_tt_normal);
@@ -738,7 +744,13 @@ void NotificationManager::PopNotification::bbl_render_block_notif_left_sign(
         pos.x -= 5;
         pos.y += 5;
         ImGui::SetCursorPos(pos);
-        imgui.text(_u8L("Error:"));
+
+		if (m_data.level == NotificationLevel::WarningNotificationLevel) {
+            imgui.text(_u8L("Warning:"));
+        } else {
+            imgui.text(_u8L("Error:"));
+        }
+        
     }
 	//ImGui::PopStyleColor(1);
 }
@@ -1805,7 +1817,7 @@ void NotificationManager::push_plater_warning_notification(const std::string& te
 {
 	// Find if was not hidden
 	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
-		if (notification->get_type() == NotificationType::PlaterWarning && notification->compare_text(_u8L("Warning:") + "\n" + text)) {
+		if (notification->get_type() == NotificationType::PlaterWarning && notification->compare_text(/*_u8L("Warning:") + "\n" + */text)) {
 			if (notification->get_state() == PopNotification::EState::Hidden) {
 				//dynamic_cast<PlaterWarningNotification*>(notification.get())->show();
 				return;
@@ -1813,7 +1825,7 @@ void NotificationManager::push_plater_warning_notification(const std::string& te
 		}
 	}
 
-	NotificationData data{ NotificationType::PlaterWarning, NotificationLevel::WarningNotificationLevel, 0,  _u8L("Warning:") + "\n" + text };
+	NotificationData data{ NotificationType::PlaterWarning, NotificationLevel::WarningNotificationLevel, 0,  /*_u8L("Warning:") + "\n" + */text };
 
 	auto notification = std::make_unique<NotificationManager::PlaterWarningNotification>(data, m_id_provider, m_evt_handler);
 	push_notification_data(std::move(notification), 0);
@@ -2507,7 +2519,7 @@ void NotificationManager::render_notifications(GLCanvas3D &canvas, float overlay
             auto level = notification->get_data().level;
             auto state = notification->get_state();
             auto type  = notification->get_type();
-            if (level == NotificationLevel::ErrorNotificationLevel || level == NotificationLevel::SeriousWarningNotificationLevel || level == NotificationLevel::NormalNotificationLevel) {
+            if (level == NotificationLevel::ErrorNotificationLevel || level == NotificationLevel::SeriousWarningNotificationLevel || level == NotificationLevel::NormalNotificationLevel || level == NotificationLevel::WarningNotificationLevel) {
                 notification->bbl_render_block_notification(canvas, bottom_up_last_y, overflow, overlay_width * m_scale);
                 ImGui::Spacing();
             } else {

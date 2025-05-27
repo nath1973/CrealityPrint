@@ -1162,6 +1162,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     // SoftFever
     ((ConfigOptionBool,                machine_LED_light_exist))
     ((ConfigOptionBool,                machine_platform_motion_enable))
+    ((ConfigOptionBool,                machine_ptc_exist))
     ((ConfigOptionBool,                use_firmware_retraction))
     ((ConfigOptionBool,                use_relative_e_distances))
     ((ConfigOptionBool,                accel_to_decel_enable))

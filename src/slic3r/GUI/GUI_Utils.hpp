@@ -137,8 +137,8 @@ public:
         const double font_to_em_koef = 10. / 11.;// Default font point size on OSX is 11 pt
 #endif
         m_em_unit_from_font_size = int(font_to_em_koef * m_normal_font.GetPointSize());
-        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
-        //m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
+        //m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
+        m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
 #else
         // initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
         m_em_unit = std::max<size_t>(10, this->GetTextExtent("m").x - 1);
@@ -319,8 +319,8 @@ private:
         m_normal_font = this->GetFont();
 
         // update em_unit value for new window font
-        //m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
-        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
+        m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
+        //m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
 
         // rescale missed controls sizes and images
         on_dpi_changed(suggested_rect);

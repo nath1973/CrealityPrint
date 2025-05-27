@@ -17,6 +17,7 @@
 #include "Tab.hpp"
 #include "MainFrame.hpp"
 #include "libslic3r_version.h"
+#include "libslic3r/common_header/common_header.h"
 #include <filesystem>
 
 #define NAME_OPTION_COMBOBOX_SIZE wxSize(FromDIP(200), FromDIP(24))
@@ -59,7 +60,7 @@ static const std::vector<std::string> filament_vendors =
      "Snapmaker",              "SnoLabs",                "Spectrum",               "SUNLU",                  "TTYT3D",
      "Tianse",                 "UltiMaker",              "Valment",                "Verbatim",               "VO3D",
      "Voxelab",                "VOXELPLA",               "YOOPAI",                 "Yousu",                  "Ziro",
-     "Zyltech"};
+     "Zyltech", "Morandi"};
      
 static const std::vector<std::string> filament_types = {"PLA",    "rPLA",  "PLA+",      "PLA Tough", "PETG",  "ABS",    "ASA",    "FLEX",   "HIPS",   "PA",     "PACF",
                                                         "NYLON",  "PVA",   "PVB",       "PC",        "PCABS", "PCTG",   "PCCF",   "PHA",    "PP",     "PEI",    "PET",    "PETG",
@@ -73,7 +74,7 @@ static const std::vector<std::string> printer_vendors =
      "CrealityPrint Arena Printer", "Peopoly",            "Prusa",              "Qidi",               "Raise3D",
      "RatRig",             "SecKit",             "Snapmaker",          "Sovol",              "Tronxy",
      "TwoTrees",           "UltiMaker",          "Vivedino",           "Voron",              "Voxelab",
-     "Vzbot",              "Wanhao"};
+     "Vzbot",              "Wanhao",            "Morandi"};
 
 static const std::unordered_map<std::string, std::vector<std::string>> printer_model_map =
     {{"Anker",          {"Anker M5", "Anker M5 All-Metal Hot End", "Anker M5C"}},
@@ -706,7 +707,7 @@ CreateFilamentPresetDialog::CreateFilamentPresetDialog(wxWindow *parent)
 	this->SetBackgroundColour(*wxWHITE);
     this->SetSize(wxSize(FromDIP(600), FromDIP(480)));
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
 	wxBoxSizer *m_main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -1593,7 +1594,7 @@ CreatePrinterPresetDialog::CreatePrinterPresetDialog(wxWindow *parent,int iType)
     this->SetBackgroundColour(*wxWHITE);
     SetSizeHints(wxDefaultSize, wxDefaultSize);
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer *m_main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -4088,7 +4089,7 @@ CreatePresetSuccessfulDialog::CreatePresetSuccessfulDialog(wxWindow *parent, con
 {
     this->SetBackgroundColour(*wxWHITE);
     this->SetSize(wxSize(FromDIP(450), FromDIP(200)));
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer *m_main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -5412,7 +5413,7 @@ ExportConfigsDialog::ExportConfigsDialog(wxWindow* parent, const wxString& expor
     this->SetBackgroundColour(*wxWHITE);
     this->SetSize(wxSize(FromDIP(600), FromDIP(600)));
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     m_main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -5487,7 +5488,7 @@ void ExportConfigsDialog::exportPresets()
     this->SetMinSize(wxSize(FromDIP(992), FromDIP(660)));
     this->SetMaxSize(wxSize(FromDIP(992), FromDIP(660)));
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     m_main_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -6920,7 +6921,7 @@ EditFilamentPresetDialog::EditFilamentPresetDialog(wxWindow *parent, FilamentInf
     this->SetBackgroundColour(*wxWHITE);
     this->SetMinSize(wxSize(FromDIP(600), -1));
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     m_main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -7416,7 +7417,7 @@ CreatePresetForPrinterDialog::CreatePresetForPrinterDialog(wxWindow *parent, std
 
     this->SetBackgroundColour(*wxWHITE);
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer *main_sizer = new wxBoxSizer(wxVERTICAL);

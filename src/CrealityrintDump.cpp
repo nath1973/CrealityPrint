@@ -13,6 +13,7 @@
 ErrorReportDialog::ErrorReportDialog(wxWindow* parent, const wxString& title)
     : Slic3r::GUI::DPIDialog(parent, wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start";
     SetFont(Slic3r::GUI::wxGetApp().normal_font());
     //SetBackgroundColour(wxColor("#4b4b4d"));
     bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
@@ -83,7 +84,7 @@ ErrorReportDialog::ErrorReportDialog(wxWindow* parent, const wxString& title)
     sendButton->SetMinSize(wxSize(FromDIP(100), FromDIP(24)));
     sendButton->SetCornerRadius(FromDIP(12));
     sendButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
-        sendReport();
+        //sendReport();
         EndModal(wxID_OK);
     });
 
@@ -116,6 +117,8 @@ ErrorReportDialog::ErrorReportDialog(wxWindow* parent, const wxString& title)
     // 调整对话框大小以适应内容
     sizer->Fit(this);
     Slic3r::GUI::wxGetApp().UpdateDlgDarkUI(this);
+
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end";
 }
 
 wxString ErrorReportDialog::getSystemInfo()
@@ -168,6 +171,7 @@ void ErrorReportDialog::on_dpi_changed(const wxRect& suggested_rect)
 
 void ErrorReportDialog::sendEmail(wxString zipFilePath)
 {
+        BOOST_LOG_TRIVIAL(warning) <<__FUNCTION__ <<  " start";     
         // 发送邮件
         CURL *curl;
         CURLcode res = CURLE_OK;
@@ -225,30 +229,48 @@ void ErrorReportDialog::sendEmail(wxString zipFilePath)
              curl_easy_setopt(curl, CURLOPT_USERNAME, DUMPTOOL_USER);
             curl_easy_setopt(curl, CURLOPT_PASSWORD, DUMPTOOL_PASS);
             
-            
-            
+             BOOST_LOG_TRIVIAL(error) << "DUMPTOOL_HOST: " << DUMPTOOL_HOST << "\nDUMPTOOL_USER: " << DUMPTOOL_USER
+                                     << "\nCURLOPT_PASSWORD: " << CURLOPT_PASSWORD << "\nDUMPTOOL_TO: " << DUMPTOOL_TO;
+
+             // 打印 CURL 错误详情
+             BOOST_LOG_TRIVIAL(error) << "CURL error: " << curl_easy_strerror(res) << " (code: " << res << ")";
+
+             // 如果是连接问题，打印解析的IP
+             char* ip = nullptr;
+             curl_easy_getinfo(curl, CURLINFO_PRIMARY_IP, &ip);
+             BOOST_LOG_TRIVIAL(error) << "Resolved IP: " << (ip ? ip : "NULL");
             
          
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
             //curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
-        
-            
             
             res = curl_easy_perform(curl);
 
-            if(res != CURLE_OK)
+            char* effective_url = nullptr;
+            curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &effective_url); // 获取最终解析的URL
+            BOOST_LOG_TRIVIAL(error) << "URL: " << (effective_url ? effective_url : "NULL");
+            if (res != CURLE_OK) {
+                BOOST_LOG_TRIVIAL(error) << "Error sending email: " << curl_easy_strerror(res);
+            } else {
+                BOOST_LOG_TRIVIAL(warning) << "sending email finished";
+            }
             fprintf(stderr, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
 
             curl_slist_free_all(recipients);
             curl_mime_free(mime);
             curl_easy_cleanup(curl);
             
+        } else {
+             BOOST_LOG_TRIVIAL(error) << "curl_easy_init failed!! ";         
         }
 
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";     
+        boost::log::core::get()->flush();
         return ;
     }
-wxString ErrorReportDialog::zipFiles() {
+
+    wxString ErrorReportDialog::zipFiles() {
         // 创建一个zip文件
         wxString format1 = "%Y%m%d%H%M%S";
         wxString zipFilePath = wxString::Format("%s/CrealityPrint_%s_%s.zip",wxFileName::GetTempDir(),CREALITYPRINT_VERSION,wxDateTime::Now().Format(format1));
@@ -290,7 +312,8 @@ wxString ErrorReportDialog::zipFiles() {
         mz_zip_writer_end(&archive);
         return zipFilePath;
     }
-void ErrorReportDialog::sendReport()
+
+    void ErrorReportDialog::sendReport()
     {
          m_systemInfoFilePath = getSystemInfo();
         if(!m_dumpFilePath.IsEmpty() && !m_systemInfoFilePath.IsEmpty()) {
@@ -301,13 +324,16 @@ void ErrorReportDialog::sendReport()
             sendEmail(dumpfile);
         }
     }
+
 void ErrorReportDialog::GetErrorReport()
     {
         // 获取错误报告
         wxString osDescription = wxGetOsDescription();
         m_info.osDescription   = osDescription;
         m_info.build           = wxString(CREALITYPRINT_VERSION, wxConvUTF8);
-        m_info.uuid            = wxDateTime::Now().Format("%Y%m%d%H%M%S");
+        m_info.uuid = Slic3r::GUI::wxGetApp().app_config->get("language") + wxDateTime::Now().Format("%Y%m%d%H%M%S") +
+                      wxString::Format("%03lu", wxDateTime::UNow().GetMillisecond());
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " uuid:" << m_info.uuid.ToStdString().c_str();
         // 获取显卡信息
         if (!glfwInit()) {
             std::cerr << "Failed to initialize GLFW!" << std::endl;
@@ -346,56 +372,183 @@ void ErrorReportDialog::GetErrorReport()
 
         return;
     }
-    // 自定义应用程序类
-bool ErrorReportDialog::addLogFiles(mz_zip_archive& archive) {
+
+bool ErrorReportDialog::addLogFiles(mz_zip_archive& archive)
+{
     try {
         // 获取日志目录路径
-        std::string log_dir = Slic3r::data_dir() + "\\log";
+        std::string           log_dir = Slic3r::data_dir() + "\\log";
         std::filesystem::path log_path(log_dir);
-        
+
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " start";
+
         // 检查目录是否存在
         if (!std::filesystem::exists(log_path)) {
-            std::cerr << "Log directory does not exist: " << log_dir << std::endl;
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Log directory does not exist: " << log_dir;
             return false;
         }
 
+        // 收集所有日志文件
+        std::vector<std::filesystem::path> log_files = collectLogFiles(log_path);
+        if (log_files.empty()) {
+            return true; // 没有日志文件，但这不是错误
+        }
+
+        // 创建临时子压缩包
+        wxString logZipPath = createLogZipPath();
+
+        // 压缩日志文件
+        bool success = compressLogFiles(log_files, logZipPath);
+        if (!success) {
+            return true; // 返回true因为这不是致命错误
+        }
+
+        // 将日志压缩包添加到主压缩包
+        bool added = addLogZipToMainArchive(archive, logZipPath);
+
+        // 清理临时文件
+        wxRemoveFile(logZipPath);
+
+        return added;
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Exception while adding log files: " << e.what();
+        return false;
+    }
+}
+
+std::vector<std::filesystem::path> ErrorReportDialog::collectLogFiles(const std::filesystem::path& log_path)
+{
+    std::vector<std::filesystem::path> log_files;
+
+    try {
         // 收集所有.log.0文件
-        std::vector<std::filesystem::path> log_files;
         for (const auto& entry : std::filesystem::directory_iterator(log_path)) {
-            if (entry.path().extension() == ".0" && 
-                entry.path().stem().extension() == ".log") {
+            if (entry.path().extension() == ".0" && entry.path().stem().extension() == ".log") {
                 log_files.push_back(entry.path());
             }
         }
 
         // 按最后修改时间排序
-        std::sort(log_files.begin(), log_files.end(),
-            [](const std::filesystem::path& a, const std::filesystem::path& b) {
-                return std::filesystem::last_write_time(a) > std::filesystem::last_write_time(b);
-            });
+        std::sort(log_files.begin(), log_files.end(), [](const std::filesystem::path& a, const std::filesystem::path& b) {
+            return std::filesystem::last_write_time(a) > std::filesystem::last_write_time(b);
+        });
 
-        // 只取最近的5个文件
-        size_t count = std::min(size_t(5), log_files.size());
-        for (size_t i = 0; i < count; ++i) {
-            const auto& log_file = log_files[i];
-            std::string filename = log_file.filename().string();
-            
-            // 添加到zip文件
-            mz_bool status = mz_zip_writer_add_file(&archive, 
-                filename.c_str(),
-                log_file.string().c_str(),
-                "", 0, MZ_BEST_COMPRESSION);
-                
-            if (!status) {
-                std::cerr << "Failed to add log file to zip: " << filename << std::endl;
-                return false;
-            }
+        // 限制文件数量
+        if (log_files.size() > 4) {
+            log_files.resize(4);
+        }
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to collect log files: " << e.what();
+    }
+
+    return log_files;
+}
+
+wxString ErrorReportDialog::createLogZipPath()
+{
+    wxFileName dumpFileName(m_dumpFilePath);
+    wxString   logZipName = dumpFileName.GetName() + "_logs.zip";
+    return wxFileName::GetTempDir() + "/" + logZipName;
+}
+
+bool ErrorReportDialog::compressLogFiles(const std::vector<std::filesystem::path>& log_files, const wxString& logZipPath)
+{
+    // 创建子压缩包
+    mz_zip_archive log_archive;
+    mz_zip_zero_struct(&log_archive);
+    mz_bool status = mz_zip_writer_init_file(&log_archive, logZipPath.mb_str(), 0);
+    if (!status) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to create log zip file!";
+        return false;
+    }
+
+    // 用于跟踪是否添加了至少一个日志文件
+    bool added_any_log = false;
+
+    // 处理所有候选日志文件
+    for (const auto& log_file : log_files) {
+        if (tryAddLogFileToArchive(log_file, log_archive)) {
+            added_any_log = true;
+        }
+    }
+
+    // 检查是否至少添加了一个日志文件
+    if (!added_any_log) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Could not add any log files to archive";
+        mz_zip_writer_end(&log_archive);
+        wxRemoveFile(logZipPath);
+        return false;
+    }
+
+    // 完成子压缩包
+    status = mz_zip_writer_finalize_archive(&log_archive);
+    if (MZ_FALSE == status) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to finalize log archive";
+        mz_zip_writer_end(&log_archive);
+        wxRemoveFile(logZipPath);
+        return false;
+    }
+    mz_zip_writer_end(&log_archive);
+
+    return true;
+}
+
+bool ErrorReportDialog::tryAddLogFileToArchive(const std::filesystem::path& log_file, mz_zip_archive& archive)
+{
+    std::string filename = log_file.filename().string();
+
+    // 尝试直接复制添加文件
+    if (tryCopyAndAddFile(log_file, archive, filename.c_str())) {
+        return true;
+    }
+
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Unable to add log file (may be locked): " << filename;
+    return false;
+}
+
+bool ErrorReportDialog::tryCopyAndAddFile(const std::filesystem::path& srcPath, mz_zip_archive& zip, const char* entryName)
+{
+    try {
+        // 创建临时文件
+        wxString tempFile = wxFileName::CreateTempFileName("log_copy_");
+
+        // 尝试复制文件
+        if (!wxCopyFile(srcPath.string(), tempFile)) {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to copy log file: " << srcPath.string();
+            wxRemoveFile(tempFile);
+            return false;
+        }
+
+        // 添加到压缩包
+        mz_bool result = mz_zip_writer_add_file(&zip, entryName, tempFile.mb_str(), "", 0, MZ_BEST_COMPRESSION);
+
+        // 删除临时文件
+        wxRemoveFile(tempFile);
+
+        if (result != MZ_TRUE) {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to add copied file to archive: " << entryName;
+            return false;
         }
 
         return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Exception while adding log files: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Exception while copying file: " << e.what();
         return false;
     }
+}
+
+bool ErrorReportDialog::addLogZipToMainArchive(mz_zip_archive& archive, const wxString& logZipPath)
+{
+    wxFileName zipFile(logZipPath);
+    wxString   logZipName = zipFile.GetFullName();
+
+    mz_bool status = mz_zip_writer_add_file(&archive, logZipName.mb_str(), logZipPath.mb_str(), "", 0,
+                                            MZ_NO_COMPRESSION); // 已经压缩过，不需要再次压缩
+
+    if (!status) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " Failed to add log zip to main zip!";
+        return false;
+    }
+
+    return true;
 }

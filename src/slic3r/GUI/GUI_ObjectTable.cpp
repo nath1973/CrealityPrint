@@ -17,7 +17,7 @@
 #include "BitmapCache.hpp"
 #include "GUI_ObjectTable.hpp"
 #include "GUI_ObjectList.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 //use wxGridWindow to compute position
 //#include "wx/generic/private/grid.h"
 
@@ -3312,7 +3312,8 @@ ObjectTableDialog::ObjectTableDialog(wxWindow* parent, Plater* platerObj, Model 
     auto m_main_sizer = new wxBoxSizer(wxVERTICAL);
 
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3D.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
+    
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     //top line

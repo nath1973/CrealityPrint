@@ -15,6 +15,7 @@
 #include <wx/radiobox.h>
 #include "libslic3r/calib.hpp"
 
+class ImgBtn;
 namespace Slic3r { namespace GUI {
 
 class PA_Calibration_Dlg : public DPIDialog
@@ -159,7 +160,6 @@ protected:
     int        m_bedTempValue;
 };
 
-
 class High_Flowrate_Dlg : public DPIDialog
 {
 public:
@@ -168,28 +168,21 @@ public:
     void on_dpi_changed(const wxRect& suggested_rect) override;
 
 protected:
-    //virtual void on_start(wxCommandEvent& event);
-    void         on_start0(wxCommandEvent& event);
-    void         on_start1(wxCommandEvent& event);
-    void         on_start2(wxCommandEvent& event);
-    void         on_start3(wxCommandEvent& event);
-    void         on_start4(wxCommandEvent& event);
-    void         on_start5(wxCommandEvent& event);
-    void         on_start6(wxCommandEvent& event);
-    void         on_start7(wxCommandEvent& event);
-    void         on_start8(wxCommandEvent& event);
     Calib_Params m_params;
-    wxButton*      m_btn0;
-    wxButton*    m_btn1;
-    wxButton*      m_btn2;
-    wxButton*      m_btn3;
-    wxButton*      m_btn4;
-    wxButton*      m_btn5;
-    wxButton*      m_btn6;
-    wxButton*      m_btn7;
-    wxButton*      m_btn8;
+    ImgBtn*      m_btn0 = nullptr;
+    ImgBtn*      m_btn1 = nullptr;
+    ImgBtn*      m_btn2 = nullptr;
+    ImgBtn*      m_btn3 = nullptr;
+    ImgBtn*      m_btn4 = nullptr;
+    ImgBtn*      m_btn5 = nullptr;
+    ImgBtn*      m_btn6 = nullptr;
+    ImgBtn*      m_btn7 = nullptr;
+    ImgBtn*      m_btn8 = nullptr;
     //Button*      m_btn8;
     Plater*      m_plater;
+
+private:
+    float m_CurrentValue = 0.0f;
 };
 
 class Limit_Speed_Dlg : public DPIDialog

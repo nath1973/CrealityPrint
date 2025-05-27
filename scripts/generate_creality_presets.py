@@ -419,7 +419,14 @@ def process_machine_json(printer,package_path, out_path):
     if process_index != -1:
         preferred_process =data["metadata"]["preferred_process"][0:process_index].strip() 
     out_data["default_print_profile"] = preferred_process + " @"+machine_name+" "+printer["nozzleDiameter"][0]+" nozzle"
-    out_data["default_filament_profile"] = ["Hyper PLA @"+machine_name+" "+printer["nozzleDiameter"][0]+" nozzle"]
+    if "01001" in top_material:
+        out_data["default_filament_profile"] = ["Hyper PLA @"+machine_name+" "+printer["nozzleDiameter"][0]+" nozzle"]
+    elif "00001" in top_material:
+        out_data["default_filament_profile"] = ["Generic PLA @"+machine_name+" "+printer["nozzleDiameter"][0]+" nozzle"]
+    elif "04001" in top_material:
+        out_data["default_filament_profile"] = ["CR-PLA @"+machine_name+" "+printer["nozzleDiameter"][0]+" nozzle"]
+    elif "08001" in top_material:
+        out_data["default_filament_profile"] = ["Ender-PLA @"+machine_name+" "+printer["nozzleDiameter"][0]+" nozzle"]
 
     if "nozzle_diameter" in out_data:
         out_data["nozzle_diameter"] = [out_data["nozzle_diameter"]]

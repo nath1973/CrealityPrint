@@ -4232,6 +4232,7 @@ LayerResult GCode::process_layer(
     if (m_wipe_tower)
         m_wipe_tower->set_creality_cfs(print.getCrealityCFS());
 
+
     // add tag for processor
     gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Layer_Change) + "\n";
     // export layer z
@@ -6999,13 +7000,13 @@ std::string GCode::set_extruder(unsigned int extruder_id, double print_z, bool b
         check_add_eol(toolchange_gcode_parsed);
 
         
-        if (!m_config.single_extruder_multi_material && m_placeholder_parser_integration.num_extruders > 1 && m_powerPos != Vec2d::Zero()) {
-            gcode += m_writer.travel_to_xy(m_powerPos);
-        } 
-        else 
-        if (!m_config.single_extruder_multi_material && m_config.print_sequence.value == PrintSequence::ByObject && change_tool) {
-            gcode += m_writer.travel_to_xy(Vec2d::Zero());
-        }
+        //if (!m_config.single_extruder_multi_material && m_placeholder_parser_integration.num_extruders > 1 && m_powerPos != Vec2d::Zero()) {
+        //    gcode += m_writer.travel_to_xy(m_powerPos);
+        //} 
+        //else 
+        //if (!m_config.single_extruder_multi_material && m_config.print_sequence.value == PrintSequence::ByObject && change_tool) {
+        //    gcode += m_writer.travel_to_xy(Vec2d::Zero());
+        //}
 
         gcode += toolchange_gcode_parsed;
 

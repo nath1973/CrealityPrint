@@ -242,9 +242,9 @@ void Tab::create_preset_tab()
         restore_last_select_item();
     });
 
-
+    bool is_dark = wxGetApp().dark_mode();
     //add_scaled_button(panel, &m_btn_compare_preset, "compare");
-    add_border_hover_icon(m_top_panel, &m_btn_save_preset, "save", wxSize(FromDIP(24), FromDIP(24)));
+    add_border_hover_icon(m_top_panel, &m_btn_save_preset, is_dark ? "save_dark_default" : "save_light_default", wxSize(FromDIP(24), FromDIP(24)));
     add_border_hover_icon(m_top_panel, &m_btn_delete_preset, "cross", wxSize(FromDIP(24), FromDIP(24)));
     //if (m_type == Preset::Type::TYPE_PRINTER)
     //    add_scaled_button(panel, &m_btn_edit_ph_printer, "cog");
@@ -282,8 +282,9 @@ void Tab::create_preset_tab()
 
     add_scaled_button(m_top_panel, &m_undo_btn,        m_bmp_white_bullet.name());
     add_scaled_button(m_top_panel, &m_undo_to_sys_btn, m_bmp_white_bullet.name());
-    add_border_hover_icon(m_top_panel, &m_btn_search, "search", wxSize(FromDIP(24), FromDIP(24)));
+    add_border_hover_icon(m_top_panel, &m_btn_search, is_dark ? "search" : "search_light", wxSize(FromDIP(24), FromDIP(24)));
     m_btn_search->SetToolTip(_L("Search in preset"));
+    
 
     //search input
     m_search_item = new StaticBox(m_top_panel);
@@ -377,7 +378,7 @@ void Tab::create_preset_tab()
     // BBS: model config
     if (m_presets_choice) {
         m_presets_choice->Reparent(m_top_panel);
-        m_top_sizer->Add(m_presets_choice, 1, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
+        m_top_sizer->Add(m_presets_choice, 1, wxLEFT | wxALIGN_CENTER_VERTICAL, 10);
     } else {
         m_top_sizer->AddSpacer(10);
         m_top_sizer->AddStretchSpacer(1);
@@ -1320,7 +1321,11 @@ void Tab::sys_color_changed()
         icon->msw_rescale();
         icon->on_sys_color_changed(wxGetApp().dark_mode());
     }
-        
+
+    bool is_dark = wxGetApp().dark_mode();
+    m_btn_save_preset->SetBitmap_(is_dark ?  "save_dark_default" : "save_light_default");  
+    m_btn_search->SetBitmap_(is_dark ? "search" : "search_light");  
+
     if (m_detach_preset_btn)
         m_detach_preset_btn->msw_rescale();
 
@@ -3598,6 +3603,7 @@ void TabFilament::build()
         optgroup = page->new_optgroup(L("Print chamber temperature"), L"param_chamber_temp");
         optgroup->append_single_option_line("chamber_temperature", "chamber-temperature");
         optgroup->append_single_option_line("activate_chamber_temp_control", "chamber-temperature");
+        
 
         optgroup->append_separator();
 
@@ -4224,7 +4230,7 @@ void TabFilament::create_preset_tab()
     //m_top_sizer->Add(m_wcb_choicePrintType, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
     bSizer->Add(m_wcb_choicePrintType);
 
-    m_top_sizer->Add(m_boxPanel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
+    m_top_sizer->Add(m_boxPanel, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, FromDIP(20));
 
     //m_top_sizer->Add(m_undo_btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 5);
     const float scale_factor = /*wxGetApp().*/em_unit(this) * 0.1;// GetContentScaleFactor();
@@ -4576,6 +4582,7 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line("support_air_filtration", "air-filtration");
         optgroup->append_single_option_line("machine_LED_light_exist");
         optgroup->append_single_option_line("machine_platform_motion_enable");
+        optgroup->append_single_option_line("machine_ptc_exist");
 
         auto edit_custom_gcode_fn = [this](const t_config_option_key& opt_key) { edit_custom_gcode(opt_key); };
 
@@ -7000,7 +7007,7 @@ void TabPrinter::create_preset_tab()
     //m_top_sizer->Add(m_wcb_choicePrintType, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
     bSizer->Add(m_wcb_choicePrintType);
 
-    m_top_sizer->Add(m_boxPanel, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 1);
+    m_top_sizer->Add(m_boxPanel, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, FromDIP(20));
 
     //m_top_sizer->Add(m_undo_btn, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 5);
     const float scale_factor = /*wxGetApp().*/em_unit(this) * 0.1;// GetContentScaleFactor();

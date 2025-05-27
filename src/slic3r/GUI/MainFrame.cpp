@@ -75,7 +75,7 @@
 #include "print_manage/AppMgr.hpp"
 #define ALL_PLATFORM 1
 #include "UpdateParams.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
 
@@ -156,9 +156,11 @@ static wxIcon main_frame_icon(GUI_App::EAppMode app_mode)
                 }
         }*/
     }
-    return wxIcon(path, wxBITMAP_TYPE_ICO);
-#else // _WIN32
-    return wxIcon(Slic3r::var("CrealityPrint_128px.png"), wxBITMAP_TYPE_PNG);
+    //return wxIcon(path, wxBITMAP_TYPE_ICO);
+    //--lsg filedialog icon
+    return wxIcon(Slic3r::var(Slic3r::CxBuildInfo::getIconName_noTheme() + "_128px.png"), wxBITMAP_TYPE_PNG);
+#else
+    return wxIcon();
 #endif // _WIN32
 }
 
@@ -980,8 +982,8 @@ void  MainFrame::trackEvent(const std::string& event, const std::string& data)
         commandJson["event"] = event;
         commandJson["data"] = json::parse(data);
         wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
-        if(m_printer_mgr_view)
-            m_printer_mgr_view->run_script(strJS.ToStdString());
+        if(m_webview)
+            m_webview->RunScript(strJS.ToStdString());
     } catch (const std::exception& e) {
         BOOST_LOG_TRIVIAL(error) << "MainFrame::trackEvent: " << e.what();
     }
@@ -1017,13 +1019,18 @@ void MainFrame::init_tabpanel() {
                 if (m_tab_event_enabled)
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLVIEWTOOLBAR_3D));
                 m_param_panel->OnActivate();
+#if CUSTOM_CXCLOUD
                 UpdateParams::getInstance().checkParamsNeedUpdate();
+#endif
+
             }
             else if (sel == tpPreview) {
                 if (m_tab_event_enabled)
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLVIEWTOOLBAR_PREVIEW));
                 m_param_panel->OnActivate();
+#if CUSTOM_CXCLOUD
                 UpdateParams::getInstance().closeParamsUpdateTip();
+#endif
             }
         }
         //else if (panel == m_param_panel)
@@ -2284,9 +2291,11 @@ void MainFrame::on_sys_color_changed()
     
     // Only update home page. No need to reload others
     auto dark = Slic3r::GUI::wxGetApp().dark_mode();
+#if CUSTOM_COMMUNITY_ENABLE
     m_webview->Browse()->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)", SLIC3R_VERSION,
             dark ? "dark" : "light"));
     m_webview->Browse()->Reload();
+#endif
 
  
     m_topbar->Rescale(false);
@@ -2332,6 +2341,7 @@ static wxMenu* generate_help_menu()
     //    [](wxCommandEvent&) {
     //        //TODO
     //    });
+#if CUSTOM_CXCLOUD
     // Check New Version
     append_menu_item(helpMenu, wxID_ANY, _L("Check for Update"), _L("Check for Update"),
         [](wxCommandEvent&) {
@@ -2370,7 +2380,7 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, _L("User Feedback"), _L("User Feedback"), [](wxCommandEvent&) {
         wxLaunchDefaultBrowser(user_feedback_website(), wxBROWSER_NEW_WINDOW);
     });
-
+#endif
     append_menu_item(helpMenu, wxID_ANY, _L("Log View"), _L("Log View"), [](wxCommandEvent&) {
         std::string data_dir = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
         //A.0
@@ -2503,22 +2513,22 @@ void MainFrame::init_menubar_as_editor()
         // BBS: close save project
 #ifndef __APPLE__
         append_menu_item(fileMenu, wxID_ANY, _L("Save Project") + "\t" + ctrl + "S", _L("Save current project to file"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project(false, FT_PROJECT); }, "menu_save", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project_nogcode(false, FT_PROJECT); }, "menu_save", nullptr,
             [this](){return m_plater != nullptr && can_save(); }, this);
 #else
         append_menu_item(fileMenu, wxID_ANY, _L("Save Project") + "\t" + ctrl + "S", _L("Save current project to file"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project(); }, "", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project_nogcode(); }, "", nullptr,
             [this](){return m_plater != nullptr && can_save(); }, this);
 #endif
 
 
 #ifndef __APPLE__
         append_menu_item(fileMenu, wxID_ANY, _L("Save Project as") + dots + "\t" + ctrl + _L("Shift+") + "S", _L("Save current project as"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project(true, FT_PROJECT); }, "menu_save", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project_nogcode(true, FT_PROJECT); }, "menu_save", nullptr,
             [this](){return m_plater != nullptr && can_save_as(); }, this);
 #else
         append_menu_item(fileMenu, wxID_ANY, _L("Save Project as") + dots + "\t" + ctrl + _L("Shift+") + "S", _L("Save current project as"),
-            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project(true); }, "", nullptr,
+            [this](wxCommandEvent&) { if (m_plater) m_plater->save_project_nogcode(true); }, "", nullptr,
             [this](){return m_plater != nullptr && can_save_as(); }, this);
 #endif
 
@@ -2751,7 +2761,8 @@ void MainFrame::init_menubar_as_editor()
                 if (handle_key_event(e)) {
                     return;
                 }
-                m_plater->clone_selection();
+                //m_plater->clone_selection();
+                m_plater->get_current_canvas3D()->triger_extra_render_event(GLCanvas3D::ERenderEvent::ObjectCloneOptions);
             },
             "", nullptr, [this](){return can_clone(); }, this);
         editMenu->AppendSeparator();
@@ -4624,7 +4635,7 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
         SetIcon(wxIcon(szExeFileName, wxBITMAP_TYPE_ICO));
     }
 #else
-    SetIcon(wxIcon(var("CrealityPrint_128px.png"), wxBITMAP_TYPE_PNG));
+    SetIcon(wxIcon(var(Slic3r::CxBuildInfo::getIconName() + "_128px.png"), wxBITMAP_TYPE_PNG));
 #endif // _WIN32
 
     //just hide the Frame on closing

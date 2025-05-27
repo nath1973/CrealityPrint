@@ -21,6 +21,7 @@ private:
     int syncShowTokenInvalidTipDlg(const std::string& fromPage);
     int showAutoMappingNoLoginTipDlg(const std::string& fromPage);
     int showAutoMappingDiffAccountTipDlg(const std::string& fromPage);
+    int showNoSelectedSyncUserPreset(const std::string& fromPage);
 
 private:
     LoginTip();

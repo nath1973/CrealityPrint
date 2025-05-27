@@ -66,12 +66,18 @@ void RemotePrinterManager::uploadThread()
     }
 }
 
-void RemotePrinterManager::pushUploadTasks(const std::string& ipAddress, const std::string& fileName, const std::string& filePath, std::function<void(std::string, float)> progressCallback, std::function<void(std::string, int)> uploadStatusCallback, std::function<void(std::string, std::string)> onCompleteCallback) 
+void RemotePrinterManager::pushUploadTasks(const std::string& ipAddress, const std::string& fileName, const std::string& filePath, std::function<void(std::string, float,double)> progressCallback, std::function<void(std::string, int)> uploadStatusCallback, std::function<void(std::string, std::string)> onCompleteCallback) 
 {
     std::lock_guard<std::mutex> lock(m_mtxUpload);
     m_uploadTasks.emplace_back(ipAddress, fileName, filePath, progressCallback, uploadStatusCallback, onCompleteCallback);
     m_cvUpload.notify_one();
 }
+
+void RemotePrinterManager::uploadFileByLan(const std::string& ipAddress, const std::string& fileName, const std::string& filePath, std::function<void(float,double)> progressCallback, std::function<void(std::string, int)> uploadStatusCallback, std::function<void(std::string, std::string)> onCompleteCallback) 
+{
+    m_pLanPrinterInterface->sendFileToDevice(ipAddress,fileName,filePath,progressCallback,nullptr,nullptr);
+}
+
 void RemotePrinterManager::cancelUpload(const std::string& ipAddress) { 
     RemotePrinerType printerType = determinePrinterType(ipAddress); 
     switch (printerType) {
@@ -82,8 +88,13 @@ void RemotePrinterManager::cancelUpload(const std::string& ipAddress) {
     }
 }
 
+void RemotePrinterManager::setOldPrinterMap(std::string& ipAddress)
+{
+    oldPrinters.push_back(ipAddress);
+}
+
 void RemotePrinterManager::pushFile(const std::string& ipAddress, const std::string& fileName, const std::string& filePath, 
-    std::function<void(std::string, float)> progressCallback, 
+    std::function<void(std::string, float,double)> progressCallback, 
     std::function<void(std::string, int)> uploadStatusCallback,
     std::function<void(std::string, std::string)> onCompleteCallback)
 {
@@ -91,9 +102,9 @@ void RemotePrinterManager::pushFile(const std::string& ipAddress, const std::str
 
     auto sendFile = [&](auto* printerInterface, auto&&... args) {
         std::future<void> future = printerInterface->sendFileToDevice(std::forward<decltype(args)>(args)...,
-            [=](float progress) {
+            [=](float progress, double speed) {
                 if (progressCallback) {
-                    progressCallback(ipAddress, progress);
+                    progressCallback(ipAddress, progress,speed);
                 }
             },
             [=](int statusCode) {
@@ -113,7 +124,7 @@ void RemotePrinterManager::pushFile(const std::string& ipAddress, const std::str
         }
     };
 
-    switch (printerType)
+   switch (printerType)
     {
         case RemotePrinerType::REMOTE_PRINTER_TYPE_LAN:
             sendFile(m_pLanPrinterInterface, ipAddress, fileName, filePath);
@@ -137,6 +148,10 @@ void RemotePrinterManager::pushFile(const std::string& ipAddress, const std::str
 
 RemotePrinerType RemotePrinterManager::determinePrinterType(const std::string& ipAddress)
 {
+    bool isExists = (std::find(oldPrinters.begin(),oldPrinters.end(), ipAddress) != oldPrinters.end());
+    if(isExists)
+        return RemotePrinerType::REMOTE_PRINTER_TYPE_LAN;
+
     if(ipAddress.find('.') !=-1)
         return RemotePrinerType::REMOTE_PRINTER_TYPE_KLIPPER4408;
 

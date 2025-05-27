@@ -243,7 +243,7 @@ wxBitmap* BitmapCache::load_png(const std::string &bitmap_name, unsigned width, 
         return it->second;
 
     wxImage image;
-    if (! image.LoadFile(Slic3r::GUI::from_u8(Slic3r::var(bitmap_name + ".png")), wxBITMAP_TYPE_PNG) ||
+    if (! image.LoadFile(Slic3r::GUI::from_u8(Slic3r::var(bitmap_name + ".png")), wxBITMAP_TYPE_PNG ) ||
         image.GetWidth() == 0 || image.GetHeight() == 0)
         return nullptr;
 
@@ -339,7 +339,7 @@ wxBitmap* BitmapCache::load_svg(const std::string &bitmap_name, unsigned target_
         replaces["#F0F0F1"] = "#404040"; // ORCA disabled background color
         replaces["#262E30"] = "#EFEFF0"; // ORCA
     } else {
-        replaces["#949494"] = "#7C8282"; // ORCA replace icon line color for light theme
+        replaces["#EDEDED"] = "#7C8282"; // ORCA replace icon line color for light theme
     }
 
     if (strstr(bitmap_name.c_str(), "toggle_on") != NULL && dark_mode) // ORCA only replace color of toggle button

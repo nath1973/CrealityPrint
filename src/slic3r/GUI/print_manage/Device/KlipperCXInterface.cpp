@@ -15,7 +15,7 @@ KlipperCXInterface::~KlipperCXInterface() {
     curl_global_cleanup();
 }
 
-std::future<void> KlipperCXInterface::sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback) {
+std::future<void> KlipperCXInterface::sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float,double)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback) {
     return std::async(std::launch::async, [=]() {
         try{
         m_upload_file.setProcessCallback(progressCallback);

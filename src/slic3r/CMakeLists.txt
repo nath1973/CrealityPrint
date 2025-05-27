@@ -82,6 +82,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Widgets/HoverBorderIcon.cpp
     GUI/Widgets/HoverBorderBox.hpp
     GUI/Widgets/HoverBorderBox.cpp
+    GUI/Widgets/NumberEntryDialog.hpp
+    GUI/Widgets/NumberEntryDialog.cpp
     GUI/AboutDialog.cpp
     GUI/AboutDialog.hpp
     GUI/NetworkTestDialog.cpp
@@ -662,6 +664,8 @@ set(SLIC3R_GUI_SOURCES
 	GUI/UpdateParams.cpp
 	GUI/LoginTip.hpp
 	GUI/LoginTip.cpp
+	GUI/PrinterPresetConfig.hpp
+	GUI/PrinterPresetConfig.cpp
     Config/OptionConfig.h
     Config/OptionConfig.cpp
 )

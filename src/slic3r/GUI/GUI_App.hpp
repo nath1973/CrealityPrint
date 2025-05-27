@@ -83,7 +83,7 @@ class PrinterDialog;
 class HMSQuery;
 class ModelMallDialog;
 class PingCodeBindDialog;
-
+class PrinterPresetConfig;
 
 enum FileType
 {
@@ -93,6 +93,7 @@ enum FileType
     FT_AMF,
     FT_3MF,
     FT_GCODE,
+    FT_GCODE_3MF,
     FT_MODEL,
     FT_ZIP,
     FT_PROJECT,
@@ -335,6 +336,7 @@ private:
     std::string     get_local_models_path();
     bool            OnInit() override;
     int             OnExit() override;
+    void            init_user_profile();
     void            track_event(const std::string& event, const std::string& data);
     void            OnUnhandledException()  override;
     bool            initialized() const { return m_initialized; }
@@ -648,6 +650,7 @@ private:
     PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
     Plater*         plater_{ nullptr };
+    PrinterPresetConfig* printerPresetConfig{ nullptr };
 
 	PresetUpdater*  get_preset_updater() { return preset_updater; }
 

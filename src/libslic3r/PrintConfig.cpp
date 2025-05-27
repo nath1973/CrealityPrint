@@ -2438,6 +2438,12 @@ void PrintConfigDef::init_fff_params()
     def->mode    = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def          = this->add("machine_ptc_exist", coBool);
+    def->label   = L("Chamber ptc heater");
+    def->tooltip = L("Chamber ptc heater exist");
+    def->mode    = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("accel_to_decel_enable", coBool);
     def->label = L("Enable accel_to_decel");
     def->tooltip = L("Klipper's max_accel_to_decel will be adjusted automatically");
@@ -5119,6 +5125,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = max_temp;
     def->set_default_value(new ConfigOptionInts{0});
+    
 
     def = this->add("nozzle_temperature", coInts);
     def->label = L("Other layers");

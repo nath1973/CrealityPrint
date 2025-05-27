@@ -14,11 +14,15 @@
 #include <boost/log/trivial.hpp>
 #include <wx/graphics.h>
 #include "Notebook.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 #define TOPBAR_ICON_SIZE  17
 
 // original is 300, in some screen scale setting case(for example 175%), make the topbar too long
-#define TOPBAR_TITLE_WIDTH  172
+#define TOPBAR_TITLE_WIDTH  FromDIP(80)
+
+static long UPLOAD_BTN_CODE = 12123;
+static long HOME_BTN_CODE_CHECKED = 12124;
+static long HOME_BTN_CODE_UNCHECKED = 12125;
 
 using namespace Slic3r;
 class ButtonsCtrl : public wxControl
@@ -163,9 +167,10 @@ void ButtonsCtrl::RefreshColor()
     for (auto& [index, button] : m_mapPageButtons) {
         StateColor bg_color = StateColor(std::pair{ wxColour(21, 191, 89), (int)StateColor::Hovered },
             std::pair{ is_dark ? wxColour(1, 1, 1) : wxColour(214, 214, 220), (int)StateColor::Normal });
-        button->SetCornerRadius(0);
+        button->SetCornerRadius(FromDIP(3));
         button->SetFontBold(true);
-        button->SetBackgroundColor(bg_color);        
+        button->SetBackgroundColor(bg_color);     
+        button->SetBackgroundColour(default_btn_bg);
         StateColor text_color = StateColor(std::pair{ is_dark ? wxColour(254, 254, 254) : wxColour(255,255,255), (int)StateColor::Hovered },
             std::pair{ is_dark ? wxColour(254, 254, 254) : wxColour(0,0,0), (int)StateColor::Normal });
         button->SetTextColor(text_color);
@@ -308,6 +313,7 @@ void BBLTopbarArt::DrawBackground(wxDC& dc, wxWindow* wnd, const wxRect& rect)
 {
     bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
     dc.SetBrush(wxBrush(is_dark ? wxColour(1, 1, 1) : wxColour(214, 214, 220)));
+    dc.SetPen(*wxTRANSPARENT_PEN);
     wxRect clipRect = rect;
     clipRect.y -= wnd->FromDIP(8);
     clipRect.height += wnd->FromDIP(8);
@@ -337,10 +343,18 @@ void BBLTopbarArt::DrawButton(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& i
     int bmpX = 0, bmpY = 0;
     int textX = 0, textY = 0;
 
-    const wxBitmap& bmp = item.GetState() & wxAUI_BUTTON_STATE_DISABLED
-        ? item.GetDisabledBitmap()
-        : item.GetBitmap();
-
+    wxBitmap bmp;
+    if (UPLOAD_BTN_CODE == item.GetUserData()) {
+         bmp = item.GetState() & wxAUI_BUTTON_STATE_DISABLED ? item.GetDisabledBitmap() : 
+             (item.GetState() & wxAUI_BUTTON_STATE_HOVER ? item.GetHoverBitmap() : item.GetBitmap());
+    } else if (HOME_BTN_CODE_CHECKED == item.GetUserData()) {
+        bmp = item.GetState() == wxAUI_BUTTON_STATE_NORMAL ? item.GetBitmap() : item.GetHoverBitmap();
+    } 
+    else {
+        bmp = item.GetState() & wxAUI_BUTTON_STATE_DISABLED ?
+                                  item.GetDisabledBitmap() : item.GetBitmap();
+    }
+   
     const wxSize bmpSize = bmp.IsOk() ? bmp.GetScaledSize() : wxSize(0, 0);
 
     if (m_textOrientation == wxAUI_TBTOOL_TEXT_BOTTOM)
@@ -370,14 +384,15 @@ void BBLTopbarArt::DrawButton(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& i
             (textHeight / 2);
     }
 
-
     if (!(item.GetState() & wxAUI_BUTTON_STATE_DISABLED))
     {
         if (item.GetState() & wxAUI_BUTTON_STATE_PRESSED)
         {
             dc.SetPen(wxPen(StateColor::darkModeColorFor("#15BF59"))); // ORCA
             //dc.SetBrush(wxBrush(StateColor::darkModeColorFor("#15BF59"))); // ORCA
-            dc.DrawRoundedRectangle(rect, wnd->FromDIP(5));
+            if (UPLOAD_BTN_CODE != item.GetUserData()) {
+                dc.DrawRoundedRectangle(rect, wnd->FromDIP(5));
+            }
         }
         else if ((item.GetState() & wxAUI_BUTTON_STATE_HOVER) || item.IsSticky())
         {
@@ -403,7 +418,9 @@ void BBLTopbarArt::DrawButton(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& i
                 // gc->DrawRoundedRectangle(rect.x, rect.y, rect.width, rect.height, 3);
 
                 // Draw the border
-                gc->StrokePath(path);
+                if (UPLOAD_BTN_CODE != item.GetUserData()) {
+                    gc->StrokePath(path);
+                }
 
                 // Destroy the graphics context to free resources
                 delete gc;
@@ -415,11 +432,17 @@ void BBLTopbarArt::DrawButton(wxDC& dc, wxWindow* wnd, const wxAuiToolBarItem& i
         }
         else if (item.GetState() & wxAUI_BUTTON_STATE_CHECKED)
         {
-            // it's important to put this code in an else statement after the
-            // hover, otherwise hovers won't draw properly for checked items
-            dc.SetPen(wxPen(StateColor::darkModeColorFor("#009688"))); // ORCA
-            //dc.SetBrush(wxBrush(StateColor::darkModeColorFor("#009688"))); // ORCA
-            dc.DrawRectangle(rect);
+            if (HOME_BTN_CODE_CHECKED == item.GetUserData()) {
+                dc.SetPen(wxPen(StateColor::darkModeColorFor("#15BF59")));     // ORCA
+                dc.SetBrush(wxBrush(StateColor::darkModeColorFor("#15BF59"))); // ORCA
+                dc.DrawRoundedRectangle(rect, wnd->FromDIP(5));
+            } else {
+                // it's important to put this code in an else statement after the
+                // hover, otherwise hovers won't draw properly for checked items
+                dc.SetPen(wxPen(StateColor::darkModeColorFor("#009688"))); // ORCA
+                // dc.SetBrush(wxBrush(StateColor::darkModeColorFor("#009688"))); // ORCA
+                dc.DrawRectangle(rect);
+            }
         }
     }
 
@@ -458,7 +481,8 @@ void BBLTopbarArt::DrawSeparator(wxDC& dc, wxWindow* wnd, const wxRect& _rect)
         rect.x += (rect.width / 2);
         rect.width     = wnd->FromDIP(1);
         int new_height = (rect.height * 3) / 4;
-        rect.y += ((_rect.height - rect.height));
+        rect.y += wnd->FromDIP(3);
+        //((_rect.height - rect.height));
         rect.height = new_height;
     } else {
         rect.y += (rect.height / 2);
@@ -468,8 +492,9 @@ void BBLTopbarArt::DrawSeparator(wxDC& dc, wxWindow* wnd, const wxRect& _rect)
         rect.width = new_width;
     }
 
-    wxColour startColour(142, 142, 142);
-    wxColour endColour(142, 142, 142);
+     bool     is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+    wxColour startColour = is_dark ? ("#454548") : ("#AAAAB0");
+    wxColour endColour   = is_dark ? ("#454548") : ("#AAAAB0");
     dc.GradientFillLinear(rect, startColour, endColour, horizontal ? wxSOUTH : wxEAST);
 }
 
@@ -488,7 +513,6 @@ BBLTopbar::BBLTopbar(wxWindow* pwin, wxFrame* parent)
     topbarParent = parent;
 }
 
-
 void BBLTopbar::Init(wxFrame* parent) 
 {
     m_title_item = nullptr;
@@ -505,9 +529,12 @@ void BBLTopbar::Init(wxFrame* parent)
     //auto  = [=](int x) {return x * em_unit(this) / 10; };
     //this->SetMargins(wxSize(10, 10));
     this->AddSpacer(FromDIP(5));
+
     bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
     wxBitmap logo_bitmap = create_scaled_bitmap("logo", nullptr, (20));
+    wxBitmap logo_bitmap_checked = create_scaled_bitmap("logo_checked", nullptr, (20));
     wxAuiToolBarItem* logo_item   = this->AddTool(ID_LOGO, "", logo_bitmap);
+    logo_item->SetHoverBitmap(logo_bitmap_checked);
 
     this->AddSpacer(FromDIP(10));
     this->AddSeparator(); 
@@ -586,8 +613,10 @@ void BBLTopbar::Init(wxFrame* parent)
     wxAuiToolBarItem* item_ctrl = this->AddControl( m_tabCtrol);
     item_ctrl->SetAlignment(wxALIGN_CENTRE);
  
-    this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& evt) {   
-//         wxGetApp().mainframe->select_tab(evt.GetId());
+    this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this, logo_item](wxCommandEvent& evt) {
+        //         wxGetApp().mainframe->select_tab(evt.GetId());
+        logo_item->SetUserData(HOME_BTN_CODE_UNCHECKED);
+        logo_item->SetState(wxAUI_BUTTON_STATE_NORMAL);
         if (nullptr != m_tabCtrol) 
         {
             ButtonsCtrl* pCtr = dynamic_cast<ButtonsCtrl*>(m_tabCtrol);
@@ -603,59 +632,49 @@ void BBLTopbar::Init(wxFrame* parent)
 
     this->AddStretchSpacer(1);
     m_title_LabelItem = new Label(this, Label::Head_12, _L(""));
-    m_title_LabelItem->SetMinSize(wxSize(172, FromDIP(-1)));
-    m_title_LabelItem->SetMaxSize(wxSize(172, FromDIP(-1)));
+    m_title_LabelItem->SetMinSize(wxSize(TOPBAR_TITLE_WIDTH, FromDIP(-1)));
+    m_title_LabelItem->SetSize(wxSize(TOPBAR_TITLE_WIDTH, FromDIP(-1)));
+    m_title_LabelItem->Bind(wxEVT_MOTION, &BBLTopbar::OnMouseMotion, this);
+    m_title_LabelItem->Bind(wxEVT_LEFT_DOWN, &BBLTopbar::OnMouseLeftDown, this);
+
     m_title_LabelItem->SetWindowStyleFlag(wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL);
     wxColour bgColor  = Slic3r::GUI::wxGetApp().dark_mode() ? wxColour("#010101") : wxColour(214, 214, 220);
     m_title_LabelItem->SetBackgroundColour(bgColor);
     m_title_item = this->AddControl(m_title_LabelItem);
-    this->AddStretchSpacer(1);  
-     //this->AddSpacer(FromDIP(15));
-     //this->AddSeparator();
-     //this->AddSpacer(FromDIP(5));
 
-    //m_publish_bitmap = create_scaled_bitmap("topbar_publish", nullptr, TOPBAR_ICON_SIZE);
-    //m_publish_item = this->AddTool(ID_PUBLISH, "", m_publish_bitmap);
-    //m_publish_disable_bitmap = create_scaled_bitmap("topbar_publish_disable", nullptr, TOPBAR_ICON_SIZE);
-    //m_publish_item->SetDisabledBitmap(m_publish_disable_bitmap);
-    //this->EnableTool(m_publish_item->GetId(), false);
-    //this->AddSpacer(FromDIP(4));
-
-    /*wxBitmap model_store_bitmap = create_scaled_bitmap("topbar_store", nullptr, TOPBAR_ICON_SIZE);
-    m_model_store_item = this->AddTool(ID_MODEL_STORE, "", model_store_bitmap);
-    this->AddSpacer(12);
-    */
-
-    /*
-    m_model_store_bitmap       = create_scaled_bitmap("models_dark", nullptr, 20);
-    m_model_store_item         = this->AddTool(ID_MODEL_STORE, "", m_model_store_bitmap, _L("Models"));
-    m_model_store_hover_bitmap = create_scaled_bitmap("models_pressed", nullptr, 20);
-    m_model_store_item->SetHoverBitmap(m_model_store_hover_bitmap);
-     
-
-    this->AddSpacer(FromDIP(20));
-    this->AddTool(ID_DOWNMANAGER, "", create_scaled_bitmap("download", nullptr, TOPBAR_ICON_SIZE), _L("Download Manager"));
-
-    this->AddSpacer(FromDIP(20));
-    this->AddTool(ID_LOGIN, "", create_scaled_bitmap("login", nullptr, TOPBAR_ICON_SIZE), _L("Login"));
-
-    this->AddSpacer(FromDIP(20));
-    this->AddSeparator();
-    this->AddSpacer(FromDIP(15));
-*/
-
-    wxBitmap upload_bitmap  = create_scaled_bitmap(is_dark ? "toolbar_upload3mf" : "toolbar_upload3mf_light", this, (TOPBAR_ICON_SIZE));
-    m_upload_btn           = this->AddTool(ID_UPLOAD3MF, "", upload_bitmap, _L("upload 3mf to crealitycloud"));
-
-    wxBitmap          upload_disable_bitmap = create_scaled_bitmap("toolbar_upload3mf_disable", this, (TOPBAR_ICON_SIZE));
-    m_upload_btn->SetDisabledBitmap(upload_disable_bitmap);
-    EnableUpload3mf();
     this->AddSpacer(FromDIP(10));
-#ifndef __APPLE__
+    wxAuiToolBarItem * tool_sep = this->AddSeparator();
+    this->AddSpacer(FromDIP(10));
+#if CUSTOM_CXCLOUD  
+    wxSize   targetSize(FromDIP(40), FromDIP(24));
+    wxBitmap upload_bitmap = create_scaled_bitmap3("toolbar_upload3mf", this, (TOPBAR_ICON_SIZE),targetSize);
+    wxImage  upload_image  = upload_bitmap.ConvertToImage();
+    upload_image.Rescale(targetSize.GetWidth(), targetSize.GetHeight(), wxIMAGE_QUALITY_BICUBIC);
+    wxBitmap upload_bitmap1(upload_image);
+    m_upload_btn = this->AddTool(ID_UPLOAD3MF, "", upload_bitmap1, _L("upload 3mf to crealitycloud"));
+    m_upload_btn->SetUserData(UPLOAD_BTN_CODE);
+
+    wxBitmap upload_disable_bitmap = create_scaled_bitmap3("toolbar_upload3mf_disable", this, (TOPBAR_ICON_SIZE), targetSize);
+    upload_image = upload_disable_bitmap.ConvertToImage();
+    upload_image.Rescale(targetSize.GetWidth(), targetSize.GetHeight(), wxIMAGE_QUALITY_HIGH);
+    wxBitmap upload_bitmap2(upload_image);
+    m_upload_btn->SetDisabledBitmap(upload_bitmap2);
+
+    wxBitmap upload_hover_bitmap = create_scaled_bitmap3("toolbar_upload3mf_hover", this, (TOPBAR_ICON_SIZE), targetSize);
+    upload_image                 = upload_hover_bitmap.ConvertToImage();
+    upload_image.Rescale(targetSize.GetWidth(), targetSize.GetHeight(), wxIMAGE_QUALITY_HIGH);
+    wxBitmap upload_bitmap3(upload_image);
+    m_upload_btn->SetHoverBitmap(upload_bitmap3);
+
+    this->AddSpacer(FromDIP(5));
+    wxAuiToolBarItem* tool_sep1 = this->AddSeparator();
+    this->AddSpacer(FromDIP(5));
+
+    EnableUpload3mf();
+#endif
+#ifdef __WIN32__
     wxBitmap iconize_bitmap = create_scaled_bitmap(is_dark ? "topbar_min" : "topbar_min_light", this, (TOPBAR_ICON_SIZE));
     wxAuiToolBarItem* iconize_btn = this->AddTool(wxID_ICONIZE_FRAME, "", iconize_bitmap);
-
-    this->AddSpacer(FromDIP(10));
 
     maximize_bitmap = create_scaled_bitmap(is_dark ? "topbar_max" : "topbar_max_light", this, (TOPBAR_ICON_SIZE));
     window_bitmap = create_scaled_bitmap(is_dark ? "topbar_win" : "topbar_win_light", this, (TOPBAR_ICON_SIZE));
@@ -666,11 +685,9 @@ void BBLTopbar::Init(wxFrame* parent)
         maximize_btn = this->AddTool(wxID_MAXIMIZE_FRAME, "", maximize_bitmap);
     }
 
-    this->AddSpacer(FromDIP(10));
-
     wxBitmap close_bitmap = create_scaled_bitmap(is_dark ? "topbar_close" : "topbar_close_light", this, (TOPBAR_ICON_SIZE));
     wxAuiToolBarItem* close_btn    = this->AddTool(wxID_CLOSE_FRAME, "", close_bitmap, wxString("Models"));
-    this->AddSpacer(FromDIP(5));
+    //this->AddSpacer(FromDIP(5));
 #endif
 
     Realize();
@@ -687,9 +704,9 @@ void BBLTopbar::Init(wxFrame* parent)
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnDropdownToolItem, this, ID_TOP_DROPDOWN_MENU);
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCalibToolItem, this, ID_CALIB);
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnUpload3mf, this, ID_UPLOAD3MF);
-    this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnIconize, this, wxID_ICONIZE_FRAME);
-    this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnFullScreen, this, wxID_MAXIMIZE_FRAME);
-    this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCloseFrame, this, wxID_CLOSE_FRAME);
+    //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnIconize, this, wxID_ICONIZE_FRAME);
+    //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnFullScreen, this, wxID_MAXIMIZE_FRAME);
+    //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCloseFrame, this, wxID_CLOSE_FRAME);
     this->Bind(wxEVT_LEFT_DCLICK, &BBLTopbar::OnMouseLeftDClock, this);
     this->Bind(wxEVT_LEFT_DOWN, &BBLTopbar::OnMouseLeftDown, this);
     this->Bind(wxEVT_LEFT_UP, &BBLTopbar::OnMouseLeftUp, this);
@@ -761,10 +778,12 @@ void BBLTopbar::OnRedo(wxAuiToolBarEvent& event)
 
 void BBLTopbar::EnableUpload3mf()
 {
+#if CUSTOM_CXCLOUD
     if (wxGetApp().plater()) { 
         this->EnableTool(m_upload_btn->GetId(), wxGetApp().plater()->can_arrange());
         Refresh();
     }
+#endif
 }
 bool BBLTopbar::GetSaveProjectItemEnabled()
 {
@@ -810,8 +829,15 @@ void BBLTopbar::ShowCalibrationButton(bool show)
 
 void BBLTopbar::SetSelection(size_t index)
 {
-    if (nullptr != m_tabCtrol)
+    if (index == MainFrame::tpHome)
     {
+        wxAuiToolBarEvent evt;
+        OnLogo(evt);
+    }
+    else if (nullptr != m_tabCtrol)
+    {
+        wxAuiToolBarItem* item = this->FindTool(ID_LOGO);
+        item->SetState(wxAUI_BUTTON_STATE_NORMAL);
         ButtonsCtrl* pCtr = dynamic_cast<ButtonsCtrl*>(m_tabCtrol);
         pCtr->SetSelection(index);
     }
@@ -881,12 +907,17 @@ void BBLTopbar::OnConfigRelate(wxAuiToolBarEvent& evt)
     
 void BBLTopbar::OnLogo(wxAuiToolBarEvent& evt) 
 { 
+#if CUSTOM_CXCLOUD
+    wxAuiToolBarItem* item = this->FindTool(ID_LOGO);
+    item->SetUserData(HOME_BTN_CODE_CHECKED);
+    item->SetState(wxAUI_BUTTON_STATE_CHECKED);
     wxGetApp().mainframe->select_tab(size_t(0));
     if (nullptr != m_tabCtrol)
     {
         ButtonsCtrl* pCtr = dynamic_cast<ButtonsCtrl*>(m_tabCtrol);
         pCtr->SetSelection(-1);
     }
+#endif
 }
 
 void BBLTopbar::OnDownMgr(wxAuiToolBarEvent& evt) {}
@@ -921,7 +952,7 @@ wxMenu* BBLTopbar::GetCalibMenu()
 void BBLTopbar::SetTitle(wxString title)
 {
     wxGCDC dc(this);
-    wxString newTitle = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, FromDIP(TOPBAR_TITLE_WIDTH) - FromDIP(30));
+    wxString newTitle = wxControl::Ellipsize(title, dc, wxELLIPSIZE_END, TOPBAR_TITLE_WIDTH - FromDIP(30));
 
     if (m_title_LabelItem) {
         m_title_LabelItem->SetLabel(newTitle);
@@ -939,6 +970,7 @@ void BBLTopbar::SetTitle(wxString title)
 void BBLTopbar::SetMaximizedSize()
 {
 #ifndef __APPLE__
+if (maximize_bitmap.IsOk())
     maximize_btn->SetBitmap(maximize_bitmap);
 #endif
 }
@@ -946,6 +978,7 @@ void BBLTopbar::SetMaximizedSize()
 void BBLTopbar::SetWindowSize()
 {
 #ifndef __APPLE__
+if (window_bitmap.IsOk())
     maximize_btn->SetBitmap(window_bitmap);
 #endif
 }
@@ -978,12 +1011,13 @@ void BBLTopbar::Rescale(bool isResize) {
     item = this->FindTool(ID_PREFERENCES);
     item->SetBitmap(create_scaled_bitmap(is_dark ? "preferences" : "preferences_light", this, (TOPBAR_ICON_SIZE)));
 
-    //item = this->FindTool(ID_CONFIG_RELATE);
-    //if (item)
-    //    item->SetBitmap(create_scaled_bitmap(is_dark ? "config_relate" : "config_relate_light", this, TOPBAR_ICON_SIZE));   
-    //if (m_relationsItem)
-    //    m_relationsItem->SetBitmap(create_scaled_bitmap(is_dark ? "config_relate" : "config_relate_light", this, (TOPBAR_ICON_SIZE)));
-
+#ifdef __APPLE__
+     item = this->FindTool(ID_CONFIG_RELATE);
+     if (item)
+         item->SetBitmap(create_scaled_bitmap(is_dark ? "config_relate" : "config_relate_light", this, TOPBAR_ICON_SIZE));
+     if (m_relationsItem)
+         m_relationsItem->SetBitmap(create_scaled_bitmap(is_dark ? "config_relate" : "config_relate_light", this, (TOPBAR_ICON_SIZE)));
+#endif
     item = this->FindTool(wxID_UNDO);
     item->SetBitmap(create_scaled_bitmap(is_dark ? "topbar_undo" : "topbar_undo_light", this, (TOPBAR_ICON_SIZE)));
     item->SetDisabledBitmap(create_scaled_bitmap(is_dark ? "topbar_undo_disabled" : "topbar_undo_disabled_light", this, (TOPBAR_ICON_SIZE)));
@@ -1006,11 +1040,7 @@ void BBLTopbar::Rescale(bool isResize) {
     item->SetBitmap(create_scaled_bitmap("topbar_store", this, TOPBAR_ICON_SIZE));
     */
     
-
-    item = this->FindTool(ID_UPLOAD3MF);
-    if (item)
-        item->SetBitmap(create_scaled_bitmap(is_dark ? "toolbar_upload3mf" : "toolbar_upload3mf_light", this, (TOPBAR_ICON_SIZE)));
-#ifndef __APPLE__
+#ifdef __WIN32__
     item = this->FindTool(wxID_ICONIZE_FRAME);
     item->SetBitmap(create_scaled_bitmap(is_dark ? "topbar_min" : "topbar_min_light", this, (TOPBAR_ICON_SIZE)));
     item = this->FindTool(wxID_MAXIMIZE_FRAME);
@@ -1172,7 +1202,21 @@ void BBLTopbar::OnMouseLeftUp(wxMouseEvent& event)
     {
         ReleaseMouse();
     }
-
+    wxPoint           client_pos = this->ScreenToClient(mouse_pos);
+    wxAuiToolBarItem* item       = this->FindToolByPosition(client_pos.x, client_pos.y);
+    wxAuiToolBarItem* max_item   = this->FindTool(wxID_MAXIMIZE_FRAME);
+    wxAuiToolBarItem* min_item   = this->FindTool(wxID_ICONIZE_FRAME);
+    wxAuiToolBarItem* close_item = this->FindTool(wxID_CLOSE_FRAME);
+    if (item == max_item) {
+        wxAuiToolBarEvent evt;
+        OnFullScreen(evt);
+    } else if (item == min_item) {
+        wxAuiToolBarEvent evt;
+        OnIconize(evt);
+    } else if (item == close_item) {
+        wxAuiToolBarEvent evt;
+        OnCloseFrame(evt);
+    }
     event.Skip();
 }
 

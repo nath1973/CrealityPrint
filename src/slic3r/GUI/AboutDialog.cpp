@@ -13,7 +13,7 @@
 #include <wx/clipbrd.h>
 #include <wx/gdicmn.h>
 #include <wx/string.h>
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
 
@@ -21,7 +21,7 @@ AboutDialogLogo::AboutDialogLogo(wxWindow* parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
 {
     this->SetBackgroundColour(*wxWHITE);
-    this->logo = ScalableBitmap(this, Slic3r::var("CrealityPrint_192px.png"), wxBITMAP_TYPE_PNG);
+    this->logo = ScalableBitmap(this, Slic3r::var(Slic3r::CxBuildInfo::getIconName() +"_192px.png"), wxBITMAP_TYPE_PNG);
     this->SetMinSize(this->logo.GetBmpSize());
 
     this->Bind(wxEVT_PAINT, &AboutDialogLogo::onRepaint, this);
@@ -52,8 +52,8 @@ CopyrightsDialog::CopyrightsDialog()
 {
     this->SetFont(wxGetApp().normal_font());
 	this->SetBackgroundColour(*wxWHITE);
-
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    // crealiyprint.ico
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxStaticLine *staticline1 = new wxStaticLine( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_HORIZONTAL );
@@ -219,7 +219,7 @@ AboutDialog::AboutDialog()
     SetFont(wxGetApp().normal_font());
 	SetBackgroundColour(*wxWHITE);
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     // wxPanel *m_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(560), FromDIP(237)), wxTAB_TRAVERSAL);
@@ -240,7 +240,7 @@ AboutDialog::AboutDialog()
     bool is_zh = wxGetApp().app_config->get("language") == "zh_CN";
 
     // logo and creality_name text
-    m_logo_bitmap = ScalableBitmap(this, "Creality3D_about", 32);
+    m_logo_bitmap = ScalableBitmap(this, Slic3r::CxBuildInfo::getIconName(), 32);
     m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bitmap.bmp(), wxDefaultPosition,wxDefaultSize, 0);
     // m_logo->SetSizer(vesizer);
 

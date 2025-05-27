@@ -498,7 +498,10 @@ void OtherInstanceMessageHandler::handle_message(const std::string& message)
 {
 	BOOST_LOG_TRIVIAL(info) << "message from other instance: " << message;
 	if(message=="login" || message=="logout") {
-		wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+		if(message=="logout")
+		{
+			wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+		}
 		wxGetApp().reload_homepage();
 		return;
 	}

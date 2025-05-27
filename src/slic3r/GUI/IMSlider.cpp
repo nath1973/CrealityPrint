@@ -1260,6 +1260,7 @@ bool IMSlider::render(int canvas_width, int canvas_height)
                 m_last_time = cur;
                 moves_tick(false);
             }
+            imgui.set_requires_extra_frame();
         }
 
         //config.prepareWindow(DispConfig::e_wt_slider_move, ImVec2(canvas_width / 2, canvas_height), scale);
@@ -1278,14 +1279,13 @@ bool IMSlider::render(int canvas_width, int canvas_height)
         ImGui::SetNextWindowPos(ImVec2(left_widgets_width + remaining_space / 2, canvas_height - 10), ImGuiCond_Always, ImVec2(0.5, 1.0));
         ImGui::SetNextWindowSize(winsize);
 
-        ImGui::PushStyleColor(ImGuiCol_WindowBg,m_is_dark ? ImVec4(75.0 / 255.0, 75.0 / 255.0, 77.0 / 255.0, 1.0) : ImVec4(255,255,255,1));
-        ImGui::PushStyleColor(ImGuiCol_Border, m_is_dark ? ImVec4(38.0 / 255.0, 38.0 / 255.0, 38.0 / 255.0, 1.0) : ImVec4(203/255, 203/255, 204/255,1.0));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg,m_is_dark ? ImVec4(75.0 / 255.0, 75.0 / 255.0, 77.0 / 255.0, 1.0) : ImVec4(1,1,1,1));
+        ImGui::PushStyleColor(ImGuiCol_Border, m_is_dark ? ImVec4(110.0 / 255.0, 110.0 / 255.0, 115.0 / 255.0, 1.0) : ImVec4(203.0/255, 203.0/255, 204.0/255,1.0));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 
         int flag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                   ImGuiWindowFlags_NoFocusOnAppearing;
+                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
         
         if (ImGui::Begin("moves_slider", nullptr, flag)) {
             
@@ -1334,7 +1334,8 @@ bool IMSlider::render(int canvas_width, int canvas_height)
             {
                 ImGui::SameLine();
                 ImGui::PushItemWidth(input_size);
-                ImGui::PushStyleColor(ImGuiCol_Text, m_is_dark ? ImVec4(255 / 255.0f, 255 / 255.f, 255 / 255.f, 1) : ImVec4(0/ 255.f, 0, 0, 1));
+                ImGui::PushStyleColor(ImGuiCol_Text, m_is_dark ? ImVec4(255 / 255.0f, 255 / 255.f, 255 / 255.f, 1) :
+                                                                 ImVec4(51.0 / 255.f, 51.0 / 255.f, 51.0 / 255.f, 1));
                 //border
                 {
                     ImVec2 win_pos = ImGui::GetWindowPos();
@@ -1345,7 +1346,9 @@ bool IMSlider::render(int canvas_width, int canvas_height)
 
                     bool hover = ImGui::IsMouseHoveringRect(pos_min, pos_max);
 
-                    ImVec4 border_color = hover ? ImGuiWrapper::COL_CREALITY : ImVec4(110.0f / 255.0f, 110.0f / 255.0f, 114.0f/255.0f, 1.0f);
+                    ImVec4 border_color = hover ? ImGuiWrapper::COL_CREALITY :
+                                                  (m_is_dark ? ImVec4(110.0f / 255.0f, 110.0f / 255.0f, 114.0f / 255.0f, 1.0f) :
+                                                               ImVec4(203.0 / 255, 203.0 / 255, 204.0 / 255, 1.0));
 
                     draw_list->AddRect(pos_min, pos_max, ImGui::ColorConvertFloat4ToU32(border_color), 5.0f, ImDrawFlags_RoundCornersAll);
                 }
@@ -1362,7 +1365,8 @@ bool IMSlider::render(int canvas_width, int canvas_height)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4());
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
-                ImGui::PushStyleColor(ImGuiCol_Text, m_is_dark ? ImVec4(255 / 255.0f, 255 / 255.f, 255 / 255.f, 1) : ImVec4(0 / 255.f, 0, 0, 1));
+                ImGui::PushStyleColor(ImGuiCol_Text, m_is_dark ? ImVec4(255 / 255.0f, 255 / 255.f, 255 / 255.f, 1) :
+                                                                 ImVec4(51.0 / 255.f, 51.0 / 255.f, 51.0 / 255.f, 1));
 
                 {
                     ImGui::SameLine(0,0);

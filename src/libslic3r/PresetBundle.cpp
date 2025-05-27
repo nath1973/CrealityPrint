@@ -23,7 +23,7 @@
 #include <boost/locale.hpp>
 #include <boost/log/trivial.hpp>
 #include <miniz/miniz.h>
-
+#include "buildinfo.h"
 
 // Store the print/filament/printer presets into a "presets" subdirectory of the Slic3rPE config dir.
 // This breaks compatibility with the upstream Slic3r if the --datadir is used to switch between the two versions.
@@ -358,6 +358,10 @@ VendorType PresetBundle::get_current_vendor_type()
         else if (vendor_name.compare("Creality") == 0)
             t = VendorType::Creality;
     }
+#ifdef CUSTOMIZED
+    //定制的 平台板渲染，直接用cx的。  custom,texture,smmoth
+    t = VendorType::Creality;
+#endif
     return t;
 }
 
@@ -3861,7 +3865,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
                 else if (boost::iequals(it.key(), BBL_JSON_KEY_DEFAULT_MATERIALS)) {
                     //get machine list
                     std::string default_materials_field = it.value();
-                    if (Slic3r::unescape_strings_cstyle(default_materials_field, model.default_materials)) {
+                   if (Slic3r::unescape_strings_cstyle(default_materials_field, model.default_materials)) {
                     	Slic3r::sort_remove_duplicates(model.default_materials);
                         if (! model.default_materials.empty() && model.default_materials.front().empty())
                             // An empty material was inserted into the list of default materials. Remove it.

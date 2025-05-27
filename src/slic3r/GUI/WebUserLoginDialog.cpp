@@ -25,6 +25,7 @@
 
 #include <sstream>
 #include <slic3r/GUI/Widgets/WebView.hpp>
+#include "libslic3r/common_header/common_header.h"
 using namespace std;
 
 using namespace nlohmann;
@@ -45,7 +46,7 @@ ZUserLogin::ZUserLogin() : wxDialog((wxWindow *) (wxGetApp().mainframe), wxID_AN
     // Url
     NetworkAgent* agent = wxGetApp().getAgent();
     if (!agent) {
-        std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+        std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
         SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
         SetBackgroundColour(*wxWHITE);

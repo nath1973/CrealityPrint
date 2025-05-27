@@ -348,6 +348,7 @@ include(aliyun-oss-cpp-sdk/aliyun-oss-cpp-sdk.cmake)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   include(metartc/metartc.cmake)
 endif()
+
 if(ENABLE_BREAKPAD)
     message(STATUS "Breakpad is enabled...")
     add_definitions(-DUSE_BREAKPAD)
@@ -398,6 +399,7 @@ else()
         dep_Assimp
         )
 endif()
+    
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	list(APPEND _dep_list "dep_metartc")
 endif()

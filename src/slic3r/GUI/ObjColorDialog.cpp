@@ -16,6 +16,7 @@
 #include <wx/sizer.h>
 
 #include "libslic3r/ObjColorUtils.hpp"
+#include "libslic3r/common_header/common_header.h"
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -144,7 +145,7 @@ ObjColorDialog::ObjColorDialog(wxWindow *                      parent,
     , m_filament_ids(filament_ids)
     , m_first_extruder_id(first_extruder_id)
 {
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % Slic3r::resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % Slic3r::resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(Slic3r::encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     auto m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1));

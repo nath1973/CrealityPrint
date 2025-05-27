@@ -38,21 +38,21 @@ echo "Run the script for each .po file"
 for /r "./localization/i18n/" %%f in (CrealityPrint*.po) do (
     call :processFile "%%f" "CrealityPrint"
 )
-set pot_file="./localization/i18n/Community.pot"
-echo "Run the script for each .po file"
-for /r "./localization/i18n/" %%f in (Community*.po) do (
-    call :processFile "%%f" "Community" 1
-)
-set pot_file="./localization/i18n/DeviceList.pot"
-echo "Run the script for each .po file"
-for /r "./localization/i18n/" %%f in (DeviceList*.po) do (
-    call :processFile "%%f" "DeviceList" 1
-)
-set pot_file="./localization/i18n/SendPage.pot"
-echo "Run the script for each .po file"
-for /r "./localization/i18n/" %%f in (SendPage*.po) do (
-    call :processFile "%%f" "SendPage" 1
-)
+@REM set pot_file="./localization/i18n/Community.pot"
+@REM echo "Run the script for each .po file"
+@REM for /r "./localization/i18n/" %%f in (Community*.po) do (
+@REM     call :processFile "%%f" "Community" 1
+@REM )
+@REM set pot_file="./localization/i18n/DeviceList.pot"
+@REM echo "Run the script for each .po file"
+@REM for /r "./localization/i18n/" %%f in (DeviceList*.po) do (
+@REM     call :processFile "%%f" "DeviceList" 1
+@REM )
+@REM set pot_file="./localization/i18n/SendPage.pot"
+@REM echo "Run the script for each .po file"
+@REM for /r "./localization/i18n/" %%f in (SendPage*.po) do (
+@REM     call :processFile "%%f" "SendPage" 1
+@REM )
 goto :eof
 
 
@@ -73,7 +73,10 @@ goto :eof
         po2json "%file%" "./resources/i18n/%lang%/%part%.json"
         echo "prcessFile: ./resources/i18n/%lang%/%part%.json"
     )else (
-        .\tools\msgfmt.exe --check-format -o "./resources/i18n/%lang%/%part%.mo" "%file%"
+        .\tools\msgfmt.exe --check-format -o "./resources/i18n/%lang%/%part%.mo" "%file%"   || (
+            echo "Error occurred while processing %file%"
+            exit 1
+        )
         echo "prcessFile: ./resources/i18n/%lang%/%part%.mo"
     )
 goto :eof

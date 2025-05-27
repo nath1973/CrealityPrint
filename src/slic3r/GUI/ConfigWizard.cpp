@@ -49,7 +49,7 @@
 #include "MsgDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "MainFrame.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 #if defined(__linux__) && defined(__WXGTK3__)
 #define wxLinux_gtk3 true
 #else
@@ -1488,7 +1488,7 @@ void PageTemperatures::apply_custom_config(DynamicPrintConfig& config)
 
 ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
     : wxPanel(parent)
-    , bg(ScalableBitmap(parent, "CrealityPrint_192px_transparent.png", 192))
+    , bg(ScalableBitmap(parent, var(Slic3r::CxBuildInfo::getIconName() + "_192px.png"), 192))
     , bullet_black(ScalableBitmap(parent, "bullet_black.png"))
     , bullet_blue(ScalableBitmap(parent, "bullet_blue.png"))
     , bullet_white(ScalableBitmap(parent, "bullet_white.png"))
@@ -1496,11 +1496,12 @@ ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
     , item_hover(NO_ITEM)
     , last_page((size_t)-1)
 {
+    //_transparent.png
 #ifndef __WXOSX__ 
     SetDoubleBuffered(true);// SetDoubleBuffered exists on Win and Linux/GTK, but is missing on OSX
 #endif //__WXOSX__
     SetMinSize(bg.bmp().GetSize());
-
+    
     const wxSize size = GetTextExtent("m");
     em_w = size.x;
     em_h = size.y;

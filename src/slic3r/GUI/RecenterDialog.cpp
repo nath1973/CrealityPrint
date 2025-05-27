@@ -4,7 +4,7 @@
 #include <wx/dcgraph.h>
 #include <wx/dcmemory.h>
 #include <slic3r/GUI/Widgets/Label.hpp>
-
+#include "libslic3r/common_header/common_header.h"
 #define BORDER FromDIP(25)
 #define DRAW_PANEL_SIZE wxSize(FromDIP(475), FromDIP(100))
 
@@ -14,7 +14,7 @@ namespace Slic3r { namespace GUI {
 RecenterDialog::RecenterDialog(wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style)
       : DPIDialog(parent, id, _L("Confirm"), pos, size, style)
 {
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     hint1 = _L("Please home all axes (click ");

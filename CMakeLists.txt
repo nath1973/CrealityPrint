@@ -15,18 +15,37 @@ set(DUMPTOOL_TO $ENV{DUMPTOOL_TO})
 if(CX_DEBUG)
   add_definitions(-D_DEBUG1=1)
 endif()
-include("version.inc")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
+
+include(BuildPlatformDetection)
+if(BUILD_OS_WIN64)
+	set(BUILD_OS "win64")
+elseif(BUILD_OS_WIN32)
+	set(BUILD_OS "win32")
+elseif(BUILD_OS_LINUX)
+	set(BUILD_OS "linux")
+elseif(BUILD_OS_OSX)
+	set(BUILD_OS "macx")
+endif()
+
+include(ConfigureAllModules)
+__configure_build_info_header(
+	customized
+)
+__get_main_git_hash(MAIN_GIT_HASH)
+message("mySLIC3R_APP_NAME=${SLIC3R_APP_NAME}")
+#
+if (NOT ${CUSTOM_TYPE} STREQUAL "")
+    message(STATUS "build customized project")
+else()
+    include("version.inc")
+endif()
+#custom
+__build_info_slic3r_header()
+
+message("mySLIC3R_APP_NAME33333=${SLIC3R_APP_NAME}")
 include(GNUInstallDirs)
 include(CMakeDependentOption)
-# include(cmake/modules/git.cmake)
-# __get_branch_name(BRANCH_NAME)
-# string(REGEX MATCH "v([0-9]+\\.[0-9]+\\.[0-9]+)" VERSION_NUMBER "${BRANCH_NAME}")
-# if (VERSION_NUMBER)
-#     string(SUBSTRING "${VERSION_NUMBER}" 1 -1 VERSION_NUMBER)
-# else ()
-#     set(VERSION_NUMBER "6.0.0")
-# endif ()
-# set(CREALITYPRINT_VERSION ${VERSION_NUMBER})
 
 project(${SOLUTION_NAME})
 message("CREALITYPRINT_VERSION=${CREALITYPRINT_VERSION}")
@@ -43,7 +62,7 @@ endif()
 if(DEFINED ENV{SLIC3R_STATIC})
         set(SLIC3R_STATIC_INITIAL $ENV{SLIC3R_STATIC})
 else()
-        if (MSVC OR MINGW OR APPLE)
+        if (MSVC OR MINGW OR APPLE)           
                 set(SLIC3R_STATIC_INITIAL 1)
         else()
                 set(SLIC3R_STATIC_INITIAL 0)
@@ -773,44 +792,9 @@ function(crealityprint_copy_dlls target config postfix output_dlls)
     
 endfunction()
 
-# build info
-function(__get_main_git_hash _git_hash)
-	if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
-		execute_process(
-			COMMAND git rev-parse HEAD
-			WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-			OUTPUT_VARIABLE GIT_HASH
-			OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-	endif()
-	if(NOT GIT_HASH)
-		set(GIT_HASH "NO_GIT_COMMIT_HASH_DEFINED")
-	endif()
-	if(BUILD_VERSION_HASH)
-		set(GIT_HASH "${BUILD_VERSION_HASH}")
-	endif()
-	set(${_git_hash} "${GIT_HASH}" PARENT_SCOPE)
-endfunction()
-
-macro(__build_info_header)
-    string(TIMESTAMP BUILD_TIME "%y-%m-%d %H:%M")
-    set(BUILD_INFO_HEAD "BUILDINFO_H_")
-    set(DEBUG_RESOURCES_DIR "${BIN_OUTPUT_DIR}/Debug/resources/")
-    set(RELEASE_RESOURCES_DIR "${BIN_OUTPUT_DIR}/Release/resources/")
-
-    __get_main_git_hash(MAIN_GIT_HASH)
-
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/buildinfo.h.in)
-        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/buildinfo.h.in
-                    ${CMAKE_BINARY_DIR}/buildinfo.h)
-    endif()
-endmacro()
-__build_info_header()
-
-
-
 # libslic3r, CrealityPrint GUI and the CrealityPrint executable.
 add_subdirectory(src)
+
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${STARTUP_PROJECT_NAME})
 add_dependencies(gettext_make_pot hintsToPot)
 
@@ -875,8 +859,8 @@ configure_file(${LIBDIR}/platform/unix/fhs.hpp.in ${LIBDIR_BIN}/platform/unix/fh
 message(STATUS "CMAKE_INSTALL_PREFIX333=${CMAKE_INSTALL_PREFIX}")
 
 message(STATUS "SLIC3R_RESOURCES_DIR222=${SLIC3R_RESOURCES_DIR}")
-if (WIN32)
-include(package/package.cmake)
-elseif( APPLE)
+# if (WIN32)
+# include(package/package.cmake)
+# elseif( APPLE)
 add_subdirectory(package)
-endif()
+# endif()

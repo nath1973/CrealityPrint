@@ -3639,8 +3639,17 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
     std::map<size_t, std::pair<coord_t, coord_t>> map_flid_deltas;//ÿ������ߣ���ͷβ��ģ����������--��--����һ��դ����롣
     std::map<size_t, coord_t> map_flid_lens;
 	Polylines polylines_out2;//�滻 polylines_out ��Ϊ�������
+    
     if (is_vaild_flag)
     {
+        // Add data check.
+        bool bValid = true;
+        for (auto& cnt : fill_lines_counts) {
+            if (cnt == 0)
+                bValid = false;
+        }
+        
+        if (bValid) {
         //��ֱ����
         Polylines polylines1; polylines1.clear();
         polylines1.insert(polylines1.end(), fill_lines.begin(), fill_lines.begin() + fill_lines_counts[0]);
@@ -3945,6 +3954,7 @@ bool FillRectilinear::fill_surface_by_multilines(const Surface *surface, FillPar
 
 
         fill_lines2 = fill_lines;//����
+        }
     }
     //add by wxj end
 

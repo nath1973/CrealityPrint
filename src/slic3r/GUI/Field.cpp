@@ -629,7 +629,7 @@ static void unbind_events(wxEvtHandler *h)
 
 void free_window(wxWindow *win)
 {
-#if !defined(__WXGTK__)
+// #if !defined(__WXGTK__)
     if(win->IsBeingDeleted())
         return;
     unbind_events(win);
@@ -642,9 +642,9 @@ void free_window(wxWindow *win)
     win->Reparent(wxGetApp().mainframe);
     if (win->GetClientData())
         reinterpret_cast<std::deque<wxWindow *>*>(win->GetClientData())->push_back(win);
-#else
-    delete win;
-#endif
+// #else
+//     delete win; // Calling this will result in a secondary release of memory
+// #endif
 }
 
 template<class T>

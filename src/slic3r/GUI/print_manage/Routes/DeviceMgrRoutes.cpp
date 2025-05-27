@@ -11,6 +11,7 @@
 #include "../AccountDeviceMgr.hpp"
 #include "slic3r/GUI/print_manage/RemotePrinterManager.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
 namespace DM {
     DeviceMgrRoutes::DeviceMgrRoutes()
     {
@@ -53,6 +54,33 @@ namespace DM {
 
             return true;
             });
+
+        this->Handler({ "set_current_plate_index" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+            int index = json_data["plateIndex"].get<int>();
+            if(wxGetApp().plater()->get_partplate_list().get_curr_plate_index()!=index)
+            {
+                wxGetApp().plater()->select_sliced_plate(index);
+            }
+            
+            Slic3r::GCodeProcessorResult* current_result = wxGetApp().plater()->get_partplate_list().get_current_slice_result();
+            if(current_result->creality_extruder_types.size()>0)
+            {
+                nlohmann::json commandJson;
+                commandJson["command"] = "set_current_plate_index";
+                commandJson["result"] = 1;
+                commandJson["plateIndex"] = index;
+                AppUtils::PostMsg(browse, commandJson);
+            }else{
+                nlohmann::json commandJson;
+                commandJson["command"] = "set_current_plate_index";
+                commandJson["result"] = 0;
+                commandJson["plateIndex"] = index;
+                AppUtils::PostMsg(browse, commandJson);
+            }
+            
+            return true;
+            });
+            
 
         //for device module 
         this->Handler({ "set_device_merge_state" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
@@ -219,15 +247,21 @@ namespace DM {
             device.mac = json_data["mac"];
             device.model = json_data["model"];
             device.connectType = json_data["type"];
+
             DM::DeviceMgr::Ins().UpdateDevice(device.address, device);
             return true;
             });
         this->Handler({ "add_device" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+
+            wxString strJS = wxString::Format("handleStudioCmd(%s)", json_data.dump(-1, ' ', true));
+
             DM::DeviceMgr::Data device;
             device.address = json_data["address"];
             device.mac = json_data["mac"];
             device.model = json_data["model"];
             device.connectType = json_data["type"];
+            device.oldPrinter = json_data["oldPrinter"];
+            
 
             std::string group = json_data["group"];
             DM::DeviceMgr::Ins().AddDevice(group, device);
@@ -275,5 +309,6 @@ namespace DM {
 
             return true;
             });
+
     }
 }

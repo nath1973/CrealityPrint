@@ -352,41 +352,51 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
     const int select_btn_length = 2 * ImGui::GetStyle().FramePadding.x + std::max(ImGui::CalcTextSize(("1 " + _u8L("selected")).c_str()).x, ImGui::CalcTextSize(_u8L("Select").c_str()).x);
 
     auto selectable = [this](const std::string& label, wchar_t icon_id, bool selected, const ImVec2& size_arg) {
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0,0 });
-
+        
         ImGuiWindow* window = ImGui::GetCurrentWindow();
-        const ImVec2 label_size = ImGui::CalcTextSize(label.c_str(), NULL, true);
+        if (window->SkipItems)
+            return false;
+
+        ImGuiContext&     g          = *GImGui;
+        const ImGuiStyle& style      = g.Style;
+        const ImGuiID     id         = window->GetID(label.c_str());
+
         ImVec2 pos = window->DC.CursorPos;
-        // ImVec2 size = ImGui::CalcItemSize(size_arg, label_size.x + ImGui::GetStyle().FramePadding.x * 2.0f, label_size.y + ImGui::GetStyle().FramePadding.y * 2.0f);
-        //ImVec2 size = ImGui::CalcItemSize(size_arg, 120, 40);
-        //ImVec2 size(26, 16);
-        float  view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
-        ImVec2 button_size(96 * view_scale, 43 * view_scale);
-        bool hovered = ImGui::IsMouseHoveringRect(pos, pos + button_size);
+        ImVec2 button_size = size_arg;
 
         bool is_dark = wxGetApp().dark_mode();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, 0.f));
+        
+        const ImRect bb(pos, pos + button_size);
+        ImGui::ItemSize(bb, style.FramePadding.y);
+        if (!ImGui::ItemAdd(bb, id))
+            return false;
+
+        bool hovered, held;
+        bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, 0);
+
+        const float rounding = 5.0f;
+
+        ImU32 fg, bg;
         if (selected || hovered) {
-            //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, icon_id == 0 ? 1.0f : 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(1.f, 1.f, 1.f, 1.f));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGuiWrapper::COL_CREALITY);
-            
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
+            fg = IM_COL32_WHITE;
+            bg = ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY);
         } else {
             if (is_dark) {
-                ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(1.f, 1.f, 1.f, 1.f));
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.f, 1.f, 1.f, 0.f));
+                fg = IM_COL32_WHITE;
+                bg = ImGui::GetColorU32(ImGuiCol_WindowBg, 1.0f);
+            } else {
+                fg = IM_COL32_BLACK;
+                bg = ImGui::GetColorU32(ImGuiCol_WindowBg, 1.0f);
             }
-            else {
-                ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.f, 0.f, 0.f, 1.f));
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.f, 1.f, 1.f, 1.f));
-            }
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGuiWrapper::COL_CREALITY);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGuiWrapper::COL_CREALITY);
         }
 
-        bool res = ImGui::Button(label.c_str(), button_size);
+        ImDrawFlags corners = ImDrawFlags_RoundCornersNone;
+        if (label == _u8L("Union")) {
+            corners = ImDrawFlags_RoundCornersLeft;
+        } else if (label == _u8L("Intersection")) {
+            corners = ImDrawFlags_RoundCornersRight;
+        }
+        window->DrawList->AddRectFilled(pos, pos + button_size, bg, rounding, corners);
 
         if (ImGui::IsItemVisible() && icon_id != 0) {
             ImVec2      button_pos = ImGui::GetItemRectMin();
@@ -398,26 +408,19 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
                 ImVec2       text_size = ImGui::CalcTextSize(into_u8(icon).c_str());
                 y_offset = button_size.y / 2.0 - text_size.y - 2;
                 ImVec2 text_pos(button_pos.x + (button_size.x - text_size.x) * 0.5f, button_pos.y + y_offset);
-                draw_list->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Tab), into_u8(icon).c_str());
+                draw_list->AddText(text_pos, fg, into_u8(icon).c_str());
             }
             {
                 const char* line      = label.data();
                 ImVec2      text_size = ImGui::CalcTextSize(line);
                 y_offset = button_size.y / 2.0 + 2;
                 ImVec2 text_pos(button_pos.x + (button_size.x - text_size.x) * 0.5f, button_pos.y + y_offset);
-                draw_list->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Tab), line);
+                draw_list->AddText(text_pos, fg, line);
             }
+
         }
 
-        //if (selected || hovered) {
-            ImGui::PopStyleColor(5);
-        //}
-        //else {
-        //    ImGui::PopStyleColor(4);
-        //}
-
-        ImGui::PopStyleVar(1);
-        return res;
+        return pressed;
     };
 
     auto sub_selectable = [this](const std::string& label, bool selected, const ImVec2& size_arg) {
@@ -437,7 +440,7 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         ImVec2 pos  = window->DC.CursorPos;
         ImVec2 win_size = ImGui::GetContentRegionAvail();
         float view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
-        ImVec2 size(60 * view_scale, 24 * view_scale);
+        ImVec2 size(std::max(60.0f * view_scale, size_arg.x), 24 * view_scale);
         //ImVec2 size = ImGui::CalcItemSize(size_arg, max_label + style.FramePadding.x * 2.0f, max_label + style.FramePadding.y * 2.0f);
         
         //pos.x = pos.x + win_size.x * 0.5 - size.x * 0.5; //in window top center
@@ -454,11 +457,15 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         float radius = size.x * 0.5f;
         // Render
         bool isDark = wxGetApp().dark_mode();
-        ImU32 normal = isDark ? ImGui::GetColorU32(IM_COL32(110, 110, 115, 255)) : ImGui::GetColorU32(IM_COL32(75, 75, 77, 125));
+        ImU32 normal = ImGui::GetColorU32(ImGuiCol_WindowBg, 1.0f);
         ImU32 hover = ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY);
-        const ImU32 col = (!held && !hovered && !selected) ? normal : hover;
+        bool  highlight = held || hovered || selected;
+        const ImU32 col = highlight ? hover : normal;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, highlight ? IM_COL32_WHITE : ImGui::GetColorU32(ImGuiCol_Text));
         ImGui::RenderNavHighlight(bb, id);
-        ImGui::RenderFrame(bb.Min, bb.Max, col, false, radius);
+        ImGui::RenderFrame(bb.Min, bb.Max, col, selected ? false : true, radius);
 
         ImVec2 center = ImVec2((bb.Min.x + bb.Max.x) * 0.5f, (bb.Min.y + bb.Max.y) * 0.5f);
         /*window->DrawList->AddCircleFilled(center, radius, col, 32);*/
@@ -466,8 +473,8 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         // Draw text
         ImVec2 text_pos = ImVec2(center.x - label_size.x * 0.5f, center.y - label_size.y * 0.5f);
         ImGui::RenderText(text_pos, label.data());
-
-        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(2);
 
         return held;
     };
@@ -527,6 +534,8 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         else 
         {
             normal = isDark ? ImGui::GetColorU32(IM_COL32(110, 110, 115, 255)) : ImGui::GetColorU32(IM_COL32(75, 75, 77, 125));
+        
+            ImGui::PushStyleColor(ImGuiCol_Text, hovered ? ImGui::GetColorU32(IM_COL32_WHITE) : ImGui::GetColorU32(ImGuiCol_Text, 1.0f)); 
         }
         
         ImU32 hover = ImGui::GetColorU32(ImGuiWrapper::COL_CREALITY);
@@ -547,32 +556,59 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         if (!enable)
         {
             ImGui::PopItemFlag();
-            ImGui::PopStyleColor();
         }
+        ImGui::PopStyleColor();
         ImGui::PopStyleVar();
 
         return enable && pressed;
     };
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0);
 
 
     float view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
     bool  is_dark    = wxGetApp().dark_mode();
-    if (selectable(_u8L("Union"), is_dark ? ImGui::UnionBooleanDarkButton : ImGui::UnionBooleanButton, m_operation_mode == MeshBooleanOperation::Union, ImVec2(max_tab_length, 0.0f))) {
-        m_operation_mode = MeshBooleanOperation::Union;
+    
+    {
+        ImGuiContext& g      = *GImGui;
+        ImGuiWindow*  window = g.CurrentWindow;
+        ImVec2 p_min = window->DC.CursorPos;
+
+        ImVec2 selectable_size = ImVec2(std::max((float) max_tab_length, 96.0f * view_scale), 43 * view_scale);
+
+        if (selectable(_u8L("Union"), ImGui::UnionBooleanButton, m_operation_mode == MeshBooleanOperation::Union, selectable_size)) {
+            m_operation_mode = MeshBooleanOperation::Union;
+        }
+        ImGui::SameLine(0, 0);
+        if (selectable(_u8L("Difference"), ImGui::DifferenceBooleanButton, m_operation_mode == MeshBooleanOperation::Difference,
+                       selectable_size)) {
+            m_operation_mode = MeshBooleanOperation::Difference;
+        }
+        ImGui::SameLine(0, 0);
+        if (selectable(_u8L("Intersection"), ImGui::IntersectionBooleanButton, m_operation_mode == MeshBooleanOperation::Intersection,
+                       selectable_size)) {
+            m_operation_mode = MeshBooleanOperation::Intersection;
+        }
+
+        ImVec4 line_color = is_dark ? ImVec4(110.0 / 255.0, 110.0 / 255.0, 114.0 / 255.0, 1) : ImVec4(214.0 / 255.0, 214.0 / 255.0, 220.0 / 255.0, 1.0);
+
+        ImGui::PushStyleColor(ImGuiCol_Border, line_color);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0);
+
+        ImGui::RenderFrameBorder(p_min, p_min + ImVec2(selectable_size.x * 3.0, selectable_size.y), 5);
+
+        window->DrawList->AddLine(ImVec2(p_min.x + selectable_size.x, p_min.y), 
+                                    ImVec2(p_min.x + selectable_size.x, p_min.y + selectable_size.y), ImGui::GetColorU32(line_color));
+        window->DrawList->AddLine(ImVec2(p_min.x + selectable_size.x * 2, p_min.y),
+                                  ImVec2(p_min.x + selectable_size.x * 2, p_min.y + selectable_size.y), ImGui::GetColorU32(line_color));
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
     }
-    ImGui::SameLine(0, 0);
-    if (selectable(_u8L("Difference"), is_dark ? ImGui::DifferenceBooleanDarkButton : ImGui::DifferenceBooleanButton, m_operation_mode == MeshBooleanOperation::Difference, ImVec2(max_tab_length, 0.0f))) {
-        m_operation_mode = MeshBooleanOperation::Difference;
-    }
-    ImGui::SameLine(0, 0);
-    if (selectable(_u8L("Intersection"), is_dark ? ImGui::IntersectionBooleanDarkButton : ImGui::IntersectionBooleanButton, m_operation_mode == MeshBooleanOperation::Intersection, ImVec2(max_tab_length, 0.0f))) {
-        m_operation_mode = MeshBooleanOperation::Intersection;
-    }
+
     ImGui::PopStyleVar();
 
-    // ImGui::AlignTextToFramePadding();
+    ImGui::AlignTextToFramePadding();
     std::string cap_str1 = m_operation_mode != MeshBooleanOperation::Difference ? _u8L("Part 1") : _u8L("Subtract from");
     m_imgui->text(cap_str1);
     ImGui::SameLine(max_cap_length);

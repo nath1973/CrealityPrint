@@ -31,7 +31,8 @@
 #endif // _MSW_DARK_MODE
 #endif //__WINDOWS__
 #include "print_manage/AppMgr.hpp"
-
+#include "libslic3r/common_header/common_header.h"
+#include "buildinfo.h"
 namespace Slic3r { namespace GUI {
 
 WX_DEFINE_LIST(RadioSelectorList);
@@ -343,11 +344,11 @@ wxBoxSizer *PreferencesDialog::create_item_region_combobox(wxString title, wxWin
 
         wxGetApp().update_publish_status();
         
-        #ifdef __APPLE__
-            this->notify_preferences_changed();
-        #else
+        //#ifdef __APPLE__
+        //    this->notify_preferences_changed();
+        //#else
             wxGetApp().reload_homepage();
-        #endif
+        //#endif
         CallAfter([this,region] {
             wxGetApp().send_app_message("region|" + region.ToStdString(),true);
          });
@@ -671,6 +672,11 @@ wxBoxSizer* PreferencesDialog::create_item_darkmode_checkbox(wxString title, wxW
         wxGetApp().update_ui_from_settings();
         set_dark_mode();
 #endif
+#ifdef CUSTOMIZED
+        Slic3r::CxBuildInfo::setDarkMode(checkbox->GetValue());
+        std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
+        SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
+#endif
         //DM::AppMgr::Ins().SystemThemeChanged();
         SimpleEvent evt = SimpleEvent(EVT_GLCANVAS_COLOR_MODE_CHANGED);
         wxPostEvent(wxGetApp().plater(), evt);
@@ -959,11 +965,12 @@ wxBoxSizer* PreferencesDialog::create_item_button(
 
 wxBoxSizer* PreferencesDialog ::create_item_downloads(wxWindow* parent)
 {
+
     bool is_dark = wxGetApp().dark_mode();
 
     wxBoxSizer* hbox_sizer = new wxBoxSizer(wxHORIZONTAL);
     hbox_sizer->Add(0, 0, 0, wxEXPAND | wxLEFT, 23);
-
+#if CUSTOM_CXCLOUD
     // StateColor download_input_bg(std::pair<wxColour, int>(wxColour("#F0F0F1"), StateColor::Disabled), std::pair<wxColour, int>(*wxWHITE, StateColor::Enabled));
     auto item_panel = new ::TextDisplay(parent, wxEmptyString, is_dark ? "open_dialog" : "open_dialog_light", wxDefaultPosition, DESIGN_COMMON_INPUT_SIZE, wxTE_PROCESS_ENTER);
 
@@ -1000,8 +1007,10 @@ wxBoxSizer* PreferencesDialog ::create_item_downloads(wxWindow* parent)
     hbox_sizer->AddSpacer(FromDIP(LAYOUT_COMMON_INTERVAL));
     hbox_sizer->Add(item_panel, 0, wxALIGN_CENTER, 0);
 
+
     wxColour bg_color = is_dark ? wxColour("#383636") : wxColour("#FFFFFF");
     item_panel->SetLabel(download_path);
+
     // item_panel->SetTextColor(bg_color);
 
     // hbox_sizer->Add(0, 0, 0, wxEXPAND | wxLEFT, 3);
@@ -1010,7 +1019,7 @@ wxBoxSizer* PreferencesDialog ::create_item_downloads(wxWindow* parent)
     // hbox_sizer->Add(0, 0, 0, wxEXPAND | wxLEFT, 3);
 
     hbox_sizer->Layout();
-
+#endif
     return hbox_sizer;
 
 }
@@ -1205,7 +1214,7 @@ void PreferencesDialog::create()
     m_backup_interval_time = app_config->get("backup_interval");
 
     // set icon for dialog
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
     SetSizeHints(wxDefaultSize, wxDefaultSize);
 
@@ -1329,7 +1338,7 @@ wxWindow* PreferencesDialog::create_general_page()
     //     wxLANGUAGE_POLISH
     // };
 
-    auto translations = wxTranslations::Get()->GetAvailableTranslations("CrealityPrint");
+    auto translations = wxTranslations::Get()->GetAvailableTranslations(Slic3r::CxBuildInfo::getProjectName());
     std::vector<const wxLanguageInfo *> language_infos;
     language_infos.emplace_back(wxLocale::GetLanguageInfo(wxLANGUAGE_ENGLISH));
     for (size_t i = 0; i < translations.GetCount(); ++i) {
@@ -1356,10 +1365,12 @@ wxWindow* PreferencesDialog::create_general_page()
     auto item_downloads = create_item_downloads(page);
 
     auto sizer_radio       = create_item_role_radiobutton(_L("User Role"), page);
+#if CUSTOM_CXCLOUD
     auto item_user_sync    = create_item_checkbox(_L("Auto sync user presets(Printer/Filament/Process)"), page, _L("User Sync"), 50,
-                                                  "sync_user_preset");
+                                        "sync_user_preset");
     auto item_user_exp    = create_item_checkbox(_L("User Experience Program"), page, _L("User Experience Program"), 50,
                                                   "user_exp");
+#endif 
     //item_user_exp->
     auto item_save_presets = create_item_button(_L("Clear my choice on the unsaved presets."), _L("Clear"), page, L"", _L("Clear my choice on the unsaved presets."), []() {
         wxGetApp().app_config->set("save_preset_choise", "");
@@ -1369,7 +1380,7 @@ wxWindow* PreferencesDialog::create_general_page()
         wxGetApp().app_config->set("save_project_choise", "");
     });
 
-    auto item_arrange = create_item_arrange_checkbox(_L("Automatically layout when importing or copying"), page, 50, "is_arrange");
+    auto item_arrange = create_item_arrange_checkbox(_L("Automatically Layout on Model File Import"), page, 50, "is_arrange");
     //dark mode
 #ifdef _WIN32
     // auto title_darkmode = create_item_title(_L("Dark Mode"), page, _L("Dark Mode"));
@@ -1386,9 +1397,9 @@ wxWindow* PreferencesDialog::create_general_page()
     sizer_page->AddSpacer(FromDIP(20));
     sizer_page->Add(item_currency, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(20));
-
+#if CUSTOM_CXCLOUD
     sizer_page->Add(item_downloads, 0, wxTOP, FromDIP(3));
-
+#endif
     sizer_page->AddSpacer(FromDIP(20));
 
 #ifdef _WIN32
@@ -1404,11 +1415,13 @@ wxWindow* PreferencesDialog::create_general_page()
     sizer_page->AddSpacer(FromDIP(10));
     sizer_page->Add(item_default_page, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(10));
+#if CUSTOM_CXCLOUD
     sizer_page->Add(item_user_sync, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(10));
+
     sizer_page->Add(item_user_exp, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(5));
-    
+#endif
     sizer_page->Add(item_save_presets, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(5));
     sizer_page->Add(item_save_choise, 0, wxTOP, FromDIP(3));

@@ -92,6 +92,8 @@ void ArrangeJob::clear_input()
     m_unprintable.clear();
     m_locked.clear();
     m_unarranged.clear();
+    m_move_top_left_ids.clear();
+    m_instance_id_to_instance.clear();
     m_uncompatible_plates.clear();
     m_selected.reserve(count + 1 /* for optional wti */);
     m_unselected.reserve(count + 1 /* for optional wti */);
@@ -107,7 +109,7 @@ ArrangePolygon ArrangeJob::prepare_arrange_polygon(void* model_instance)
     return get_instance_arrange_poly(instance, config);
 }
 
-void ArrangeJob::prepare_selected() {
+void ArrangeJob::prepare_selected(bool consider_lock) {
     PartPlateList& plate_list = m_plater->get_partplate_list();
 
     clear_input();
@@ -116,6 +118,8 @@ void ArrangeJob::prepare_selected() {
     bool selected_is_locked = false;
     //BBS: remove logic for unselected object
     //double stride = bed_stride_x(m_plater);
+
+    PartPlate* cur_plate = plate_list.get_curr_plate();
 
     std::vector<const Selection::InstanceIdxsList*>
         obj_sel(model.objects.size(), nullptr);
@@ -136,11 +140,22 @@ void ArrangeJob::prepare_selected() {
                 inst_sel[size_t(inst_id)] = true;
 
         for (size_t i = 0; i < inst_sel.size(); ++i) {
+
+            bool in_plate = cur_plate->contain_instance(oidx, i) || cur_plate->intersect_instance(oidx, i);
+            if(!inst_sel[i] && !in_plate) {
+                continue;
+            }
+
             ModelInstance* mi = mo->instances[i];
             ArrangePolygon&& ap = prepare_arrange_polygon(mo->instances[i]);
-            //BBS: partplate_list preprocess
-            //remove the locked plate's instances, neither in selected, nor in un-selected
-            bool locked = plate_list.preprocess_arrange_polygon(oidx, i, ap, inst_sel[i]);
+
+            bool locked = false;
+            if(consider_lock) {
+                //BBS: partplate_list preprocess
+                //remove the locked plate's instances, neither in selected, nor in un-selected
+                locked = plate_list.preprocess_arrange_polygon(oidx, i, ap, inst_sel[i]);
+            }
+            
             if (!locked)
                 {
                 ArrangePolygons& cont = mo->instances[i]->printable ?
@@ -149,6 +164,17 @@ void ArrangeJob::prepare_selected() {
                     m_unprintable;
 
                 ap.itemid = cont.size();
+
+                // if do selection layout, the selected arrange_poly's setter callback need to be reset to deal with  arrange failing situation
+                if (m_plater->get_prepare_state() == Job::JobPrepareState::PREPARE_STATE_EXTRA) {
+
+                    ap.instance_id = cont.size(); // use instance_id to for [arrange selected] logic, because the itemid can be changed by the arrange and used for other logic
+
+                    if (mo->instances[i]->printable && inst_sel[i]) {
+                        m_instance_id_to_instance[ap.instance_id] = mo->instances[i];
+                    }
+                }
+
                 cont.emplace_back(std::move(ap));
                 }
             else
@@ -175,7 +201,25 @@ void ArrangeJob::prepare_selected() {
             }
         }
 
+    if (m_plater->get_prepare_state() == Job::JobPrepareState::PREPARE_STATE_EXTRA) {
+            // adjust some offsets between the current plate and the first plate(start point located at (0,0))
+            PartPlateList& plate_list       = m_plater->get_partplate_list();
+            PartPlate*     plate0           = plate_list.get_plate(0);
+            Vec3d          cur_plate_origin = plate_list.get_current_plate_origin();
+            Vec3d          plate_offset     = cur_plate_origin - plate0->get_origin();
+            for (auto& polygon : m_unselected) {
+                polygon.translation.x() -= scaled<double>(plate_offset.x());
+                polygon.translation.y() -= scaled<double>(plate_offset.y());
+            }
+
+    }
+
     prepare_wipe_tower();
+
+    if (m_plater->get_prepare_state() == Job::JobPrepareState::PREPARE_STATE_EXTRA) {
+        // this param is set to false when arrange selected(if have objects contained in the plate)
+        params.do_final_align = m_unselected.empty();
+    }
 
 
     // The strides have to be removed from the fixed items. For the
@@ -218,6 +262,13 @@ void ArrangeJob::prepare_all() {
                 ArrangePolygons& cont = mo->instances[i]->printable ? m_selected :m_unprintable;
 
                 ap.itemid = cont.size();
+
+                // fix: the very big size object(larger then bed size), need to move to top left area of the first plate
+                ap.instance_id = cont.size(); // use instance_id to for [arrange selected] logic, because the itemid can be changed by the arrange and used for other logic
+                if (mo->instances[i]->printable) {
+                    m_instance_id_to_instance[ap.instance_id] = mo->instances[i];
+                }
+
                 cont.emplace_back(std::move(ap));
             }
             else
@@ -342,7 +393,8 @@ void ArrangeJob::prepare_wipe_tower()
         if (auto wti = get_wipe_tower(*m_plater, bedid)) {
             // wipe tower is already there
             wipe_tower_ap = get_wipetower_arrange_poly(&wti);
-            wipe_tower_ap.bed_idx = bedid_unlocked;
+            //wipe_tower_ap.bed_idx = bedid_unlocked;
+            wipe_tower_ap.bed_idx = 0;
             m_unselected.emplace_back(wipe_tower_ap);
         }
         else if (need_wipe_tower) {
@@ -401,6 +453,8 @@ void ArrangeJob::prepare_partplate() {
             if (!locked)
             {
                 ap.itemid = cont.size();
+                ap.instance_id = cont.size();
+                m_instance_id_to_instance[ap.instance_id] = mo->instances[inst_idx];
                 cont.emplace_back(std::move(ap));
             }
             else
@@ -450,7 +504,10 @@ void ArrangeJob::prepare()
         only_on_partplate = true;   // only arrange items on current plate
         prepare_partplate();
     }
-
+    else if (state == Job::JobPrepareState::PREPARE_STATE_EXTRA) {
+        only_on_partplate = true;
+        prepare_selected(false);
+    }
 
 #if SAVE_ARRANGE_POLY
     if (1)
@@ -564,7 +621,7 @@ void ArrangeJob::process(Ctl &ctl)
             BOOST_LOG_TRIVIAL(debug) << item.name << ", bed: " << item.bed_idx << ", trans: " << item.translation.transpose()
             <<", bbox:"<<get_extents(item.poly).min.transpose()<<","<<get_extents(item.poly).max.transpose();
     }
-
+    
     arrangement::arrange(m_selected, m_unselected, bedpts, params);
 
     // sort by item id
@@ -634,6 +691,16 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     }
     else
         plate_list.clear(false, false, true, -1);
+
+    // under the "only_on_partplate" situation, if ArrangePolygon can not place on the current plate, move them to the top left position of the first plate
+    if (only_on_partplate) {
+        for (ArrangePolygon& ap : m_selected) {
+            if (ap.bed_idx > 0) {
+                m_move_top_left_ids.emplace_back(ap.instance_id);
+            }
+        }
+    }
+
     //BBS: adjust the bed_index, create new plates, get the max bed_index
     for (ArrangePolygon& ap : m_selected) {
         //if (ap.bed_idx < 0) continue;  // bed_idx<0 means unarrangable
@@ -670,34 +737,79 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         ap.apply();
     }
 
+    bool move_object_top_left = false;
+
     // Apply the arrange result to all selected objects
     for (ArrangePolygon& ap : m_selected) {
-        //BBS: partplate postprocess
-        plate_list.postprocess_arrange_polygon(ap, true);
 
-        ap.apply();
+        if ( (only_on_partplate && std::find(m_move_top_left_ids.begin(), m_move_top_left_ids.end(), ap.instance_id) != m_move_top_left_ids.end()) || (ap.bed_idx == -1)) {
+            //ap.translation(Y) += scaled<double>(plate_list.plate_stride_y());
+
+            ModelInstance* mi = nullptr;
+            if (m_instance_id_to_instance.find(ap.instance_id) != m_instance_id_to_instance.end()) {
+                mi = m_instance_id_to_instance[ap.instance_id];
+            }
+
+            PartPlate* first_plate = plate_list.get_plate(0);
+            if (first_plate && mi) {
+                BoundingBoxf3 plate_bbox   = first_plate->get_build_volume();
+                 Vec3d   instance_bbox_size = mi->get_object()->instance_bounding_box(0).size();
+                 instance_bbox_size = mi->get_matrix().matrix().block(0,0,3,3).inverse() * instance_bbox_size;
+                 auto          offset             = mi->get_offset();
+                 Vec3d top_left = {plate_bbox.min.x() + instance_bbox_size.x(), plate_bbox.max.y() + instance_bbox_size.y(), offset(2)};
+                 mi->set_offset(top_left);
+
+                 move_object_top_left = true;
+            }
+
+        } else {
+            // BBS: partplate postprocess
+            plate_list.postprocess_arrange_polygon(ap, true);
+            ap.apply();
+        }
+
+        
     }
 
-    // Apply the arrange result to unselected objects(due to the sukodu-style column changes, the position of unselected may also be modified)
-    for (ArrangePolygon& ap : m_unselected)
-    {
-        if (ap.is_virt_object)
-            continue;
+    if(m_plater->get_prepare_state() != Job::JobPrepareState::PREPARE_STATE_EXTRA) {
+        // Apply the arrange result to unselected objects(due to the sukodu-style column changes, the position of unselected may also be modified)
+        for (ArrangePolygon& ap : m_unselected)
+        {
+            if (ap.is_virt_object)
+                continue;
 
-        //BBS: partplate postprocess
-        plate_list.postprocess_arrange_polygon(ap, false);
+            //BBS: partplate postprocess
+            plate_list.postprocess_arrange_polygon(ap, false);
 
-        ap.apply();
+            ap.apply();
+        }
     }
 
-    // Move the unprintable items to the last virtual bed.
+    // Move the unprintable items to top left position of the first plate
     // Note ap.apply() moves relatively according to bed_idx, so we need to subtract the orignal bed_idx
     for (ArrangePolygon& ap : m_unprintable) {
-        ap.bed_idx = beds + 1;
-        plate_list.postprocess_arrange_polygon(ap, true);
+        ModelInstance* mi = nullptr;
+        if (m_instance_id_to_instance.find(ap.instance_id) != m_instance_id_to_instance.end()) {
+            mi = m_instance_id_to_instance[ap.instance_id];
+        }
 
-        ap.apply();
-        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(":arrange m_unprintable: name: %4%, bed_id %1%, trans {%2%,%3%}") % ap.bed_idx % unscale<double>(ap.translation(X)) % unscale<double>(ap.translation(Y)) % ap.name;
+        PartPlate* first_plate = plate_list.get_plate(0);
+        if (first_plate && mi) {
+            BoundingBoxf3 plate_bbox   = first_plate->get_build_volume();
+                Vec3d   instance_bbox_size = mi->get_object()->instance_bounding_box(0).size();
+                instance_bbox_size = mi->get_matrix().matrix().block(0,0,3,3).inverse() * instance_bbox_size;
+                auto          offset             = mi->get_offset();
+                Vec3d top_left = {plate_bbox.min.x() + instance_bbox_size.x(), plate_bbox.max.y() + instance_bbox_size.y(), offset(2)};
+                mi->set_offset(top_left);
+
+                move_object_top_left = true;
+        }
+
+        //ap.bed_idx = beds + 1;
+        //plate_list.postprocess_arrange_polygon(ap, true);
+
+        //ap.apply();
+        //BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(":arrange m_unprintable: name: %4%, bed_id %1%, trans {%2%,%3%}") % ap.bed_idx % unscale<double>(ap.translation(X)) % unscale<double>(ap.translation(Y)) % ap.name;
     }
 
     m_plater->update();
@@ -713,6 +825,13 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
             _L("Arrangement ignored the following objects which can't fit into a single bed:\n%s"),
             concat_strings(names, "\n")));
     }
+
+    if (move_object_top_left) {
+        m_plater->get_notification_manager()->push_notification(NotificationType::BBLPlateInfo,
+                                                                NotificationManager::NotificationLevel::WarningNotificationLevel,
+                                    into_u8(_L("Current tray is full; Unarranged models are placed above Tray 1.")));
+    }
+
     m_plater->get_notification_manager()->close_notification_of_type(NotificationType::ArrangeOngoing);
 
     //BBS: reload all objects due to arrange

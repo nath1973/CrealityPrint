@@ -2,6 +2,7 @@
 #include "GUI_App.hpp"
 #include "MsgDialog.hpp"
 #include "I18N.hpp"
+#include "Widgets/HoverBorderIcon.hpp"
 #include <wx/dcgraph.h>
 #include "MainFrame.hpp"
 #include <string>
@@ -2607,304 +2608,126 @@ void Dec_Acceleration_Dlg::on_dpi_changed(const wxRect& suggested_rect)
 //
 
 High_Flowrate_Dlg::High_Flowrate_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
-    : DPIDialog(parent,
-                id,
-                _L("Pass 2"),
-                wxDefaultPosition,
-                parent->FromDIP(wxSize(-1, 280)),
-                wxDEFAULT_DIALOG_STYLE)
+    : DPIDialog(parent, wxID_ANY, _L("Pass 2"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
     , m_plater(plater)
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
-    this->SetMinSize(wxSize(FromDIP(320), FromDIP(230)));
-    this->SetMaxSize(wxSize(FromDIP(320), FromDIP(230)));
+    this->SetSize(wxSize(FromDIP(559), FromDIP(507)));
+    this->SetMinSize(wxSize(FromDIP(559), FromDIP(507)));
+    this->SetMaxSize(wxSize(FromDIP(559), FromDIP(507)));
 
-    m_btn0     = new wxButton(this, wxID_ANY, _L("-20"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn1     = new wxButton(this, wxID_ANY, _L("-15"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn2     = new wxButton(this, wxID_ANY, _L("-10"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn3     = new wxButton(this, wxID_ANY, _L("-5"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn4     = new wxButton(this, wxID_ANY, _L("0"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn5     = new wxButton(this, wxID_ANY, _L("5"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn6     = new wxButton(this, wxID_ANY, _L("10"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn7     = new wxButton(this, wxID_ANY, _L("15"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    m_btn8     = new wxButton(this, wxID_ANY, _L("20"), wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-    //m_btn8     = new Button(this, _L("20"));
-    StateColor btn_bg_green(std::pair<wxColour, int>(wxColour(0, 137, 123), StateColor::Pressed),
-                            std::pair<wxColour, int>(wxColour(0, 120, 215), StateColor::Hovered),
-                            std::pair<wxColour, int>(wxColour(23, 204, 90), StateColor::Normal));
+    wxSize btnSize = wxSize(FromDIP(144), FromDIP(115));
+    m_btn0         = new ImgBtn(this, wxEmptyString, "calib_-20", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn1         = new ImgBtn(this, wxEmptyString, "calib_-15", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn2         = new ImgBtn(this, wxEmptyString, "calib_-10", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn3         = new ImgBtn(this, wxEmptyString, "calib_-5", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn4         = new ImgBtn(this, wxEmptyString, "calib_0", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn5         = new ImgBtn(this, wxEmptyString, "calib_5", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn6         = new ImgBtn(this, wxEmptyString, "calib_10", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn7         = new ImgBtn(this, wxEmptyString, "calib_15", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+    m_btn8         = new ImgBtn(this, wxEmptyString, "calib_20", wxDefaultPosition, btnSize, wxTE_PROCESS_ENTER);
+
+    m_btn0->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 0.8; }));
+    m_btn1->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 0.85; }));
+    m_btn2->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 0.9; }));
+    m_btn3->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 0.95; }));
+    m_btn4->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 1.0; }));
+    m_btn5->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 1.05; }));
+    m_btn6->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 1.1; }));
+    m_btn7->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 1.15; }));
+    m_btn8->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { e.Skip(); m_CurrentValue = 1.2; }));
+
+    StateColor btn_bg_green(std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Disabled),
+                         std::pair<wxColour, int>(wxColour(206, 206, 206), StateColor::Pressed),
+                         std::pair<wxColour, int>(wxColour(238, 238, 238), StateColor::Hovered),
+                         std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Enabled),
+                         std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Normal));
+
+    StateColor report_bd(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled),
+                         std::pair<wxColour, int>(wxColour("#d6d6dc"), StateColor::Enabled));
+    StateColor report_text(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled),
+                           std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
 
     wxString info_str      = _L("Choose the one with the best coarse tuning");
     auto     info_str_size = wxWindow::GetTextExtent(info_str);
     auto     wx_info       = new wxStaticText(this, wxID_ANY, info_str, wxDefaultPosition, info_str_size, wxALIGN_LEFT);
 
-    std::string icon_path = (boost::format("%1%/images/FlowFineTune_tip.png") % resources_dir()).str();
-    wxBitmap    bitmap;
-    bitmap.LoadFile(icon_path, wxBITMAP_TYPE_ANY);
-    wxBitmapButton* svgButton = new wxBitmapButton(this, wxID_ANY, bitmap);
+    wxButton* svgButton = new wxButton(this, wxID_HIGHEST + 3, "", wxDefaultPosition, wxSize(FromDIP(18), FromDIP(18)), wxBORDER_NONE);
+    svgButton->SetBackgroundColour(this->GetBackgroundColour());
+
+    wxBitmap qImg = create_scaled_bitmap3("cali_page_caption_help", this, FromDIP(25), wxSize(FromDIP(25), FromDIP(25)));
+    svgButton->SetBitmap(qImg);
     svgButton->Bind(wxEVT_BUTTON, [](wxCommandEvent&) {
         wxLaunchDefaultBrowser("https://wiki.creality.com/zh/software/update-released/Basic-introduction/calibration-tutorial");
     });
-    auto sizer0 = new wxBoxSizer(wxHORIZONTAL);
-    sizer0->Add(wx_info, 0, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer0->Add(svgButton, 1, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    m_btn0->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn0->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn0->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn0->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn0->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn0->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn0->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn0->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn0->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn0->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start0, this);
-
-    m_btn1->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn1->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn1->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn1->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn1->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn1->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn1->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn1->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn1->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn1->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start1, this);
-
-    m_btn2->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn2->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn2->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn2->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn2->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn2->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn2->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn2->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn2->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn2->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start2, this);
-
-    m_btn3->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn3->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn3->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn3->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn3->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn3->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn3->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn3->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn3->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn3->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start3, this);
-
-    m_btn4->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn4->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn4->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn4->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn4->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn4->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn4->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn4->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn4->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn4->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start4, this);
-
-    m_btn5->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn5->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn5->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn5->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn5->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn5->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn5->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn5->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn5->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn5->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start5, this);
-
-    m_btn6->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn6->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn6->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn6->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn6->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn6->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn6->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn6->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn6->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn6->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start6, this);
-
-    m_btn7->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn7->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn7->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn7->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn7->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn7->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn7->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn7->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn7->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn7->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start7, this);
-
-    m_btn8->SetBackgroundColour(wxColour(23, 204, 90));
-    m_btn8->SetForegroundColour(wxColour(38, 46, 48));
-    m_btn8->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn8->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn8->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn8->Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent& e) { m_btn8->SetBackgroundColour(wxColour(0, 120, 215)); });
-    m_btn8->Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& e) { m_btn8->SetBackgroundColour(wxColour(23, 204, 90)); });
-    m_btn8->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start8, this);
-    /*
-    m_btn0->SetBackgroundColor(btn_bg_green);
-    m_btn0->SetBorderColor(wxColour(0, 150, 136));
-
-    m_btn0->SetTextColor(wxColour(38, 46, 48));
-    m_btn0->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn0->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn0->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn0->SetCornerRadius(FromDIP(3));
-    m_btn0->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start0, this);
-
-    m_btn1->SetBackgroundColor(btn_bg_green);
-    m_btn1->SetBorderColor(wxColour(0, 150, 136));
-    m_btn1->SetTextColor(wxColour(38, 46, 48));
-    m_btn1->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn1->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn1->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn1->SetCornerRadius(FromDIP(3));
-    m_btn1->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start1, this);
-
-    m_btn2->SetBackgroundColor(btn_bg_green);
-    m_btn2->SetBorderColor(wxColour(0, 150, 136));
-    m_btn2->SetTextColor(wxColour(38, 46, 48));
-    m_btn2->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn2->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn2->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn2->SetCornerRadius(FromDIP(3));
-    m_btn2->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start2, this);
-
-    m_btn3->SetBackgroundColor(btn_bg_green);
-    m_btn3->SetBorderColor(wxColour(0, 150, 136));
-    m_btn3->SetTextColor(wxColour(38, 46, 48));
-    m_btn3->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn3->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn3->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn3->SetCornerRadius(FromDIP(3));
-    m_btn3->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start3, this);
-
-    m_btn4->SetBackgroundColor(btn_bg_green);
-    m_btn4->SetBorderColor(wxColour(0, 150, 136));
-    m_btn4->SetTextColor(wxColour(38, 46, 48));
-    m_btn4->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn4->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn4->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn4->SetCornerRadius(FromDIP(3));
-    m_btn4->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start4, this);
-
-    m_btn5->SetBackgroundColor(btn_bg_green);
-    m_btn5->SetBorderColor(wxColour(0, 150, 136));
-    m_btn5->SetTextColor(wxColour(38, 46, 48));
-    m_btn5->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn5->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn5->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn5->SetCornerRadius(FromDIP(3));
-    m_btn5->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start5, this);
-
-    m_btn6->SetBackgroundColor(btn_bg_green);
-    m_btn6->SetBorderColor(wxColour(0, 150, 136));
-    m_btn6->SetTextColor(wxColour(38, 46, 48));
-    m_btn6->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn6->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn6->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn6->SetCornerRadius(FromDIP(3));
-    m_btn6->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start6, this);
-
-    m_btn7->SetBackgroundColor(btn_bg_green);
-    m_btn7->SetBorderColor(wxColour(0, 150, 136));
-    m_btn7->SetTextColor(wxColour(38, 46, 48));
-    m_btn7->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn7->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn7->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn7->SetCornerRadius(FromDIP(3));
-    m_btn7->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start7, this);
-
-    m_btn8->SetBackgroundColor(btn_bg_green);
-    m_btn8->SetBorderColor(wxColour(0, 150, 136));
-    m_btn8->SetTextColor(wxColour(38, 46, 48));
-    m_btn8->SetSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn8->SetMinSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn8->SetMaxSize(wxSize(FromDIP(100), FromDIP(50)));
-    m_btn8->SetCornerRadius(FromDIP(3));
-    m_btn8->Bind(wxEVT_BUTTON, &High_Flowrate_Dlg::on_start8, this);
-    */
-    auto sizer1 = new wxBoxSizer(wxHORIZONTAL);
-    sizer1->Add(m_btn0, 0, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer1->Add(m_btn1, 1, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer1->Add(m_btn2, 2, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    auto sizer2 = new wxBoxSizer(wxHORIZONTAL);
-    sizer2->Add(m_btn3, 0, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer2->Add(m_btn4, 1, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer2->Add(m_btn5, 2, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    auto sizer3 = new wxBoxSizer(wxHORIZONTAL);
-    sizer3->Add(m_btn6, 0, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer3->Add(m_btn7, 1, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-    sizer3->Add(m_btn8, 2, wxALL | wxALIGN_CENTER_VERTICAL, 2);
-
-    wxBoxSizer* settings_sizer = new wxBoxSizer(wxVERTICAL);
-    settings_sizer->Add(sizer0);
-    settings_sizer->Add(sizer1);
-    settings_sizer->Add(sizer2);
-    settings_sizer->Add(sizer3);
 
     wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
-    v_sizer->Add(settings_sizer);
     SetSizer(v_sizer);
 
-    m_btn0->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start0), NULL, this);
-    m_btn1->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start1), NULL, this);
-    m_btn2->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start2), NULL, this);
-    m_btn3->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start3), NULL, this);
-    m_btn4->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start4), NULL, this);
-    m_btn5->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start5), NULL, this);
-    m_btn6->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start6), NULL, this);
-    m_btn7->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start7), NULL, this);
-    m_btn8->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start8), NULL, this);
-    wxGetApp().UpdateDlgDarkUI(this);
+    auto topSizer = new wxBoxSizer(wxHORIZONTAL);
+    topSizer->Add(wx_info, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    topSizer->Add(svgButton, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    v_sizer->Add(topSizer, 0, wxTOP | wxALIGN_CENTRE_HORIZONTAL, FromDIP(30));
 
+    wxGridSizer* gridSizer = new wxGridSizer(3, 3, FromDIP(6), FromDIP(17));
+    gridSizer->Add(m_btn0, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn1, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn2, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn3, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn4, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn5, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn6, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn7, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn8, 0, wxALIGN_CENTER, FromDIP(5));
+
+    v_sizer->Add(gridSizer, 0, wxTOP | wxALIGN_CENTRE_HORIZONTAL, FromDIP(16));
+
+    wxBoxSizer* buttonsSizer = new wxBoxSizer(wxHORIZONTAL);
+    Button* okButton = new Button(this, _L("Confirm"));
+    okButton->SetBackgroundColor(btn_bg_green);
+    okButton->SetBorderColor(report_bd);
+    okButton->SetTextColor(report_text);
+    okButton->SetFont(Label::Body_12);
+    okButton->SetSize(wxSize(FromDIP(100), FromDIP(24)));
+    okButton->SetMinSize(wxSize(FromDIP(100), FromDIP(24)));
+    okButton->SetMaxSize(wxSize(FromDIP(100), FromDIP(24)));
+    okButton->SetCornerRadius(FromDIP(12));
+    okButton->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& e) { 
+         m_plater->calib_flowrate(2, m_CurrentValue);
+        EndModal(wxID_OK);
+    });
+
+    Button* cancelButton = new Button(this, _L("Cancel"));
+    cancelButton->SetBackgroundColor(btn_bg_green);
+    cancelButton->SetBorderColor(report_bd);
+    cancelButton->SetTextColor(report_text);
+    cancelButton->SetFont(Label::Body_12);
+    cancelButton->SetSize(wxSize(FromDIP(100), FromDIP(24)));
+    cancelButton->SetMinSize(wxSize(FromDIP(100), FromDIP(24)));
+    cancelButton->SetMaxSize(wxSize(FromDIP(100), FromDIP(24)));
+    cancelButton->SetCornerRadius(FromDIP(12));
+    cancelButton->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& e) { EndModal(wxID_CANCEL); });
+
+    buttonsSizer->Add(okButton);
+    buttonsSizer->AddSpacer(FromDIP(10));
+    buttonsSizer->Add(cancelButton);
+    v_sizer->AddSpacer(FromDIP(15));
+    v_sizer->Add(buttonsSizer, 1, wxALL | wxALIGN_CENTRE_HORIZONTAL, 0);
+
+    wxGetApp().UpdateDlgDarkUI(this);
     Layout();
     Fit();
 }
 
 High_Flowrate_Dlg::~High_Flowrate_Dlg()
 {
-    // Disconnect Events
-    m_btn0->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start0), NULL, this);
-    m_btn1->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start1), NULL, this);
-    m_btn2->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start2), NULL, this);
-    m_btn3->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start3), NULL, this);
-    m_btn4->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start4), NULL, this);
-    m_btn5->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start5), NULL, this);
-    m_btn6->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start6), NULL, this);
-    m_btn7->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start7), NULL, this);
-    m_btn8->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(High_Flowrate_Dlg::on_start8), NULL, this);
 }
 
 void High_Flowrate_Dlg::on_dpi_changed(const wxRect& suggested_rect)
 {
     this->Refresh();
     Fit();
-}
-
-void High_Flowrate_Dlg::on_start0(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2,0.8);
-    EndModal(wxID_OK);
-}
-
-void High_Flowrate_Dlg::on_start1(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 0.85);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start2(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 0.90);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start3(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 0.95);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start4(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 1.0);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start5(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 1.05);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start6(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 1.10);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start7(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 1.15);
-    EndModal(wxID_OK);
-}
-void High_Flowrate_Dlg::on_start8(wxCommandEvent& event) {
-    m_plater->calib_flowrate(2, 1.20);
-    EndModal(wxID_OK);
 }
 
 }} // namespace Slic3r::GUI

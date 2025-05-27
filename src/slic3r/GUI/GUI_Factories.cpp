@@ -25,7 +25,7 @@
 #include "ParamsPanel.hpp"
 #include "MsgDialog.hpp"
 #include "wx/utils.h"
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r
 {
 namespace GUI
@@ -652,6 +652,9 @@ wxMenu* MenuFactory::append_submenu_add_testing_model(wxMenu* menu, ModelVolumeT
     for (size_t i = 0; i < names.size(); i++) 
     {
         auto& item = names.at(i);
+        if (item == L("Block20XY") && Slic3r::CxBuildInfo::isCusotmized()) {
+            continue;
+        }
         append_menu_item(
             sub_menu, wxID_ANY, _(item), "",
             [type, item, icon_names, file_names, i](wxCommandEvent&) {
@@ -967,7 +970,7 @@ void MenuFactory::append_menu_item_fill_bed(wxMenu *menu)
 {
     append_menu_item(
         menu, wxID_ANY, _L("Fill bed with copies"), _L("Fill the remaining area of bed with copies of the selected object"),
-        [](wxCommandEvent &) { plater()->fill_bed_with_instances(); }, "", nullptr, []() { return plater()->can_increase_instances(); }, m_parent);
+        [](wxCommandEvent &) { plater()->canvas3D()->triger_extra_render_event(GLCanvas3D::ERenderEvent::FillBedOptions); }, "", nullptr, []() { return plater()->can_increase_instances(); }, m_parent);
 }
 
 wxMenuItem* MenuFactory::append_menu_item_printable(wxMenu* menu)
@@ -2000,7 +2003,7 @@ void MenuFactory::append_menu_item_clone(wxMenu* menu)
 #endif
     append_menu_item(menu, wxID_ANY, _L("Clone") + "\t" + ctrl + "K", "",
         [this](wxCommandEvent&) {
-            plater()->clone_selection();
+            plater()->canvas3D()->triger_extra_render_event(GLCanvas3D::ERenderEvent::ObjectCloneOptions);
         }, "", nullptr,
         []() {
             return true;

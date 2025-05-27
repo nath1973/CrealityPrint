@@ -61,7 +61,7 @@ processFile() {
         po2json "$file" "./resources/i18n/$lang/$part.json"
         echo "processFile: ./resources/i18n/$lang/$part.json"
     else
-        msgfmt --check-format -o "./resources/i18n/$lang/$part.mo" "$file"
+        msgfmt --check-format -o "./resources/i18n/$lang/$part.mo" "$file"  || exit 1
         echo "processFile: ./resources/i18n/$lang/$part.mo"
     fi
 }

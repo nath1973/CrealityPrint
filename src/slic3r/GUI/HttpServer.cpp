@@ -27,6 +27,21 @@ std::string url_get_param(const std::string& url, const std::string& key)
     return result;
 }
 
+std::string url_get_param_ignore(const std::string& url, const std::string& key)
+{
+    size_t start = url.find(key);
+    if (start == std::string::npos) return "";
+    size_t eq = url.find('=', start);
+    if (eq == std::string::npos) return "";
+    std::string key_str = url.substr(start, eq - start);
+    if (key_str != key)
+        return "";
+    start += key.size() + 1;
+    size_t end = url.length(); // Last param
+    std::string result = url.substr(start, end - start);
+    return result;
+}
+
 void session::start()
 {
     read_first_line();
@@ -89,7 +104,12 @@ void session::read_next_line()
                     }
 
                     const std::string url_str = Http::url_decode(headers.get_url());
-                    if (url_str.find("/videostream") == 0) {
+                    if (url_str.find("/proxy") == 0){
+                        // 处理代理请求
+                        this->handle_proxy_request(url_str);
+                        return ;
+                    }
+                    else if (url_str.find("/videostream") == 0) {
                         #if defined(__linux__) || defined(__LINUX__)
                         std::string   ip           = url_get_param(url_str, "ip");
                         std::string timestamp = url_get_param(url_str, "timestamp");
@@ -258,9 +278,9 @@ void HttpServer::start()
     boost::asio::ip::tcp::socket socket(io_context);
     
     boost::system::error_code ec;
-    #ifndef _WIN32
+    //#ifndef _WIN32
     // 尝试绑定到指定端口
-    for(int i=1;i<10;i++)
+    for(int i=1;i<=20;i++)
     {
         if(is_port_in_use(port))
         {
@@ -268,12 +288,12 @@ void HttpServer::start()
         }else{
             break;
         }
-        if(i==9)
+        if(i==20)
         {
             return;
         }
     }
-    #endif
+    //#endif
     
     BOOST_LOG_TRIVIAL(info) << "start_http_service...:"<<port;
     start_http_server    = true;
@@ -371,6 +391,171 @@ void parse_url(const std::string& url, std::string& path, std::string& params) {
         }
     }
 }
+void session::do_write_proxy(SocketPtr proxysocket, const std::string& target_host,const std::string& target_path)
+{
+    // 构造 HTTP 请求
+        std::string request = "GET " + target_path + " HTTP/1.1\r\n";
+        request += "Host: " + target_host + "\r\n";
+        request += "Connection: close\r\n\r\n";
+
+        
+        // 发送请求
+        //boost::asio::write(socket, boost::asio::buffer(request));
+        proxysocket->async_send(boost::asio::buffer(request), [&](const boost::system::error_code& ec, std::size_t bytes_transferred) {
+            if (!ec) {
+                
+                std::cout << "Request sent successfully: " << bytes_transferred << " bytes\n";
+                //boost::asio::streambuf response;
+                //boost::asio::read_until(*proxysocket, response, "\r\n");
+            } else {
+                //this->write_response(
+                //        build_http_response(500, "text/plain", "Internal server error: Unable to connect to target host"));
+                
+            }
+        });
+        timer_.expires_after(std::chrono::seconds(5));
+}
+void session::write_response(const std::string& response)
+{
+    auto self(shared_from_this());
+    std::shared_ptr<std::string> str = std::make_shared<std::string>(response);
+                        async_write(socket, boost::asio::buffer(str->c_str(), str->length()),
+                                    [this, self, str](const boost::beast::error_code& e, std::size_t s) {
+                            if (e) {
+                                std::cerr << "Error writing response: " << e.message() << "\n";
+                                server.stop(self);
+                                return;
+                            }else{
+                                std::cerr << "Response sent successfully: " << s << " bytes\n";
+                                server.stop(self);
+                                return;
+                            }
+                        });
+}
+void session::do_read(SocketPtr socket_ptr)
+{
+    auto self(shared_from_this());
+    async_read_until(*socket_ptr, proxy_buff, '\r', [this, self,socket_ptr](const boost::beast::error_code& e, std::size_t s) {
+        timer_.cancel();
+        if (!e) {
+            std::string  line, ignore;
+            std::istream stream{&proxy_buff};
+            std::getline(stream, line, '\r');
+            //{}
+            std::getline(stream, ignore, '\n');
+            timer_.expires_after(std::chrono::seconds(5));
+            async_read(*socket_ptr, proxy_buff,[this](const boost::system::error_code& ec, size_t) {
+                //if(ec) {
+                //    std::cerr << "Error reading response: " << ec.message() << "\n";
+                //    return;
+                //}
+                timer_.cancel();
+                std::ostringstream response_body;
+                response_body << "HTTP/1.1 200 OK\r\n";
+                response_body << "Content-Type: application/json\r\n"; 
+                response_body << "Access-Control-Allow-Origin: *\r\n";
+                
+                std::istream response_stream1{&proxy_buff};
+                std::string allLine,line;
+                bool body_started = false;
+                while (std::getline(response_stream1, line))
+                {
+                    if(line == "\r"&&!body_started)
+                    {
+                        body_started = true; // 开始读取body
+                        continue; // 跳过空行
+                    }
+                    if(body_started)
+                        allLine += line;
+                }
+                try{
+                    nlohmann::json json_data = nlohmann::json::parse(allLine);
+                    std::string body = json_data.dump();
+                    response_body << "Content-Length: " << body.length() << "\r\n";
+                    response_body << "connection: keep-alive\r\n";
+                    response_body << "\r\n"; // 结束头部
+                    response_body <<  body;
+                    write_response(response_body.str());
+                    }catch (nlohmann::json::parse_error& e) {
+                        std::cerr << "JSON parse error: " << e.what() << "\n";
+                        write_response(
+                            build_http_response(500, "text/plain", "Internal server error: JSON parse error"));
+                        return;
+                    }
+                });
+            // read body
+            //std::cout << "Response received: " << line << "\n";
+        } else if (e != boost::asio::error::operation_aborted) {
+            server.stop(self);
+        }
+    });
+    timer_.expires_after(std::chrono::seconds(5));
+                   
+}
+void session::handle_proxy_request(const std::string& url)
+{
+    BOOST_LOG_TRIVIAL(info) << "Proxy request: " << url;
+
+    // 解析目标服务器地址和路径
+    std::string target_host = url_get_param(url, "host");
+    std::string target_path = url_get_param_ignore(url, "path");
+    //std::string target_path = url_get_param(url, "path");
+
+
+    if (target_host.empty() || target_path.empty()) {
+        BOOST_LOG_TRIVIAL(error) << "Invalid proxy request: missing host or path";
+        return ;
+    }
+
+    try {
+       
+        SocketPtr socket_ptr = nullptr;
+        auto it = m_proxy_sockets.find(target_host);
+            if(it != m_proxy_sockets.end() && it->second->is_open())
+            {
+                socket_ptr = it->second;
+            }else{
+                socket_ptr = std::make_shared<tcp::socket>(server.io_service);
+                m_proxy_sockets.emplace(target_host,socket_ptr);
+            }
+        
+        socket_ptr->async_connect(
+            tcp::endpoint(boost::asio::ip::address::from_string(target_host), 81),
+            [this,socket_ptr,target_host,target_path](const boost::system::error_code& ec) {
+                if (!ec) {
+                    // 连接成功，可以继续使用 socket_ptr
+                    timer_.cancel();
+                    
+                     this->do_write_proxy(socket_ptr,target_host, target_path);
+                     this->do_read(socket_ptr);
+                }else{
+                    std::cerr << "Error connecting to target host: " << ec.message() << "\n";
+                    write_response(
+                        build_http_response(500, "text/plain", "Internal server error: Unable to connect to target host"));
+                }
+            });
+        timer_.expires_after(std::chrono::seconds(5));
+        timer_.async_wait([this,socket_ptr](std::error_code ec) {
+            if (!ec) {
+                std::cout << "Operation timed out!" << std::endl;
+                //write_response(
+                //        build_http_response(500, "text/plain", "timeout: Unable to connect to target host"));
+                
+                socket_ptr->close(); // 超时后关闭socket连接
+               // 超时取消后的清理工作（如果有）
+            } else {
+                // 处理其他错误情况（理论上不应该发生）
+            }
+        });
+
+        // 返回代理响应
+        return ;
+    } catch (std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << "Proxy request failed: " << e.what();
+        return ;
+    }
+}
+
 std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const std::string& url)
 {
     BOOST_LOG_TRIVIAL(warning) << "creality server: get_response:"<<url;
@@ -378,7 +563,7 @@ std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const 
     std::string params;
     parse_url(url, path, params);
     boost::filesystem::path currentPath = boost::filesystem::path(resources_dir()).append("web");
-   
+    
     if (path.find("/resources") == 0) {
         currentPath = boost::filesystem::path(resources_dir()).parent_path();
     }

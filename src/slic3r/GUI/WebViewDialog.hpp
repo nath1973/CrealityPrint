@@ -114,7 +114,7 @@ public:
 	wxWebView* Browse(){ return m_browser;};
 private:
 
-    wxWebView* m_browser;
+    wxWebView*  m_browser = nullptr;
     wxBoxSizer *bSizer_toolbar;
     wxButton *  m_button_back;
     wxButton *  m_button_forward;
@@ -161,6 +161,11 @@ private:
     // Last executed JavaScript snippet, for convenience.
     wxString m_javascript;
     wxString m_response_js;
+
+#ifdef __WXGTK__
+    // When using GTK, there may be a problem of synthetic dirty area failure, so perform a low-frequency refresh
+    wxTimer* m_freshTimer;
+#endif
 
     DECLARE_EVENT_TABLE()
 };

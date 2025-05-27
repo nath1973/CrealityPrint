@@ -662,6 +662,7 @@ std::string get_file_md5(const std::string& path)
 
 std::string user_feedback_website() 
 {
+#if 0
     std::string website = "http://as.cxswyjy.com/slice/#/OnlineSupport?";
 
     // qtuser_core::VersionSettings setting;
@@ -743,7 +744,16 @@ std::string user_feedback_website()
     // website += QStringLiteral("&deviceId=") + (QString::fromUtf8(device_id));
     // if (!cloudId.isEmpty())
     //     website += "&cloudAccount=" + cloudId;
-
+#endif
+    std::string website      = "https://support.creality.com/";
+    std::string language = wxGetApp().app_config->get("language");
+    if (language == "zh_CN") {
+        website += "?site=SLICE_APP_CN";
+    } else if (language == "zh_TW") {
+        website += "?site=SLICE_APP_TW";
+    } else {
+        website += "?site=SLICE_APP_EN";
+    }
     return website;
   }
 

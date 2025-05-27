@@ -140,6 +140,7 @@ function build_slicer() {
             cmake .. \
                 -G "${SLICER_CMAKE_GENERATOR}" \
                 -DBBL_RELEASE_TO_PUBLIC=1 \
+                -DUPDATE_ONLINE_MACHINES=1 \
                 -DGENERATE_ORCA_HEADER=$SLICER_HEADER \
                 -DCMAKE_PREFIX_PATH="$DEPS/usr/local" \
                 -DCMAKE_INSTALL_PREFIX="$PWD/CrealityPrint" \

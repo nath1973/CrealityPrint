@@ -1268,3 +1268,6 @@ msgstr "The extruder is occupied and pre-loading cannot be performed."
 #~ msgstr ""
 #~ "The current printer's material rack consumables do not exist. Do you want "
 #~ "to continue printing？"
+
+msgid "Ignore"
+msgstr "Ignore"

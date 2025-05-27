@@ -135,6 +135,10 @@ namespace GUI {
             unsigned int ibo_id{ 0 };
             size_t vertices_count{ 0 };
             size_t indices_count{ 0 };
+
+            //unsigned int vao_id{ 0 };
+            unsigned int instance_vbo_id{ 0 };
+            unsigned int instance_count{ 0 };
         };
     private:
         RenderData m_render_data;
@@ -149,6 +153,9 @@ namespace GUI {
         bool m_render_disabled{ false };
         BoundingBoxf3 m_bounding_box;
         std::string m_filename;
+
+        //for render clone preview, if "glDrawElementsInstanced" not supported, use normal render 
+        std::vector<Vec3f> m_model_offsets;
 
     public:
         GLModel() = default;
@@ -179,6 +186,11 @@ namespace GUI {
         void render();
         void render(const std::pair<size_t, size_t>& range);
         void render_instanced(unsigned int instances_vbo, unsigned int instances_count);
+
+        bool send_instance_data_to_gpu(const std::vector<Vec3f>& instances_offsets);
+        void render_instanced_ex();
+        void render_single(const Vec3f& single_offset);
+        void release_instance_data_from_gpu();
 
         bool is_initialized() const { return vertices_count() > 0 && indices_count() > 0; }
         bool is_empty() const { return m_render_data.geometry.is_empty(); }

@@ -56,7 +56,7 @@ ComboBox::ComboBox(wxWindow *parent,
             std::make_pair(0x15BF59, (int) StateColor::Hovered),
             std::make_pair(0xDBDBDB, (int) StateColor::Normal)));
         TextInput::SetBackgroundColor(StateColor(std::make_pair(0xF0F0F1, (int) StateColor::Disabled),
-            std::make_pair(wxColour("#787565"), (int) StateColor::Focused), // ORCA updated background color for focused item
+                       std::make_pair(*wxWHITE, (int) StateColor::Focused), // ORCA updated background color for focused item
             std::make_pair(*wxWHITE, (int) StateColor::Normal)));
         TextInput::SetLabelColor(StateColor(
             std::make_pair(wxColour("#ACACAC"), (int) StateColor::Disabled), // ORCA: Use same color for disabled text on combo boxes
@@ -296,7 +296,9 @@ void ComboBox::mouseDown(wxMouseEvent &event)
     } else if (drop.HasDismissLongTime()) {
         drop.autoPosition();
         drop_down = true;
+        //drop.Raise();
         drop.Popup();
+        
         wxCommandEvent e(wxEVT_COMBOBOX_DROPDOWN);
         GetEventHandler()->ProcessEvent(e);
     }

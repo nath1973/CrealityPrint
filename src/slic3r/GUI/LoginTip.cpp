@@ -64,20 +64,29 @@ int LoginTip::isFilamentUserMaterialValid(const std::string& userMaterial)
             }
             
         }
-        CommunicateWithCXCloud commWithCXCloud;
-        std::vector<UserProfileListItem> vtUserProfileListItem;
-        commWithCXCloud.getUserProfileList(vtUserProfileListItem);
-        if (!CXCloudDataCenter::getInstance().isTokenValid()) {
-            if (!m_bShowTipDlg || m_bHasSkipToLogin) {
-                return wxID_CANCEL;
-            }
-            ret = syncShowTokenInvalidTipDlg("");
+        if (wxGetApp().app_config->get("sync_user_preset") != "true") {
+            ret = showNoSelectedSyncUserPreset("");
             if (ret != wxID_YES) {
                 m_bShowTipDlg = false;
-            } else {
-                m_bHasSkipToLogin = true;
             }
             return ret;
+        }
+        if (!CXCloudDataCenter::getInstance().isTokenValid()) {
+            CommunicateWithCXCloud           commWithCXCloud;
+            std::vector<UserProfileListItem> vtUserProfileListItem;
+            commWithCXCloud.getUserProfileList(vtUserProfileListItem);
+            if (!CXCloudDataCenter::getInstance().isTokenValid()) {
+                if (!m_bShowTipDlg || m_bHasSkipToLogin) {
+                    return wxID_CANCEL;
+                }
+                ret = syncShowTokenInvalidTipDlg("");
+                if (ret != wxID_YES) {
+                    m_bShowTipDlg = false;
+                } else {
+                    m_bHasSkipToLogin = true;
+                }
+                return ret;
+            }
         }
         return 0;   //  用户预设是有效的
     }
@@ -132,6 +141,18 @@ int LoginTip::showAutoMappingDiffAccountTipDlg(const std::string& fromPage)
     if (res == wxID_YES) {
         wxGetApp().mainframe->select_tab(MainFrame::tpHome);
         // wxGetApp().swith_community_sub_page("param_set");
+    }
+    return res;
+}
+
+int LoginTip::showNoSelectedSyncUserPreset(const std::string& fromPage)
+{
+    wxString      strTip = _L("no selected sync user presets, please select again?");
+    MessageDialog msgDlg(nullptr, strTip, wxEmptyString, wxICON_QUESTION | wxYES_NO);
+    int           res = msgDlg.ShowModal();
+    if (res == wxID_YES) {
+        wxGetApp().app_config->set("sync_user_preset", "true");
+        wxGetApp().start_sync_user_preset();
     }
     return res;
 }

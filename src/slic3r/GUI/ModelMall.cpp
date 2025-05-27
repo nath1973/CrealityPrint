@@ -10,14 +10,14 @@
 #include "MainFrame.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
     ModelMallDialog::ModelMallDialog(Plater* plater /*= nullptr*/)
         :DPIFrame(nullptr, wxID_ANY, _L("3D Models"), wxDefaultPosition, wxDefaultSize, wxCLOSE_BOX|wxDEFAULT_DIALOG_STYLE|wxMAXIMIZE_BOX|wxMINIMIZE_BOX|wxRESIZE_BORDER)
     {
         // icon
-        std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+        std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
         SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
         SetSize(MODEL_MALL_PAGE_SIZE);

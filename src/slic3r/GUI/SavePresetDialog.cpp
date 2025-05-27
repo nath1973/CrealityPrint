@@ -19,7 +19,7 @@
 #include "GUI_App.hpp"
 #include "format.hpp"
 #include "Tab.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 using Slic3r::GUI::format_wxstr;
 
 namespace Slic3r { namespace GUI {
@@ -388,7 +388,7 @@ void SavePresetDialog::build(std::vector<Preset::Type> types, std::string suffix
     SetFont(wxGetApp().normal_font());
 
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     if (suffix.empty()) suffix = _CTX_utf8(L_CONTEXT("Copy", "PresetName"), "PresetName");

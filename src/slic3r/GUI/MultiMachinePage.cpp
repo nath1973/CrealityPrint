@@ -1,7 +1,7 @@
 #include "MultiMachinePage.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
 
@@ -308,7 +308,7 @@ MultiMachinePickPage::MultiMachinePickPage(Plater* plater /*= nullptr*/)
 
     SetBackgroundColour(*wxWHITE);
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);

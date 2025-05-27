@@ -1371,6 +1371,9 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
     if (wxGetApp().plater()->get_current_canvas3D()->get_canvas_type() == GLCanvas3D::ECanvasType::CanvasPreview)
         return;
 
+    // unregister all extra render event(render-fill-in-bed or render-object-clone) when show right click menu
+    wxGetApp().plater()->get_current_canvas3D()->unregister_all_extra_render_event();
+
     wxMenu* menu {nullptr};
     Plater* plater = wxGetApp().plater();
 
@@ -2312,11 +2315,19 @@ void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name
     // BBS: backup
     Slic3r::save_object_mesh(*new_object);
 
-    // BBS: find an empty cell to put the copied object
-    auto start_point = wxGetApp().plater()->build_volume().bounding_volume2d().center();
-    auto empty_cell  = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)});
+    //// BBS: find an empty cell to put the copied object
+    //auto start_point = wxGetApp().plater()->build_volume().bounding_volume2d().center();
 
-    new_object->instances[0]->set_offset(center ? to_3d(Vec2d(empty_cell(0), empty_cell(1)), -new_object->origin_translation.z()) : bb.center());
+    //BoundingBoxf3 bbox;
+    //bbox.merge(new_volume->get_convex_hull().bounding_box());
+
+    //Vec2f bbox_size = { bbox.size().x() + 1.0, bbox.size().y() + 1.0 };
+
+    //auto empty_cell  = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)}, bbox_size);
+
+    //new_object->instances[0]->set_offset(center ? to_3d(Vec2d(empty_cell(0), empty_cell(1)), -new_object->origin_translation.z()) : bb.center());
+
+    wxGetApp().plater()->arrange_loaded_object_to_new_position(new_object->instances[0]);
 
     new_object->ensure_on_bed();
 
@@ -6327,7 +6338,10 @@ void ObjectList::render_plate(ObjectDataViewModelNode* plate)
         }
 
         if (ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(_u8L("Click the icon to reset all settings of the object").c_str());
+            ImGui::PopStyleColor();
         }
 
         ImGui::PopID();
@@ -6495,7 +6509,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         }
         ImGui::PopID();
         if (ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(_u8L("Click the icon to toggle printable property of the object").c_str());
+            ImGui::PopStyleColor();
         }
         ImGui::SameLine(0, 0);
     }
@@ -6526,7 +6543,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         }
 
         if (tooltip.length() > 0 && ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(tooltip.ToUTF8().data());
+            ImGui::PopStyleColor();
         }
         ImGui::SameLine(0, 0);
     
@@ -6611,7 +6631,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             }
 
             if (ImGui::IsItemHovered()) {
+                ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+                ImGui::PushStyleColor(ImGuiCol_Text, text_color);
                 ImGui::SetTooltip(node_name);
+                ImGui::PopStyleColor();
             }
 
             ImGui::PopID();
@@ -6646,7 +6669,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         bool right_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
 
         if (ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(node_name);
+            ImGui::PopStyleColor();
         }
 
         ImGui::PopID();
@@ -6679,7 +6705,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
         }
 
         if (ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(node_name);
+            ImGui::PopStyleColor();
         }
 
         bool right_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
@@ -6770,7 +6799,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             }
 
             if (is_view3D && ImGui::IsItemHovered()) {
+                ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+                ImGui::PushStyleColor(ImGuiCol_Text, text_color);
                 ImGui::SetTooltip(_u8L("Click the icon to edit support painting of the object").c_str());
+                ImGui::PopStyleColor();
             }
 
             ImGui::PopID();
@@ -6814,7 +6846,10 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             }
 
             if (is_view3D && ImGui::IsItemHovered()) {
+                ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+                ImGui::PushStyleColor(ImGuiCol_Text, text_color);
                 ImGui::SetTooltip(_u8L("Click the icon to edit color painting of the object").c_str());
+                ImGui::PopStyleColor();
             }
 
             ImGui::PopID();
@@ -6857,8 +6892,11 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             }
         }
 
-        if (is_view3D &&ImGui::IsItemHovered()) {
+        if (is_view3D && ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(_u8L("Click the icon to shift this object to the bed").c_str());
+            ImGui::PopStyleColor();
         }
 
         ImGui::PopID();
@@ -6900,9 +6938,11 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             }
         }
 
-        if (is_view3D && ImGui::IsItemHovered())
-        {
+        if (is_view3D && ImGui::IsItemHovered()) {
+            ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
             ImGui::SetTooltip(_u8L("Click the icon to reset all settings of the object").c_str());
+            ImGui::PopStyleColor();
         }
 
         ImGui::PopID();
@@ -7084,7 +7124,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
 
                 if (need_tooltips) {
                     if (ImGui::IsItemHovered()) {
-                        ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(51 / 255.0, 51 / 255.0, 51 / 255.0, 1.0);
+                        ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
                         ImGui::PushStyleColor(ImGuiCol_Text, text_color);
 
                         ImGui::SetTooltip(ext_names[ext_idx].c_str());
@@ -7254,7 +7294,11 @@ void GUI::ObjectList::render_current_device_name(const float max_right) {
     ImGui::TextColored(ImGuiWrapper::COL_CREALITY, remake_text.c_str());
 
     if (ImGui::IsItemHovered()) {
+        bool   is_dark    = wxGetApp().dark_mode();
+        ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+        ImGui::PushStyleColor(ImGuiCol_Text, text_color);
         ImGui::SetTooltip(_u8L("Can be set in the \"Worktop\" or \"Device\"").c_str());
+        ImGui::PopStyleColor();
     }
 }
 
@@ -7266,7 +7310,7 @@ void ObjectList::render_printer_preset_by_ImGui()
     const ImVec4 transparent(0.0f, 0.0f, 0.0f, 0.0f);
     bool is_dark = wxGetApp().dark_mode();
     ImGui::PushStyleColor(ImGuiCol_Header, ImGuiWrapper::COL_CREALITY);
-    ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(51 / 255.0, 51 / 255.0, 51 / 255.0, 1.0);
+    ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
     ImGui::PushStyleColor(ImGuiCol_Text, text_color);
 
     // Title
@@ -7515,7 +7559,10 @@ void ObjectList::render_printer_preset_by_ImGui()
     }
 
     if (ImGui::IsItemHovered()) {
+        ImVec4 text_color = is_dark ? ImVec4(1.0, 1.0, 1.0, 1.0) : ImVec4(0.2, 0.2, 0.2, 1.0);
+        ImGui::PushStyleColor(ImGuiCol_Text, text_color);
         ImGui::SetTooltip(_u8L("Click to edit preset").c_str());
+        ImGui::PopStyleColor();
     }
 
     ImGui::PopID();

@@ -1160,3 +1160,9 @@ msgstr "The filament you want is not found"
 
 #~ msgid "Update All"
 #~ msgstr "Update All"
+
+msgid "Model not downloaded, click to download the model"
+msgstr "Model not downloaded, click to download the model"
+
+msgid "Download the model"
+msgstr "Download the model"

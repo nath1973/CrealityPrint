@@ -136,7 +136,7 @@ void OneFilamentColorItem::OnPaint(wxPaintEvent& event)
     {
         tmpText = "?";
     }
-
+    dc.SetFont(Label::Body_12);
     dc.GetTextExtent(tmpText, &textWidth, &textHeight);
     wxCoord x = (size.GetWidth() - textWidth) / 2;
     wxCoord y = (size.GetHeight() - textHeight) / 2;
@@ -192,6 +192,7 @@ void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const DM:
         m_cfs_index_info        = wxString::Format("CFS%d", m_box_id); // CFS1, CFS2, CFS3, CFS4
         wxStaticText* cfs_label = new wxStaticText(this, wxID_ANY, m_cfs_index_info);
         m_cfs_label             = cfs_label;
+        cfs_label->SetFont(Label::Body_12);
         if (Slic3r::GUI::wxGetApp().dark_mode())
             cfs_label->SetForegroundColour(wxColour("#FFFFFF"));
         else
@@ -251,6 +252,7 @@ void OneBoxFilamentColorItem::update_ui_item_info_by_material_box_info(const DM:
             cfs_label->SetForegroundColour(wxColour("#FFFFFF"));
         else 
             cfs_label->SetForegroundColour(wxColour("#000000"));
+        cfs_label->SetFont(Label::Body_12);
         m_box_sizer->Add(cfs_label, 0, wxALIGN_CENTRE_VERTICAL);
         m_box_sizer->AddSpacer(FromDIP(12));
 

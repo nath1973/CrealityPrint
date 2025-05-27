@@ -26,6 +26,10 @@ class ArrangeJob : public Job
     std::map<int, ArrangePolygons> m_selected_groups;   // groups of selected items for sequential printing
     std::vector<int> m_uncompatible_plates;  // plate indices with different printing sequence than global
 
+    // under the "only_on_partplate" situation, if ArrangePolygon can not place on the current plate, move them to the top left position of the first plate
+    std::vector<int> m_move_top_left_ids;
+    std::map<int, ModelInstance*> m_instance_id_to_instance;
+
     arrangement::ArrangeParams params;
     int current_plate_index = 0;
     Polygon bed_poly;
@@ -39,7 +43,8 @@ class ArrangeJob : public Job
 
     // Prepare the selected and unselected items separately. If nothing is
     // selected, behaves as if everything would be selected.
-    void prepare_selected();
+    // if consider_lock is false, will ignore the plate lock state, (the "Arrange Selected" situation will set the "consider_lock" to false)
+    void prepare_selected(bool consider_lock = true);
 
     void prepare_all();
 

@@ -32,7 +32,7 @@
 #include <wx/string.h>
 #include <wx/wx.h>
 #include <wx/dataview.h>
-
+#include "libslic3r/common_header/common_header.h"
 
 namespace Slic3r {
 namespace GUI {
@@ -132,7 +132,7 @@ namespace GUI {
 
             // Create a rounded rectangle path with all four corners rounded
             wxGraphicsPath path = gc->CreatePath();
-            path.AddRoundedRectangle(rect.x, rect.y, rect.width , rect.height , 12);
+            path.AddRoundedRectangle(rect.x, rect.y, rect.width - 1, rect.height - 1, FromDIP(5));
 
             gc->DrawPath(path);
             delete gc;
@@ -219,7 +219,7 @@ TipsDialog::TipsDialog(wxWindow *parent, const wxString &title, const wxString &
     m_app_key(app_key)
 {
     SetBackgroundColour(*wxWHITE);
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer *m_sizer_main = new wxBoxSizer(wxVERTICAL);
@@ -468,6 +468,9 @@ ParamsPanel::ParamsPanel( wxWindow* parent, wxWindowID id, const wxPoint& pos, c
         m_mode_view  = new SwitchButton(m_top_panel, wxID_ABOUT, is_dark ? "advanced_process_dark_checked" : "advanced_process_light_checked",
                                        is_dark ? "advanced_process_dark" : "advanced_process_light", true, wxSize(FromDIP(10), FromDIP(10)));
         
+        StateColor stateColor = StateColor(std::make_pair(is_dark ? 0x4B4B4D : 0xFFFFFF, (int) StateColor::Disabled),
+                                     std::make_pair(0x15BF59, (int) StateColor::Hovered),
+                                     std::make_pair(is_dark ? 0x4B4B4D : 0xFFFFFF, (int) StateColor::Normal));
         m_mode_view_box = new HoverBorderBox(m_top_panel, m_mode_view, wxDefaultPosition, wxSize(FromDIP(24),FromDIP(24)), wxTE_PROCESS_ENTER);
         m_mode_view->SetToolTip(_L("Advance parameters"));
 
@@ -507,7 +510,7 @@ ParamsPanel::ParamsPanel( wxWindow* parent, wxWindowID id, const wxPoint& pos, c
         m_compare_btn->Bind(wxEVT_LEFT_DOWN, ([this](auto& e) { wxGetApp().mainframe->diff_dialog.show(); }));
 
         // m_setting_btn = new HoverBorderIcon(m_top_panel, wxID_ANY, "table", wxEmptyString, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER, true, 16, true, wxSize(10, 10));
-        m_setting_btn = new  HoverBorderIcon(m_top_panel, wxEmptyString, "table", wxDefaultPosition, wxSize(FromDIP(24), FromDIP(24)), wxTE_PROCESS_ENTER);
+        m_setting_btn = new  HoverBorderIcon(m_top_panel, wxEmptyString, is_dark ? "table_new" : "table_new_dark", wxDefaultPosition, wxSize(FromDIP(24), FromDIP(24)), wxTE_PROCESS_ENTER);
         m_setting_btn->SetToolTip(_L("View all object's settings"));
         m_setting_btn->Bind(wxEVT_LEFT_DOWN, [this](auto& e) { wxGetApp().plater()->PopupObjectTable(-1, -1, {0, 0}); });
 
@@ -534,6 +537,7 @@ ParamsPanel::ParamsPanel( wxWindow* parent, wxWindowID id, const wxPoint& pos, c
     m_color_border_box->SetBackgroundColour(*wxWHITE);
     m_color_border_box->SetBorderWidth(1);
     m_color_border_box->SetBorderColor(0x7A7A7F);
+    m_color_border_box->SetCornerFlags(0xC);
     m_tmp_sizer = new wxBoxSizer(wxVERTICAL);
     m_tmp_sizer->SetMinSize(wxSize(0, FromDIP(150)));
 
@@ -825,10 +829,12 @@ void ParamsPanel::create_layout_printerAndFilament()
         m_btn_system->SetClientData(new bool(true));
         m_btn_system->SetFont(font);
         m_btn_system->Bind(wxEVT_ENTER_WINDOW, [this](auto& event) {
+#ifndef __APPLE_
             bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
             if (*sys_Value)
                 return;
             m_btn_system->SetBackgroundColour(wxColour(21, 191, 89));
+#endif // !__APPLE_
             });
         m_btn_system->Bind(wxEVT_LEAVE_WINDOW, [this](auto& event) {
             bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
@@ -853,10 +859,12 @@ void ParamsPanel::create_layout_printerAndFilament()
         m_btn_user->SetClientData(new bool(false));
         m_btn_user->SetFont(font);
         m_btn_user->Bind(wxEVT_ENTER_WINDOW, [this](auto& event) {
+#ifndef __APPLE_
             bool* sys_Value = static_cast<bool*>(m_btn_user->GetClientData());
             if (*sys_Value)
                 return;
             m_btn_user->SetBackgroundColour(wxColour(21, 191, 89));
+#endif // !1
             });
         m_btn_user->Bind(wxEVT_LEAVE_WINDOW, [this](auto& event) {
             bool* sys_Value = static_cast<bool*>(m_btn_user->GetClientData());
@@ -1000,9 +1008,11 @@ void ParamsPanel::create_layout_printerAndFilament()
             Tab* cur_tab = dynamic_cast<Tab*> (m_current_tab);
             cur_tab->delete_preset();
 
+            wxTreeItemId id = m_preset_listBox->GetFocusedItem();
+            if (id.IsOk())
+                m_preset_listBox->Delete(id);
+
             OnParentDialogOpen();
-            //m_preset_listBox->DeleteItem();
-            //OnPanelShowInit();
             });
         Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_delete);
 
@@ -1246,17 +1256,17 @@ void ParamsPanel::create_layout_process()
 //    m_tmp_panel->GetSizer()->Add(m_page_view, 1, wxEXPAND);
 //#else
     // m_left_sizer->Add( m_page_view, 4, wxEXPAND );
-    m_left_sizer->Add(m_color_border_box, 4, wxEXPAND);
-//#endif
+    m_color_border_box->SetBorderColor(wxColour(21, 191, 89));
+    m_left_sizer->Add(m_color_border_box, 4, wxEXPAND | wxRIGHT | wxDOWN, FromDIP(10));
+    //#endif
 
     if (m_img_tooltip_panel)
     {
-        m_left_sizer->AddSpacer(FromDIP(20) * em_unit(this) / 10);
-        m_left_sizer->Add(m_img_tooltip_panel, 1, wxEXPAND);
+        m_left_sizer->Add(m_img_tooltip_panel, 1, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(10));
 
         m_btn_show_img_tooltip->SetMinSize(wxSize(50, 20));
-        m_left_sizer->AddSpacer(FromDIP(15) * em_unit(this) / 10);
-        m_left_sizer->Add(m_btn_show_img_tooltip, 0, wxALIGN_RIGHT | wxALL, 5);
+        //m_left_sizer->AddSpacer(FromDIP(15) * em_unit(this) / 10);
+        m_left_sizer->Add(m_btn_show_img_tooltip, 0, wxALL, 5);
         m_left_sizer->AddSpacer(FromDIP(5) * em_unit(this) / 10);
 
     }
@@ -1785,7 +1795,8 @@ void ParamsPanel::sys_color_changed()
     m_mode_view->GetOnImg() = ScalableBitmap(m_mode_view, is_dark ? "advanced_process_dark_checked" : "advanced_process_light_checked", FromDIP(14));
     m_mode_view->GetOffImg() = ScalableBitmap(m_mode_view, is_dark ? "advanced_process_dark" : "advanced_process_light", FromDIP(14));
 
-    m_compare_btn->SetBitmap_(is_dark ? "compare_dark_default" : "compare_light_default");
+    m_compare_btn->SetBitmap_(is_dark ? "compare_dark_default" : "compare_light_default");  
+    m_setting_btn->SetBitmap_(is_dark ? "table_new" : "table_new_dark");  
 
     m_compare_btn->on_sys_color_changed(is_dark);
     m_setting_btn->on_sys_color_changed(is_dark);

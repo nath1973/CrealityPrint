@@ -17,7 +17,7 @@
 
 #include <slic3r/GUI/Widgets/WebView.hpp>
 #include "print_manage/AppMgr.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 namespace pt = boost::property_tree;
 
 namespace Slic3r { namespace GUI {
@@ -33,7 +33,7 @@ END_EVENT_TABLE()
 
 WebViewPanel::WebViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
 {
-    
+#if CUSTOM_COMMUNITY_ENABLE
     wxString url = GetURL();
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
 
@@ -215,7 +215,18 @@ WebViewPanel::WebViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefau
 
     m_LoginUpdateTimer = nullptr;
 
+#ifdef __WXGTK__
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    SetDoubleBuffered(true);
+    m_freshTimer = new wxTimer();
+    m_freshTimer->SetOwner(this);
+    m_freshTimer->Start(500);
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&){
+        this->Refresh();
+    });
+#endif
     DM::AppMgr::Ins().Register(m_browser);
+#endif
 }
 
 wxString WebViewPanel::GetURL()
@@ -267,6 +278,12 @@ wxString WebViewPanel::GetURL()
 }
 WebViewPanel::~WebViewPanel()
 {
+#ifdef __WXGTK__
+    m_freshTimer->Stop();
+    m_browser->Stop();
+    m_browser->RemoveScriptMessageHandler("wx");
+#endif
+#if CUSTOM_COMMUNITY_ENABLE
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << " Start";
     SetEvtHandlerEnabled(false);
     DM::AppMgr::Ins().UnRegister(m_browser);
@@ -278,6 +295,7 @@ WebViewPanel::~WebViewPanel()
         m_LoginUpdateTimer = NULL;
     }
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << " End";
+#endif
 }
 void WebViewPanel::Reload()
 {
@@ -287,6 +305,7 @@ void WebViewPanel::Reload()
 }
 void WebViewPanel::load_url(wxString& url)
 {
+#if CUSTOM_COMMUNITY_ENABLE
     this->Show();
     this->Raise();
     m_url->SetLabelText(url);
@@ -296,6 +315,7 @@ void WebViewPanel::load_url(wxString& url)
     m_browser->LoadURL(url);
     m_browser->SetFocus();
     UpdateState();
+#endif
 }
 
 /**
@@ -585,8 +605,10 @@ int WebViewPanel::get_model_mall_detail_url(std::string* url, std::string id)
 
 void WebViewPanel::update_mode()
 {
+#if CUSTOM_COMMUNITY_ENABLE
     GetSizer()->Show(size_t(0), wxGetApp().app_config->get("internal_developer_mode") == "true");
     GetSizer()->Layout();
+#endif
 }
 
 /**

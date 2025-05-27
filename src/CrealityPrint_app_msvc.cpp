@@ -35,7 +35,7 @@ extern "C"
 //#include <boost/algorithm/string/classification.hpp>
 
 #include <stdio.h>
-
+#include "../libslic3r/buildinfo.h"
 #ifdef SLIC3R_GUI
 class OpenGLVersionCheck
 {
@@ -240,7 +240,17 @@ protected:
 		return tokens;
 	}
 };
-
+// ½«Õ­×Ö·û×ª»»Îª¿í×Ö·û
+std::wstring ConvertToWide(const char* str)
+{
+    int          length = MultiByteToWideChar(CP_ACP, 0, str, -1, nullptr, 0);
+    if (length == 0) {
+        return L"";
+    }
+    std::wstring wstr(length, 0);
+    MultiByteToWideChar(CP_ACP, 0, str, -1, &wstr[0], length);
+    return wstr;
+}
 bool OpenGLVersionCheck::message_pump_exit = false;
 #endif /* SLIC3R_GUI */
 
@@ -321,15 +331,16 @@ int wmain(int argc, wchar_t **argv)
             printf("MESA OpenGL library was loaded sucessfully\n");
     }
 #endif /* SLIC3R_GUI */
-
-
     wchar_t path_to_slic3r[MAX_PATH + 1] = { 0 };
+    std::wstring slicer_library = ConvertToWide(PROJECT_DLL_NAME_WIN32) + L".dll";
+    //std::wstring slicer_library = std::wstring(PROJECT_DLL_NAME_WIN32) + L".dll";
+
     wcscpy(path_to_slic3r, path_to_exe);
-    wcscat(path_to_slic3r, L"CrealityPrint_Slicer.dll");
+    wcscat(path_to_slic3r, slicer_library.c_str());
 //	printf("Loading Slic3r library: %S\n", path_to_slic3r);
     HINSTANCE hInstance_Slic3r = LoadLibraryExW(path_to_slic3r, nullptr, 0);
     if (hInstance_Slic3r == nullptr) {
-        printf("CrealityPrint_Slicer.dll was not loaded, error=%d\n", GetLastError());
+        printf("%s was not loaded, error=%d\n",slicer_library.c_str(), GetLastError());
         return -1;
     }
 

@@ -1536,6 +1536,7 @@ namespace ProcessBar {
 		borders.push_back(path + "none.svg");
 		borders.push_back(path + "process_border_hover.svg");
 		borders.push_back(path + "process_border_press.svg");
+        borders.push_back(path + "none.svg");
 
 		bool res = m_icons_texture.load_from_svg_files_as_sprites_array(filenames, borders, states, sprite_size_px, false);
 		if (res)

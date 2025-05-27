@@ -1398,3 +1398,6 @@ msgstr "五通占用中，请先执行退料！"
 
 msgid "The extruder is occupied and pre-loading cannot be performed."
 msgstr "挤出机占用中，无法执行预上料"
+
+msgid "Ignore"
+msgstr "忽略"

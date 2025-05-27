@@ -10,7 +10,7 @@
 #include "wxExtensions.hpp"
 #include "MainFrame.hpp"
 #include <wx/notebook.h>
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
 
@@ -25,7 +25,7 @@ KBShortcutsDialog::KBShortcutsDialog()
     const wxFont& bold_font = wxGetApp().bold_font();
     SetFont(font);
 
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     this->SetSizeHints(wxDefaultSize, wxDefaultSize);

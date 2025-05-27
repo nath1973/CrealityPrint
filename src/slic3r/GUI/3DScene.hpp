@@ -117,6 +117,11 @@ protected:
         GLVolume& m_parent;
         GUI::GLModel m_model;
         BoundingBoxf3 m_old_box;
+        //m_old_box can capture the changes when the model been scaled and been rotated
+        //but it can not capture the changes when the model been mirrored
+        //and this matrix to store the transformation of the model
+        //to resolve bug https://zentao.creality.com/zentao/bug-view-8179.html
+        Geometry::Transformation m_old_matrix_no_offset;
         Vec3d m_shift{ Vec3d::Zero() };
 
     public:
@@ -218,6 +223,9 @@ public:
     std::vector<coordf_t>       print_zs;
     // Offset into qverts & tverts, or offsets into indices stored into an OpenGL name_index_buffer.
     std::vector<size_t>         offsets;
+
+    // used in clone operation preview
+    std::vector<Vec3f> m_volume_preview_offsets;
 
     // Bounding box of this volume, in unscaled coordinates.
     BoundingBoxf3 bounding_box() const {
@@ -324,6 +332,12 @@ public:
 
     //BBS: add outline related logic and add virtual specifier
     virtual void        render_with_outline(const Transform3d &view_model_matrix);
+
+    // for GLVolume instance rendering, used in object clone preview
+    void setup_instance_offsets(const std::vector<Vec3f>& instances_offsets);
+    void render_instanced(int type);
+    void render_clone_single(int type);
+    void release_instance_data();
 
     //BBS: add simple render function for thumbnail
     void simple_render(GLShaderProgram* shader, ModelObjectPtrs& model_objects, std::vector<ColorRGBA>& extruder_colors, bool ban_light =false);

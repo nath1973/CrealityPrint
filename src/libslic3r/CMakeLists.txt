@@ -5,7 +5,7 @@ include(PrecompiledHeader)
 
 string(TIMESTAMP COMPILE_TIME %Y%m%d-%H%M%S)
 set(SLIC3R_BUILD_TIME ${COMPILE_TIME})
-
+message("aaaa SLIC3R_APP_NAME=${SLIC3R_APP_NAME}")
 if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h")
     if(GENERATE_ORCA_HEADER)
         message("libslic3r_version is exists")
@@ -18,6 +18,7 @@ if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h")
 else()
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libslic3r_version.h.in ${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h @ONLY)
 endif()
+message("xxxx SLIC3R_APP_NAME=${SLIC3R_APP_NAME}")
 
 if (MINGW)
     add_compile_options(-Wa,-mbig-obj)
@@ -508,7 +509,10 @@ set(lisbslic3r_sources
     GlobalConfig.cpp
     GlobalConfig.hpp
 )
-
+list(APPEND lisbslic3r_sources
+    common_header/common_header.h
+    common_header/common_header.cpp
+)
 if(WIN32)
     list(APPEND lisbslic3r_sources
         baseline.hpp
@@ -534,6 +538,7 @@ include(creality.cmake)
 
 add_library(libslic3r STATIC ${lisbslic3r_sources} 
     "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/buildinfo.h"
     ${OpenVDBUtils_SOURCES})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lisbslic3r_sources})
 

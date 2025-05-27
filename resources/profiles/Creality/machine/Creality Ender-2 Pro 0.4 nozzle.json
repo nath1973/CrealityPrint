@@ -87,7 +87,7 @@
     "use_relative_e_distances": "1",
     "z_offset": "0",
     "default_filament_profile": [
-        "Hyper PLA @Creality Ender-2 Pro 0.4 nozzle"
+        "CR-PLA @Creality Ender-2 Pro 0.4 nozzle"
     ],
     "deretraction_speed": "25",
     "extruder_colour": "#FCE94F",
@@ -116,5 +116,5 @@
     "z_hop": "0.2",
     "z_hop_types": "Normal Lift",
     "name": "Creality Ender-2 Pro 0.4 nozzle",
-    "setting_id": "67704"
+    "setting_id": "44121"
 }

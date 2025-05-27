@@ -122,9 +122,17 @@ void GLVolume::SinkingContours::update()
     const int object_idx = m_parent.object_idx();
     const Model& model = GUI::wxGetApp().plater()->model();
 
-    if (0 <= object_idx && object_idx < int(model.objects.size()) && m_parent.is_sinking() && !m_parent.is_below_printbed()) {
+    if (0 <= object_idx && object_idx < int(model.objects.size()) && m_parent.is_sinking() && !m_parent.is_below_printbed()) 
+    {
         const BoundingBoxf3& box = m_parent.transformed_convex_hull_bounding_box();
-        if (!m_old_box.size().isApprox(box.size()) || m_old_box.min.z() != box.min.z()) {
+
+        Geometry::Transformation world_matrix(m_parent.world_matrix());
+
+        if (!m_old_box.size().isApprox(box.size()) || m_old_box.min.z() != box.min.z() || !m_old_matrix_no_offset.get_matrix().isApprox(world_matrix.get_matrix_no_offset())) 
+        {
+			m_old_matrix_no_offset.set_matrix(world_matrix.get_matrix());
+			m_old_matrix_no_offset.reset_offset();
+
             m_old_box = box;
             m_shift = Vec3d::Zero();
 
@@ -136,13 +144,18 @@ void GLVolume::SinkingContours::update()
             init_data.color = ColorRGBA::WHITE();
             unsigned int vertices_counter = 0;
             MeshSlicingParams slicing_params;
-            slicing_params.trafo = m_parent.world_matrix();
+            //slicing_params.trafo = m_parent.world_matrix();          
+            slicing_params.trafo = world_matrix.get_matrix();
             const Polygons polygons = union_(slice_mesh(mesh.its, 0.0f, slicing_params));
-            for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) {
+            
+            for (const ExPolygon& expoly : diff_ex(expand(polygons, float(scale_(HalfWidth))), shrink(polygons, float(scale_(HalfWidth))))) 
+            {
                 const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
                 init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
                 init_data.reserve_indices(init_data.indices_count() + triangulation.size());
-                for (const Vec3d& v : triangulation) {
+                
+                for (const Vec3d& v : triangulation) 
+                {
                     init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
                     ++vertices_counter;
                     if (vertices_counter % 3 == 0)
@@ -576,6 +589,54 @@ void GLVolume::simple_render(GLShaderProgram* shader, ModelObjectPtrs& model_obj
         glFrontFace(GL_CCW);
 }
 
+void GLVolume::setup_instance_offsets(const std::vector<Vec3f>& instances_offsets)
+{
+    if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
+        model.send_instance_data_to_gpu(instances_offsets);
+    }
+    else
+    {
+        m_volume_preview_offsets = instances_offsets;
+    }
+}
+
+//used in the object clone operartion for rendering the ready clone shell preview
+void GLVolume::render_instanced(int type)
+{
+
+    if (type == int(GLVolumeCollection::ERenderType::Transparent)) {
+        glsafe(::glEnable(GL_BLEND));
+        glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    }
+
+    model.render_instanced_ex();
+
+    if (type == int(GLVolumeCollection::ERenderType::Transparent))
+        glsafe(::glDisable(GL_BLEND));
+
+}
+
+void GLVolume::render_clone_single(int type)
+{
+    if (type == int(GLVolumeCollection::ERenderType::Transparent)) {
+        glsafe(::glEnable(GL_BLEND));
+        glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    }
+
+    for(const Vec3f& single_offset : m_volume_preview_offsets) {
+        model.render_single(single_offset);
+    }
+
+    if (type == int(GLVolumeCollection::ERenderType::Transparent))
+        glsafe(::glDisable(GL_BLEND));
+}
+
+void GLVolume::release_instance_data()
+{
+    model.release_instance_data_from_gpu();
+    m_volume_preview_offsets.clear();
+}
+
 bool GLVolume::is_sla_support() const { return this->composite_id.volume_id == -int(slaposSupportTree); }
 bool GLVolume::is_sla_pad() const { return this->composite_id.volume_id == -int(slaposPad); }
 
@@ -954,11 +1015,14 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
         // render sinking contours of non-hovered volumes
         shader->stop_using();
-        if (sink_shader != nullptr) {
+        if (sink_shader != nullptr)
+        {
             sink_shader->start_using();
-            if (m_show_sinking_contours) {
+            if (m_show_sinking_contours) 
+            {
                 if (volume.first->is_sinking() && !volume.first->is_below_printbed() &&
-                    volume.first->hover == GLVolume::HS_None && !volume.first->force_sinking_contours) {
+                    volume.first->hover == GLVolume::HS_None && !volume.first->force_sinking_contours) 
+                {
                     volume.first->render_sinking_contours();
                 }
             }

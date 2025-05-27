@@ -38,7 +38,7 @@
 
 #include <atomic>
 #include <thread>
-
+#include "libslic3r/common_header/common_header.h"
 #ifdef _WIN32
     #include <windows.h>
     #include <netlistmgr.h>
@@ -608,7 +608,9 @@ SendSystemInfoDialog::SendSystemInfoDialog(wxWindow* parent)
     wxString html = GUI::format_wxstr(
             "<html><body bgcolor=%1%><font color=%2%>"
             "<table><tr><td>"
-            "<img src = \"" + resources_dir() + "/images/CrealityPrint_192px.png\" />"
+            "<img src = \"" +
+            resources_dir() + "/images/" + Slic3r::CxBuildInfo::getIconName() +
+            "_192px.png\" />"
             "</td><td align=\"left\">"
             + text0 + "<br / ><br / >"
             + text1 + "<br /><br />"

@@ -13,7 +13,7 @@ KlipperInterface::~KlipperInterface() {
     curl_global_cleanup();
 }
 
-std::future<void> KlipperInterface::sendFileToDevice(const std::string& serverIp, int port, const std::string& fileName, const std::string& filePath, std::function<void(float)> progressCallback, std::function<void(int)> errorCallback, std::function<void(std::string)> onCompleteCallback) {
+std::future<void> KlipperInterface::sendFileToDevice(const std::string& serverIp, int port, const std::string& fileName, const std::string& filePath, std::function<void(float,double)> progressCallback, std::function<void(int)> errorCallback, std::function<void(std::string)> onCompleteCallback) {
     return std::async(std::launch::async, [=]() {
         CURL* curl = curl_easy_init();
         if (!curl) {
@@ -50,7 +50,7 @@ std::future<void> KlipperInterface::sendFileToDevice(const std::string& serverIp
             }
         } else {
             if (progressCallback) {
-                progressCallback(100.0f); // Assuming the upload is complete
+                progressCallback(100.0f,0.0f); // Assuming the upload is complete
             }
         }
 

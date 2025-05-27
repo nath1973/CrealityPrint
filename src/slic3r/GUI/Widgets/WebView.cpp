@@ -179,6 +179,17 @@ class WebViewWebKit : public wxWebViewWebKit
     }
 };
 
+#elif defined __linux__
+
+    // TODO: release webview script message handle in Destructor
+    // class WebViewWebGTK : public wxWebview
+    // {
+    //     ~WebViewWebGTK() override
+    //     {
+    //         RemoveScriptMessageHandler("wx");
+    //     }
+    // };
+
 #endif
 
 class FakeWebView : public wxWebView

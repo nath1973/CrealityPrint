@@ -490,6 +490,12 @@ public:
         //BBS: add more arrangeSettings
         bool is_seq_print        = false;
         bool  align_to_y_axis    = false;
+        bool checkerboard_layout = true;
+    };
+
+    struct CloneSettings
+    {
+        int clone_num = 1;
     };
 
     struct OrientSettings
@@ -507,6 +513,13 @@ public:
         CanvasView3D = 0,
         CanvasPreview = 1,
         CanvasAssembleView = 2,
+    };
+
+    enum ERenderEvent 
+    {
+        FillBedOptions,
+        ObjectCloneOptions,
+        Count
     };
 
     int GetHoverId();
@@ -629,6 +642,11 @@ private:
     int split_to_part_count = 0;
     int custom_height_count = 0;
     int assembly_view_count = 0;
+
+    // extra popup render 
+    std::array<std::function<void()>, static_cast<size_t>(ERenderEvent::Count)> m_extra_render_callbacks;
+
+    CloneSettings m_clone_settings;
 
 public:
     OrientSettings& get_orient_settings()
@@ -777,6 +795,7 @@ public:
     void toggle_model_objects_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1, const ModelVolume* mv = nullptr);
     void update_instance_printable_state_for_object(size_t obj_idx);
     void update_instance_printable_state_for_objects(const std::vector<size_t>& object_idxs);
+    void set_model_object_visible(bool visible, const ModelObject* mo);
 
     void set_config(const DynamicPrintConfig* config);
     void set_process(BackgroundSlicingProcess* process);
@@ -1038,10 +1057,17 @@ public:
 
     // BBS: get empty cells to put new object
     // start_point={-1,-1} means sort from bed center, step is the unscaled x,y stride
-    std::vector<Vec2f> get_empty_cells(const Vec2f start_point, const Vec2f step = {10, 10});
+    std::vector<Vec2f> get_empty_cells(const Vec2f start_point, const Vec2f bbox_size = {10,10}, float extra_offset = 1.0f, int plate_index = 0);
     // BBS: get the nearest empty cell
     // start_point={-1,-1} means sort from bed center
-    Vec2f get_nearest_empty_cell(const Vec2f start_point, const Vec2f step = {10, 10});
+    Vec2f get_nearest_empty_cell(const Vec2f start_point, const Vec2f bbox_size = {10,10}, float extra_offset = 1.0f, int plate_index = 0);
+    std::vector<Vec2f> get_expand_cells(const Vec2f&         start_point,
+                                        int                  max_cells,
+                                        const Vec2f          bbox_size    = {10, 10},
+                                        float                extra_offset = 1.0f,
+                                        const BoundingBoxf3* plate_bbox   = nullptr,
+                                        bool ignore_others = false);
+    bool               is_bbox_overlap_with_any_object(const BoundingBox& bbox);
 
     void set_cursor(ECursorType type);
     void msw_rescale();
@@ -1135,6 +1161,7 @@ public:
 
     bool draw_input_double(const std::string& label, double* v, double stride, const Vec2d& size);
     bool draw_input_int(const std::string& label, int* v, int stride, const int* p_min, const int* p_max, const Vec2d& size);
+    bool draw_input_int_v2(const std::string& label, int* v, int stride, const int* p_min, const int* p_max, const Vec2d& size);
 
     //bool get_printer_objects_panel_fold();
     void set_left_panel_fold(ECanvasType type, bool fold);
@@ -1143,6 +1170,10 @@ public:
     ImVec2 get_printer_objects_panel_size() { return m_printer_objects_panel_size; }
 
     ImVec4 get_view_manipulate_rect() { return m_view_manipulate_rect; }
+
+    void triger_extra_render_event(ERenderEvent event);
+    void unregister_extra_render_event(ERenderEvent event);
+    bool unregister_all_extra_render_event();
 
 private:
     bool _is_shown_on_screen() const;
@@ -1222,9 +1253,13 @@ private:
     //BBS: GUI refactor: adjust main toolbar position
     bool _render_orient_menu(float left, float right, float bottom, float top);
     bool _render_arrange_menu(float left, float right, float bottom, float top);
+    bool _render_fill_bed_options(float left, float right, float bottom, float top);
+    bool _render_object_clone_options(float left, float right, float bottom, float top);
     void _render_3d_navigator();
     // render thumbnail using the default framebuffer
     void render_thumbnail_legacy(ThumbnailData& thumbnail_data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, PartPlateList& partplate_list, ModelObjectPtrs& model_objects, const GLVolumeCollection& volumes, std::vector<ColorRGBA>& extruder_colors, GLShaderProgram* shader, Camera::EType camera_type);
+
+    void _render_extra_popup();
 
     void _update_volumes_hover_state();
 

@@ -48,7 +48,7 @@
 #include "dark_mode.hpp"
 #endif // _MSW_DARK_MODE
 #endif //__WINDOWS__
-
+#include "libslic3r/common_header/common_header.h"
 
 namespace ConfigRelateGUI {
     static wxColour green = wxColour("#17CC5F");
@@ -109,25 +109,14 @@ namespace ConfigRelateGUI {
             SetMaxSize(size);
             SetFont(::Label::Body_12);
         
-            bool is_dark = wxGetApp().app_config->get("dark_color_mode") == "1";
-            if (is_dark) 
-            {
-                m_defaultColor = StateColor(std::pair<wxColour, int>(green, StateColor::Pressed),
-                                            std::pair<wxColour, int>(green, StateColor::Hovered),
-                                            std::pair<wxColour, int>(wxColour("#6E6E73"), StateColor::Normal),
-                                            std::pair<wxColour, int>(green, StateColor::Checked));
-                SetBackgroundColor(m_defaultColor);
-                SetForegroundColour(white);
-                SetBorderWidth(0);
-                //SetValue
-            } else {
-                m_defaultColor = StateColor(std::pair<wxColour, int>(green, StateColor::Pressed),
-                                            std::pair<wxColour, int>(green, StateColor::Hovered),
-                                   std::pair<wxColour, int>(*wxWHITE, StateColor::Normal));
-                SetBackgroundColor(m_defaultColor);
-                SetForegroundColour(wxColour("#A0A0A0"));
-                SetBorderWidth(1);
-            }
+            m_defaultColor = StateColor(std::pair<wxColour, int>(green, StateColor::Pressed),
+                                        std::pair<wxColour, int>(green, StateColor::Hovered),
+                                        std::pair<wxColour, int>(wxColour("#6E6E73"), StateColor::Normal),
+                                        std::pair<wxColour, int>(green, StateColor::Checked));
+            SetBackgroundColor(m_defaultColor);
+            SetForegroundColour(white);
+            SetBorderWidth(0);
+
 
             m_checkedColor = StateColor(std::pair<wxColour, int>(green, StateColor::Pressed),
                                         std::pair<wxColour, int>(green, StateColor::Hovered),
@@ -286,7 +275,7 @@ namespace ConfigRelateGUI {
             style &= ~wxHSCROLL;
             SetWindowStyle(style);
 
-#ifndef __linux__
+#ifndef __linux__ || __APPLE__
             Bind(wxEVT_PAINT, &_ListView::OnPaint, this);
 #endif
             Bind(wxEVT_MOTION, &_ListView::OnMouseMove, this);
@@ -601,6 +590,7 @@ namespace ConfigRelateGUI {
     static void initListItem(_ListItem& item, wxString text, bool isSingle, bool isSystem, int col)
     {
         item.m_mask = wxLIST_MASK_TEXT;
+        item.SetTextColour(isSystem ? (wxGetApp().dark_mode() ? white : wxColour("#000000")) : green);
         item.SetText(text);
         item.SetColumn(col);
         item.SetId(isSystem ? 1 : 0);
@@ -2042,7 +2032,7 @@ public:
     {
 // _L("The printers are from different vendors. Please check the parameters to avoid printing failure.")
         this->SetBackgroundColour(*wxWHITE);
-        std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+        std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
         SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
         wxBoxSizer *main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -2609,7 +2599,7 @@ public:
                 m_addProcessButton->Bind(wxEVT_LEFT_DOWN, [=](wxMouseEvent& e) {
                     std::string              targetPrinter;
                     wxDataViewItem             id    = selectedModel(targetPrinter);
-                    std::string                title = "Copy technologies from other printers to " + from_u8(targetPrinter).ToStdString();
+                    std::string                title = _L("Copy technologies from other printers to").ToStdString() + " " + from_u8(targetPrinter).ToStdString();
                     CopyRelateTechnologyDialog dlg(parentWindow, title, targetPrinter, m_bundle);
                     dlg.ShowModal();
 
@@ -3229,7 +3219,7 @@ void ConfigRelateDialog::create()
     m_relateBundle = new RelateBundle();
 
     // set icon for dialog
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
     SetSizeHints(wxDefaultSize, wxDefaultSize);
 

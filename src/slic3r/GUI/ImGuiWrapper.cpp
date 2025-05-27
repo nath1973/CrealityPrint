@@ -109,11 +109,8 @@ static const std::map<const wchar_t, std::string> font_icons_wide = {
 
     // Boolean operations
     {ImGui::UnionBooleanButton, "union_boolean"},
-    {ImGui::UnionBooleanDarkButton, "union_boolean_dark"},
     {ImGui::IntersectionBooleanButton, "intersection_boolean"},
-    {ImGui::IntersectionBooleanDarkButton, "intersection_boolean_dark"},
     {ImGui::DifferenceBooleanButton, "difference_boolean"},
-    {ImGui::DifferenceBooleanDarkButton, "difference_boolean_dark"},
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
@@ -794,6 +791,67 @@ bool ImGuiWrapper::bbl_slider_float(const std::string& label, float* v, float v_
         ImGui::PopStyleVar();
     }
 
+
+    return ret;
+}
+
+bool ImGuiWrapper::bbl_slider_int_style(
+    const std::string& label, int* v, int v_min, int v_max, const char* format, bool clamp, const wxString& tooltip)
+{
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(238 / 255.0f, 238 / 255.0f, 238 / 255.0f, 0.00f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(238 / 255.0f, 238 / 255.0f, 0.00f, 0.00f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.81f, 0.81f, 0.81f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, COL_CREALITY);
+
+    bool ret = bbl_slider_int(label, v, v_min, v_max, format, clamp, tooltip);
+
+    ImGui::PopStyleColor(4);
+    ImGui::PopStyleVar(1);
+
+    return ret;
+}
+
+bool ImGuiWrapper::bbl_slider_int(
+    const std::string& label, int* v, int v_min, int v_max, const char* format, bool clamp, const wxString& tooltip)
+{
+    const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
+
+    // let the label string start with "##" to hide the automatic label from ImGui::SliderInt()
+    bool        label_visible = !boost::algorithm::istarts_with(label, "##");
+    std::string str_label     = label_visible ? std::string("##") + std::string(label) : std::string(label);
+
+    // removes 2nd occurrence of "##", if present
+    std::string::size_type pos = str_label.find("##", 2);
+    if (pos != std::string::npos)
+        str_label = str_label.substr(0, pos) + str_label.substr(pos + 2);
+
+    bool ret = ImGui::SliderInt(str_label.c_str(), v, v_min, v_max, format);
+
+    m_last_slider_status.hovered                = ImGui::IsItemHovered();
+    m_last_slider_status.clicked                = ImGui::IsItemClicked();
+    m_last_slider_status.deactivated_after_edit = ImGui::IsItemDeactivatedAfterEdit();
+
+    if (!tooltip.empty() && ImGui::IsItemHovered())
+        this->tooltip(into_u8(tooltip).c_str(), max_tooltip_width);
+
+    if (clamp)
+        *v = std::clamp(*v, v_min, v_max);
+
+    const ImGuiStyle& style = ImGui::GetStyle();
+
+    if (label_visible) {
+        // if the label is visible, hide the part of it that should be hidden
+        std::string            out_label = std::string(label);
+        std::string::size_type pos       = out_label.find("##");
+        if (pos != std::string::npos)
+            out_label = out_label.substr(0, pos);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {1, style.ItemSpacing.y});
+        ImGui::SameLine();
+        this->text(out_label.c_str());
+        ImGui::PopStyleVar();
+    }
 
     return ret;
 }

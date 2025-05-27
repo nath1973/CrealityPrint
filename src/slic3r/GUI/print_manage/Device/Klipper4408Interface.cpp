@@ -24,7 +24,7 @@ bool isGCodeFile(const boost::filesystem::path& filePath) {
     }
     return extStr == ".gcode";
 }
-std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback) {
+std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float,double)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback) {
     return std::async(std::launch::async, [=]() {
     bool res = false;
 
@@ -38,14 +38,17 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
     std::string temp_upload_name = uploadFileName;
     
     http.clear_header();
-    progressCallback(0.1f);
+    progressCallback(0.1f,0.0f);
     //Disable MD5
     //     if(isGCodeFile(localFilePath)) {
     //         std::string md5 = DM::AppUtils::MD5(localFilePath); 
     //         http.header("MD5", md5);
     //     }
-    progressCallback(1.0f);
+    progressCallback(1.0f,0.0f);
     std::string filePath =  wxString::FromUTF8(localFilePath.c_str()).ToStdString();
+    //static time_t last_time = 0;
+    time_t last_time = time(NULL);
+    int percent = 0;
     http.header("Content-Type", "multipart/form-data")
         .mime_form_add_file(temp_upload_name, filePath.c_str()).timeout_connect(5)
         .on_complete([&](std::string body, unsigned status) {
@@ -74,9 +77,21 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
         })
         .on_progress([&](Slic3r::Http::Progress progress, bool& cancel) {
             if (progressCallback) {
+                
+                time_t now = time(NULL);
+                double speed = 0;
+                if(now != last_time) {
+                    curl_off_t bytes_sent = progress.ulnow;
+                    double time_elapsed = difftime(now, last_time);
+                    speed = bytes_sent / time_elapsed / 1024; // 字节/秒
+                }
                 if(progress.ultotal > 0) {
-                    float percent = static_cast<float>(progress.ulnow) / progress.ultotal * 100.0f;
-                    progressCallback(percent<1.0f?1.0f:percent);
+                    float tpercent = static_cast<float>(progress.ulnow) / progress.ultotal * 100.0f;
+                    if(percent == round(tpercent)) {
+                        return ;
+                    }
+                    percent = round(tpercent);
+                    progressCallback(percent<1.0f?1.0f:percent, speed);
                 }
             }
             if (cancel) {

@@ -5,8 +5,9 @@ echo ROOT=%ROOT_C3D%
 set build_type=Release
 if [%1] == [] (
 	echo "build Usage:"
-	echo "Only build: build.bat v0.1.0.1"
-	echo "Build and package:build.bat v0.1.0.1 package Creality_Print"
+	echo "Only build: build.bat 0.1.0.1"
+    echo "%5 is custom type, such as 'test'"
+    echo "Build and package:./scripts/jenkins_package_build.bat 0.1.0.1 local_package CrealityPrint Alpha CrealityPrint"
 	exit /b 0
 )
 
@@ -59,6 +60,12 @@ if [%4] == [] (
   set VERSION_EXTRA=%4
 )
 
+if [%5] == [] (
+	set CUSTOM_TYPE=""
+) else (
+  set CUSTOM_TYPE=%5
+)
+
 setlocal enabledelayedexpansion
 if [%LOCAL_BUILD%]==[OFF] (
     echo TAG_NAME=%TAG_NAME%
@@ -96,41 +103,41 @@ call build_deps.bat Release
 
 :C3DGenerate
 echo "C3DGenerate..."
+echo call run_gettext.bat
+if [%5] == [] (
+    call run_gettext.bat || exit /b 1
+) else (
+    echo customum gettext
+    call ./customized/%APPNAME%/copy_resources.bat || exit /b 1
+    call ./customized/%APPNAME%/run_gettext.bat || exit /b 1
+)
+
 SET C3D_BUILD_DIR=%ROOT_C3D%\build_Release
-@REM IF EXIST %C3D_BUILD_DIR% (
-@REM     echo RD /S /Q %C3D_BUILD_DIR%
-@REM     RD /S /Q %C3D_BUILD_DIR%
-@REM ) ELSE (
-@REM     echo HINT: %C3D_BUILD_DIR% NOT EXIST, skip remove
-@REM )
 
 @REM build orca
 echo "%ROOT_C3D%"
 cd %ROOT_C3D%
 mkdir %C3D_BUILD_DIR%
 cd %C3D_BUILD_DIR%
-echo cmake .. -G "%VS_Version%" -A x64 -DBBL_RELEASE_TO_PUBLIC=1 -DCMAKE_PREFIX_PATH="%BUILD_DEPLIB%\usr\local" -DCMAKE_INSTALL_PREFIX=".\CrealityPrint"  -DCMAKE_BUILD_TYPE=Release -DPROCESS_NAME=%APPNAME% -DCREALITYPRINT_VERSION=%TAG_NAME%
+echo cmake .. -G "%VS_Version%" -A x64 -DBBL_RELEASE_TO_PUBLIC=1 -DCMAKE_PREFIX_PATH="%BUILD_DEPLIB%\usr\local" -DCMAKE_INSTALL_PREFIX=".\CrealityPrint"  -DCMAKE_BUILD_TYPE=Release -DPROCESS_NAME=%APPNAME% -DCREALITYPRINT_VERSION=%TAG_NAME% -DCUSTOM_TYPE=%CUSTOM_TYPE%
 
 @REM cmake .. -G "%VS_Version%" -A x64 -DBBL_RELEASE_TO_PUBLIC=1 -DCMAKE_PREFIX_PATH="%BUILD_DEPLIB%\usr\local" -DCMAKE_INSTALL_PREFIX=".\CrealityPrint" -DCMAKE_BUILD_TYPE=%build_type%
-cmake .. -G "%VS_Version%" -A x64 -DBBL_RELEASE_TO_PUBLIC=1 ^
+cmake .. -G "%VS_Version%" -A x64 -DBBL_RELEASE_TO_PUBLIC=1 -DUPDATE_ONLINE_MACHINES=1 ^
 -DCMAKE_PREFIX_PATH="%BUILD_DEPLIB%\usr\local" ^
--DCMAKE_INSTALL_PREFIX=".\CrealityPrint"  ^
+-DCMAKE_INSTALL_PREFIX=".\%APPNAME%"  ^
 -DCMAKE_BUILD_TYPE=Release ^
 -DPROCESS_NAME=%APPNAME% ^
 -DCREALITYPRINT_VERSION=%TAG_NAME% ^
--DPROJECT_VERSION_EXTRA=%VERSION_EXTRA%
+-DPROJECT_VERSION_EXTRA=%VERSION_EXTRA% ^
+-DCUSTOM_TYPE=%CUSTOM_TYPE%
 
 cd ..
-echo call run_gettext.bat
-call run_gettext.bat || exit /b 1
-
-
 cd %C3D_BUILD_DIR%
 cmake --build . --config %build_type% --target ALL_BUILD -- -m
 
 for /f "tokens=1-3 delims=/ " %%1 in ("%date%") do set currentdate=%%1%%2%%3
 echo currentdate=%currentdate%
-set JOB_NAME=CrealityPrint_Release_Package
+@REM set JOB_NAME=CrealityPrint_Release_Package
 echo JOB_NAME=%JOB_NAME%
 set zipName=CrealityPrint_%TAG_NAME%_%currentdate%.zip
 set EXE_NAME=%APPNAME%_%TAG_NAME%_%VERSION_EXTRA%.exe
@@ -150,7 +157,7 @@ if [%INSTALL_TYPE%]==[nsis] (
 ) else if [%INSTALL_TYPE%]==[zip] (
     cmake --build . --target install --config %build_type%   
     echo zipname=%zipName%
-    %ROOT_C3D%\tools\7z.exe a -tzip %zipName% %C3D_BUILD_DIR%\CrealityPrint
+    %ROOT_C3D%\tools\7z.exe a -tzip %zipName% %C3D_BUILD_DIR%\%APPNAME%
     echo zipfinished : %zipName%
     set EXE_NAME=%zipName%
     echo SIGN_PACKAGE_PATH=%JOB_NAME%> %ROOT_C3D%\var.prop

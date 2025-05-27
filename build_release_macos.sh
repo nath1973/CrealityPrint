@@ -163,6 +163,7 @@ function build_slicer() {
             cmake .. \
                 -G "${SLICER_CMAKE_GENERATOR}" \
                 -DBBL_RELEASE_TO_PUBLIC=1 \
+                -DUPDATE_ONLINE_MACHINES=1 \
                 -DGENERATE_ORCA_HEADER=0 \
                 -DCMAKE_PREFIX_PATH="$DEPS/usr/local" \
                 -DCMAKE_INSTALL_PREFIX="$PWD/CrealityPrint" \
@@ -171,7 +172,8 @@ function build_slicer() {
                 -DCMAKE_INSTALL_RPATH="${DEPS}/usr/local" \
                 -DCMAKE_MACOSX_BUNDLE=ON \
                 -DCMAKE_OSX_ARCHITECTURES="${ARCH}" \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET="${OSX_DEPLOYMENT_TARGET}"
+                -DCMAKE_OSX_DEPLOYMENT_TARGET="${OSX_DEPLOYMENT_TARGET}" \
+                -DENABLE_BREAKPAD=ON
         fi
         cmake --build . --config "$BUILD_CONFIG" --target "$SLICER_BUILD_TARGET"
     )

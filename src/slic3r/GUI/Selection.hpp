@@ -192,6 +192,20 @@ private:
     // BBS
     EMode m_volume_selection_mode{ Instance };
     bool m_volume_selection_locked { false };
+    
+    //used in the clone preview operation, the model object clone operation
+    std::vector<Vec3f> m_clone_offsets;
+
+    // used in volume clone operation, possible to have multiple volume selected at the same time;
+    // key -- the volume idx in m_list; value -- the offset of the volume in the clone operation
+    std::unordered_map<int, std::vector<Vec3f> > m_volume_clone_offsets;
+
+    std::unordered_map<size_t, unsigned int> m_clone_volume_id_to_selected_id;
+
+    bool m_select_bbox_visible { true };
+
+    //used in render-fill-in-bed options when toggle object visible
+    int  m_prev_sel_object_idx{-1};
 
 public:
     Selection();
@@ -369,6 +383,17 @@ public:
         render_bounding_box(box, Transform3d::Identity(), color);
     }
 
+    void calculate_clone_preview_offsets(int numbers);
+    void render_clone_shells();
+    void release_clone_preview_info();
+    void paste_objects_from_clipboard_and_set_offsets();
+    void paste_volumes_from_clipboard_and_set_offsets();
+    void clear_clipboard();
+    void calculate_checkerboard_preview_offsets(float distance);
+    void paste_objects_from_checkerboard_layout();
+    void clear_clone_offsets();
+    void toggle_selection_visible(bool visible);
+
     //BBS
     void cut_to_clipboard();
     void copy_to_clipboard();
@@ -416,6 +441,11 @@ private:
     void render_sidebar_scale_hints(const std::string& sidebar_field, bool gizmo_uniform_scale, GLShaderProgram& shader, const Transform3d& matrix);
     void render_sidebar_layers_hints(const std::string& sidebar_field, GLShaderProgram& shader);
 
+    // calculate the ModelObject preview offset
+    void calculate_model_object_clone_preview_offsets(int numbers);
+    // calculate the Volume preview offset
+    void calculate_volume_clone_preview_offsets(int numbers);
+
 public:
     enum class SyncRotationType {
         // Do not synchronize rotation. Either not rotating at all, or rotating by world Z axis.
@@ -440,6 +470,8 @@ private:
         const Transform3d& transform, const Vec3d& world_pivot);
     void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
         const Transform3d& transform, const Vec3d& world_pivot);
+
+    float get_layout_extra_offset(ModelObject* src_object);
 };
 
 ModelVolume    *get_selected_volume   (const Selection &selection);

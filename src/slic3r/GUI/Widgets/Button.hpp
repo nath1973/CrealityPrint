@@ -85,6 +85,33 @@ private:
     DECLARE_EVENT_TABLE()
 };
 
+class RoundedButton : public wxButton
+{
+public:
+    RoundedButton(wxWindow*          parent,
+                  wxWindowID         id,
+                  const wxString&    label,
+                  const wxPoint&     pos       = wxDefaultPosition,
+                  const wxSize&      size      = wxDefaultSize,
+                  long               style     = 0,
+                  const wxValidator& validator = wxDefaultValidator,
+                  const wxString&    name      = wxButtonNameStr);
+
+    void SetCornerRadius(int radius);
+    void SetBackgroundColor(const wxColour& color);
+    void SetTextColor(const wxColour& color);
+    void SetIcon(const wxBitmap& icon);
+
+private:
+    int      m_cornerRadius = 5;                   // Ô²½Ç°ë¾¶
+    wxColour m_bgColor      = wxColour("#15BF59"); // ±³¾°ÑÕÉ«
+    wxColour m_textColor    = *wxWHITE;            // ÎÄ×ÖÑÕÉ«
+    wxBitmap m_icon;
+
+    void OnPaint(wxPaintEvent& event);
+
+    void Render(wxDC& dc);
+};
 class RoundedPanel : public wxPanel {
 public:
     RoundedPanel(wxWindow* parent, wxWindowID id = wxID_ANY,

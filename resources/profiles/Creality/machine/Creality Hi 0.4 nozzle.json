@@ -33,7 +33,7 @@
     "host_type": "octoprint",
     "layer_change_gcode": ";AFTER_LAYER_CHANGE\n;[layer_z]",
     "machine_LED_light_exist": "1",
-    "machine_end_gcode": "G1 X0 Y100 F8000\nEND_PRINT",
+    "machine_end_gcode": "END_PRINT",
     "machine_load_filament_time": "0",
     "machine_max_acceleration_e": "5000",
     "machine_max_acceleration_extruding": "12000",
@@ -81,7 +81,6 @@
     "thumbnails": "96x96,300x300",
     "thumbnails_format": "PNG",
     "time_cost": "0",
-    "time_lapse_gcode": ";===================== date: 20250307 =====================\n{if !spiral_mode && print_sequence != \"by object\"}\n; don't support timelapse gcode in spiral_mode and by object sequence for I3 structure printer\n\nM5001 G92 E0\nM5001 G17\nM5001 G2 Z{layer_z + 0.4} I0.86 J0.86 P1 F20000 ; spiral lift a little\nM5001 G1 Z{max_layer_z + 0.4}\n\nM5001 G1 X0 Y{first_layer_center_no_wipe_tower[1]} F18000 ; move to safe pos\nM5001 G1 X0 Y100 F3000 ; move to safe pos\nM5001 P15\n\nM5001 M400 P300\nM5001 G92 E0\nM5001 G1 X0 F18000\n{endif}",
     "use_firmware_retraction": "0",
     "use_relative_e_distances": "1",
     "z_offset": "0",
@@ -112,5 +111,5 @@
     "z_hop": "0.4",
     "z_hop_types": "Auto Lift",
     "name": "Creality Hi 0.4 nozzle",
-    "setting_id": "91937"
+    "setting_id": "60527"
 }

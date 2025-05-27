@@ -460,7 +460,7 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
     size_t text_line = 0;
     static size_t last_text_line = 0;
     const ImU32 text_name_clr = m_is_dark ? IM_COL32(255, 255, 255, 0.88 * 255) : IM_COL32(38, 46, 48, 255);
-    const ImU32 text_value_clr = m_is_dark ? IM_COL32(255, 255, 255, 0.4 * 255) : IM_COL32(144, 144, 144, 255);
+    const ImU32   text_value_clr    = m_is_dark ? IM_COL32(255, 255, 255, 255) : IM_COL32(51, 51, 51, 255);
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
     //BBS: GUI refactor: add canvas size from parameters
@@ -478,8 +478,13 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
     imgui.push_toolbar_style(m_scale);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0, 4.0 * m_scale));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0 * m_scale, 6.0 * m_scale));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,  m_is_dark ? 0.0f : 1.0f);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, text_name_clr);
     ImGui::PushStyleColor(ImGuiCol_Text, text_value_clr);
+    ImGui::PushStyleColor(ImGuiCol_Border, m_is_dark ? ImVec4(38.0 / 255.0, 38.0 / 255.0, 38.0 / 255.0, 1.0) :
+                                                       ImVec4(203.0 / 255, 203.0 / 255, 204.0 / 255, 1.0));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, m_is_dark ? ImVec4(43.0 / 255, 43.0 / 255, 45.0 / 255, 1.0) : ImGuiWrapper::COL_WINDOW_BG);
+
     imgui.begin(std::string("ExtruderPosition"), ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
     ImGui::AlignTextToFramePadding();
     //BBS: minus the plate offset when show tool position
@@ -616,8 +621,8 @@ void GCodeViewer::Marker::render(int canvas_width, int canvas_height, const EVie
     }
 
     imgui.end();
-    ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(4);
     imgui.pop_toolbar_style();
 }
 
@@ -2218,7 +2223,12 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
             const Vec3f &prev_position = (i == 0? prev.position : curr.interpolation_points[i-1]);
             const Vec3f &curr_position = (i == loop_num? curr.position : curr.interpolation_points[i]);
 
-            const Vec3f dir = (curr_position - prev_position).normalized();
+            Vec3f dir = (curr_position - prev_position).normalized();
+            // In some cases (such as when the z-offset is set to -0.1 and previewing model slices with surface boundaries), 
+            // the z-value of interpolated coordinates may be abnormal, and this situation should be corrected.
+            if (curr.position.z() == prev.position.z())
+                dir[2] = 0.0f;
+
             const Vec3f right = Vec3f(dir.y(), -dir.x(), 0.0f).normalized();
             const Vec3f left = -right;
             const Vec3f up = right.cross(dir);

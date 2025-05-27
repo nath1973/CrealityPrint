@@ -63,6 +63,16 @@ std::pair<bool, std::string> GLShadersManager::init()
         , { "ENABLE_ENVIRONMENT_MAP"sv }
 #endif // ENABLE_ENVIRONMENT_MAP
         );
+
+    if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
+        // used to render clone shells
+        valid &= append_shader("clone_preview_instance", { prefix + "clone_preview_instance.vs", prefix + "clone_preview_instance.fs" });
+    }
+    else
+    {
+        valid &= append_shader("clone_preview", { prefix + "clone_preview.vs", prefix + "clone_preview.fs" });
+    }
+
     // used to render variable layers heights in 3d editor
     valid &= append_shader("variable_layer_height", { prefix + "variable_layer_height.vs", prefix + "variable_layer_height.fs" });
     // used to render highlight contour around selected triangles inside the multi-material gizmo

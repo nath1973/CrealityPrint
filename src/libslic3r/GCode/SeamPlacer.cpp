@@ -1635,6 +1635,7 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
            + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
           * 0.5;
       depth = 1.4142 * depth / beta_angle;
+
       // There are some nice geometric identities in determination of the correct depth of new seam point.
       //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
       Vec2f final_pos = perimeter_point.position.head<2>() + depth * dir_to_middle;
@@ -1651,22 +1652,24 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
     if (po->config().staggered_inner_seams && loop.length() > 0.0) {
       //fix depth, it is sometimes strongly underestimated
       depth = std::max(loop.paths[projected_point.path_idx].width, depth);
-
-      while (depth > 0.0f) {
+      
+      double dDepth(depth);
+      while (dDepth > 0.0f) {
         auto next_point = get_next_loop_point(projected_point);
         Vec2f a = unscale(projected_point.foot_pt).cast<float>();
         Vec2f b = unscale(next_point.foot_pt).cast<float>();
-        float dist = (a - b).norm();
-        if (dist > depth) {
-          Vec2f final_pos = a + (b - a) * depth / dist;
+        double dist = (a - b).norm();
+        if (dist > dDepth) {
+            Vec2f final_pos    = a + (b - a) * dDepth / dist;
           next_point.foot_pt = Point::new_scale(final_pos.x(), final_pos.y());
         }
-        depth -= dist;
+        dDepth -= dist;
         projected_point = next_point;
       }
       seam_point = projected_point.foot_pt;
     }
   }
+
 
   // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
   // thus empty path segments will not be produced by G-code export.

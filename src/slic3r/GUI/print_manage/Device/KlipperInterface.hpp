@@ -16,7 +16,7 @@ public:
                                        int                        port,
                                        const std::string&         fileName,
                                        const std::string&         filePath,
-                                       std::function<void(float)> progressCallback,
+                                       std::function<void(float,double)> progressCallback,
                                        std::function<void(int)>   errorCallback, 
                                        std::function<void(std::string)> onCompleteCallback);
 

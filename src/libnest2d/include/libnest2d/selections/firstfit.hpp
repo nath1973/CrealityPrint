@@ -3,72 +3,74 @@
 
 #include "selection_boilerplate.hpp"
 // for writing SVG
-//#include "../tools/svgtools.hpp"
+// #include "../tools/svgtools.hpp"
 
 namespace libnest2d { namespace selections {
 
-template<class RawShape>
-class _FirstFitSelection: public SelectionBoilerplate<RawShape> {
+template<class RawShape> class _FirstFitSelection : public SelectionBoilerplate<RawShape>
+{
     using Base = SelectionBoilerplate<RawShape>;
+
 public:
     using typename Base::Item;
-    using Config = int; //dummy
+    using Config = int; // dummy
 
 private:
     using Base::packed_bins_;
     using typename Base::ItemGroup;
-    using Container = ItemGroup;//typename std::vector<_Item<RawShape>>;
+    using Container = ItemGroup; // typename std::vector<_Item<RawShape>>;
 
     Container store_;
 
 public:
+    void configure(const Config& /*config*/) {}
 
-    void configure(const Config& /*config*/) { }
-
-    template<class TPlacer, class TIterator,
-             class TBin = typename PlacementStrategyLike<TPlacer>::BinType,
+    template<class TPlacer,
+             class TIterator,
+             class TBin    = typename PlacementStrategyLike<TPlacer>::BinType,
              class PConfig = typename PlacementStrategyLike<TPlacer>::Config>
-    void packItems(TIterator first,
-                   TIterator last,
-                   TBin&& bin,
-                   PConfig&& pconfig = PConfig())
+    void packItems(TIterator first, TIterator last, TBin&& bin, PConfig&& pconfig = PConfig())
     {
-
         using Placer = PlacementStrategyLike<TPlacer>;
 
         store_.clear();
-        store_.reserve(last-first);
+        store_.reserve(last - first);
 
         std::vector<Placer> placers;
-        placers.reserve(last-first);
-        
-        typename Base::PackGroup fixed_bins;
-        std::for_each(first, last, [this, &fixed_bins](Item& itm) {
+        placers.reserve(last - first);
+
+        std::for_each(first, last, [this](Item& itm) {
             if (itm.isFixed()) {
-                if (itm.binId() < 0) itm.binId(0);
+                if (itm.binId() < 0)
+                    itm.binId(0);
                 auto binidx = size_t(itm.binId());
 
-                while (fixed_bins.size() <= binidx)
-                    fixed_bins.emplace_back();
+                while (packed_bins_.size() <= binidx) // 减少多次扩容的内存分配开销,1.5倍扩容
+                    packed_bins_.emplace_back();
 
-                fixed_bins[binidx].emplace_back(itm);
+                packed_bins_[binidx].emplace_back(itm); // 按编号存放固定的零件
+            } else {
+                store_.emplace_back(itm); // 存放不固定的零件
             }
-            else {
-                store_.emplace_back(itm);
-            }
-            });
+        });
 
-        std::for_each(pconfig.m_excluded_regions.begin(), pconfig.m_excluded_regions.end(), [this, &pconfig](Item& itm) {
-            pconfig.m_excluded_items.emplace_back(itm);
-            });
+        for (int i = 0; i < packed_bins_.size(); ++i) {
+            const ItemGroup& ig = packed_bins_[i];
+            placers.emplace_back(bin);
+            placers.back().configure(pconfig);
+            placers.back().preload(ig);
+        }
+
+        std::for_each(pconfig.m_excluded_regions.begin(), pconfig.m_excluded_regions.end(),
+                      [this, &pconfig](Item& itm) { pconfig.m_excluded_items.emplace_back(itm); });
 
 #ifdef SVGTOOLS_HPP
         svg::SVGWriter<RawShape> svgwriter;
-        std::for_each(first, last, [this,&svgwriter](Item &itm) { svgwriter.writeShape(itm, "none", "blue"); });
+        std::for_each(first, last, [this, &svgwriter](Item& itm) { svgwriter.writeShape(itm, "none", "blue"); });
         svgwriter.save(boost::filesystem::path("SVG") / "all_items.svg");
 #endif
-        
-        std::function<bool(Item& i1, Item& i2)> sortfunc;
+
+        std::function<bool(Item & i1, Item & i2)> sortfunc;
         if (pconfig.sortfunc)
             sortfunc = pconfig.sortfunc;
         else {
@@ -78,7 +80,7 @@ public:
                     return p1 > p2;
 
                 return i1.bed_temp != i2.bed_temp ? (i1.bed_temp > i2.bed_temp) :
-                        (i1.height != i2.height ? (i1.height < i2.height) : (i1.area() > i2.area()));
+                                                    (i1.height != i2.height ? (i1.height < i2.height) : (i1.area() > i2.area()));
             };
         }
 
@@ -87,124 +89,68 @@ public:
         // debug: write down intitial order
         for (auto it = store_.begin(); it != store_.end(); ++it) {
             std::stringstream ss;
-            ss << "initial order: " << it->get().name << ", p=" << it->get().priority() << ", bed_temp=" << it->get().bed_temp << ", height=" << it->get().height
-               << ", area=" << it->get().area();
+            ss << "initial order: " << it->get().name << ", p=" << it->get().priority() << ", bed_temp=" << it->get().bed_temp
+               << ", height=" << it->get().height << ", area=" << it->get().area();
             if (this->unfitindicator_)
                 this->unfitindicator_(ss.str());
         }
 
-        int item_id = 0;
-        auto makeProgress = [this, &item_id](Placer &placer, size_t bin_idx) {
-            packed_bins_[bin_idx] = placer.getItems();
-            this->last_packed_bin_id_ = int(bin_idx);
-            this->progress_(static_cast<unsigned>(item_id));
+        int  item_id      = 0;
+        auto makeProgress = [this, &item_id](Placer& placer, size_t bin_idx) {
+            packed_bins_[bin_idx]     = placer.getItems(); // 获取packed_bins_[i]对应床号的零件
+            this->last_packed_bin_id_ = int(bin_idx);      // 床号  大于0 是存放到虚拟床(即打印床外)
+            this->progress_(static_cast<unsigned>(--item_id));
         };
 
         auto& cancelled = this->stopcond_;
-        
+
         this->template remove_unpackable_items<Placer>(store_, bin, pconfig);
 
-        for (auto it = store_.begin(); it != store_.end() && !cancelled(); ++it) {
-            // skip unpackable item
-            if (it->get().binId() == BIN_ID_UNFIT)
-                continue;
-            bool was_packed = false;
-            int best_bed_id = -1;
-            int bed_id_firstfit = -1;
-            double score = LARGE_COST_TO_REJECT+1, best_score = LARGE_COST_TO_REJECT+1;
-            double score_all_plates = 0, score_all_plates_best = std::numeric_limits<double>::max();
-            typename Placer::PackResult result, result_best, result_firstfit;
-            int j = 0;
-            while(!was_packed && !cancelled()) {
-                for(; j < placers.size() && !was_packed && !cancelled(); j++) {
+        auto it = store_.begin();
+        while (it != store_.end() && !cancelled()) {
+            bool                        was_packed = false; 
+            size_t                      j = 0;
+            typename Placer::PackResult result;
+            double                      score = LARGE_COST_TO_REJECT + 1;
+            while (!was_packed && !cancelled()) // 不能打包或取消
+            {
+                // placers为摆放的堆数，例如盘内+盘外两堆(盘内摆满时)， 或仅盘内一堆（盘内还有空间）
+                for (; j < placers.size() && !was_packed && !cancelled(); ++j) {
+                    // 调用PackResult pack(Item& item, const Range& rem = Range())进行打包，并返回结果
                     result = placers[j].pack(*it, rem(it, store_));
-                    score = result.score();
-                    score_all_plates = score;
-                    for (int i = 0; i < placers.size(); i++) { score_all_plates += placers[i].score();}
-                    if (this->unfitindicator_) this->unfitindicator_(it->get().name + " bed_id="+std::to_string(j) + ",score=" + std::to_string(score)+", score_all_plates="+std::to_string(score_all_plates));
-
-                    if(score >= 0 && score < LARGE_COST_TO_REJECT) {
-                        if (bed_id_firstfit == -1) {
-                            bed_id_firstfit = j;
-                            result_firstfit = result;
-                        }
-                        if (score_all_plates < score_all_plates_best) {
-                            best_score = score;
-                            score_all_plates_best = score_all_plates;
-                            best_bed_id = j;
-                            result_best = result;
-                        }
+                    score  = result.score();
+                    if (score >= 0 && score < LARGE_COST_TO_REJECT) {
+                        was_packed = true;
+                        it->get().binId(int(j));
+                        placers[j].accept(result);
+                        makeProgress(placers[j], j);
                     }
                 }
-                if (best_bed_id == MAX_NUM_PLATES) {
-                    // item is not fit because we have tried all possible plates to find a good enough fit
-                    if (bed_id_firstfit == MAX_NUM_PLATES) {
-                        it->get().binId(BIN_ID_UNFIT);
-                        if (this->unfitindicator_)
-                            this->unfitindicator_(it->get().name + " bed_id_firstfit == MAX_NUM_PLATES" + ",best_score=" + std::to_string(best_score));
+                if (!was_packed) {
+                    if (placers.empty()) {
+                        placers.emplace_back(bin);
+                        placers.back().configure(pconfig);
+                        packed_bins_.emplace_back();
+                        j = placers.size() - 1;
+                    } else if (true) {
+                        placers.emplace_back(bin);
+                        placers.back().plateID(placers.size() - 1);
+                        placers.back().configure(pconfig);
+                        if (packed_bins_.size() >= placers.size())
+                            placers.back().preload(packed_bins_[placers.size() - 1]);
+                        // placers.back().preload(pconfig.m_excluded_items);
+                        packed_bins_.emplace_back();
+                        j = placers.size() - 1;
+                    } else {
                         break;
                     }
-                    else {
-                        // best bed is invalid, but firstfit bed is OK, use the latter
-                        best_bed_id = bed_id_firstfit;
-                        result_best = result_firstfit;
-                    }
-                }
-
-                if(best_bed_id>=0)
-                {
-                    was_packed = true;
-                    j = best_bed_id;
-                    it->get().binId(int(j));
-                    it->get().itemId(item_id++);
-                    placers[j].accept(result_best);
-                    makeProgress(placers[j], j);
-                }
-
-                if (was_packed && it->get().has_tried_with_excluded) {
-                    placers[j].clearItems([](const Item &itm) { return itm.isFixed() && !itm.is_wipe_tower; });
-                    if (fixed_bins.size() >= placers.size())
-                        placers[j].preload(fixed_bins[placers.size() - 1]);
-                }
-                bool placer_not_packed = !was_packed && !placers.empty() && j == placers.size() && placers[j - 1].getPackedSize() == 0; // large item is not placed into the bin
-                if (placer_not_packed) {
-                    if (it->get().has_tried_with_excluded == false) {
-                        it->get().has_tried_with_excluded = true;
-                        placers[j - 1].clearItems([](const Item &itm) { return itm.isFixed()&&!itm.is_wipe_tower; });
-                        placers[j - 1].preload(pconfig.m_excluded_items);
-                        j = j - 1;
-                        continue;
-                    } else {
-                        placers[j - 1].clearItems([](const Item &itm) { return itm.isFixed() && !itm.is_wipe_tower; });
-                        placers[j - 1].preload(fixed_bins[placers.size() - 1]);
-                    }
-                }
-
-                if(!was_packed){
-                    if (this->unfitindicator_ && !placers.empty())
-                        this->unfitindicator_(it->get().name + ", height=" +std::to_string(it->get().height)
-                            + " ,plate_id=" + std::to_string(j-1)
-                            + ", score=" + std::to_string(score)
-                            + ", best_bed_id=" + std::to_string(best_bed_id)
-                            + ", score_all_plates=" + std::to_string(score_all_plates)
-                            +", overfit=" + std::to_string(result.overfit()));
-
-                    placers.emplace_back(bin);
-                    placers.back().plateID(placers.size() - 1);
-                    placers.back().configure(pconfig);
-                    if (fixed_bins.size() >= placers.size())
-                        placers.back().preload(fixed_bins[placers.size() - 1]);
-                    //placers.back().preload(pconfig.m_excluded_items);
-                    packed_bins_.emplace_back();
-                    j = placers.size() - 1;
                 }
             }
+            ++it;
         }
     }
-
 };
 
-}
-}
+}} // namespace libnest2d::selections
 
 #endif // FIRSTFIT_HPP

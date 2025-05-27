@@ -120,13 +120,12 @@ class FilamentPopPanel : public PopupWindow
 public:
 	FilamentPopPanel(wxWindow* parent, int index);
 	~FilamentPopPanel();
-#ifdef __APPLE__
-	void OnMouseLeave(wxMouseEvent& event);
-#endif
+
 	void Popup(wxPoint position = wxDefaultPosition);
 	void Dismiss();
     void sys_color_changed();
     void setFilamentItem(FilamentItem* pFilamentItem) { m_pFilamentItem = pFilamentItem; }
+	void on_left_down(wxMouseEvent &evt);
 
 public:
 
@@ -230,7 +229,7 @@ public:
 
 private:
     json m_FilamentProfileJson;
-    int LoadFilamentProfile();
+    int LoadFilamentProfile(bool isCxVedor=true);
     bool LoadFile(std::string jPath, std::string& sContent);
     int LoadProfileFamily(std::string strVendor, std::string strFilePath);
     int GetFilamentInfo(std::string VendorDirectory, json& pFilaList, std::string filepath, std::string& sVendor, std::string& sType);

@@ -1,0 +1,58 @@
+#include "common_header.h"
+
+#include "../libslic3r/libslic3r_version.h"
+namespace Slic3r { 
+namespace CxBuildInfo {
+const std::string getVersion() { return std::string(CREALITYPRINT_VERSION); }
+const std::string  getBuildTime() { return std::string(SLIC3R_BUILD_TIME); }
+const std::string  getBuildId() { return std::string(SLIC3R_BUILD_ID); }
+const std::string getBuildOs() { return std::string(BUILD_OS); }
+const std::string getBuildType() { return std::string(PROJECT_VERSION_EXTRA); }
+
+const std::string getProjectName() { return std::string(SLIC3R_PROCESS_NAME); }
+
+ void setDarkMode(bool isDark) {
+     if (g_is_dark != isDark) {
+
+     }
+     g_is_dark = isDark;
+ }
+
+const bool isCusotmized()
+    {
+#if defined(CUSTOMIZED)
+    return true;
+#else
+    return false;
+#endif
+}
+
+const bool isEnabledCxCloud()
+{
+#if defined(CUSTOMIZED) && !defined(CUSTOM_CXCLOUD_ENABLED)
+    return false;
+#else
+    return true;
+#endif
+}
+const std::string getIconName_noTheme() {
+#if defined(CUSTOMIZED)
+    return std::string(CUSTOM_TYPE);
+#endif //
+    return std::string(SLIC3R_APP_NAME);
+}
+const std::string getIconName()
+{
+#if defined(CUSTOMIZED)
+    if ( g_is_dark && std::string(CUSTOM_TYPE) == "MorandiPrint") 
+    {
+        return std::string(CUSTOM_TYPE) + "_light";
+    }
+    return std::string(CUSTOM_TYPE);
+#endif //
+    return std::string(SLIC3R_APP_NAME);
+}
+
+}
+
+} // namespace Slic3r

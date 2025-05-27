@@ -13,8 +13,14 @@
 #include <string>
 #include <set>
 #include <memory>
+#include "buildinfo.h"
 
-#define LOCALHOST_PORT      13666
+#ifdef CUSTOMIZED
+#define LOCALHOST_PORT      15888
+#else 
+#define LOCALHOST_PORT 13666
+#endif // CUSTOMIZED
+
 #define LOCALHOST_URL       "http://localhost:"
 
 namespace Slic3r { namespace GUI {
@@ -118,6 +124,7 @@ public:
     int get_port() { return port; }
     static std::shared_ptr<Response> bbl_auth_handle_request(const std::string& url);
     static std::shared_ptr<Response> creality_handle_request(const std::string& url);
+    
     #if defined(__linux__) || defined(__LINUX__)
     void sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp::socket &socket);
     std::mutex frame_mutex_;
@@ -147,7 +154,7 @@ private:
     std::function<std::shared_ptr<Response>(const std::string&)> m_request_handler{&HttpServer::creality_handle_request};
 
 };
-
+using SocketPtr = std::shared_ptr<boost::asio::ip::tcp::socket>;
 class session : public std::enable_shared_from_this<session>
 {
     HttpServer::IOServer& server;
@@ -155,7 +162,7 @@ class session : public std::enable_shared_from_this<session>
 
     boost::asio::streambuf buff;
     http_headers headers;
-
+    
     void read_first_line();
     void read_next_line();
     void read_body();
@@ -164,8 +171,11 @@ class session : public std::enable_shared_from_this<session>
 #endif
 private:
     boost::asio::deadline_timer *m_video_timer=nullptr;
+    boost::asio::streambuf proxy_buff;
+    boost::asio::steady_timer timer_;
+    std::map<std::string, SocketPtr> m_proxy_sockets;
 public:
-    session(HttpServer::IOServer& server, boost::asio::ip::tcp::socket socket) : server(server), socket(std::move(socket)) {
+    session(HttpServer::IOServer& server, boost::asio::ip::tcp::socket socket) : server(server), socket(std::move(socket)),timer_(server.io_service) {
         
     }
     ~session() {
@@ -174,6 +184,10 @@ public:
     }
     void start();
     void stop();
+    void handle_proxy_request(const std::string& url);
+    void do_write_proxy(SocketPtr socket_ptr, const std::string& target_host,const std::string& target_path);
+    void write_response(const std::string& response);
+    void do_read(SocketPtr socket_ptr);
 };
 
 std::string url_get_param(const std::string& url, const std::string& key);

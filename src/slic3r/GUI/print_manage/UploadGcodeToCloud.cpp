@@ -37,7 +37,7 @@
 #include "slic3r/GUI/print_manage/MaterialMapPanel.hpp"
 #include "slic3r/GUI/Notebook.hpp"
 #include "data/DataCenter.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 namespace Slic3r { namespace GUI {
 
 #define INITIAL_NUMBER_OF_MACHINES 0
@@ -235,7 +235,7 @@ UploadGcodeToCloudDialog::UploadGcodeToCloudDialog(Plater* plater)
     SetFont(wxGetApp().normal_font());
 
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     Freeze();
@@ -965,7 +965,7 @@ void UploadGcodeToCloudDialog::send_gcode(bool start_print)
 
     RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(
         ipAddress.ToStdString(), uploadNameUtf8, gcodeFilePath,
-        [this](std::string ip, float progress) {
+        [this](std::string ip, float progress,double speed) {
             // Update the progress bar
             int           progressValue = static_cast<int>(progress);
             wxThreadEvent evt(wxEVT_THREAD);

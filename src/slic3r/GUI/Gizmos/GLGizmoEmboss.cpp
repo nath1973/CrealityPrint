@@ -2187,7 +2187,7 @@ void GLGizmoEmboss::draw_style_list() {
     else
         ImGui::TextColored(ImGuiWrapper::COL_ORCA, "%s", title.c_str());
         
-    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+    ImGui::SetNextItemWidth(1.5 * m_gui_cfg->input_width);
     auto add_text_modify = [&is_modified](const std::string& name) {
         if (!is_modified) return name;
         return name + Preset::suffix_modified();
@@ -4242,7 +4242,7 @@ GuiCfg create_gui_configuration()
     const float count_line_of_text = 3.f;
     cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
     ImVec2 letter_m_size = ImGui::CalcTextSize("M");
-    const float count_letter_M_in_input = 12.f;
+    const float count_letter_M_in_input = 8.f;
     cfg.input_width = letter_m_size.x * count_letter_M_in_input;
     GuiCfg::Translations &tr = cfg.translations;
 

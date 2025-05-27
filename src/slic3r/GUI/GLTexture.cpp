@@ -512,6 +512,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
     std::vector<unsigned char> border_disable(sprite_bytes, 0);
     std::vector<unsigned char> border_hover(sprite_bytes, 0);
     std::vector<unsigned char> border_press(sprite_bytes, 0);
+    std::vector<unsigned char> border_normal(sprite_bytes, 0);
 
     //BBS
     std::vector<unsigned char> pressed_data(sprite_bytes, 0); // (gizmo) pressed
@@ -535,7 +536,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
 
 
     //create border image from svg
-    if (border_filenames.size() >= 3)
+    if (border_filenames.size() >= 4)
     {
         NSVGimage* image = nsvgParseFromFile(border_filenames.at(0).c_str(), "px", 96.0f);
         if (image != nullptr)
@@ -560,6 +561,14 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
             nsvgRasterize(rast, image, 1, 1, scale, border_press.data(), sprite_size_px, sprite_size_px, sprite_stride);
             nsvgDelete(image);
         }
+
+        image = nsvgParseFromFile(border_filenames.at(3).c_str(), "px", 96.0f);
+        if (image != nullptr) {
+            float scale = (float) sprite_size_px / std::max(image->width, image->height);
+            nsvgRasterize(rast, image, 1, 1, scale, border_normal.data(), sprite_size_px, sprite_size_px, sprite_stride);
+            nsvgDelete(image);
+        }
+        
     }
 
 
@@ -631,7 +640,7 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
         }
 
         //Normal
-        ::memcpy((void*)sprite_white_only_data.data(), (const void*)border_disable.data(), sprite_bytes);
+        ::memcpy((void*)sprite_white_only_data.data(), (const void*)border_normal.data(), sprite_bytes);
         for (int i = 0; i < sprite_n_pixels; ++i) {
             int offset = i * 4;
             if (sprite_data.data()[offset + 0] != 0 ||

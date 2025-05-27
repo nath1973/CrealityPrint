@@ -307,12 +307,16 @@ void FillBedJob::finalize(bool canceled, std::exception_ptr &eptr)
             BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(":selected: bed_id %1%, trans {%2%,%3%}") % ap.bed_idx % unscale<double>(ap.translation(X)) % unscale<double>(ap.translation(Y));
         }
 
+        std::vector<size_t> select_object_ids;
         int   newSize = m_plater->model().objects.size();
         auto obj_list = m_plater->sidebar().obj_list();
         for (size_t i = oldSize; i < newSize; i++) {
             obj_list->add_object_to_list(i, true, true, false);
             obj_list->update_printable_state(i, 0);
+            select_object_ids.emplace_back(i);
         }
+
+        select_object_ids.emplace_back(m_object_idx);
 
         BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ": paste_objects_into_list";
 
@@ -325,6 +329,10 @@ void FillBedJob::finalize(bool canceled, std::exception_ptr &eptr)
         //BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ": model_object->ensure_on_bed()";
 
         m_plater->update();
+
+        for (size_t obj_idx : select_object_ids) {
+            m_plater->get_view3D_canvas3D()->get_selection().add_object(obj_idx, false);
+        }
     }
 }
 

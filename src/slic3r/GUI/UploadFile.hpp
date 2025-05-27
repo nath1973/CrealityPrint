@@ -36,7 +36,7 @@ class ErrorCodeException : public std::exception {
         int getAliyunInfo();
         int getOssInfo();
         int uploadGcodeToCXCloud(const std::string& name, const std::string&fileName, std::function<void(std::string)> onCompleteCallback=nullptr);
-        void setProcessCallback(std::function<void(int)> funcProcessCb);
+        void setProcessCallback(std::function<void(int,double)> funcProcessCb);
         const LastError& getLastError() { return m_lastError; }
         int uploadFileToAliyun(const std::string& local_path, const std::string& target_path, const std::string& fileName);
         int downloadFileFromAliyun(const std::string& target_path, const std::string& local_path);
@@ -49,7 +49,7 @@ class ErrorCodeException : public std::exception {
         std::string m_secretAccessKey = "";
         std::string m_endPoint = "";
         std::string m_bucket = "";
-        std::function<void(int)> m_funcProcessCb = nullptr;
+        std::function<void(int,double)> m_funcProcessCb = nullptr;
         LastError m_lastError;
     };
 

@@ -23,6 +23,7 @@ public:
         const wxSize &  size      = wxDefaultSize, 
         long style = 0);
 
+    void SetCornerFlags(int flags);
     void SetCornerRadius(double radius);
 
     void SetBorderWidth(int width);
@@ -52,6 +53,7 @@ protected:
 
 protected:
     double radius;
+    int          cornerFlags = 0xF;
     int border_width = 1;
     StateHandler state_handler;
     StateColor   border_color;

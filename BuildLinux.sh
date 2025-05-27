@@ -166,7 +166,7 @@ then
     then
         BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug -DBBL_INTERNAL_TESTING=1"
     else
-        BUILD_ARGS="${BUILD_ARGS} -DBBL_RELEASE_TO_PUBLIC=1 -DBBL_INTERNAL_TESTING=0"
+        BUILD_ARGS="${BUILD_ARGS} -DBBL_RELEASE_TO_PUBLIC=1 -DBBL_INTERNAL_TESTING=0 -DUPDATE_ONLINE_MACHINES=1"
     fi
     echo -e "cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="${DPS_PATH}/usr/local" -DSLIC3R_STATIC=1 ${BUILD_ARGS}"
     cmake -S . -B build -G Ninja \
@@ -174,6 +174,7 @@ then
         -DSLIC3R_STATIC=1 \
         -DORCA_TOOLS=ON \
         -DGENERATE_ORCA_HEADER=0 \
+        -DENABLE_BREAKPAD=ON \
         ${BUILD_ARGS}
     echo "done"
     echo "Building CrealityPrint ..."

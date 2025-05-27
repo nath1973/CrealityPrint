@@ -139,6 +139,7 @@
 #include "Widgets/CheckBox.hpp"
 #include "Widgets/Button.hpp"
 #include "Widgets/HoverBorderIcon.hpp"
+#include "Widgets/NumberEntryDialog.hpp"
 
 #include "GUI_ObjectTable.hpp"
 #include "libslic3r/Thread.hpp"
@@ -176,7 +177,10 @@
 #include <boost/iostreams/filter/gzip.hpp>
 #include "print_manage/data/DataCenter.hpp"
 #include "UpdateParams.hpp"
+#include "libslic3r/ModelArrange.hpp"
+#include "PrinterPresetConfig.hpp"
 
+#include "libslic3r/common_header/common_header.h"
 using boost::optional;
 namespace fs = boost::filesystem;
 using Slic3r::_3DScene;
@@ -2123,8 +2127,7 @@ std::string& Sidebar::get_search_line()
 
 void Sidebar::on_current_device_changed(wxCommandEvent& event)
 {
-    nlohmann::json printer = DM::DataCenter::Ins().get_current_device();
-    DM::Device device_data= DM::Device::deserialize(printer);
+    DM::Device device_data= DM::DataCenter::Ins().get_current_device_data();
     if(!device_data.isMultiColorDevice)
     {
         wxGetApp().app_config->set("is_currentMachine_Colors", "0");
@@ -2208,9 +2211,7 @@ void Sidebar::on_show_box_color_selection(wxCommandEvent& event)
 
 void Sidebar::on_auto_sync_current_device_filament(wxCommandEvent& event)
 {
-    // DM::Device device_data = DM::Device::deserialize(DM::DataCenter::Ins().get_current_device());
-    nlohmann::json printer = DM::DataCenter::Ins().get_current_device();
-    DM::Device device_data= DM::Device::deserialize(printer);
+    DM::Device device_data= DM::DataCenter::Ins().get_current_device_data();
     if(p->m_cx_panel_filament_content)
     {
         if(device_data.materialBoxes.size() == 0)
@@ -3367,7 +3368,10 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLTOOLBAR_PASTE, [q](SimpleEvent&) { q->paste_from_clipboard(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_LAYERSEDITING, &priv::on_action_layersediting, this);
         //BBS: add clone
-        view3D_canvas->Bind(EVT_GLTOOLBAR_CLONE, [q](SimpleEvent&) { q->clone_selection(); });
+        view3D_canvas->Bind(EVT_GLTOOLBAR_CLONE, [q](SimpleEvent&) {
+            q->canvas3D()->triger_extra_render_event(GLCanvas3D::ERenderEvent::ObjectCloneOptions);
+        });
+
         view3D_canvas->Bind(EVT_GLTOOLBAR_MORE, [q](SimpleEvent&) { q->increase_instances(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_FEWER, [q](SimpleEvent&) { q->decrease_instances(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_SPLIT_OBJECTS, &priv::on_action_split_objects, this);
@@ -3599,7 +3603,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
             catch (...) {}
             int skip_confirm = e.GetInt();
             this->q->new_project(skip_confirm, true);
+#if CUSTOM_CXCLOUD
             Slic3r::GUI::UpdateParams::getInstance().checkParamsNeedUpdate();
+#endif
             });
         //wxPostEvent(this->q, wxCommandEvent{EVT_RESTORE_PROJECT});
     }
@@ -4797,6 +4803,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     for (unsigned int i = 0; i < project_presets.size(); i++) { delete project_presets[i]; }
                     project_presets.clear();
                 }
+                fs::path tmpPath = path;
+                tmpPath.replace_extension("");
+                set_project_name(wxString::FromUTF8(tmpPath.filename().string()));
             }
         } catch (const ConfigurationError &e) {
             std::string message = GUI::format(_L("Failed loading file \"%1%\". An invalid configuration was found."), filename.string()) + "\n\n" + e.what();
@@ -5014,6 +5023,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     q->skip_thumbnail_invalid = false;
     if (load_model && load_config) {
         if (model.objects.empty()) {
+            q->select_view_3D("Preview");
             partplate_list.load_gcode_files();
             PartPlate * first_plate = nullptr, *cur_plate = nullptr;
             int plate_cnt = partplate_list.get_plate_count();
@@ -5022,6 +5032,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             for (index = 0; index < plate_cnt; index ++)
             {
                 cur_plate = partplate_list.get_plate(index);
+                if(!cur_plate->thumbnail_data.is_valid())
+                {
+                    cur_plate->load_thumbnail_data(cur_plate->thumbnail_file, cur_plate->thumbnail_data);
+                }
                 if (!first_plate && cur_plate->is_slice_result_valid()) {
                     first_plate = cur_plate;
                     first_plate_index = index;
@@ -5247,19 +5261,41 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
     view3D->get_canvas3d()->arrange_wipe_tower(wti);
 #else
     // BBS: find an empty cell to put the copied object
-    for (auto& instance : new_instances) {
-        auto offset = instance->get_offset();
-        auto start_point = this->bed.build_volume().bounding_volume2d().center();
-        bool plate_empty = partplate_list.get_curr_plate()->empty();
-        Vec3d displacement;
-        if (plate_empty)
-            displacement = {start_point(0), start_point(1), offset(2)};
-        else {
-            auto empty_cell = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)});
-            displacement    = {empty_cell.x(), empty_cell.y(), offset(2)};
+    //for (auto& instance : new_instances) {
+    //    auto offset = instance->get_offset();
+    //    auto start_point = this->bed.build_volume().bounding_volume2d().center();
+    //    bool plate_empty = partplate_list.get_curr_plate()->empty();
+    //    Vec3d displacement;
+    //    if (plate_empty)
+    //        displacement = {start_point(0), start_point(1), offset(2)};
+    //    else {
+    //        auto empty_cell = wxGetApp().plater()->canvas3D()->get_nearest_empty_cell({start_point(0), start_point(1)});
+    //        displacement    = {empty_cell.x(), empty_cell.y(), offset(2)};
+    //    }
+    //    instance->set_offset(displacement);
+    //}
+
+    string sArrage = wxGetApp().app_config->get("is_arrange");
+    if ("1" == sArrage) {
+        int idx = 0;
+        for (ModelInstance* inst : new_instances) {
+            // if multiple instances(multiple stl files) loaded at the same time, when process the first instance, make sure the fixed_ap
+            // not include the loaded instance
+            q->arrange_loaded_object_to_new_position(inst, 0 == idx ? new_instances : std::vector<ModelInstance*>());
+            idx++;
         }
-        instance->set_offset(displacement);
+    } else {
+        auto start_point = this->bed.build_volume().bounding_volume2d().center();
+        Vec3d displacement;
+        for (auto& instance : new_instances) {
+            auto offset = instance->get_offset();
+            displacement = {start_point(0), start_point(1), offset(2)};
+            instance->set_offset(displacement);
+        }
     }
+
+
+
 #endif
 
 #endif /* AUTOPLACEMENT_ON_LOAD */
@@ -5283,6 +5319,9 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
     }
     else
         wxGetApp().obj_list()->add_objects_to_list(obj_idxs);
+
+    wxGetApp().obj_list()->reload_all_plates(true);
+
     auto end = std::chrono::high_resolution_clock::now();
     auto duration   = std::chrono::duration_cast<std::chrono::seconds>(end - start);
     int  spend_time = duration.count();
@@ -5759,6 +5798,105 @@ void Plater::find_new_position(const ModelInstancePtrs &instances)
         m.apply();
 }
 
+void Plater::arrange_loaded_object_to_new_position(ModelInstance* new_instance, const std::vector<ModelInstance*>& ignore_insts)
+{
+    if(!new_instance)
+        return;
+
+    const Slic3r::DynamicPrintConfig& config = wxGetApp().preset_bundle->full_config();
+
+    arrangement::ArrangePolygons movable, fixed;
+    arrangement::ArrangeParams arr_params = init_arrange_params(this);
+
+    arrangement::ArrangePolygon arrange_poly;
+    arrange_poly = get_instance_arrange_poly(new_instance, config);
+
+    movable.emplace_back(std::move(arrange_poly));
+
+    PartPlateList& plate_list = this->get_partplate_list();
+    PartPlate* cur_plate = plate_list.get_curr_plate();
+    if(!cur_plate)
+        return;
+
+    
+
+    for (size_t oidx = 0; oidx < p->model.objects.size(); ++oidx)
+    {
+        ModelObject* mo = p->model.objects[oidx];
+        for (size_t inst_idx = 0; inst_idx < mo->instances.size(); ++inst_idx) {
+
+            // if import multiple stl files at the same time, those new instances can not be fixed_ap
+            if (std::find(ignore_insts.begin(), ignore_insts.end(), mo->instances[inst_idx]) != ignore_insts.end())
+                continue;
+
+            bool             in_plate = cur_plate->contain_instance(oidx, inst_idx) || cur_plate->intersect_instance(oidx, inst_idx);
+            if(!in_plate || new_instance->get_object() == mo)
+                continue;
+
+            arrangement::ArrangePolygon fixed_ap;
+            
+            fixed_ap = get_instance_arrange_poly(mo->instances[inst_idx], config);
+
+            fixed.emplace_back(fixed_ap);
+
+        }
+    }
+
+    Points      bedpts = get_shrink_bedpts(this->config(), arr_params);
+
+    //adjust some offsets between the current plate and the first plate(start point located at (0,0))
+    PartPlate* plate0 = plate_list.get_plate(0);
+    Vec3d cur_plate_origin = plate_list.get_current_plate_origin();
+    Vec3d plate_offset = cur_plate_origin - plate0->get_origin();
+    for (auto& polygon : fixed) {
+        polygon.translation.x() -= scaled<double>(plate_offset.x());
+        polygon.translation.y() -= scaled<double>(plate_offset.y());
+    }
+
+    if (auto wt = get_wipe_tower_arrangepoly(*this))
+        fixed.emplace_back(*wt);
+
+    update_arrange_params(arr_params, this->config(), movable);
+    update_selected_items_inflation(movable, this->config(), arr_params);
+    update_unselected_items_inflation(fixed, this->config(), arr_params);
+    update_selected_items_axis_align(movable, this->config(), arr_params);
+
+    arr_params.do_final_align = fixed.empty();
+    arrangement::arrange(movable, fixed, bedpts, arr_params);
+
+    std::vector<int> move_top_left_ids;
+    move_top_left_ids.clear();
+    for (auto& ap : movable) {
+        if (ap.bed_idx > 0) {
+            move_top_left_ids.emplace_back(ap.itemid);
+        }
+    }
+
+    for (auto& ap : movable) {
+        if (std::find(move_top_left_ids.begin(), move_top_left_ids.end(), ap.itemid) != move_top_left_ids.end()) {
+            PartPlate* first_plate = this->get_partplate_list().get_plate(0);
+            if (first_plate) {
+                BoundingBoxf3 plate_bbox         = first_plate->get_build_volume();
+                const Vec3d   instance_bbox_size = new_instance->get_object()->instance_bounding_box(0).size();
+                auto          offset             = new_instance->get_offset();
+                Vec3d top_left = {plate_bbox.min.x() + instance_bbox_size.x(), plate_bbox.max.y() + instance_bbox_size.y(), offset(2)};
+                new_instance->set_offset(top_left);
+            }
+
+            this->get_notification_manager()->push_notification(NotificationType::BBLPlateInfo,
+                                                                NotificationManager::NotificationLevel::NormalNotificationLevel,
+                                                                into_u8(_L("Current tray is full; Unarranged models are placed above Tray 1.")));
+        }
+        else {
+            plate_list.postprocess_bed_index_for_current_plate(ap);
+            plate_list.postprocess_arrange_polygon(ap, true);
+            ap.apply();
+        }
+
+        
+    }
+}
+
 void Plater::update_mode(const int mode)
 {
     ConfigOptionMode app_mode;
@@ -5908,7 +6046,7 @@ void Plater::priv::process_validation_warning(StringObjectException const &warni
         notification_manager->push_notification(
             NotificationType::ValidateWarning,
             NotificationManager::NotificationLevel::WarningNotificationLevel,
-            _u8L("WARNING:") + "\n" + text, hypertext, action_fn
+            /*_u8L("WARNING:") + "\n" + */text, hypertext, action_fn
         );
     }
 }
@@ -7299,7 +7437,11 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
 
     if (preset_type == Preset::TYPE_FILAMENT) {
         wxGetApp().preset_bundle->set_filament_preset(idx, preset_name);
-        wxGetApp().preset_bundle->filaments.select_preset_by_name(preset_name, false);
+        //static bool isfirst =true;
+        //if (isfirst){
+        //    wxGetApp().preset_bundle->filaments.select_preset_by_name(preset_name, false);
+        //    isfirst = false;
+        //}
         wxGetApp().plater()->update_project_dirty_from_presets();
         wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
         sidebar->update_dynamic_filament_list();
@@ -8494,6 +8636,7 @@ void Plater::priv::show_right_click_menu(Vec2d mouse_position, wxMenu *menu)
     position = wxDefaultPosition;
 #endif
     GLCanvas3D &canvas = *q->canvas3D();
+    canvas.unregister_all_extra_render_event();
     canvas.apply_retina_scale(mouse_position);
     canvas.set_popup_menu_position(mouse_position);
     q->PopupMenu(menu, position);
@@ -10004,6 +10147,20 @@ void Plater::priv::check_printer_standard_status()
                 if (sJsonNozzles.find(strPrinterVariant) != std::string::npos)
                 {
                     wxGetApp().app_config->set_variant(sJsonVendor, sJsonModel, strPrinterVariant, true);
+                    //  add filament
+                    std::vector<std::string> vtFilament = wxGetApp().printerPresetConfig->getFilament(sJsonModel, strPrinterVariant);
+                    if (vtFilament.size() > 0) {
+                        std::map<std::string, std::string> section_new;
+                        if (wxGetApp().app_config->has_section(AppConfig::SECTION_FILAMENTS)) {
+                            section_new = wxGetApp().app_config->get_section(AppConfig::SECTION_FILAMENTS);
+                        }
+                        for (auto& item : vtFilament) {
+                            if (section_new.find(item) == section_new.end()) {
+                                section_new[item] = "true";
+                            }
+                        }
+                        wxGetApp().app_config->set_section(AppConfig::SECTION_FILAMENTS, section_new);
+                    }
                     isSystemPrinter = true;
                     break;
                 }
@@ -10554,6 +10711,78 @@ int Plater::save_project(bool saveAs, FileType ft, En3mfType type_3mf)
         NetworkAgent* agent = wxGetApp().getAgent();
     }
     catch (...) {}
+
+    return wxID_YES;
+}
+
+int Plater::save_project_nogcode(bool saveAs, FileType ft, En3mfType type_3mf)
+{
+    // if (up_to_date(false, false)) // should we always save
+    //    return;
+    wxString filename;
+    switch (ft) {
+    case Slic3r::GUI::FT_3MF: {
+        filename = get_project_filename(".3mf");
+        break;
+    }
+    case Slic3r::GUI::FT_CXPROJECT: {
+        filename = get_project_filename(".cxprj");
+        break;
+    }
+    case Slic3r::GUI::FT_PROJECT: {
+        filename = get_project_filename(".3mf");
+        if (filename.IsEmpty())
+            filename = get_project_filename(".cxprj");
+        break;
+    }
+    default: break;
+    }
+    if (!saveAs && filename.IsEmpty())
+        saveAs = true;
+    if (saveAs)
+        filename = p->get_export_file(ft);
+    if (filename.empty())
+        return wxID_NO;
+    if (filename == "<cancel>")
+        return wxID_CANCEL;
+
+    // BBS export 3mf without gcode
+    if (export_3mf(into_path(filename),
+                   /*SaveStrategy::WithGcode |*/ SaveStrategy::SplitModel | SaveStrategy::ShareMesh | SaveStrategy::FullPathSources, -1,
+                   nullptr, type_3mf) < 0) {
+        MessageDialog(
+            this,
+            _L("Failed to save the project.\nPlease check whether the folder exists online or if other programs open the project file."),
+            _L("Save project"), wxOK | wxICON_WARNING)
+            .ShowModal();
+        return wxID_CANCEL;
+    }
+
+    Slic3r::remove_backup(model(), false);
+
+    p->set_project_filename(filename);
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << __LINE__ << " call set_project_filename: " << filename;
+
+    up_to_date(true, false);
+    up_to_date(true, true);
+
+    wxGetApp().update_saved_preset_from_current_preset();
+    reset_project_dirty_after_save();
+    // MessageDialog(this, _L("Succeeded to save the project."), _L("Save project"), wxOK).ShowModal();
+
+    MessageDialog msg(this, _L("Saved successfully. Open Local Folder"), _L("Information"), wxYES_NO | wxYES_DEFAULT);
+    if (msg.ShowModal() == wxID_YES) {
+        wxLaunchDefaultApplication(from_u8(into_path(filename).parent_path().string()));
+    }
+
+    try {
+        json             j;
+        boost::uintmax_t size = boost::filesystem::file_size(into_path(filename));
+        j["file_size"]        = size;
+        j["file_name"]        = std::string(filename.mb_str());
+
+        NetworkAgent* agent = wxGetApp().getAgent();
+    } catch (...) {}
 
     return wxID_YES;
 }
@@ -12834,7 +13063,7 @@ ProjectDropDialog::ProjectDropDialog(const std::string &filename)
     SetBackgroundColour(m_def_color);
 
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer *m_sizer_main = new wxBoxSizer(wxVERTICAL);
@@ -13122,7 +13351,7 @@ bool Plater::load_files(const wxArrayString& filenames)
     }
     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start filename " << filename;
 
-    const std::regex pattern_drop(".*[.](stp|step|stl|oltp|obj|amf|3mf|svg|zip|cxprj)", std::regex::icase);
+    const std::regex pattern_drop(".*[.](stp|step|stl|oltp|obj|ply|amf|3mf|svg|zip|cxprj)", std::regex::icase);
     const std::regex pattern_gcode_drop(".*[.](gcode|g)", std::regex::icase);
 
     std::vector<fs::path> normal_paths;
@@ -13481,12 +13710,13 @@ void Plater::add_file()
     default:break;
     }
 
-    string sArrage = wxGetApp().app_config->get("is_arrange");
-    if (("1" == sArrage) && (model().objects.size() > 0))
-    {
-        set_prepare_state(Job::PREPARE_STATE_MENU);
-        arrange();
-    }
+    // -------- no need to do the arrange, because it has been done in the load_model_objects interface --------
+    //string sArrage = wxGetApp().app_config->get("is_arrange");
+    //if (("1" == sArrage) && (model().objects.size() > 0))
+    //{
+    //    set_prepare_state(Job::PREPARE_STATE_MENU);
+    //    arrange();
+    //}
 
     auto end = std::chrono::high_resolution_clock::now();
     // 计算耗时
@@ -14032,8 +14262,7 @@ void Plater::export_gcode_3mf(bool export_all)
 
     wxString wildcard;
     wildcard = GUI::format_wxstr("%s|%s", file_wildcards(FT_ONLY_GCODE), file_wildcards(FT_3MF));
-    if (export_all)
-    {
+    if (export_all) {
         wildcard = file_wildcards(FT_3MF);
         default_output_file.replace_extension(".3mf");
     }
@@ -14046,21 +14275,123 @@ void Plater::export_gcode_3mf(bool export_all)
 
     fs::path output_path;
     {
-        std::string ext = default_output_file.extension().string();
-        wxFileDialog dlg(this, _L("Save Sliced file as:"),
-            start_dir,
-            from_path(default_output_file.filename()),
-            /*GUI::file_wildcards(FT_3MF, ext),*/
-            wildcard,
-            wxFD_SAVE | wxFD_OVERWRITE_PROMPT
-        );
+        std::string  ext = default_output_file.extension().string();
+        wxFileDialog dlg(this, _L("Save Sliced file as:"), start_dir, from_path(default_output_file.filename()),
+                         /*GUI::file_wildcards(FT_3MF, ext),*/
+                         wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
         if (dlg.ShowModal() == wxID_OK) {
             output_path = into_path(dlg.GetPath());
-            ext = output_path.extension().string();
+            ext         = output_path.extension().string();
             if ((ext != ".3mf") && (ext != ".gcode"))
                 output_path = output_path.string() + ".3mf";
         }
     }
+
+    //wxString wildcard;
+    //wildcard = GUI::format_wxstr("%s|%s", file_wildcards(FT_ONLY_GCODE), file_wildcards(FT_GCODE_3MF));
+    //if (export_all)
+    //{
+    //    wildcard = file_wildcards(FT_GCODE_3MF);
+    //    default_output_file.replace_extension(".gcode.3mf");
+    //}
+    ////default_output_file.replace_extension(".3mf");
+
+    //default_output_file = fs::path(Slic3r::fold_utf8_to_ascii(default_output_file.string()));
+
+    ////Get a last save path
+    //start_dir = appconfig.get_last_output_dir(default_output_file.parent_path().string(), false);
+
+    //fs::path output_path;
+    //{
+    //    std::string ext = default_output_file.extension().string();
+    //    if (!export_all) {
+    //        wxFileDialog dlg(this, _L("Save Sliced file as:"), start_dir, from_path(default_output_file.filename()),
+    //                         /*GUI::file_wildcards(FT_3MF, ext),*/
+    //                         wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    //        if (dlg.ShowModal() == wxID_OK) {
+    //            output_path = into_path(dlg.GetPath());
+    //            ext         = output_path.extension().string();
+    //            int index   = dlg.GetFilterIndex();
+    //            if (index == 0) {
+    //                std::string ext2 = output_path.string();
+    //                {
+    //                    ext2 = output_path.extension().string();
+    //                    if (ext2.length() != 0) {
+    //                        string output = output_path.string();
+    //                        output_path   = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                        ext2          = output_path.extension().string();
+    //                        if (ext2.length() != 0) {
+    //                            output      = output_path.string();
+    //                            output_path = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                            ext2        = output_path.extension().string();
+    //                            if (ext2.length() != 0) {
+    //                                output      = output_path.string();
+    //                                output_path = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                            }
+    //                        }
+    //                    }
+    //                }
+    //                output_path = output_path.string() + ".gcode";
+    //            } else {
+    //                std::string ext2 = output_path.string();
+    //                {
+    //                    ext2 = output_path.extension().string();
+    //                    if (ext2.length() != 0) {
+    //                        string output = output_path.string();
+    //                        output_path   = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                        ext2          = output_path.extension().string();
+    //                        if (ext2.length() != 0) {
+    //                            output      = output_path.string();
+    //                            output_path = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                            ext2        = output_path.extension().string();
+    //                            if (ext2.length() != 0) {
+    //                                output      = output_path.string();
+    //                                output_path = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                            }
+    //                        }
+    //                    }
+    //                }
+    //                output_path = output_path.string() + ".gcode.3mf";
+    //            }
+    //        }
+    //    } else {
+    //        wxString     defaultFileName = get_project_filename();
+    //        if (defaultFileName.IsEmpty()) {
+    //            defaultFileName = _L("Untitled");
+    //        }
+    //        wxFileDialog dlg(this, _L("Save Sliced file as:"), start_dir, defaultFileName,
+    //                         /*GUI::file_wildcards(FT_3MF, ext),*/
+    //                         wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    //        if (dlg.ShowModal() == wxID_OK) {
+    //            output_path = into_path(dlg.GetPath());
+    //            ext         = output_path.extension().string();
+    //            {
+    //                std::string ext2 = output_path.string();
+    //                if (ext2.length() > 10)
+    //                    ext2 = ext2.substr(ext2.length() - 10, 10);
+    //                // if (ext2 != ".gcode.3mf")
+    //                {
+    //                    ext2 = output_path.extension().string();
+    //                    if (ext2.length() != 0) {
+    //                        string output = output_path.string();
+    //                        output_path   = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                        ext2          = output_path.extension().string();
+    //                        if (ext2.length() != 0) {
+    //                            output      = output_path.string();
+    //                            output_path = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                            ext2        = output_path.extension().string();
+    //                            if (ext2.length() != 0) {
+    //                                output      = output_path.string();
+    //                                output_path = fs::path(output.substr(0, output.length() - ext2.length()));
+    //                            }
+    //                        }
+    //                    }
+    //                    output_path = output_path.string() + ".gcode.3mf";
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 
     if (!output_path.empty()) {
         //BBS do not set to removable media path
@@ -16048,12 +16379,13 @@ void Plater::paste_from_clipboard()
     if (!p->sidebar->obj_list()->paste_from_clipboard())
         p->view3D->get_canvas3d()->get_selection().paste_from_clipboard();
 
-    string sArrage = wxGetApp().app_config->get("is_arrange");
-    if ("1" == sArrage)
-    {
-        set_prepare_state(Job::PREPARE_STATE_MENU);
-        arrange();
-    }
+    // no need to do arrange after paste from clipboard
+    //string sArrage = wxGetApp().app_config->get("is_arrange");
+    //if ("1" == sArrage)
+    //{
+    //    set_prepare_state(Job::PREPARE_STATE_MENU);
+    //    arrange();
+    //}
 }
 
 //BBS: add clone
@@ -16061,24 +16393,28 @@ void Plater::clone_selection()
 {
     if (is_selection_empty())
         return;
-    long res = wxGetNumberFromUser("",
-        _L("Clone"),
-        _L("Number of copies:"),
-        1, 0, 1000, this);
-    wxString msg;
-    if (res == -1) {
-        msg = _L("Invalid number");
-        return;
-    }
-    Selection& selection = p->get_selection();
-    selection.clone(res);
 
-    string sArrage = wxGetApp().app_config->get("is_arrange");
-    if ("1" == sArrage)
-    {
-        set_prepare_state(Job::PREPARE_STATE_MENU);
-        arrange();
+    Selection& selection = p->get_selection();
+
+    this->take_snapshot(std::string("Selection-clone"));
+
+    if (!can_paste_from_clipboard())
+        return;
+
+    // At first try to paste values from the ObjectList's clipboard
+    // to check if Settings or Layers were copied
+    // and then paste from the 3DCanvas's clipboard if not
+    if (!p->sidebar->obj_list()->paste_from_clipboard()) {
+        Selection::EMode selection_mode = selection.get_mode();
+        if (selection_mode == Selection::Volume) {
+            selection.paste_volumes_from_clipboard_and_set_offsets();
+        }
+        else {
+            selection.paste_objects_from_clipboard_and_set_offsets();
+        }
+
     }
+        
 }
 
 std::vector<Vec2f> Plater::get_empty_cells(const Vec2f step)
@@ -16656,6 +16992,12 @@ int Plater::select_plate_by_hover_id(int hover_id, bool right_click, bool isModi
         if (!ret)
         {
             if (last_arrange_job_is_finished()) {
+                PartPlate* plate = p->partplate_list.get_plate(plate_index);
+                if(!plate || !plate->has_objects_for_arrange()) {
+                    m_arrange_running.store(false);
+                    return -1;
+                }
+
                 set_prepare_state(Job::PREPARE_STATE_MENU);
                 arrange();
             }

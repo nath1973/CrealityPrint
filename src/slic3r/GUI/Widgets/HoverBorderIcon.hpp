@@ -24,7 +24,7 @@ public:
 protected:
     void paintEvent(wxPaintEvent& evt);
 
-    void render(wxDC& dc);
+    virtual void render(wxDC& dc);
 
     void messureSize();
 
@@ -32,7 +32,6 @@ protected:
 
     void Create(wxWindow* parent, const wxString& text, const wxString& icon, const wxPoint& pos, const wxSize& size, long style);
 
-private:
     ScalableBitmap m_icon;
     wxRect m_iconRect;
     wxString m_hover_tip;
@@ -42,6 +41,23 @@ private:
 
 
     wxDECLARE_EVENT_TABLE();
+};
+
+class ImgBtn : public HoverBorderIcon
+{
+public:
+    ImgBtn();
+    ImgBtn(wxWindow*       parent,
+           const wxString& text,
+           const wxString& icon,
+           const wxPoint&  pos   = wxDefaultPosition,
+           const wxSize&   size  = wxDefaultSize,
+           long            style = 0);
+    ~ImgBtn();
+
+protected:
+    void render(wxDC& dc) override;
+    void Create(wxWindow* parent, const wxString& text, const wxString& icon, const wxPoint& pos, const wxSize& size, long style);
 };
 
 #endif // TEXTDISPLAY_HPP

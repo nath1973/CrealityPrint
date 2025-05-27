@@ -205,6 +205,7 @@ public:
     bool is_hovered() const { return (m_state == Hover) || (m_state == HoverPressed) || (m_state == HoverDisabled); }
     bool is_pressed() const { return (m_state == Pressed) || (m_state == HoverPressed); }
     bool is_visible() const { return m_data.visible; }
+    void set_visible(bool visible) { m_data.visible = visible; }
     bool is_separator() const { return m_type == Separator; }
 
     bool is_left_toggable() const { return m_data.left.toggable; }
@@ -249,7 +250,7 @@ public:
     GLTexture::Quad_UVs get_uvs_with_render_state(int render_state, unsigned int tex_width, unsigned int tex_height, unsigned int icon_size) const;
 
 private:
-    void set_visible(bool visible) { m_data.visible = visible; }
+    
 
     friend class GLToolbar;
 };
@@ -454,6 +455,9 @@ public:
     void  set_scroll(float scroll) { m_layout.scroll = scroll; }
     float get_scroll() { return m_layout.scroll; }
     void  to_scroll(float offset) { m_layout.scroll += offset; };
+
+    void on_set_virtual_item(const std::string& item_name);
+
  private:
     void calc_layout();
     float get_width_horizontal() const;

@@ -14,6 +14,7 @@ namespace DM {
             std::string mac;
             std::string address;
             std::string name;
+            bool oldPrinter;    //¾É»úÐÍ ÈçD3Pro
         };
     public:
         DeviceMgr();

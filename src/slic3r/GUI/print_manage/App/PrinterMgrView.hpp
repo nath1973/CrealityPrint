@@ -58,6 +58,10 @@ namespace Slic3r {
             void forward_init_device_cmd_to_printer_list();
             void request_refresh_all_device();
             int load_machine_preset_data();
+            int getFileListFromLanDevice(const std::string strIp);
+            int deleteFileListFromLanDevice(const std::string strIp, const std::string strName);
+            int uploadeFileLanDevice(const std::string strIp);
+
             bool LoadFile(std::string jPath, std::string & sContent);
 
             // need to close the video when send page is opened
@@ -81,6 +85,11 @@ namespace Slic3r {
             bool m_apikey_sent;
 
             std::unordered_map<std::string, std::function<void(const nlohmann::json&)>> m_commandHandlers;
+
+            #ifdef __WXGTK__
+            // When using GTK, there may be a problem of synthetic dirty area failure, so perform a low-frequency refresh
+            wxTimer* m_freshTimer;
+            #endif
 
             // DECLARE_EVENT_TABLE()
         };

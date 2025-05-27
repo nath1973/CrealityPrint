@@ -48,10 +48,18 @@ public:
     void pushUploadTasks(const std::string&               ipAddress,
                         const std::string&                      fileName,
                         const std::string&                      filePath,
-                        std::function<void(std::string, float)> progressCallback,
+                        std::function<void(std::string, float,double)> progressCallback,
                         std::function<void(std::string, int)>   uploadStatusCallback = nullptr, 
                         std::function<void(std::string, std::string)>   onCompleteCallback = nullptr);
     void cancelUpload(const std::string& ipAddress);
+    void uploadFileByLan(const std::string& ipAddress,
+                         const std::string& fileName,
+                         const std::string& filePath,
+                         std::function<void(float,double)> progressCallback = nullptr,
+                         std::function<void(std::string, int)>   uploadStatusCallback = nullptr,
+                         std::function<void(std::string, std::string)>   onCompleteCallback = nullptr);
+
+    void setOldPrinterMap(std::string& ipAddress);
 
 private:
     RemotePrinterManager();
@@ -62,7 +70,7 @@ private:
     void pushFile(const std::string&                      ipAddress,
                   const std::string&                      fileName,
                   const std::string&                      filePath,
-                  std::function<void(std::string, float)> progressCallback,
+                  std::function<void(std::string, float,double)> progressCallback,
                   std::function<void(std::string, int)>   uploadStatusCallback = nullptr,
                   std::function<void(std::string, std::string)> onCompleteCallback = nullptr);
 
@@ -74,13 +82,15 @@ private:
 
     std::mutex m_mtxUpload;
     std::condition_variable m_cvUpload;
-    std::deque<std::tuple<std::string, std::string, std::string, std::function<void(std::string, float)>, std::function<void(std::string, int)>, std::function<void(std::string, std::string)> >> m_uploadTasks;
+    std::deque<std::tuple<std::string, std::string, std::string, std::function<void(std::string, float,double)>, std::function<void(std::string, int)>, std::function<void(std::string, std::string)> >> m_uploadTasks;
     bool m_bExit = false;
 
     static std::unique_ptr<RemotePrinterManager> instance;
     static std::once_flag flag;
 
     RemotePrinerType determinePrinterType(const std::string& ipAddress);
+
+    std::vector<std::string> oldPrinters;
 };
 } // namespace RemotePrintManage
 

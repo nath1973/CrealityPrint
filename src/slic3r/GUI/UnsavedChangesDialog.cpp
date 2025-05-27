@@ -24,7 +24,7 @@
 #include "PresetComboBoxes.hpp"
 #include "Widgets/RoundedRectangle.hpp"
 #include "Widgets/CheckBox.hpp"
-
+#include "libslic3r/common_header/common_header.h"
 using boost::optional;
 
 #ifdef __linux__
@@ -850,7 +850,7 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection *dependent_
 {
     SetBackgroundColour(*wxWHITE);
     // icon
-    std::string icon_path = (boost::format("%1%/images/Creative3DTitle.ico") % resources_dir()).str();
+    std::string icon_path = (boost::format("%1%/images/%2%.ico") % resources_dir() % Slic3r::CxBuildInfo::getIconName()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
 
     wxBoxSizer *m_sizer_main = new wxBoxSizer(wxVERTICAL);

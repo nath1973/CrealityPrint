@@ -233,6 +233,8 @@ namespace DM {
         item["model"] = data.model;
         item["name"] = data.name;
         item["connectType"] = data.connectType;
+        item["oldPrinter"] = data.oldPrinter;
+
 
         for (auto& g : p->data["groups"])
         {
