@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/preventwarpe">
-	<file>preventwarpe/preventwarpe.qml</file>
-    </qresource>
-</RCC>

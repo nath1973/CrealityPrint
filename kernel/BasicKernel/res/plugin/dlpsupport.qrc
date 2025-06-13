@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/dlpsupport">
-        <file>dlpsupport/main.qml</file>
-    </qresource>
-</RCC>
