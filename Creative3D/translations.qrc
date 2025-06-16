@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/translations">
+		<file>en.qm</file>
+		<file>zh_TW.qm</file>
+		<file>zh_CN.qm</file>
+		<file>en_c3d.qm</file>
+		<file>zh_CN_c3d.qm</file>
+		<file>zh_TW_c3d.qm</file>
+		<file>en_orca.qm</file>
+		<file>zh_CN_orca.qm</file>
+		<file>zh_TW_orca.qm</file>
+    </qresource>
+</RCC>
