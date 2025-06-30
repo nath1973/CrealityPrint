@@ -292,7 +292,7 @@ gst_bambusrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
       return GST_FLOW_ERROR;
   }
 
-#if GLIB_CHECK_VERSION(2,68,0)
+#if 0/*GLIB_CHECK_VERSION(2,68,0)*/
   gpointer sbuf = g_memdup2(sample.buffer, sample.size);
 #else
   gpointer sbuf = g_memdup(sample.buffer, sample.size);

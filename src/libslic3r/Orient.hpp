@@ -1,10 +1,9 @@
 #ifndef ORIENT_HPP
 #define ORIENT_HPP
 
-#include "libslic3r/Model.hpp"
-
 namespace Slic3r {
-
+class ModelObject;
+class ModelInstance;
 namespace orientation {
 
 

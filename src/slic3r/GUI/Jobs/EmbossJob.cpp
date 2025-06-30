@@ -5,6 +5,8 @@
 #include <boost/log/trivial.hpp>
 
 #include <libslic3r/Model.hpp>
+#include <libslic3r/ModelVolume.hpp>
+#include "libslic3r/ModelInstance.hpp"
 #include <libslic3r/Format/OBJ.hpp> // load_obj for default mesh
 #include <libslic3r/CutSurface.hpp> // use surface cuts
 #include <libslic3r/BuildVolume.hpp> // create object
@@ -1145,18 +1147,28 @@ void create_volume(TriangleMesh                    &&mesh,
     // when new volume is created change selection to this volume
     auto                add_to_selection = [volume](const ModelVolume *vol) { return vol == volume; };
     wxDataViewItemArray sel              = obj_list->reorder_volumes_and_get_selection(object_idx, add_to_selection);
+    
     if (!sel.IsEmpty())
         obj_list->select_item(sel.front());
-
+    
     obj_list->selection_changed();
 
     // Now is valid text volume selected open emboss gizmo
     GLGizmosManager &manager = canvas->get_gizmos_manager();
     if (manager.get_current_type() != gizmo)
         manager.open_gizmo(gizmo);
-
+    
     // update model and redraw scene
     //canvas->reload_scene(true);
+    //根据父模型的耗材颜色对应号码，写入浮雕中
+    int modelExtruder = obj->config.extruder();
+    
+    ModelConfig &config=obj_list->get_item_config(sel.front());
+    if (config.has("extruder"))
+        config.set("extruder", modelExtruder);
+    else
+        config.set_key_value("extruder", new ConfigOptionInt(1));
+    //obj_list->set_extruder_for_selected_items(modelExtruder);
     plater->update();
 }
 

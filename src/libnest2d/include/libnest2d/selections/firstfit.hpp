@@ -106,9 +106,11 @@ public:
 
         this->template remove_unpackable_items<Placer>(store_, bin, pconfig);
 
+        
         auto it = store_.begin();
         while (it != store_.end() && !cancelled()) {
             bool                        was_packed = false; 
+            bool                        needNewBin = true;
             size_t                      j = 0;
             typename Placer::PackResult result;
             double                      score = LARGE_COST_TO_REJECT + 1;
@@ -132,7 +134,7 @@ public:
                         placers.back().configure(pconfig);
                         packed_bins_.emplace_back();
                         j = placers.size() - 1;
-                    } else if (true) {
+                    } else if (needNewBin) {
                         placers.emplace_back(bin);
                         placers.back().plateID(placers.size() - 1);
                         placers.back().configure(pconfig);
@@ -144,6 +146,10 @@ public:
                     } else {
                         break;
                     }
+
+                    if (j > 1)
+                        if (placers[j - 1].getPackedSize() < 1)
+                            needNewBin = false;
                 }
             }
             ++it;

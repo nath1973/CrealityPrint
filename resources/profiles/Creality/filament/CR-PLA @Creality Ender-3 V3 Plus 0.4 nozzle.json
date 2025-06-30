@@ -5,7 +5,7 @@
     "name": "CR-PLA @Creality Ender-3 V3 Plus 0.4 nozzle",
     "from": "system",
     "instantiation": "true",
-    "inherits": "fdm_filament_common",
+    "inherits": "fdm_filament_pla",
     "activate_air_filtration": "0",
     "activate_chamber_temp_control": "0",
     "additional_cooling_fan_speed": "80",
@@ -37,7 +37,7 @@
     "filament_deretraction_speed": "nil",
     "filament_diameter": "1.75",
     "filament_end_gcode": [
-        "; filament end gcode \n"
+        ";filament end gcode \n"
     ],
     "filament_flow_ratio": "0.95",
     "filament_is_support": "0",
@@ -63,7 +63,7 @@
     "filament_shrink": "100%",
     "filament_soluble": "0",
     "filament_start_gcode": [
-        "; filament start gcode\n"
+        ";filament start gcode\n"
     ],
     "filament_toolchange_delay": "0",
     "filament_type": [

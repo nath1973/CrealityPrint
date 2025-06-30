@@ -1,5 +1,7 @@
 #include "libslic3r.h"
 #include "Model.hpp"
+#include "ModelObject.hpp"
+#include "ModelInstance.hpp"
 #include "TriangleMesh.hpp"
 #include "SlicingAdaptive.hpp"
 

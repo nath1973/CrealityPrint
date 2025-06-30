@@ -408,22 +408,25 @@ void PrinterBoxFilamentPanel::update_box_filament_items()
             [](const DM::MaterialBox& a, const DM::MaterialBox& b) { return a.box_type > b.box_type; });
 
     bool has_exact_material = false;
-    for (const auto& materialBox : m_device_data.materialBoxes) {
-        OneBoxFilamentColorItem* one_box_item = new OneBoxFilamentColorItem(this, wxDefaultSize);
-        assert(one_box_item);
-        one_box_item->update_ui_item_info_by_material_box_info(materialBox);
+    {
+        wxWindowUpdateLocker freeze_guard(this);
+        for (const auto& materialBox : m_device_data.materialBoxes) {
+            OneBoxFilamentColorItem* one_box_item = new OneBoxFilamentColorItem(this, wxDefaultSize);
+            assert(one_box_item);
+            one_box_item->update_ui_item_info_by_material_box_info(materialBox);
 
-        m_filament_box_items.push_back(one_box_item);
-        for (const auto& material : materialBox.materials) {
-            if (materialBox.box_type == 0 && !material.color.empty()) {
-                has_exact_material = true;
-                break;
+            m_filament_box_items.push_back(one_box_item);
+            for (const auto& material : materialBox.materials) {
+                if (materialBox.box_type == 0 && !material.color.empty()) {
+                    has_exact_material = true;
+                    break;
+                }
             }
-        }
 
-        m_sizer->Add(one_box_item, 0, wxTOP | wxBOTTOM, FromDIP(5));
-	    m_sizer->Layout();
-	    this->GetParent()->Layout();
+            m_sizer->Add(one_box_item, 0, wxTOP | wxBOTTOM, FromDIP(5));
+            m_sizer->Layout();
+            this->GetParent()->Layout();
+        }
     }
     if (m_funcExactMaterialCb) {
         m_funcExactMaterialCb(has_exact_material);

@@ -1,6 +1,7 @@
 #include "../libslic3r.h"
 #include "../Model.hpp"
 #include "../TriangleMesh.hpp"
+#include "../Utils.hpp"
 
 #include "TextShape.hpp"
 

@@ -10,6 +10,8 @@
 #include "Plater.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 
 #include <boost/algorithm/string.hpp>
 

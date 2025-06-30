@@ -330,7 +330,7 @@ public:
         float scale;
 
         float width;
-        float limit_width{-1.0f}; // Èç¹ûÊÇÐ¡ÓÚÁãÔò²»ÏÞÖÆ£¬·ñÔòÏÞÖÆ×î´ó¿í¶È
+        float limit_width{-1.0f}; // ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         float height;
         bool dirty;
         float scroll;
@@ -449,6 +449,8 @@ public:
     void set_horizontal_expand(bool b_h_expand=true){ m_horizontal_expand=b_h_expand; }
 
     Vec2f get_separator_position(int separator_idx);
+    //Vec2f get_item_position(const std::string& name);
+    Vec2f get_item_position_from_top_left(const GLCanvas3D& parent, const std::string& name);
 
     void set_limit_width(float w) { m_layout.limit_width = w; };
 

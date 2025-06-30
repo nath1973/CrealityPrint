@@ -221,7 +221,7 @@ public:
     // Has this profile been loaded?
     bool                loaded      = false;
 
-    bool m_is_user_printer_hidden = true;   //true-ÏÔÊ¾  false-Òş²Ø
+    bool m_is_user_printer_hidden = true;   //true-æ˜¾ç¤º  false-éšè—
 
     bool m_is_non_standard_printer = false; 
     // Configuration data, loaded from a file, or set from the defaults.
@@ -451,7 +451,7 @@ public:
     void            update_after_user_presets_loaded();
     //BBS: get user presets
     int  get_user_presets(PresetBundle *preset_bundle, std::vector<Preset> &result_presets);
-    void set_sync_info_and_save(std::string name, std::string setting_id, std::string syncinfo, long long update_time);
+    void set_sync_info_and_save(std::string name, std::string setting_id, std::string syncinfo, long long update_time, std::string user_id = "");
     bool need_sync(std::string name, std::string setting_id, long long update_time);
 
     //BBS: add function to generate differed preset for save
@@ -733,37 +733,12 @@ private:
     // The "-- default -- " preset is always the first, so it needs
     // to be handled differently.
     // If a preset does not exist, an iterator is returned indicating where to insert a preset with the same name.
-    std::deque<Preset>::iterator find_preset_internal(const std::string &name)
-    {
-        auto it = Slic3r::lower_bound_by_predicate(m_presets.begin() + m_num_default_presets, m_presets.end(), [&name](const auto& l) { return l.name < name;  });
-        if (it == m_presets.end() || it->name != name) {
-            // Preset has not been not found in the sorted list of non-default presets. Try the defaults.
-            for (size_t i = 0; i < m_num_default_presets; ++ i)
-                if (m_presets[i].name == name) {
-                    it = m_presets.begin() + i;
-                    break;
-                }
-        }
-        return it;
-    }
+    std::deque<Preset>::iterator find_preset_internal(const std::string &name);
     std::deque<Preset>::const_iterator find_preset_internal(const std::string &name) const
         { return const_cast<PresetCollection*>(this)->find_preset_internal(name); }
 
-    std::deque<Preset>::iterator find_preset_internal_by_id(const std::string& setting_id)
-    {
-        auto it = m_presets.begin() + m_num_default_presets;
-        for (; it != m_presets.end(); ++it) {
-            if (it->setting_id == setting_id)
-                break;
-        }
-        return it;
-    }
-    std::deque<Preset>::iterator 	   find_preset_renamed(const std::string &name) {
-    	auto it_renamed = m_map_system_profile_renamed.find(name);
-    	auto it = (it_renamed == m_map_system_profile_renamed.end()) ? m_presets.end() : this->find_preset_internal(it_renamed->second);
-    	assert((it_renamed == m_map_system_profile_renamed.end()) || (it != m_presets.end() && it->name == it_renamed->second));
-    	return it;
-    }
+    std::deque<Preset>::iterator find_preset_internal_by_id(const std::string& setting_id);
+    std::deque<Preset>::iterator 	   find_preset_renamed(const std::string &name);
     std::deque<Preset>::const_iterator find_preset_renamed(const std::string &name) const
         { return const_cast<PresetCollection*>(this)->find_preset_renamed(name); }
 

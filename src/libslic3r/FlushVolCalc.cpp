@@ -6,7 +6,7 @@
 
 namespace Slic3r {
 
-const int g_min_flush_volume_from_support = 420.f;
+const int g_min_flush_volume_from_support = 700.f;
 const int g_flush_volume_to_support = 230;
 
 const int g_max_flush_volume = 1200;

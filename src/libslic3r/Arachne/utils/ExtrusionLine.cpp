@@ -3,14 +3,20 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
-#include <string>
+#include <cstdlib>
 
 #include "ExtrusionLine.hpp"
-#include "linearAlg2D.hpp"
 #include "../../VariableWidth.hpp"
+#include "libslic3r/Arachne/utils/ExtrusionJunction.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
-//#include "libslic3r/Visual/Json.hpp"
+namespace Slic3r {
+class Flow;
+}  // namespace Slic3r
 
 namespace Slic3r::Arachne
 {
@@ -34,22 +40,12 @@ int64_t ExtrusionLine::getLength() const
     return len;
 }
 
-coord_t ExtrusionLine::getMinimalWidth() const
-{
-    return std::min_element(junctions.cbegin(), junctions.cend(),
-                            [](const ExtrusionJunction& l, const ExtrusionJunction& r)
-                            {
-                                return l.w < r.w;
-                            })->w;
-}
-
 void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const int64_t allowed_error_distance_squared, const int64_t maximum_extrusion_area_deviation)
 {
     const size_t min_path_size = is_closed ? 3 : 2;
     if (junctions.size() <= min_path_size)
         return;
 
-    int64_t sqrt_smallest_line_segment_squared = std::sqrt(smallest_line_segment_squared);
     /* ExtrusionLines are treated as (open) polylines, so in case an ExtrusionLine is actually a closed polygon, its
      * starting and ending points will be equal (or almost equal). Therefore, the simplification of the ExtrusionLine
      * should not touch the first and last points. As a result, start simplifying from point at index 1.
@@ -159,14 +155,19 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
                 //                    ^ current
                 Point intersection_point;
                 bool has_intersection = Line(previous_previous.p, previous.p).intersection_infinite(Line(current.p, next.p), &intersection_point);
-                
-                Point d1 = (intersection_point - previous.p);
-                Point d2 = (intersection_point - current.p);
+                const auto dist_greater = [](const Point& p1, const Point& p2, const int64_t threshold) {
+                    const auto vec = (p1 - p2).cwiseAbs().cast<uint64_t>().eval();
+                    if(vec.x() > threshold || vec.y() > threshold) {
+                        // If this condition is true, the distance is definitely greater than the threshold.
+                        // We don't need to calculate the squared norm at all, which avoid potential arithmetic overflow.
+                        return true;
+                    }
+                    return vec.squaredNorm() > threshold;
+                };
                 if (!has_intersection
                     || Line::distance_to_infinite_squared(intersection_point, previous.p, current.p) > double(allowed_error_distance_squared)
-                    || larger_than_ex(d1, sqrt_smallest_line_segment_squared)  // The intersection point is way too far from the 'previous'
-                    || larger_than_ex(d2, sqrt_smallest_line_segment_squared)  // and 'current' points, so it shouldn't replace 'current'
-                    )
+                    || dist_greater(intersection_point, previous.p, smallest_line_segment_squared)  // The intersection point is way too far from the 'previous'
+                    || dist_greater(intersection_point, current.p, smallest_line_segment_squared))  // and 'current' points, so it shouldn't replace 'current'
                 {
                     // We can't find a better spot for it, but the size of the line is more than 5 micron.
                     // So the only thing we can do here is leave it in...
@@ -175,9 +176,6 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
                 {
                     // New point seems like a valid one.
                     const ExtrusionJunction new_to_add = ExtrusionJunction(intersection_point, current.w, current.perimeter_index);
-                    
-                    //JSON_DEBUG("special_case_" + std::to_string(point_idx), {previous_previous.p, previous.p, current.p, next.p, new_to_add.p});
-
                     // If there was a previous point added, remove it.
                     if(!new_junctions.empty())
                     {
@@ -284,17 +282,21 @@ double ExtrusionLine::area() const
 } // namespace Slic3r::Arachne
 
 namespace Slic3r {
-void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extrusion_paths, const ExtrusionRole role, const Flow &flow)
+void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extrusion_paths, const ExtrusionRole role, const Flow &flow, int overhang)
 {
     for (const ClipperLib_Z::Path &extrusion_path : extrusion_paths) {
         ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion_path);
-        Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON)).paths);
+        Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON), overhang).paths);
     }
 }
 
-void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow)
+void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow, int overhang)
 {
     ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion);
-    Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON)).paths);
+    Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON), overhang).paths);
+}
+void extrusion_path_append(ExtrusionPaths& dst, const ThickPolyline& thick_polyline, const ExtrusionRole role, const Flow& flow, int overhang)
+{
+    Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON), overhang).paths);
 }
 } // namespace Slic3r

@@ -73,7 +73,6 @@
 #define CLI_SLICING_ERROR                  -100
 #define CLI_GCODE_PATH_CONFLICTS           -101
 
-
 namespace boost { namespace filesystem { class directory_entry; }}
 
 namespace Slic3r {
@@ -92,6 +91,9 @@ extern std::string log_memory_info(bool ignore_loglevel = false);
 extern void disable_multi_threading();
 // Returns the size of physical memory (RAM) in bytes.
 extern size_t total_physical_memory();
+
+// TEST LOG
+extern std::function<void(const std::string& model, const std::string& function, const std::string& message)> ADD_TEST_POINT;
 
 // Set a path with GUI resource files.
 void set_var_dir(const std::string &path);
@@ -164,7 +166,7 @@ bool makedir(const std::string path);
 // so the user knows where to search for the debugging output.
 std::string debug_out_path(const char *name, ...);
 // smaller level means less log. level=5 means saving all logs.
-void set_log_path_and_level(const std::string& file, unsigned int level);
+void set_log_path_and_level(const std::string& file, unsigned int level, bool enable_test = false);
 void flush_logs();
 
 // A special type for strings encoded in the local Windows 8-bit code page.
@@ -744,6 +746,34 @@ std::string toLower(const std::string& s);
 bool isEqualAfterProcessing(const std::string& a, const std::string& b);
 
 } // namespace Slic3r
+
+/*
+* Automatic initialization and cleaning of resources for handling local logic.
+*   ScopedResource resource(
+        [] { initialize(); },
+        [] { cleanup(); }
+    );
+*/
+
+class ResGuard
+{
+public:
+    ResGuard(std::function<void()> init, std::function<void()> cleanup) : cleanup_(std::move(cleanup)) { init(); }
+
+    ~ResGuard()
+    {
+        if (cleanup_)
+            cleanup_();
+    }
+
+    ResGuard(const ResGuard&) = delete;
+    ResGuard& operator=(const ResGuard&) = delete;
+
+    ResGuard(ResGuard&& other) noexcept : cleanup_(std::move(other.cleanup_)) { other.cleanup_ = nullptr; }
+
+private:
+    std::function<void()> cleanup_;
+};
 
 #if WIN32
     #define SLIC3R_STDVEC_MEMSIZE(NAME, TYPE) NAME.capacity() * ((sizeof(TYPE) + __alignof(TYPE) - 1) / __alignof(TYPE)) * __alignof(TYPE)

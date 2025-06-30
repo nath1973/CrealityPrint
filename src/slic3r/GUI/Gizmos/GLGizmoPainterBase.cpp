@@ -10,8 +10,12 @@
 #include "slic3r/GUI/OpenGLManager.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/TriangleMeshSlicer.hpp"
 
 #include <memory>
 #include <optional>
@@ -197,8 +201,10 @@ void GLGizmoPainterBase::render_cursor_circle()
 
     glsafe(::glLineWidth(1.5f));
     glsafe(::glDisable(GL_DEPTH_TEST));
-
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     glsafe(::glPushAttrib(GL_ENABLE_BIT));
+#endif //ENABLE_RENDERDOC_CAPTURE
     glsafe(::glLineStipple(4, 0xAAAA));
     glsafe(::glEnable(GL_LINE_STIPPLE));
 
@@ -211,7 +217,7 @@ void GLGizmoPainterBase::render_cursor_circle()
         static const unsigned int StepsCount = 32;
         static const float StepSize = 2.0f * float(PI) / float(StepsCount);
         init_data.format = { GLModel::Geometry::EPrimitiveType::LineLoop, GLModel::Geometry::EVertexLayout::P2 };
-        init_data.color  = { 0.0f, 1.0f, 0.3f, 1.0f };
+        //init_data.color  = { 0.0f, 1.0f, 0.3f, 1.0f };
         init_data.reserve_vertices(StepsCount);
         init_data.reserve_indices(StepsCount);
 
@@ -224,6 +230,7 @@ void GLGizmoPainterBase::render_cursor_circle()
         }
 
         m_circle.init_from(std::move(init_data));
+        m_circle.set_color({0.0f, 1.0f, 0.3f, 1.0f});
     }
 
     // BBS
@@ -244,7 +251,11 @@ void GLGizmoPainterBase::render_cursor_circle()
         shader->stop_using();
     }
 
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     glsafe(::glPopAttrib());
+#endif // ENABLE_RENDERDOC_CAPTURE
+
     glsafe(::glEnable(GL_DEPTH_TEST));
 }
 
@@ -1990,7 +2001,7 @@ void TriangleSelectorGUI::update_paint_contour()
     init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
     init_data.reserve_vertices(2 * contour_edges.size());
     init_data.reserve_indices(2 * contour_edges.size());
-    init_data.color = ColorRGBA::WHITE();
+    //init_data.color = ColorRGBA::WHITE();
     // vertices + indices
     unsigned int vertices_count = 0;
     for (const Vec2i32& edge : contour_edges) {
@@ -2001,7 +2012,10 @@ void TriangleSelectorGUI::update_paint_contour()
     }
 
     if (!init_data.is_empty())
+    {
         m_paint_contour.init_from(std::move(init_data));
+        m_paint_contour.set_color(ColorRGBA::WHITE());
+    }
 }
 
 void TriangleSelectorGUI::render_paint_contour(const Transform3d& matrix)

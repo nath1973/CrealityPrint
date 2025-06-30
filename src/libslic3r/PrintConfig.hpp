@@ -241,9 +241,11 @@ enum BrimType {
     btNoBrim
 };
 
-enum TimelapseType : int {
-    tlTraditional = 0,
-    tlSmooth
+enum TimelapseType : int { 
+
+   tlTraditional,
+    tlSmooth,
+    tlClose
 };
 
 enum SkirtType { stCombined, stPerObject };
@@ -967,7 +969,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat, ironing_angle))
     // Detect bridging perimeters
     ((ConfigOptionBool, detect_overhang_wall))
+    ((ConfigOptionBool, smooth_speed_discontinuity_area))
+    ((ConfigOptionFloat, smooth_coefficient))
     ////yy
+    //((ConfigOptionBool, overhang_optimization))
     //((ConfigOptionBool, overhang_optimization))
     ((ConfigOptionInt, wall_filament))
     ((ConfigOptionFloatOrPercent, inner_wall_line_width))
@@ -991,6 +996,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       overhang_2_4_speed))
     ((ConfigOptionFloatOrPercent,       overhang_3_4_speed))
     ((ConfigOptionFloatOrPercent,       overhang_4_4_speed))
+    ((ConfigOptionFloatOrPercent,       overhang_totally_speed))
     ((ConfigOptionBool,                 only_one_wall_top))
 
     //SoftFever

@@ -210,6 +210,8 @@ void StaticBox::doRender(wxDC& dc)
 
             // 绘制圆角矩形
             if (cornerFlags == 0xF) { // 所有角都是圆角
+                rc.width += border_width * 2;
+                rc.height += border_width * 2;
                 dc.DrawRoundedRectangle(rc, radius - border_width);
             } else {
                 int r = radius - border_width;

@@ -1,6 +1,7 @@
 #include "ModelArrange.hpp"
 
 #include <libslic3r/Model.hpp>
+#include <libslic3r/ModelInstance.hpp>
 #include <libslic3r/Geometry/ConvexHull.hpp>
 #include <libslic3r/Print.hpp>
 
@@ -177,13 +178,6 @@ ArrangePolygon get_instance_arrange_poly(ModelInstance* instance, const Slic3r::
     else if (enable_support) {
         ap.brim_width = 24.0; // 2*MAX_BRANCH_RADIUS_FIRST_LAYER
         ap.has_tree_support = true;
-    }
-
-    // For by-object printing, the brim_width need to add up the extruder_clearance_radius
-    auto print_sequence_type = config.option<ConfigOptionEnum<PrintSequence>>("print_sequence")->value;
-    if (print_sequence_type == PrintSequence::ByObject) {
-        auto extruder_clearance_radius = config.option<ConfigOptionFloat>("extruder_clearance_radius");
-        ap.brim_width += extruder_clearance_radius->getFloat();
     }
 
     auto size = obj->instance_convex_hull_bounding_box(instance).size();

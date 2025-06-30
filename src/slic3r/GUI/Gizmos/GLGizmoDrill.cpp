@@ -11,6 +11,8 @@
 
 #include "libslic3r/MeshBoolean.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include "imgui/imgui.h"
 #include <imgui/imgui_internal.h>

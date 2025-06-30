@@ -2,7 +2,7 @@
 @REM .\scripts\sync_web.bat release-v6.0.3 D:\Jenkins\workspace\Community 
 set web_tag_file=%cd%/web_sync_tag
 if [%1]==[] (
-    set web_branch=release-v6.0.3
+    set web_branch=release-0615
 )  else (
     set web_branch=%1
 )
@@ -70,6 +70,7 @@ if %GIT_COUNT% equ %WEB_TAG_NUM% (
 @REM run web build
 cd %web_root%\Community
 rmdir /s /q "%sync_source_dir%"
+call npm run po2json || exit /b 1
 call npm run release || exit /b 1
 echo npm run release end
 
@@ -86,6 +87,57 @@ xcopy "%sync_source_dir%\*" "%sync_target_dir%\" /s /e /y
 echo  copy end
 
 :END
+
+:RUN_WEB_TOOL2
+@REM run DMgr web build
+set "sync_source_dir=%web_root%\DMgr\dist"
+set "sync_target_dir=%cp_source%\resources\web\deviceMgr"
+cd %web_root%\DMgr
+rmdir /s /q "%sync_source_dir%"
+call npm run po2json || exit /b 1
+call npm run build || exit /b 1
+echo npm run build end
+
+rem copy start
+:SYNC_WEB2
+echo SYNC_WEB Start
+
+if not exist %sync_source_dir% (
+    echo %sync_source_dir% not exist
+    exit /b 1
+)
+echo copy start
+del "%sync_target_dir%\assets\*.js" /s /q
+xcopy "%sync_source_dir%\*" "%sync_target_dir%\" /s /e /y
+echo  copy end
+
+:END
+
+:RUN_WEB_TOOL3
+@REM run DMgr web build
+set "sync_source_dir=%web_root%\SendToPrinterPage\dist"
+set "sync_target_dir=%cp_source%\resources\web\sendToPrinterPage"
+cd %web_root%\SendToPrinterPage
+rmdir /s /q "%sync_source_dir%"
+call npm run po2json || exit /b 1
+call npm run build || exit /b 1
+echo npm run build end
+
+rem copy start
+:SYNC_WEB3
+echo SYNC_WEB Start
+
+if not exist %sync_source_dir% (
+    echo %sync_source_dir% not exist
+    exit /b 1
+)
+echo copy start
+del "%sync_target_dir%\assets\*.js" /s /q
+xcopy "%sync_source_dir%\*" "%sync_target_dir%\" /s /e /y
+echo  copy end
+
+:END
+
 cd  %cp_source%
 echo web sync end
 

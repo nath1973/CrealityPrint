@@ -6,6 +6,8 @@
 #include "MTUtils.hpp"
 #include "Thread.hpp"
 
+#include "libslic3r/ModelInstance.hpp"
+
 #include <unordered_set>
 #include <numeric>
 

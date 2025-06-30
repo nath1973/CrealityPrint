@@ -10,8 +10,12 @@
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 #include <wx/window.h>
 #include <GL/glew.h>

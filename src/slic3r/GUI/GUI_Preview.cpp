@@ -736,8 +736,38 @@ void Preview::load_print_as_fff(bool keep_z_range, bool only_gcode)
             // Load the real G-code preview.
             //BBS: add more log
             BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": will load gcode_preview from result, moves count %1%") % m_gcode_result->moves.size();
+            
+            //import gcode file, preview using normal mode(no lite mode) 
+            const bool is_lite_mode = wxGetApp().app_config->get_bool("gcode_preview_lite_mode") && (!only_gcode);
+            std::vector<std::pair<EMoveType, size_t>> changed_tmp;
+            GCodeProcessorResult* tmp_result = nullptr;
+            if (is_lite_mode) {
+                //changed temporary
+                tmp_result = m_gcode_result;
+                for (size_t i = 0; i < m_gcode_result->moves.size(); i++) {
+                    auto& m = m_gcode_result->moves.at(i);
+                    auto role = m.extrusion_role;
+                    if (m.type == EMoveType::Extrude && role_been_filtered_in_lite_mode(role)) {
+                        changed_tmp.emplace_back(std::pair<EMoveType, size_t>(m.type, i));
+                        m.type = EMoveType::Extrude_Alter;
+                    }
+                }
+            }
+            
             //BBS: add only gcode mode
             m_canvas->load_gcode_preview(*m_gcode_result, colors, only_gcode);
+            
+            //restore
+            if (is_lite_mode && tmp_result != nullptr) {
+                assert(m_gcode_result == tmp_result);
+                for (auto& x : changed_tmp) {
+                    size_t i = x.second;
+                    tmp_result->moves[i].type = x.first;
+                }
+            }
+            changed_tmp.clear();
+            changed_tmp.shrink_to_fit();
+
             //BBS show sliders
             show_moves_sliders();
 

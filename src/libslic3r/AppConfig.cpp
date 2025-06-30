@@ -603,6 +603,10 @@ void AppConfig::set_defaults()
         set("role_type", "0");
     }
 
+    /*if (get("gcode_preview_lite_mode").empty()) {
+        set("gcode_preview_lite_mode", "true");
+    }*/
+
     // Remove legacy window positions/sizes
     erase("app", "main_frame_maximized");
     erase("app", "main_frame_pos");
@@ -840,6 +844,9 @@ std::string AppConfig::load()
 
     // load profile machine if not exist
     Loc_LoadProfile(m_profile_machines, m_profile_printers);
+
+    // do printer_model mapping cover_path
+    fill_model_name2cover_path();
 
     // Figure out if datadir has legacy presets
     auto ini_ver = Semver::parse(get("version"));
@@ -1397,6 +1404,20 @@ const std::map<std::string, ProfilePrinter*>& AppConfig::get_profile_printers()
     return m_profile_printers;
 }
 
+std::string AppConfig::make_model2cover_path_key(std::string vendor, std::string printer_model) 
+{ 
+    return printer_model; 
+}
+
+const std::map<std::string, std::string>& AppConfig::get_model2cover_path() 
+{ 
+    if (m_model_name2cover_path.empty())
+    {
+        fill_model_name2cover_path();
+    }
+    return m_model_name2cover_path; 
+}
+
 void AppConfig::set_mouse_device(const std::string& name, double translation_speed, double translation_deadzone,
                                  float rotation_speed, float rotation_deadzone, double zoom_speed, bool swap_yz, bool invert_x, bool invert_y, bool invert_z, bool invert_yaw, bool invert_pitch, bool invert_roll)
 {
@@ -1625,5 +1646,57 @@ bool AppConfig::exists()
 {
     return boost::filesystem::exists(config_path());
 }
+
+void AppConfig::fill_model_name2cover_path()
+{ 
+    auto profile_machines = get_profile_machines();
+    for (const auto& it : profile_machines)
+    {
+        auto vendor = it.first;
+        for (const auto& model : it.second.models)
+        {
+            auto coverPath = model.cover;
+            for (const auto& printer : model.printers)
+            {
+                auto model_name = printer.model.empty() ? model.model : printer.model;
+                m_model_name2cover_path.insert({make_model2cover_path_key(vendor, model_name), coverPath});
+            }
+        }
+    }
+}
+
+EasyCache::EasyCache()
+{ 
+    if (boost::filesystem::exists(get_file_path()))
+    {
+        try
+        {
+            boost::nowide::ifstream ifs(get_file_path());
+            ifs >> m_data;
+            ifs.close();
+        } 
+        catch (const std::exception& err)
+        {
+            BOOST_LOG_TRIVIAL(info) << "EasyCache constructer failed. Maybe json parser failed";
+        }
+    }
+}
+
+void EasyCache::flush()
+{
+    if (m_data.is_null())
+        return;
+
+    boost::nowide::ofstream ofs(get_file_path());
+    ofs << m_data;
+    ofs.close();
+}
+
+std::string EasyCache::get_file_path()
+{
+    return (boost::filesystem::path(Slic3r::data_dir()) / "extra_config.json").make_preferred().string();
+}
+
+EasyCache::~EasyCache() { flush(); }
 
 }; // namespace Slic3r

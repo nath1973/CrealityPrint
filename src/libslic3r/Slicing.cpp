@@ -5,9 +5,14 @@
 #include "SlicingAdaptive.hpp"
 #include "PrintConfig.hpp"
 #include "Model.hpp"
+#include "Geometry.hpp"
 //----overhangoptimization----------
 #include "OverhangOptimization.hpp"
 
+
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 // #define SLIC3R_DEBUG
 
 // Make assert active if SLIC3R_DEBUG
@@ -253,10 +258,11 @@ std::vector<coordf_t> layer_height_profile_from_ranges(
    	return layer_height_profile;
 }
 
-std::vector<double> layer_height_overhang(const SlicingParameters& slicing_params,const ModelObject& object, float height,std::vector<double> input_height)
+std::vector<double> layer_height_overhang(
+    const SlicingParameters& slicing_params, const ModelObject& object, float height, std::vector<double> input_height, Transform3d trafo)
 {
     OverhangOptimization moo;
-    moo.init(object,height,input_height);
+    moo.init(object, height, input_height, trafo);
     std::vector<double> result;
     result.push_back(0.0);
     result.push_back(slicing_params.first_object_layer_height);
@@ -266,7 +272,8 @@ std::vector<double> layer_height_overhang(const SlicingParameters& slicing_param
     }
      std::vector<double> result_b = moo.get_layer_height();
      //std::vector<double> result_c = moo.smooth_layer(result_b);
-     HeightProfileSmoothingParams Hp;
+     HeightProfileSmoothingParams Hp(12,false);
+     //result_b = moo.smooth_layher_height(result_b);
      result_b=smooth_height_profile(result_b,slicing_params,Hp);
      result.insert(result.end(),result_b.begin(),result_b.end());
      float lok = slicing_params.object_print_z_height();
@@ -276,6 +283,13 @@ std::vector<double> layer_height_overhang(const SlicingParameters& slicing_param
         result.push_back(slicing_params.object_print_z_height());
         result.push_back(std::clamp(z_gap, slicing_params.min_layer_height, slicing_params.max_layer_height));
     }
+
+   /* std::ofstream outfile_input("input_overhang.txt");
+        for (int i = 0; i < result.size(); i++) {
+            outfile_input << result[i] << std::endl;
+        }
+        outfile_input.close();*/
+
     return result;
 }
 
@@ -421,6 +435,7 @@ std::vector<double> smooth_height_profile(const std::vector<double>& profile, co
         // smooth the rest of the profile by biasing a gaussian blur
         // the bias moves the smoothed profile closer to the min_layer_height
         double delta_h = slicing_params.max_layer_height - slicing_params.min_layer_height;
+        //double delta_h     = 0.32f - slicing_params.min_layer_height;
         double inv_delta_h = (delta_h != 0.0) ? 1.0 / delta_h : 1.0;
 
         double max_dz_band = (double)radius * slicing_params.layer_height;
@@ -568,6 +583,8 @@ std::vector<double> layer_width_profile_adaptive(const SlicingParameters& slicin
 
     int print_z_idx = 0;
     while (layer_height_profile[print_z_idx] + EPSILON < slicing_params.object_print_z_height()) {
+        if (print_z_idx > layer_height_profile.size())
+            break;
         float height = layer_height_profile[print_z_idx + 1] - layer_height_profile[print_z_idx];
         float width  = as.next_layer_width(layer_height_profile[print_z_idx], height, current_facet);
 

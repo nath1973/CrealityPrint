@@ -9,6 +9,7 @@
 #include "slic3r/GUI/OpenGLManager.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
 #include "libslic3r/QuadricEdgeCollapse.hpp"
 
 #include <GL/glew.h>
@@ -643,7 +644,12 @@ void GLGizmoSimplify::on_render()
 
     const Transform3d trafo_matrix = selected_volume->world_matrix();
     auto* gouraud_shader = wxGetApp().get_shader("gouraud_light");
+    
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     glsafe(::glPushAttrib(GL_DEPTH_TEST));
+#endif 
+
     glsafe(::glEnable(GL_DEPTH_TEST));
     gouraud_shader->start_using();
     const Camera& camera = wxGetApp().plater()->get_camera();
@@ -675,7 +681,10 @@ void GLGizmoSimplify::on_render()
         contour_shader->stop_using();
     }
 
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     glsafe(::glPopAttrib());
+#endif 
 }
 
 

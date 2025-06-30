@@ -11,10 +11,13 @@
 #include "libslic3r/AppConfig.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "slic3r/GUI/Selection.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 
 #include <boost/algorithm/string.hpp>
 

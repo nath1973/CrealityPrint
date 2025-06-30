@@ -16,6 +16,7 @@
 #include <libslic3r/AABBTreeIndirect.hpp>
 
 #include <libslic3r/ClipperUtils.hpp>
+#include "libslic3r/ModelObject.hpp"
 
 #include <boost/log/trivial.hpp>
 

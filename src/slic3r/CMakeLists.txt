@@ -199,6 +199,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GUI_Preview.hpp
     GUI/GUI_App_Parse.cpp
     GUI/GUI_App.cpp
+    GUI/FileDownloader.hpp
+    GUI/FileDownloader.cpp
     GUI/GUI_App.hpp
     GUI/GUI_Utils.cpp
     GUI/GUI_Utils.hpp
@@ -254,6 +256,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Tab.hpp
     GUI/ParamsDialog.cpp
     GUI/ParamsDialog.hpp
+	GUI/UITour.cpp
+    GUI/UITour.hpp
     GUI/ParamsPanel.cpp
     GUI/ParamsPanel.hpp
     GUI/PrintHostDialogs.cpp
@@ -500,6 +504,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/RecenterDialog.hpp
     GUI/PrivacyUpdateDialog.cpp
     GUI/PrivacyUpdateDialog.hpp
+    GUI/EnableLiteModeDialog.cpp
+    GUI/EnableLiteModeDialog.hpp
     GUI/BonjourDialog.cpp
     GUI/BonjourDialog.hpp
     GUI/BindDialog.cpp
@@ -668,6 +674,8 @@ set(SLIC3R_GUI_SOURCES
 	GUI/PrinterPresetConfig.cpp
     Config/OptionConfig.h
     Config/OptionConfig.cpp
+    GUI/AnalyticsDataUploadManager.hpp
+    GUI/AnalyticsDataUploadManager.cpp
 )
 
 if (WIN32)

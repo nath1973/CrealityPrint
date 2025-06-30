@@ -18,6 +18,10 @@
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "FixModelByWin10.hpp"
 
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelInstance.hpp"
+
 #define RENDER_RESET_BUTTON_BEGIN(disabled) \
     if (!(disabled)) {
 

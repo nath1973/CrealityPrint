@@ -40,9 +40,9 @@
 #include "BitmapCache.hpp"
 #include "SavePresetDialog.hpp"
 #include "MsgDialog.hpp"
-#include "ParamsDialog.hpp"
 #include "slic3r/GUI/ParamsDialog.hpp"
 #include "slic3r/GUI/CreatePresetsDialog.hpp"
+#include "slic3r/GUI/CalibrationWizardCaliPage.hpp"
 
 // A workaround for a set of issues related to text fitting into gtk widgets:
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
@@ -1339,6 +1339,11 @@ void TabPresetComboBox::update()
     {
         set_label_marker(Append(separator(L("System presets")), wxNullBitmap));
         for (std::map<wxString, std::pair<wxBitmap*, bool>>::iterator it = system_presets.begin(); it != system_presets.end(); ++it) {
+            if (m_type == Preset::TYPE_PRINT && it->first == "Default Setting" && (system_presets.size() != 1 
+                || (system_presets.size() == 1 && !project_embedded_presets.empty()) 
+                || (system_presets.size() == 1 && !nonsys_presets.empty()))) {
+                 continue;
+            }
             int item_id = Append(it->first, *it->second.first);
             SetItemTooltip(item_id, preset_descriptions[it->first]);
             bool is_enabled = it->second.second;

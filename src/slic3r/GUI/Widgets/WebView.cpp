@@ -238,6 +238,7 @@ class WebViewRef : public wxObjectRefData
 public:
     WebViewRef(wxWebView *webView) : m_webView(webView) {}
     ~WebViewRef() {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " wxWebView address: " << (void*) m_webView;
         auto iter = std::find(g_webviews.begin(), g_webviews.end(), m_webView);
         assert(iter != g_webviews.end());
         if (iter != g_webviews.end())
@@ -323,7 +324,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 #endif
         webView->EnableContextMenu(true);
     } else {
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": failed. Use fake web view.";
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": failed. Use fake web view.";
         webView = new FakeWebView;
     }
     webView->SetRefData(new WebViewRef(webView));
@@ -391,10 +392,20 @@ bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
 
 void WebView::RecreateAll()
 {
+    BOOST_LOG_TRIVIAL(warning) <<__FUNCTION__ << " start";
     auto dark = Slic3r::GUI::wxGetApp().dark_mode();
     for (auto webView : g_webviews) {
+        void* backend_before = webView->GetNativeBackend();
+        BOOST_LOG_TRIVIAL(warning) << "[RECREATE_ALL] Reloading webView " << (void*) webView << ". Backend BEFORE: " << backend_before;
+
         webView->SetUserAgent(wxString::Format("BBL-Slicer/v%s (%s) Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)", SLIC3R_VERSION,
                                                dark ? "dark" : "light"));
         webView->Reload();
+
+        void* backend_after = webView->GetNativeBackend();
+        BOOST_LOG_TRIVIAL(warning) << "[RECREATE_ALL] Reloaded webView " << (void*) webView << ". Backend AFTER: " << backend_after;
+
     }
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
+    boost::log::core::get()->flush();
 }

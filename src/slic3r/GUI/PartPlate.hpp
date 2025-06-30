@@ -7,21 +7,14 @@
 #include <thread>
 #include <mutex>
 
-#include "libslic3r/ObjectID.hpp"
-#include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "libslic3r/Format/bbs_3mf.hpp"
-#include "libslic3r/Slicing.hpp"
-#include "libslic3r/Arrange.hpp"
-#include "Plater.hpp"
-#include "libslic3r/Model.hpp"
+ #include "libslic3r/Arrange.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "GLCanvas3D.hpp"
 #include "GLTexture.hpp"
 #include "3DScene.hpp"
 #include "GLModel.hpp"
-#include "3DBed.hpp"
-#include "MeshUtils.hpp"
 #include "libslic3r/ParameterUtils.hpp"
 
 class GLUquadric;
@@ -299,6 +292,8 @@ public:
     //set the print object, result and it's index
     void set_print(PrintBase *print, GCodeResult* result = nullptr, int index = -1);
 
+    Print& get_print() const {return *m_print;}
+
     //get gcode filename
     std::string get_gcode_filename();
 
@@ -397,14 +392,7 @@ public:
     const BoundingBox get_bounding_box_crd();
     BoundingBoxf3 get_plate_box() {return get_build_volume();}
     // Orca: support non-rectangular bed
-    BoundingBoxf3 get_build_volume()
-    {
-        auto  eps=Slic3r::BuildVolume::SceneEpsilon;
-        Vec3d         up_point  = m_bounding_box.max + Vec3d(eps, eps, m_origin.z() + m_height + eps);
-        Vec3d         low_point = m_bounding_box.min + Vec3d(-eps, -eps, m_origin.z() - eps);
-        BoundingBoxf3 plate_box(low_point, up_point);
-        return plate_box;
-    }
+    BoundingBoxf3 get_build_volume();
 
     const std::vector<BoundingBoxf3>& get_exclude_areas() { return m_exclude_bounding_box; }
 
@@ -462,7 +450,14 @@ public:
     // check whether plate's slice result valid for export to file
     bool is_slice_result_ready_for_export()
     {
-        return is_slice_result_ready_for_print() && has_printable_instances();
+        //return is_slice_result_ready_for_print() && has_printable_instances();
+
+        bool result = m_slice_result_valid;
+
+        if (result)
+            result = m_gcode_result ? (!m_gcode_result->toolpath_outside) : false;// && !m_gcode_result->conflict_result.has_value()  gcode conflict can also print
+
+        return result && has_printable_instances();
     }
 
     //invalid sliced result
@@ -504,7 +499,7 @@ public:
     void set_first_layer_print_sequence(const std::vector<int> &sorted_filaments);
     void set_other_layers_print_sequence(const std::vector<LayerPrintSequence>& layer_seq_list);
     void update_first_layer_print_sequence(size_t filament_nums);
-
+    void update_first_layer_print_sequence_when_delete_filament(size_t filamen_id);
     void print() const;
 
     friend class cereal::access;

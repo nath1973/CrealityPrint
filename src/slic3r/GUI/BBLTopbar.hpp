@@ -57,6 +57,9 @@ public:
     void EnableUndoRedoItems();
     void DisableUndoRedoItems();
 
+    void DisableGuideModeItems();
+    void EnableGuideModeItems();
+
     void SaveNormalRect();
 
     void EnableUpload3mf();
@@ -69,6 +72,10 @@ public:
     bool GetSaveProjectItemEnabled();
 private:
     wxFrame* m_frame;
+    wxAuiToolBarItem* logo_item = nullptr;
+    wxAuiToolBarItem* tool_item = nullptr;
+    wxAuiToolBarItem* m_preference_item = nullptr;
+    wxAuiToolBarItem* item_ctrl = nullptr;
     wxAuiToolBarItem* m_file_menu_item;
     wxAuiToolBarItem* m_dropdown_menu_item;
     wxRect m_normalRect;
@@ -77,6 +84,7 @@ private:
     wxMenu* m_file_menu;
     wxMenu m_calib_menu;
     wxMenuItem*       m_relationsItem{NULL};   
+    wxMenu*           m_helpItem{NULL};   
     wxAuiToolBarItem* m_relationsItem1{NULL};   
 
     Label*            m_title_LabelItem = nullptr;

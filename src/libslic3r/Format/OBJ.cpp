@@ -1,5 +1,6 @@
 #include "../libslic3r.h"
 #include "../Model.hpp"
+#include "../ModelObject.hpp"
 #include "../TriangleMesh.hpp"
 
 #include "OBJ.hpp"

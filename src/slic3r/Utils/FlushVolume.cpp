@@ -2,6 +2,7 @@
 #include "../GUI/GUI.hpp"
 #include "../GUI/GUI_App.hpp"
 #include "../GUI/Plater.hpp"
+#include "libslic3r/FlushVolCalc.hpp"
 
 using namespace Slic3r::GUI;
 

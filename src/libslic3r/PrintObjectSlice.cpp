@@ -5,6 +5,7 @@
 #include "Print.hpp"
 #include "ClipperUtils.hpp"
 #include "libslic3r/FDM/PolysUlities.hpp"
+#include "libslic3r/ModelVolume.hpp"
 #include "Interlocking/InterlockingGenerator.hpp"
 //BBS
 #include "ShortestPath.hpp"
@@ -827,29 +828,37 @@ void PrintObject::slice()
         return;
     //BBS: add flag to reload scene for shell rendering
     m_print->set_status(5, L("Slicing mesh"), PrintBase::SlicingStatus::RELOAD_SCENE);
+    std::vector<coordf_t> layer_temp_height;
     std::vector<coordf_t> layer_height_profile;
     std::vector<coordf_t> layer_width_profile;
      //const Print *print  = this->print();
      /*bool is_overhang_optimization = */;
-    
-     if (m_config.overhang_optimization.value)
+
+    PrintRegionConfig                           temp_region_config;
+    const PrintObjectRegions::LayerRangeRegions layer_range = m_shared_regions->layer_ranges.front();
+    auto                                        it          = layer_range.volume_regions.begin();
+   // temp_region_config                                      = it->region->config();
+     Transform3d trafo   = this->trafo_centered();
+    this->update_layer_height_profile(*this->model_object(), m_slicing_params, layer_temp_height);
+    if (m_config.overhang_optimization.value)
      {
          this->update_layer_height_profile(*this->model_object(), m_slicing_params, layer_height_profile);
-         layer_height_profile = layer_height_overhang(m_slicing_params, *this->model_object(), m_slicing_params.layer_height,layer_height_profile);
+        layer_height_profile = layer_height_overhang(m_slicing_params, *this->model_object(), m_slicing_params.layer_height,
+                                                     layer_height_profile, trafo);
      }
     this->update_layer_height_profile(*this->model_object(), m_slicing_params, layer_height_profile);
-   
+
     if (m_config.overhang_optimization.value)
     {
-        Transform3d trafo   = this->trafo_centered();
-        layer_width_profile = layer_width_profile_adaptive(m_slicing_params, *this->model_object(), layer_height_profile, trafo);
+        layer_width_profile = layer_width_profile_adaptive(m_slicing_params, *this->model_object(), layer_height_profile, trafo);      
     }
    
 
     m_print->throw_if_canceled();
     m_typed_slices = false;
     this->clear_layers();
-    m_layers = new_layers(this, generate_object_layers(m_slicing_params, layer_height_profile, m_config.precise_z_height.value), layer_width_profile);
+    m_layers = new_layers(this, generate_object_layers(m_slicing_params, layer_height_profile, m_config.precise_z_height.value),
+                          layer_width_profile);
     this->slice_volumes();
     m_print->throw_if_canceled();
     int firstLayerReplacedBy = 0;

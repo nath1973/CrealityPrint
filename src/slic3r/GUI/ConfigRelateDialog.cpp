@@ -22,6 +22,7 @@
 #include "Widgets/TextInput.hpp"
 #include "Widgets/TextInputCtrl.hpp"
 #include "Widgets/TextDisplay.hpp"
+#include "slic3r/GUI/WebViewDialog.hpp"
 #include "Tab.hpp"
 #include <wx/listimpl.cpp>
 #include <map>
@@ -49,6 +50,7 @@
 #endif // _MSW_DARK_MODE
 #endif //__WINDOWS__
 #include "libslic3r/common_header/common_header.h"
+#include "CommunicateWithCXCloud.hpp"
 
 namespace ConfigRelateGUI {
     static wxColour green = wxColour("#17CC5F");
@@ -2579,6 +2581,7 @@ public:
                             _update();
                             select(targetPrinter);
                             _sync();
+                            CXCloudDataCenter::getInstance().setTokenInvalid(true);
                         } 
                     }
                 });
@@ -2621,6 +2624,7 @@ public:
                             _update();
                             select(targetPrinter);
                             _sync();
+                            CXCloudDataCenter::getInstance().setTokenInvalid(true);
                         }
                     }
                 });
@@ -3103,6 +3107,7 @@ public:
                                 _update();
                                 select(targetFilament);
                                 _sync();
+                                CXCloudDataCenter::getInstance().setTokenInvalid(true);
                             } 
                         }
                     });
@@ -3120,6 +3125,7 @@ public:
                             _update();
                             select(targetFilament);
                             _sync();
+                            CXCloudDataCenter::getInstance().setTokenInvalid(true);
                         }
                     });
                     btSizer->Add(m_copyMaterialButton, 0, wxLEFT, 0);

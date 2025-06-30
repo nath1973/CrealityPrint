@@ -16,15 +16,7 @@
 
 #include "GUI_Utils.hpp"
 #include "Event.hpp"
-//BBS: GUI refactor
-#include "ParamsPanel.hpp"
-#include "Monitor.hpp"
-#include "Auxiliary.hpp"
-#include "Project.hpp"
-#include "CalibrationPanel.hpp"
 #include "UnsavedChangesDialog.hpp"
-#include "Widgets/SideButton.hpp"
-#include "Widgets/SideMenuPopup.hpp"
 
 #include <boost/property_tree/ptree_fwd.hpp>
 
@@ -37,6 +29,7 @@
 
 #define ENABEL_PRINT_ALL 0
 
+class SideButton;
 class Notebook;
 class wxBookCtrlBase;
 class wxProgressDialog;
@@ -45,7 +38,10 @@ namespace Slic3r {
 
 namespace GUI
 {
-
+class ProjectPanel;
+class CalibrationPanel;
+class MonitorPanel;
+class ParamsPanel;
 class Tab;
 class PrintHostQueueDialog;
 class Plater;
@@ -244,7 +240,8 @@ public:
         eExportAllSlicedFile = 8,
         ePrintMultiMachine   = 9,
         eSendToLocalNetPrinter = 10,
-        eUpload3mf           = 11
+        eUpload3mf           = 11,
+        eSendToMultLocalNetPrinter = 12
     };
 
     enum SliceSelectType {
@@ -367,6 +364,8 @@ public:
 
     //SoftFever
     void show_device(bool bBBLPrinter);
+
+    void set_content_visible(bool visiable);
 
     PrinterMgrView* get_printer_mgr_view() { return m_printer_mgr_view; }
 

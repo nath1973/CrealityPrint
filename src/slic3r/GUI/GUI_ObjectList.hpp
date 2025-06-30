@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <memory>
 
 #include <wx/bitmap.h>
 #include <wx/dataview.h>
@@ -53,10 +54,13 @@ struct ObjectVolumeID {
 typedef Event<ObjectVolumeID> ObjectSettingEvent;
 
 class PartPlate;
+class GLTexture;
 
 wxDECLARE_EVENT(EVT_OBJ_LIST_OBJECT_SELECT, SimpleEvent);
 wxDECLARE_EVENT(EVT_OBJ_LIST_COLUMN_SELECT, IntEvent);
 wxDECLARE_EVENT(EVT_PARTPLATE_LIST_PLATE_SELECT, IntEvent);
+wxDECLARE_EVENT(EVT_UPDATE_DEVICES, wxCommandEvent);
+
 class BitmapComboBox;
 
 struct ItemForDelete
@@ -174,7 +178,30 @@ public:
         bool        m_valid = false;
     };
 
-    
+    struct ObjList_Png_Texture_Wrapper
+    {
+        enum PNG_TEXTURE_IDX
+        {
+            pngTexPrinterModel = 0,
+            pngTexOnlineDevice,
+            pngTexOnlineDeviceGray,
+            pngTexRadioSel,
+            pngTexRadioUnSel,
+            pngTexDeviceListIItem,
+            pngTexCount
+        };
+
+        std::unique_ptr<GLTexture>& get(PNG_TEXTURE_IDX idx) 
+        { 
+            return textures[idx];
+        }
+
+        ObjList_Png_Texture_Wrapper();
+        virtual ~ObjList_Png_Texture_Wrapper();
+
+    private:
+        std::vector<std::unique_ptr<GLTexture>> textures;
+    };
 
     struct Clipboard
     {
@@ -203,6 +230,7 @@ private:
     Clipboard       m_clipboard;
 
     ObjList_Texture m_texture;
+
     bool m_left_panel_fold {false};
     bool m_obj_list_window_focus{false};
 
@@ -264,6 +292,58 @@ private:
 
     wxDataViewItem m_last_selected_item {nullptr};
 
+    std::unique_ptr<ObjList_Png_Texture_Wrapper> m_png_textures;
+
+    struct device_list_data
+    {
+        struct device_list_item_data
+        {
+            std::string name;
+            std::string cover_path;
+            std::string model_name;
+            std::string address;
+            std::string mac;
+            int         state;
+            bool        online;
+            bool        isCurrent;
+            int         device_type;
+            bool        visible = true;
+        };
+        std::map<std::string, device_list_item_data> datas;
+        std::set<std::string> online_device_list;
+        std::set<std::string> offline_device_list;
+        // std::pair<std::string, std::vector<std::string>> meaning: first is <cloud key>, second is <local keys>
+        std::unordered_map<std::string, std::pair<std::string, std::vector<std::string>> > mac_2_key_map;
+
+        void clear() {
+            datas.clear();
+            online_device_list.clear();
+            offline_device_list.clear();
+            mac_2_key_map.clear();
+        }
+        void push(std::string name, device_list_item_data item);
+        void manager_duplicate_deivce(std::pair<std::string, std::vector<std::string>>& duplicate_deivces);
+
+        unsigned int get_texture_id(std::string coverPath)
+        {
+            return cover2textureId[coverPath];
+        }
+
+        void set_object_list(ObjectList* obj) { objPtr = obj;}
+
+        ~device_list_data();
+
+    private:
+        std::map<std::string, unsigned int> cover2textureId;
+        ObjectList*                         objPtr = nullptr;
+
+    } m_device_list_data;
+    friend device_list_data;
+
+    bool                       m_device_list_popup_opened = false;
+    bool                       m_device_list_dirty_mark = true;
+    std::string                m_last_printer_model;
+
 #ifdef __WXMSW__
     // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
     int 	    m_last_selected_column = -1;
@@ -292,6 +372,12 @@ private:
 
     void ensure_current_item_visible_imgui();
 
+    void update_printer_model_texture();
+    void update_printer_device_list_data(std::string vendor, bool bForce = false);
+    void draw_device_list_popup();
+    void draw_device_list_content();
+    bool set_cur_device_by_cur_preset();
+
 public:
     ObjectList(wxWindow* parent);
     ~ObjectList() override;
@@ -309,6 +395,7 @@ public:
     void                create_objects_ctrl();
     // BBS
     void                update_objects_list_filament_column(size_t filaments_count);
+    void                update_objects_list_filament_column_when_delete_filament(size_t filament_id, size_t filaments_count, int replace_filament_id = -1);
     void                update_filament_colors();
     // show/hide "Extruder" column for Objects List
     void                set_filament_column_hidden(const bool hide) const;
@@ -323,7 +410,7 @@ public:
     void                update_name_in_model(const wxDataViewItem& item) const;
     void                update_name_in_list(int obj_idx, int vol_idx) const;
     void                update_filament_values_for_items(const size_t filaments_count);
-
+    void                update_filament_values_for_items_when_delete_filament(const size_t filament_id, const int replace_id = -1);
     //BBS: update plate
     void                update_plate_values_for_items();
     void                update_name_for_items();
@@ -562,7 +649,9 @@ public:
 
     bool get_object_list_window_focus();
     void set_object_list_window_focus(bool f);
-
+    
+    wxRect printComboRect() { return m_PrintCombo; };
+    wxRect wifiBtn() { return m_WifiBtn; };
  private:
 #ifdef __WXOSX__
 //    void OnChar(wxKeyEvent& event);
@@ -590,6 +679,8 @@ public:
 
     std::vector<int> m_columns_width;
     wxSize           m_last_size;
+    wxRect           m_PrintCombo;
+    wxRect           m_WifiBtn;
 
     void render_plate(ObjectDataViewModelNode *plate);
     void render_object(ObjectDataViewModelNode* object);

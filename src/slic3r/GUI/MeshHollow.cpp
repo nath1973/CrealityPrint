@@ -3,6 +3,7 @@
 #include <libslic3r/SLA/Hollowing.hpp>
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/tools/MeshToVolume.h>
+#include "libslic3r/ModelVolume.hpp"
 
 namespace Slic3r {
 

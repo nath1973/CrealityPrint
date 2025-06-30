@@ -92,7 +92,8 @@ private:
     bool m_inter_delete_input = false;
     VolumeInfo m_src;
     VolumeInfo m_tool;
-
+    
+    bool m_show_warning = false;
     int m_current_obj_idx{ -1 };
 
     void generate_new_volume(bool delete_input, const TriangleMesh& mesh_result);

@@ -2,6 +2,7 @@
 #include "MainFrame.hpp"
 #include "I18N.hpp"
 #include "Widgets/Label.hpp"
+#include "slic3r/GUI/Monitor.hpp"
 
 namespace Slic3r { namespace GUI {
 

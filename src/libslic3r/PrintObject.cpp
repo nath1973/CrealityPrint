@@ -20,6 +20,9 @@
 #include "Format/STL.hpp"
 #include "TreeSupport.hpp"
 #include "format.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/AABBTreeLines.hpp"
 
 #include <float.h>
 #include <oneapi/tbb/blocked_range.h>
@@ -68,6 +71,9 @@ using namespace std::literals;
     #undef assert
     #include <cassert>
 #endif
+
+//#define BOTTOM_SHELL_LAYERS 7
+#define BOTTOM_SHELL_THICKNESS 0.6
 
 namespace Slic3r {
     //debug
@@ -550,7 +556,7 @@ void PrintObject::prepare_infill()
     for (const Layer *layer : m_layers) {
         layer->export_region_slices_to_svg_debug("9_prepare_infill-final");
         layer->export_region_fill_surfaces_to_svg_debug("9_prepare_infill-final");
-    } // for each layer
+    } // for each layertemp_region_config
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
     this->set_done(posPrepareInfill);
@@ -558,7 +564,17 @@ void PrintObject::prepare_infill()
 
 void PrintObject::infill()
 {
-    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start memory info " << log_memory_info();
+    PrintRegionConfig temp_region_config;
+    const PrintObjectRegions::LayerRangeRegions layer_range = m_shared_regions->layer_ranges.front();
+    auto                                        it          = layer_range.volume_regions.begin();
+    temp_region_config                                      = it->region->config();
+    if (m_config.overhang_optimization.value) {
+        temp_region_config = it->region->config();       
+        PrintRegionConfig new_config            = temp_region_config;
+        new_config.bottom_shell_thickness.value = BOTTOM_SHELL_THICKNESS;
+        //new_config.bottom_shell_layers.value    = BOTTOM_SHELL_LAYERS;
+        it->region->set_config(new_config);
+    }
 
     // prerequisites
     this->prepare_infill();
@@ -588,7 +604,11 @@ void PrintObject::infill()
 
         debug_infills(m_print, this);
     }
-    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end memory info " << log_memory_info();
+    if (m_config.overhang_optimization.value) {
+        const PrintObjectRegions::LayerRangeRegions layer_range = m_shared_regions->layer_ranges.front();
+        auto                                        it          = layer_range.volume_regions.begin();
+        it->region->set_config(temp_region_config);
+    }
 }
 
 void PrintObject::ironing()
@@ -687,7 +707,8 @@ void PrintObject::generate_support_material()
             if (m_cache_support_necessary != NoNeedSupp) {
                 std::map<SupportNecessaryType, std::string> reasons = {{SharpTail, L("floating regions")},
                                                                        {Cantilever, L("floating cantilever")},
-                                                                       {LargeOverhang, L("large overhangs")}};
+                                                                       {LargeOverhang, L("large overhangs")},
+                                                                       {Bridge, L("bridge overhangs")}};
                 std::string                                 warning_message =
                     Slic3r::format(L("It seems object %s has %s. Please re-orient the object or enable support generation."),
                                    this->model_object()->name, reasons[m_cache_support_necessary]);
@@ -1205,11 +1226,14 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "seam_slope_steps"
             || opt_key == "seam_slope_inner_walls"
             || opt_key == "support_speed"
-            || opt_key == "support_interface_speed"
+            || opt_key == "support_interface_speed" 
+            || opt_key == "smooth_speed_discontinuity_area" 
+            || opt_key == "smooth_coefficient"
             || opt_key == "overhang_1_4_speed"
             || opt_key == "overhang_2_4_speed"
             || opt_key == "overhang_3_4_speed"
-            || opt_key == "overhang_4_4_speed"
+            || opt_key == "overhang_4_4_speed" 
+            || opt_key == "overhang_totally_speed"
             || opt_key == "bridge_speed"
             || opt_key == "internal_bridge_speed"
             || opt_key == "outer_wall_speed"
@@ -3097,7 +3121,7 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
 
     // Verify the layer_height_profile.
     if (!layer_height_profile.empty() &&
-        // Must not be of even length.
+        // Must not be of even length. 
         ((layer_height_profile.size() & 1) != 0 ||
             // Last entry must be at the top of the object.
             std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_max + slicing_parameters.object_print_z_min) > 1e-3))
@@ -3810,6 +3834,8 @@ SupportNecessaryType PrintObject::is_support_necessary()
         return SharpTail;
     else if (tree_support.has_cantilever && tree_support.max_cantilever_dist > cantilevel_dist_thresh)
         return Cantilever;
+    else if (tree_support.has_bridge)
+        return Bridge;
 #endif
     return NoNeedSupp;
 }

@@ -11,8 +11,9 @@
 #include <wx/richtext/richtextctrl.h>
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Polygon.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/HMS.hpp"
 #include "MainFrame.hpp"
-#include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "Jobs/BoostThreadWorker.hpp"
 #include "Jobs/PlaterWorker.hpp"

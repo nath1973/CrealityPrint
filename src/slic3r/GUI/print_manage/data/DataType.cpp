@@ -25,7 +25,7 @@ namespace DM{
     }
 
 
-    DM::Device Device::deserialize(nlohmann::json& device)
+    DM::Device Device::deserialize(nlohmann::json& device, bool need_update_box_info)
     {
         DM::Device data;
         try{
@@ -47,63 +47,65 @@ namespace DM{
                 data.modelName = device.contains("modelName") ? device["modelName"].get<std::string>() : "";
                 data.isMultiColorDevice = device.contains("IsMultiColorDevice") ? device["IsMultiColorDevice"].get<bool>() : false;
 
-                if (device.contains("boxsInfo") && device["boxsInfo"].contains("boxColorInfo")) {
-                    for (const auto& box_info : device["boxsInfo"]["boxColorInfo"]) {
-                        DM::DeviceBoxColorInfo box_color_info;
-                        box_color_info.boxType = box_info["boxType"].get<int>();
-                        box_color_info.color = box_info["color"].get<std::string>();
-                        box_color_info.boxId = box_info["boxId"].get<int>();
-                        box_color_info.materialId = box_info["materialId"].get<int>();
-                        box_color_info.filamentType = box_info["filamentType"].get<std::string>();
-                        box_color_info.filamentName = box_info["filamentName"].get<std::string>();
-                        if (box_info.contains("cId")) {
-                            box_color_info.cId = box_info["cId"].get<std::string>();
-                        }
-                        data.boxColorInfos.push_back(box_color_info);
-                    }
-                }
-
-                if (device.contains("boxsInfo") && device["boxsInfo"].contains("materialBoxs")) {
-                    auto& materialBoxs = device["boxsInfo"]["materialBoxs"];
-
-                    for (const auto& box : materialBoxs) {
-                        DM::MaterialBox materialBox;
-                        materialBox.box_id = box.contains("id") ? box["id"].get<int>() : 0;
-                        materialBox.box_state = box.contains("state") ? box["state"].get<int>() : 0;
-                        materialBox.box_type = box.contains("type") ? box["type"].get<int>() : 0;
-                        if (box.contains("temp")) {
-                            materialBox.temp = box["temp"];
-                        }
-                        if (box.contains("humidity")) {
-                            materialBox.humidity = box["humidity"];
-                        }
-
-                        if (box.contains("materials")) {
-                            for (const auto& material : box["materials"]) {
-                                DM::Material mat;
-                                mat.material_id = material.contains("id") ? material["id"].get<int>() : 0;
-                                mat.vendor = material.contains("vendor") ? material["vendor"].get<std::string>() : "";
-                                mat.type = material.contains("type") ? material["type"].get<std::string>() : "";
-                                mat.name = material.contains("name") ? material["name"].get<std::string>() : "";
-                                mat.rfid = material.contains("rfid") ? material["rfid"].get<std::string>() : "";
-                                mat.color = material.contains("color") ? material["color"].get<std::string>() : "";
-                                mat.diameter = material.contains("diameter") ? material["diameter"].get<double>() : 0.0;
-                                mat.minTemp = material.contains("minTemp") ? material["minTemp"].get<int>() : 0;
-                                mat.maxTemp = material.contains("maxTemp") ? material["maxTemp"].get<int>() : 0;
-                                mat.pressure = material.contains("pressure") ? material["pressure"].get<double>() : 0.0;
-                                mat.percent = material.contains("percent") ? material["percent"].get<int>() : 0;
-                                mat.state = material.contains("state") ? material["state"].get<int>() : 0;
-                                mat.selected = material.contains("selected") ? material["selected"].get<int>() : 0;
-                                mat.editStatus = material.contains("editStatus") ? material["editStatus"].get<int>() : 0;
-                                mat.userMaterial = material.contains("userMaterial") ? material["userMaterial"].get<std::string>() : "";
-                                materialBox.materials.push_back(mat);
+                if (need_update_box_info)
+                {
+                    if (device.contains("boxsInfo") && device["boxsInfo"].contains("boxColorInfo")) {
+                        for (const auto& box_info : device["boxsInfo"]["boxColorInfo"]) {
+                            DM::DeviceBoxColorInfo box_color_info;
+                            box_color_info.boxType      = box_info["boxType"].get<int>();
+                            box_color_info.color        = box_info["color"].get<std::string>();
+                            box_color_info.boxId        = box_info["boxId"].get<int>();
+                            box_color_info.materialId   = box_info["materialId"].get<int>();
+                            box_color_info.filamentType = box_info["filamentType"].get<std::string>();
+                            box_color_info.filamentName = box_info["filamentName"].get<std::string>();
+                            if (box_info.contains("cId")) {
+                                box_color_info.cId = box_info["cId"].get<std::string>();
                             }
+                            data.boxColorInfos.push_back(box_color_info);
                         }
-
-                        data.materialBoxes.push_back(materialBox);
                     }
-                }
 
+                    if (device.contains("boxsInfo") && device["boxsInfo"].contains("materialBoxs")) {
+                        auto& materialBoxs = device["boxsInfo"]["materialBoxs"];
+
+                        for (const auto& box : materialBoxs) {
+                            DM::MaterialBox materialBox;
+                            materialBox.box_id    = box.contains("id") ? box["id"].get<int>() : 0;
+                            materialBox.box_state = box.contains("state") ? box["state"].get<int>() : 0;
+                            materialBox.box_type  = box.contains("type") ? box["type"].get<int>() : 0;
+                            if (box.contains("temp")) {
+                                materialBox.temp = box["temp"];
+                            }
+                            if (box.contains("humidity")) {
+                                materialBox.humidity = box["humidity"];
+                            }
+
+                            if (box.contains("materials")) {
+                                for (const auto& material : box["materials"]) {
+                                    DM::Material mat;
+                                    mat.material_id  = material.contains("id") ? material["id"].get<int>() : 0;
+                                    mat.vendor       = material.contains("vendor") ? material["vendor"].get<std::string>() : "";
+                                    mat.type         = material.contains("type") ? material["type"].get<std::string>() : "";
+                                    mat.name         = material.contains("name") ? material["name"].get<std::string>() : "";
+                                    mat.rfid         = material.contains("rfid") ? material["rfid"].get<std::string>() : "";
+                                    mat.color        = material.contains("color") ? material["color"].get<std::string>() : "";
+                                    mat.diameter     = material.contains("diameter") ? material["diameter"].get<double>() : 0.0;
+                                    mat.minTemp      = material.contains("minTemp") ? material["minTemp"].get<int>() : 0;
+                                    mat.maxTemp      = material.contains("maxTemp") ? material["maxTemp"].get<int>() : 0;
+                                    mat.pressure     = material.contains("pressure") ? material["pressure"].get<double>() : 0.0;
+                                    mat.percent      = material.contains("percent") ? material["percent"].get<int>() : 0;
+                                    mat.state        = material.contains("state") ? material["state"].get<int>() : 0;
+                                    mat.selected     = material.contains("selected") ? material["selected"].get<int>() : 0;
+                                    mat.editStatus   = material.contains("editStatus") ? material["editStatus"].get<int>() : 0;
+                                    mat.userMaterial = material.contains("userMaterial") ? material["userMaterial"].get<std::string>() : "";
+                                    materialBox.materials.push_back(mat);
+                                }
+                            }
+
+                            data.materialBoxes.push_back(materialBox);
+                        }
+                    }
+                } // end    if (need_update_box_info)
             }
         }
         catch (std::exception &e) {

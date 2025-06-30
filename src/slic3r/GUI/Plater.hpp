@@ -16,19 +16,12 @@
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
-#include "Jobs/Job.hpp"
-#include "Jobs/Worker.hpp"
 #include "Search.hpp"
-#include "PartPlate.hpp"
-#include "GUI_App.hpp"
-#include "Jobs/PrintJob.hpp"
-#include "Jobs/SendJob.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PrintBase.hpp"
 
 #include "libslic3r/calib.hpp"
 #include "libslic3r/CutUtils.hpp"
-#include "libslic3r/FlushVolCalc.hpp"
 #include "GLToolbarCollapse.h"
 #include "GLToolbarProcess.h"
 
@@ -135,9 +128,10 @@ public:
     Sidebar &operator=(Sidebar &&) = delete;
     Sidebar &operator=(const Sidebar &) = delete;
     ~Sidebar();
-
+    wxString get_filament_map_string();
     void create_printer_preset(int iType = 0);
     void remove_unused_filament_combos(const size_t current_extruder_count);
+    void remove_unused_filament_combos_delete(const size_t indexcmb);
     void update_all_preset_comboboxes();
     //void update_partplate(PartPlateList& list);
     void update_presets(Slic3r::Preset::Type preset_type);
@@ -154,8 +148,12 @@ public:
     // BBS. Add on_filaments_change() method.
     void on_filaments_change(size_t num_filaments);
     void add_filament();
-    void delete_filament();
+    void delete_filament(size_t filament_id = size_t(-1), int replace_filament_id = -1);    // 0 base, -1 means default
     void add_custom_filament(wxColour new_col);
+    //new 
+    void delete_filament_bbl(size_t filament_id = size_t(-1), int replace_filament_id = -1); // 0 base, -1 means default
+    void change_filament(size_t from_id, size_t to_id);                                  // 0 base
+    bool is_new_project_in_gcode3mf();
     // BBS
     void on_bed_type_change(BedType bed_type);
     void load_ams_list(std::string const & device, MachineObject* obj);
@@ -173,6 +171,7 @@ public:
     wxPanel*                scrolled_panel();
     wxPanel* print_panel();
     wxPanel* filament_panel();
+    HoverBorderIcon*        autoMap_button();
 
     ConfigOptionsGroup*     og_freq_chng_params(const bool is_fff);
     wxButton*               get_wiping_dialog_button();
@@ -198,6 +197,7 @@ public:
     void                    jump_to_object(ObjectDataViewModelNode* item);
     void                    can_search();
     void                    set_edit_filament(int index);
+    void                    set_menu_filement_id(int id);
 #ifdef _MSW_DARK_MODE
     void                    show_mode_sizer(bool show);
 #endif
@@ -211,7 +211,6 @@ public:
     void show_box_filament_content(bool bShow);
     void on_mapping_device_filament(wxCommandEvent& event);
     void on_show_box_color_selection(wxCommandEvent& event);
-
 private:
     struct priv;
     std::unique_ptr<priv> p;
@@ -545,6 +544,8 @@ public:
     bool leave_gizmos_stack();
 
     void on_filaments_change(size_t extruders_count);
+
+    void on_filaments_delete(size_t extruders_count, size_t filament_id, int replace_filament_id = -1);
     // BBS
     void on_bed_type_change(BedType bed_type);
     bool update_filament_colors_in_full_config();
@@ -730,7 +731,7 @@ public:
 
     void reset_gcode_toolpaths();
     void reset_last_loaded_gcode() { m_last_loaded_gcode = ""; }
-
+    void invalid_slice_result_need_reslice();
     const Mouse3DController& get_mouse3d_controller() const;
     Mouse3DController& get_mouse3d_controller();
 
@@ -863,6 +864,7 @@ public:
     wxMenu* instance_menu();
     wxMenu* layer_menu();
     wxMenu* multi_selection_menu();
+    wxMenu*     filament_action_menu(int active_filament_menu_id);
     int     GetPlateIndexByRightMenuInLeftUI();
     void    SetPlateIndexByRightMenuInLeftUI(int);
     static bool has_illegal_filename_characters(const wxString& name);

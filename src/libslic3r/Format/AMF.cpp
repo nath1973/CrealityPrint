@@ -9,6 +9,8 @@
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
+#include "../ModelObject.hpp"
+#include "../ModelVolume.hpp"
 #include "../GCode.hpp"
 #include "../PrintConfig.hpp"
 #include "../Utils.hpp"
@@ -16,6 +18,7 @@
 #include "../Geometry.hpp"
 #include "../CustomGCode.hpp"
 #include "../LocalesUtils.hpp"
+#include "../ModelInstance.hpp"
 
 #include "AMF.hpp"
 

@@ -5,6 +5,7 @@
 #include "MainFrame.hpp"
 #include "Widgets/RadioBox.hpp"
 #include <wx/listimpl.cpp>
+#include <wx/dcgraph.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace Slic3r {

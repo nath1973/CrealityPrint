@@ -33,6 +33,8 @@ END_EVENT_TABLE()
 
 WebViewPanel::WebViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) this;
+
 #if CUSTOM_COMMUNITY_ENABLE
     wxString url = GetURL();
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
@@ -80,9 +82,12 @@ WebViewPanel::WebViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefau
     m_browser = WebView::CreateWebView(this, url);
     m_browser->EnableAccessToDevTools(); // for debug:
     if (m_browser == nullptr) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " m_browser is null!!! ";
         wxLogError("Could not init m_browser");
         return;
     }
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) m_browser;
+
     // m_browser->Hide();
     SetSizer(topsizer);
 
@@ -253,31 +258,43 @@ wxString WebViewPanel::GetURL()
     version.erase(std::remove(version.begin(), version.end(), ' '), version.end());
 
     std::string region = wxGetApp().app_config->get("region");
+    if(region== "")
+    {
+         wxString strlang = wxGetApp().current_language_code_safe();
+        if (strlang == "zh_CN") {
+                region = "China";
+        } else {
+                region = "North America";
+            }
+    }
 
     std::string use_inches = wxGetApp().app_config->get("use_inches");
 
     int port = wxGetApp().get_server_port();
+    wxGetApp().check_creality_privacy_version(false); // 检查隐私政策版本
     //type = std::string("Beta");
     // for pro
     #ifdef _DEBUG1
     type = std::string("Beta");
     #endif
     wxString url = wxString::Format(
-        "http://localhost:%d/homepage/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&time=%d#/Community/Home Page", port,
-        lang, version, type, region, use_inches,std::time(0));
-
-    // for dev: 使用局域网地址：可以找【刘明，或其他前端开发同事】，按要求启动一个 http 服务，用于调试
-     /*port = 9090;
-     type = std::string("Beta");
+        "http://localhost:%d/homepage/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&ai=true&time=%d&privacy=%d#/Community/Home Page", port,
+        lang, version, type, region, use_inches,std::time(0),wxGetApp().is_privacy_checked());
+   
+     //for dev: 使用局域网地址：可以找【刘明，或其他前端开发同事】，按要求启动一个 http 服务，用于调试
+     //port = 9090;
+     //type = std::string("Beta");
      
-     wxString url = wxString::Format(
-         "http://localhost:%d/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&time=%d#/Community/Home Page", port, lang,
-         version, type, region, use_inches,use_inches,std::time(0)
-     );*/
+     //wxString url = wxString::Format(
+     //    "http://localhost:%d/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&ai=true&time=%d&privacy=%d#/Community/Home Page", port, lang,
+     //    version, type, region, use_inches,std::time(0),wxGetApp().is_privacy_checked()
+     //);
      return url;
 }
 WebViewPanel::~WebViewPanel()
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) this;
+
 #ifdef __WXGTK__
     m_freshTimer->Stop();
     m_browser->Stop();
@@ -299,9 +316,15 @@ WebViewPanel::~WebViewPanel()
 }
 void WebViewPanel::Reload()
 {
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before;
     m_browser->LoadURL(GetURL());
     //m_browser->SetFocus();
     UpdateState();
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
 }
 void WebViewPanel::load_url(wxString& url)
 {
@@ -310,11 +333,18 @@ void WebViewPanel::load_url(wxString& url)
     this->Raise();
     m_url->SetLabelText(url);
 
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before;
     if (wxGetApp().get_mode() == comDevelop)
         wxLogMessage(m_url->GetValue());
     m_browser->LoadURL(url);
     m_browser->SetFocus();
     UpdateState();
+
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after << "; url=" << url.ToStdString();
 #endif
 }
 
@@ -364,11 +394,17 @@ void WebViewPanel::OnIdle(wxIdleEvent& WXUNUSED(evt))
  */
 void WebViewPanel::OnUrl(wxCommandEvent& WXUNUSED(evt))
 {
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before;
     if (wxGetApp().get_mode() == comDevelop)
         wxLogMessage(m_url->GetValue());
     m_browser->LoadURL(m_url->GetValue());
     m_browser->SetFocus();
     UpdateState();
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after << "; url= " << m_url->GetValue().ToStdString();
 }
 
 /**
@@ -378,6 +414,9 @@ void WebViewPanel::OnBack(wxCommandEvent& WXUNUSED(evt))
 {
     m_browser->GoBack();
     UpdateState();
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
 }
 
 /**
@@ -387,6 +426,9 @@ void WebViewPanel::OnForward(wxCommandEvent& WXUNUSED(evt))
 {
     m_browser->GoForward();
     UpdateState();
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
 }
 
 /**
@@ -394,8 +436,11 @@ void WebViewPanel::OnForward(wxCommandEvent& WXUNUSED(evt))
  */
 void WebViewPanel::OnStop(wxCommandEvent& WXUNUSED(evt))
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
+
     m_browser->Stop();
     UpdateState();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
 }
 
 /**
@@ -403,8 +448,14 @@ void WebViewPanel::OnStop(wxCommandEvent& WXUNUSED(evt))
  */
 void WebViewPanel::OnReload(wxCommandEvent& WXUNUSED(evt))
 {
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before;
     m_browser->Reload();
     UpdateState();
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
 }
 
 void WebViewPanel::OnCut(wxCommandEvent& WXUNUSED(evt)) { m_browser->Cut(); }
@@ -434,6 +485,9 @@ void WebViewPanel::OnLoadScheme(wxCommandEvent& WXUNUSED(evt))
     path.Replace("\\", "/");
     path = "wxfs:///" + path + ";protocol=zip/doc.htm";
     m_browser->LoadURL(path);
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after << "; url=" << path.ToStdString();
 }
 
 void WebViewPanel::OnUseMemoryFS(wxCommandEvent& WXUNUSED(evt)) { m_browser->LoadURL("memory:page1.htm"); }
@@ -823,6 +877,10 @@ void WebViewPanel::RunScript(const wxString& javascript)
 
     if (!m_browser)
         return;
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " this Address: " << (void*) this << " wxWebView address: " << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;                           
+    boost::log::core::get()->flush();
 
     WebView::RunScript(m_browser, javascript);
 }
@@ -921,6 +979,7 @@ void WebViewPanel::OnError(wxWebViewEvent& evt)
     }
 
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << ": [" << category << "] " << evt.GetString().ToUTF8().data();
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": [" << category << "] " << evt.GetString().ToUTF8().data();
 
     if (wxGetApp().get_mode() == comDevelop) {
         wxLogMessage("%s", "Error; url='" + evt.GetURL() + "', error='" + category + " (" + evt.GetString() + ")'");

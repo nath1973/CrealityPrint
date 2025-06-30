@@ -6,6 +6,7 @@
 #include "Hollowing.hpp"
 #include "IndexedMesh.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelObject.hpp"
 
 #include <tbb/parallel_for.h>
 

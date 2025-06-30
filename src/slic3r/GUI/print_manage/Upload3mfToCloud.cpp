@@ -8,6 +8,7 @@
 #include "slic3r/GUI/GUI_Preview.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/GUI/PartPlate.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/Widgets/Button.hpp"
 #include "slic3r/GUI/Widgets/Label.hpp"
 #include "slic3r/GUI/Widgets/StateColor.hpp"
@@ -20,6 +21,7 @@
 #include "slic3r/GUI/wxExtensions.hpp"
 #include "slic3r/GUI/Jobs/BoostThreadWorker.hpp"
 #include "slic3r/GUI/Jobs/PlaterWorker.hpp"
+#include "slic3r/GUI/Auxiliary.hpp"
 
 #include <string>
 #include <vector>

@@ -1,6 +1,6 @@
 {
     "name": "Creality",
-    "version": "25.05.22.17",
+    "version": "25.06.19.15",
     "force_update": "1",
     "description": "Creality configurations",
     "machine_list": [
@@ -55,6 +55,14 @@
         {
             "name": "Creality GS-01 0.4 nozzle",
             "sub_path": "machine/Creality GS-01 0.4 nozzle.json"
+        },
+        {
+            "name": "Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "machine/Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "machine/Creality Sonic_Ender-3 S1 0.4 nozzle.json"
         },
         {
             "name": "Creality GS-03 0.8 nozzle",
@@ -271,6 +279,14 @@
             "sub_path": "machine/Creality GS-01.json"
         },
         {
+            "name": "Creality Sonic_Ender-5 S1",
+            "sub_path": "machine/Creality Sonic_Ender-5 S1.json"
+        },
+        {
+            "name": "Creality Sonic_Ender-3 S1",
+            "sub_path": "machine/Creality Sonic_Ender-3 S1.json"
+        },
+        {
             "name": "Creality GS-03",
             "sub_path": "machine/Creality GS-03.json"
         },
@@ -415,6 +431,26 @@
         {
             "name": "fdm_filament_pla",
             "sub_path": "filament/fdm_filament_pla.json"
+        },
+        {
+            "name": "fdm_filament_pp",
+            "sub_path": "filament/fdm_filament_pp.json"
+        },
+        {
+            "name": "fdm_filament_pps",
+            "sub_path": "filament/fdm_filament_pps.json"
+        },
+        {
+            "name": "fdm_filament_pva",
+            "sub_path": "filament/fdm_filament_pva.json"
+        },
+        {
+            "name": "fdm_filament_petg",
+            "sub_path": "filament/fdm_filament_petg.json"
+        },
+        {
+            "name": "fdm_filament_hips",
+            "sub_path": "filament/fdm_filament_hips.json"
         },
         {
             "name": "fdm_filament_tpu",
@@ -851,6 +887,50 @@
         {
             "name": "Soleyin Ultra PLA @Creality GS-01 0.4 nozzle",
             "sub_path": "filament/Soleyin Ultra PLA @Creality GS-01 0.4 nozzle.json"
+        },
+        {
+            "name": "CR-ABS @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "filament/CR-ABS @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "CR-PETG @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "filament/CR-PETG @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "CR-PLA @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "filament/CR-PLA @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "HP-ASA @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "filament/HP-ASA @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "HP-TPU @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "filament/HP-TPU @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "Hyper PLA @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "filament/Hyper PLA @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "CR-ABS @Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "filament/CR-ABS @Creality Sonic_Ender-3 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "CR-PETG @Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "filament/CR-PETG @Creality Sonic_Ender-3 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "CR-PLA @Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "filament/CR-PLA @Creality Sonic_Ender-3 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "HP-TPU @Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "filament/HP-TPU @Creality Sonic_Ender-3 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "Hyper PLA @Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "filament/Hyper PLA @Creality Sonic_Ender-3 S1 0.4 nozzle.json"
         },
         {
             "name": "CR-ABS @Creality GS-03 0.8 nozzle",
@@ -3073,6 +3153,14 @@
         {
             "name": "0.24mm Standard @Creality GS-01 0.4 nozzle",
             "sub_path": "process/0.24mm Standard @Creality GS-01 0.4 nozzle.json"
+        },
+        {
+            "name": "0.20mm Standard @Creality Sonic_Ender-5 S1 0.4 nozzle",
+            "sub_path": "process/0.20mm Standard @Creality Sonic_Ender-5 S1 0.4 nozzle.json"
+        },
+        {
+            "name": "0.20mm Standard @Creality Sonic_Ender-3 S1 0.4 nozzle",
+            "sub_path": "process/0.20mm Standard @Creality Sonic_Ender-3 S1 0.4 nozzle.json"
         },
         {
             "name": "0.24mm Standard @Creality GS-03 0.8 nozzle",

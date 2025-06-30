@@ -1,6 +1,6 @@
 #include "SurfaceDrag.hpp"
 
-#include <libslic3r/Model.hpp> // ModelVolume
+#include <libslic3r/ModelVolume.hpp> 
 #include <libslic3r/Emboss.hpp>
 
 #include "slic3r/Utils/RaycastManager.hpp"
@@ -11,6 +11,7 @@
 #include "I18N.hpp"
 #include "GUI_App.hpp"
 #include "Gizmos/GizmoObjectManipulation.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 
 using namespace Slic3r;

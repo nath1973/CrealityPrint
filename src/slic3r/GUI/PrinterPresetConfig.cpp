@@ -2,8 +2,10 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "3DBed.hpp"
 
 #include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/WebViewDialog.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 

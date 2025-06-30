@@ -349,6 +349,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   include(metartc/metartc.cmake)
 endif()
 
+option(ENABLE_BREAKPAD "Enable Breakpad" ON)
 if(ENABLE_BREAKPAD)
     message(STATUS "Breakpad is enabled...")
     add_definitions(-DUSE_BREAKPAD)

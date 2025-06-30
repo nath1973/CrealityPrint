@@ -9,7 +9,7 @@
 
 #include "libslic3r/PrintConfig.hpp"
 #include "wxExtensions.hpp"
-
+#include "wx/menu.h"
 class wxMenu;
 class wxMenuItem;
 
@@ -80,6 +80,8 @@ public:
     wxMenu* assemble_part_menu();
     wxMenu* assemble_multi_selection_menu();
 
+    wxMenu* filament_action_menu(int active_filament_menu_id);
+
 private:
     enum MenuType {
         mtObjectFFF = 0,
@@ -101,6 +103,7 @@ private:
     MenuWithSeparators m_assemble_object_menu;
     MenuWithSeparators m_assemble_part_menu;
    
+    wxMenu m_filament_action_menu;
 
     // Removed/Prepended Items according to the view mode
     std::array<wxMenuItem*, mtCount> items_increase;
@@ -121,6 +124,8 @@ private:
     void        create_bbl_part_menu();
     void        create_bbl_assemble_object_menu();
     void        create_bbl_assemble_part_menu();
+    //add filement right menu
+    void        create_filament_action_menu(bool init, int active_filament_menu_id);
 
     wxMenu*     append_submenu_add_generic(wxMenu* menu, ModelVolumeType type);
     // Orca: add submenu for adding handy models

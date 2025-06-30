@@ -1,5 +1,7 @@
 #include "../libslic3r.h"
 #include "../Model.hpp"
+#include "../ModelObject.hpp"
+#include "../ModelVolume.hpp"
 #include "../TriangleMesh.hpp"
 
 #include "STEP.hpp"

@@ -20,6 +20,7 @@
 #include "libslic3r/Timer.hpp" 
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/ClipperUtils.hpp" // union_ex
 #include "libslic3r/AppConfig.hpp"    // store/load font list
@@ -1974,14 +1975,22 @@ void GLGizmoEmboss::draw_style_rename_button()
         ImGui::OpenPopup(popup_id);
     }
     else if (ImGui::IsItemHovered()) {
-        if (can_rename) m_imgui->tooltip(_u8L("Send print").c_str(), m_gui_cfg->max_tooltip_width);
+        if (can_rename) m_imgui->tooltip(_u8L("Rename current style.").c_str(), m_gui_cfg->max_tooltip_width);
         else            m_imgui->tooltip(_u8L("Can't rename temporary style.").c_str(), m_gui_cfg->max_tooltip_width);
     }
-    if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+
+    ImVec4 bg_color = m_is_dark_mode ? 
+        ImVec4(0.08f, 0.08f, 0.08f, 0.95f) : // 深色模式
+        ImVec4(0.92f, 0.92f, 0.92f, 0.95f);  // 浅色模式
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, bg_color);
+
+    if (ImGui::BeginPopupModal(popup_id, NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         m_imgui->disable_background_fadeout_animation();
         draw_style_rename_popup();
         ImGui::EndPopup();
     }
+
+    ImGui::PopStyleColor(1);
 }
 
 void GLGizmoEmboss::draw_style_save_button(bool is_modified)
@@ -2068,11 +2077,15 @@ void GLGizmoEmboss::draw_style_add_button()
         }
     }
 
+    ImVec4 bg_color = m_is_dark_mode ? ImVec4(0.43f, 0.43f, 0.447f, 1.f) : ImVec4(1.f, 1.f, 1.f, 1.f);
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, bg_color);
+
     if (ImGui::BeginPopupModal(popup_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         m_imgui->disable_background_fadeout_animation();
         draw_style_save_as_popup();
         ImGui::EndPopup();
     }
+    ImGui::PopStyleColor(1);
 }
 
 void GLGizmoEmboss::draw_delete_style_button() {

@@ -14,11 +14,12 @@ public:
 
 	std::future<void> sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float,double)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback);
 
-	void cancelSendFileToDevice();
+	void cancelSendFileToDevice(std::string ipAddress = "");
 
 private:
 	const std::string urlSuffixUpload = "/upload/";
-    Slic3r::Http*     m_pHttp         = nullptr;
+    std::map<std::string, Slic3r::Http*> mapHttp; // ipAddress -> port
+	//Slic3r::Http*     m_pHttp         = nullptr;
     bool              m_bCancelSend   = false;
     };
 }

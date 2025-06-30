@@ -22,6 +22,7 @@
 #include "BitmapCache.hpp"
 #include "BindDialog.hpp"
 #include "libslic3r/common_header/common_header.h"
+#include "slic3r/GUI//Widgets/AMSControl.hpp"
 
 namespace Slic3r { namespace GUI {
 

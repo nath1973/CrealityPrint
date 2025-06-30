@@ -1,6 +1,8 @@
 #include "GLGizmoFdmSupports.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 //BBS
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Thread.hpp"

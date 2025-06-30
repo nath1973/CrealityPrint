@@ -348,7 +348,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BrimType)
 // using 0,1 to compatible with old files
 static const t_config_enum_values s_keys_map_TimelapseType = {
     {"0",       tlTraditional},
-    {"1",       tlSmooth}
+    {"1",       tlSmooth},
+    {"-1", tlClose}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TimelapseType)
 
@@ -681,6 +682,9 @@ void PrintConfigDef::init_common_params()
         def = this->add("preset_name", coString);
         def->set_default_value(new ConfigOptionString());
     }
+
+    def = this->add("printer_select_mac", coString);
+    def->set_default_value(new ConfigOptionString(""));
 }
 
 void PrintConfigDef::init_fff_params()
@@ -1191,6 +1195,17 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def             = this->add("overhang_totally_speed", coFloatOrPercent);
+    def->label      = L("Over 100% wall (not brige) (Beta)");
+    def->category   = L("Speed");
+    def->full_label = "100%";
+    def->tooltip    = L("Speed of 100% overhang wall which has 0 overlap with the lower layer.");
+    def->sidetext   = L("mm/s or %");
+    def->ratio_over = "outer_wall_speed";
+    def->min        = 0;
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatOrPercent{10, false});
+
     def = this->add("bridge_speed", coFloat);
     def->label = L("External");
     def->category = L("Speed");
@@ -1209,6 +1224,21 @@ void PrintConfigDef::init_fff_params()
     def->min = 1;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(150, true));
+
+    def           = this->add("smooth_speed_discontinuity_area", coBool);
+    def->label    = L("Smooth speed discontinuity area (Beta)");
+    def->category = L("Speed");
+    def->tooltip  = L("Add the speed transition between discontinuity area.");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def           = this->add("smooth_coefficient", coFloat);
+    def->label    = L("Smooth coefficient");
+    def->category = L("Speed");
+    def->tooltip  = L("The smaller the number, the longer the speed transition path. 0 means not apply.");
+    def->mode     = comAdvanced;
+    def->min      = 0;
+    def->set_default_value(new ConfigOptionFloat(80));
 
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
@@ -1386,7 +1416,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("activate_air_filtration",coBools);
     def->label = L("Activate air filtration");
-    def->tooltip = L("Activate for better air filtration. G-code command: M106 P3 S(0-255)");
+    def->tooltip = L("Activate for better air filtration. ");
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionBools{false});
 
@@ -1814,8 +1844,7 @@ void PrintConfigDef::init_fff_params()
     def          = this->add("smart_cooling_zones", coBools);
     def->label   = L("Smart cooling zones(Beta)");
     def->tooltip = L("If enabled, this setting will ensure that large areas without overhangs are not slowed down to meet the minimum "
-                     "layer time. Makes the selection of slowed down areas more intelligent\n\n"
-                     "*Only for PLA temporarily\n\n");
+                     "layer time. Makes the selection of slowed down areas more intelligent\n\n");
     def->set_default_value(new ConfigOptionBools{false});
 
     def = this->add("fan_cooling_layer_time", coFloats);
@@ -4373,10 +4402,12 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<TimelapseType>::get_enum_values();
     def->enum_values.emplace_back("0");
     def->enum_values.emplace_back("1");
+    def->enum_values.emplace_back("-1");
     def->enum_labels.emplace_back(L("Traditional"));
     def->enum_labels.emplace_back(L("Smooth"));
+    def->enum_labels.emplace_back(L("Close "));
     def->mode = comSimple;
-    def->set_default_value(new ConfigOptionEnum<TimelapseType>(tlTraditional));
+    def->set_default_value(new ConfigOptionEnum<TimelapseType>(tlClose));
 
     def = this->add("standby_temperature_delta", coInt);
     def->label = L("Temperature variation");
@@ -5089,6 +5120,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Setting for the number of outer wall layers for normal support; "
                     "0 means an intelligent number of layers");
     def->min = 0;
+    def->max      = 2;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(0));
 
@@ -5332,8 +5364,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(60.));
 
     def = this->add("wipe_tower_rotation_angle", coFloat);
-    def->label = L("Wipe tower rotation angle");
-    def->tooltip = L("Wipe tower rotation angle with respect to x-axis.");
+    def->label = L("Prime tower rotation angle");
+    def->tooltip = L("Prime tower rotation angle with respect to x-axis.");
     def->sidetext = L("°");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));

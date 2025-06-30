@@ -1,6 +1,7 @@
 #include "HttpServer.hpp"
 #include <boost/log/trivial.hpp>
 #include "GUI_App.hpp"
+#include "libslic3r/Thread.hpp"
 #include "slic3r/Utils/Http.hpp"
 #include "slic3r/Utils/NetworkAgent.hpp"
 #include <boost/regex.hpp>
@@ -10,6 +11,41 @@
 #endif
 namespace Slic3r {
 namespace GUI {
+
+int http_headers::content_length()
+{
+    auto request = headers.find("content-length");
+    if (request != headers.end()) {
+        std::stringstream ssLength(request->second);
+        int               content_length;
+        ssLength >> content_length;
+        return content_length;
+    }
+    return 0;
+}
+
+void http_headers::on_read_header(std::string line)
+{
+    // std::cout << "header: " << line << std::endl;
+
+    std::stringstream ssHeader(line);
+    std::string       headerName;
+    std::getline(ssHeader, headerName, ':');
+
+    std::string value;
+    std::getline(ssHeader, value);
+    headers[headerName] = value;
+}
+
+void http_headers::on_read_request_line(std::string line)
+{
+    std::stringstream ssRequestLine(line);
+    ssRequestLine >> method;
+    ssRequestLine >> url;
+    ssRequestLine >> version;
+
+    std::cout << "request for resource: " << url << std::endl;
+}
 
 std::string url_get_param(const std::string& url, const std::string& key)
 {
@@ -398,10 +434,10 @@ void session::do_write_proxy(SocketPtr proxysocket, const std::string& target_ho
         request += "Host: " + target_host + "\r\n";
         request += "Connection: close\r\n\r\n";
 
-        
+        std::shared_ptr<std::string> str = std::make_shared<std::string>(request);
         // 发送请求
         //boost::asio::write(socket, boost::asio::buffer(request));
-        proxysocket->async_send(boost::asio::buffer(request), [&](const boost::system::error_code& ec, std::size_t bytes_transferred) {
+        proxysocket->async_send(boost::asio::buffer(str->c_str(), str->length()), [str](const boost::system::error_code& ec, std::size_t bytes_transferred) {
             if (!ec) {
                 
                 std::cout << "Request sent successfully: " << bytes_transferred << " bytes\n";
@@ -567,21 +603,31 @@ std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const 
     if (path.find("/resources") == 0) {
         currentPath = boost::filesystem::path(resources_dir()).parent_path();
     }
+    if (path.find("/creality_presets") == 0) {
+        currentPath = fs::temp_directory_path();
+    }
     if(path.find("/login") == 0) {
         std::string   result_url = url_get_param(url, "result_url");
         std::string   code       = url_get_param(url, "code");
         std::string   url_scheme = (boost::format("crealityprintlink://open?code=%1%") % code).str();
 
         // hack：必须在 ui 线程 post_openlink_cmd，否则 web 端无法接收到 msg
+        std::string olderToken = wxGetApp().get_user().token;
         GUI::wxGetApp().CallAfter([url_scheme] { wxGetApp().post_openlink_cmd(url_scheme); });
-        if (wxGetApp().wait_cloud_token()) {
-            wxGetApp().send_app_message("login",true);
-            std::string location_str = (boost::format("%1%?result=success") % result_url).str();
-            return std::make_shared<ResponseRedirect>(location_str);
-        } else {
-            std::string location_str = (boost::format("%1%?result=fail") % result_url).str();
-            return std::make_shared<ResponseRedirect>(location_str);
+        int wait_time = 160; // 16s
+        while(olderToken== wxGetApp().get_user().token)
+        {
+            //std::cout <<"token" <<wxGetApp().get_user().token;
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+            wait_time--;
+            if (wait_time <= 0) {
+                std::string location_str = (boost::format("%1%?result=fail") % result_url).str();
+                return std::make_shared<ResponseRedirect>(location_str);
+            }
         }
+        wxGetApp().send_app_message("login",true);
+        std::string location_str = (boost::format("%1%?result=success") % result_url).str();
+        return std::make_shared<ResponseRedirect>(location_str);
     }
     
 

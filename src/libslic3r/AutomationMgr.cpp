@@ -24,6 +24,9 @@
 #include "Utils.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 namespace Slic3r {
 AutomationMgr::AutomationType AutomationMgr::g_automationType = AutomationMgr::AutomationType::None;

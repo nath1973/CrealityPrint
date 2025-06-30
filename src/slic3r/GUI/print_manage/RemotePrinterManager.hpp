@@ -10,7 +10,7 @@
 #include "Device/Klipper4408Interface.hpp"
 #include <curl/curl.h>
 #include "Device/KlipperCXInterface.hpp"
-
+#include <condition_variable>
 namespace RemotePrint {
 enum class RemotePrinerType {
     REMOTE_PRINTER_TYPE_NONE = -1,
@@ -51,6 +51,12 @@ public:
                         std::function<void(std::string, float,double)> progressCallback,
                         std::function<void(std::string, int)>   uploadStatusCallback = nullptr, 
                         std::function<void(std::string, std::string)>   onCompleteCallback = nullptr);
+    void pushUploadMultTasks(const std::string&               ipAddress,
+                        const std::string&                      fileName,
+                        const std::string&                      filePath,
+                        std::function<void(std::string, float,double)> progressCallback,
+                        std::function<void(std::string, int)>   uploadStatusCallback = nullptr, 
+                        std::function<void(std::string, std::string)>   onCompleteCallback = nullptr);
     void cancelUpload(const std::string& ipAddress);
     void uploadFileByLan(const std::string& ipAddress,
                          const std::string& fileName,
@@ -60,7 +66,9 @@ public:
                          std::function<void(std::string, std::string)>   onCompleteCallback = nullptr);
 
     void setOldPrinterMap(std::string& ipAddress);
-
+    void setKlipperPrinterMap(const std::string& ipAddress,int port);
+    int getKlipperPrinterMap(const std::string& ipAddress);
+    void addDownloadTask(const std::function<void()>& task);
 private:
     RemotePrinterManager();
 
@@ -73,7 +81,7 @@ private:
                   std::function<void(std::string, float,double)> progressCallback,
                   std::function<void(std::string, int)>   uploadStatusCallback = nullptr,
                   std::function<void(std::string, std::string)> onCompleteCallback = nullptr);
-
+    void workerThread();
     LanPrinterInterface*  m_pLanPrinterInterface;
     OctoPrintInterface*   m_pOctoPrinterInterface;
     KlipperInterface*     m_pKlipperInterface;
@@ -83,6 +91,8 @@ private:
     std::mutex m_mtxUpload;
     std::condition_variable m_cvUpload;
     std::deque<std::tuple<std::string, std::string, std::string, std::function<void(std::string, float,double)>, std::function<void(std::string, int)>, std::function<void(std::string, std::string)> >> m_uploadTasks;
+    std::queue<std::function<void()>> tasks;
+    std::vector<std::thread> m_multUploadThreads;
     bool m_bExit = false;
 
     static std::unique_ptr<RemotePrinterManager> instance;
@@ -91,6 +101,10 @@ private:
     RemotePrinerType determinePrinterType(const std::string& ipAddress);
 
     std::vector<std::string> oldPrinters;
+    std::map<std::string,int> mapKlipperPort;
+    std::condition_variable condition;
+    std::atomic<bool> stop_flag;
+    std::mutex queue_mutex;
 };
 } // namespace RemotePrintManage
 

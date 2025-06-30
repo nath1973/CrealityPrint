@@ -54,6 +54,7 @@ public:
     std::string get_account_device_bind_json_info();
     void        reset_account_device_file_id(const std::string& fid);
     std::string get_account_device_info_for_printers_init();
+    const AccountDeviceInfo& get_account_device_info() { return accountDeviceInfos;}
 
 private:
     AccountDeviceMgr();

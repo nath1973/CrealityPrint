@@ -21,6 +21,8 @@ public:
 
 private:
     nlohmann::json _get_acive_device();
+    void set_cur_active_address(std::string& address);
+    bool get_device_box_info_hash(nlohmann::json& device_json, unsigned long& hash);
     struct priv;
     std::unique_ptr<priv> p;
 public:

@@ -154,6 +154,26 @@ def make_parameter_package(server_id, engine_version):
             "sub_path": "filament/fdm_filament_pla.json"
         },
         {
+            "name": "fdm_filament_pp",
+            "sub_path": "filament/fdm_filament_pp.json"
+        },
+        {
+            "name": "fdm_filament_pps",
+            "sub_path": "filament/fdm_filament_pps.json"
+        },
+        {
+            "name": "fdm_filament_pva",
+            "sub_path": "filament/fdm_filament_pva.json"
+        },
+        {
+            "name": "fdm_filament_petg",
+            "sub_path": "filament/fdm_filament_petg.json"
+        },
+        {
+            "name": "fdm_filament_hips",
+            "sub_path": "filament/fdm_filament_hips.json"
+        },
+        {
             "name": "fdm_filament_tpu",
             "sub_path": "filament/fdm_filament_tpu.json"
         }
@@ -324,6 +344,9 @@ def process_process_json(printer,package_path, out_path):
                     "sub_path": os.path.join("process",basename+".json").replace("\\","/")
                 })
     return sub_paths
+
+def get_filament_type(name):
+    return ""
 def process_filament_json(printer,package_path, out_path):    
     array_keys = ["filament_type", "filament_vendor", "filament_start_gcode", "filament_end_gcode"]
     sub_paths = []
@@ -353,7 +376,38 @@ def process_filament_json(printer,package_path, out_path):
 
                 #处理特殊的key
                 filament_data["compatible_printers"] = [machine_profile_name]
-                filament_data["inherits"] = "fdm_filament_common"
+                filament_type = filament_data["filament_type"]
+                print("filament_type:"+filament_type)
+                if filament_type == "PLA" or filament_type == "PLA-CF":
+                    filament_data["inherits"] = "fdm_filament_pla"
+                elif filament_type == "PETG" or filament_type == "PETG-CF":
+                    filament_data["inherits"] = "fdm_filament_petg"
+                elif filament_type == "TPU":
+                    filament_data["inherits"] = "fdm_filament_tpu"
+                elif filament_type == "ABS":
+                    filament_data["inherits"] = "fdm_filament_abs"
+                elif filament_type == "ASA":
+                    filament_data["inherits"] = "fdm_filament_asa"
+                elif filament_type == "PP":
+                    filament_data["inherits"] = "fdm_filament_pp"
+                elif filament_type == "PPS" or filament_type == "PPS-CF":
+                    filament_data["inherits"] = "fdm_filament_pps"
+                elif filament_type == "PPS":
+                    filament_data["inherits"] = "fdm_filament_pet"
+                elif filament_type == "PET" or filament_type == "PET-CF":
+                    filament_data["inherits"] = "fdm_filament_pet"
+                elif filament_type == "PC":
+                    filament_data["inherits"] = "fdm_filament_pc"
+                elif filament_type == "PA" or filament_type == "PA6" or filament_type == "PA6-CF" or filament_type == "PA-CF" or filament_type == "PAHT" or filament_type == "PAHT-CF":
+                    filament_data["inherits"] = "fdm_filament_pa"
+                elif filament_type == "HIPS":
+                    filament_data["inherits"] = "fdm_filament_hips"
+                elif filament_type == "BVOH":
+                    filament_data["inherits"] = "fdm_filament_common"
+                    filament_data["filament_adhesiveness_category"] = "797"
+                else:
+                    filament_data["inherits"] = "fdm_filament_common"
+
                 filament_data["default_filament_colour"] = "\"\""
 
                 #if "material_flow_dependent_temperature" in filament_data:

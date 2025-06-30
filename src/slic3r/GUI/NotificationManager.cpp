@@ -274,7 +274,9 @@ void NotificationManager::PopNotification::bbl_render_block_notification(
         bg_color = ImVec4(210.0 / 255.0, 148.0 / 255.0, 0.0, 0.8f);
 	} break;
 
-    case Slic3r::GUI::NotificationManager::NotificationLevel::WarningNotificationLevel: {
+    case Slic3r::GUI::NotificationManager::NotificationLevel::WarningNotificationLevel:
+	case Slic3r::GUI::NotificationManager::NotificationLevel::SeriousWarningNotificationLevel:
+	{
         bg_color = ImVec4(0.7, 0.51, 0.04, 0.8f);
     } break;
 
@@ -283,7 +285,7 @@ void NotificationManager::PopNotification::bbl_render_block_notification(
     case Slic3r::GUI::NotificationManager::NotificationLevel::PrintInfoNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel: break;
     case Slic3r::GUI::NotificationManager::NotificationLevel::ImportantNotificationLevel: break;
-    case Slic3r::GUI::NotificationManager::NotificationLevel::SeriousWarningNotificationLevel: break;
+
     default: break;
     }
     
@@ -745,7 +747,7 @@ void NotificationManager::PopNotification::bbl_render_block_notif_left_sign(
         pos.y += 5;
         ImGui::SetCursorPos(pos);
 
-		if (m_data.level == NotificationLevel::WarningNotificationLevel) {
+		if (m_data.level == NotificationLevel::WarningNotificationLevel || m_data.level == NotificationLevel::SeriousWarningNotificationLevel) {
             imgui.text(_u8L("Warning:"));
         } else {
             imgui.text(_u8L("Error:"));
@@ -1780,7 +1782,7 @@ void NotificationManager::push_slicing_warning_notification(const std::string& t
 	}
     auto link = callback ? _u8L("Jump to") : "";
     if (obj) link += std::string(" [") + obj->name + "]";
-	NotificationData data { NotificationType::SlicingWarning, level, 0,  _u8L("Warning:") + "\n" + text, link, callback };
+	NotificationData data { NotificationType::SlicingWarning, level, 0,  /*_u8L("Warning:") + "\n" + */text, link, callback };
 
 	data.sub_msg_id = warning_msg_id;
 	data.ori_text = text;
@@ -1836,7 +1838,7 @@ void NotificationManager::push_plater_warning_notification(const std::string& te
 void NotificationManager::close_plater_warning_notification(const std::string& text)
 {
 	for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
-		if (notification->get_type() == NotificationType::PlaterWarning && notification->compare_text(_u8L("Warning:") + "\n" + text)) {
+		if (notification->get_type() == NotificationType::PlaterWarning && notification->compare_text(/*_u8L("Warning:") + "\n" + */text)) {
 			dynamic_cast<PlaterWarningNotification*>(notification.get())->real_close();
 		}
 	}
@@ -2114,7 +2116,7 @@ void NotificationManager::push_slicing_serious_warning_notification(const std::s
         link += "] ";
     }
     set_all_slicing_warnings_gray(false);
-    push_notification_data({NotificationType::SlicingSeriousWarning, NotificationLevel::SeriousWarningNotificationLevel, 0, _u8L("Serious warning:") + "\n" + text, link,
+    push_notification_data({NotificationType::SlicingSeriousWarning, NotificationLevel::SeriousWarningNotificationLevel, 0, /*_u8L("Serious warning:") + "\n" + */text, link,
                             callback},
                            0);
     set_slicing_progress_hidden();
@@ -2123,7 +2125,7 @@ void NotificationManager::push_slicing_serious_warning_notification(const std::s
 void NotificationManager::close_slicing_serious_warning_notification(const std::string &text) 
 {
     for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {
-        if (notification->get_type() == NotificationType::SlicingSeriousWarning && notification->compare_text(_u8L("Serious warning:") + "\n" + text)) { notification->close(); }
+        if (notification->get_type() == NotificationType::SlicingSeriousWarning && notification->compare_text(/*_u8L("Serious warning:") + "\n" + */text)) { notification->close(); }
     }
 }
 

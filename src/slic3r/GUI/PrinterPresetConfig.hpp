@@ -18,9 +18,19 @@ public:
     ~PrinterPresetConfig();
 
     std::vector<std::string> getFilament(const std::string& printerName, const std::string& nozzle);
+    int                      LoadProfile();
+    json                     getProfileJson() const { 
+        json m_Res           = json::object();
+        m_Res["command"]     = "response_userguide_profile";
+        m_Res["sequence_id"] = "10001";
+        m_Res["response"]    = m_ProfileJson;
+        m_Res["MachineJson"] = m_MachineJson;
+        m_Res["user_preset"] = json::array(); 
+
+        return m_Res; 
+    }
 
 private:
-    int LoadProfile();
     int LoadProfileFamily(std::string strVendor, std::string strFilePath);
     int LoadMachineJson(std::string strVendor, std::string strFilePath);
 

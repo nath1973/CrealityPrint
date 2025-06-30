@@ -2,6 +2,8 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectList.hpp"
@@ -26,6 +28,7 @@
 #include "MsgDialog.hpp"
 #include "wx/utils.h"
 #include "libslic3r/common_header/common_header.h"
+#include "FilamentPanel.h"
 namespace Slic3r
 {
 namespace GUI
@@ -111,7 +114,8 @@ std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::PART_CAT
                     }},
     { L("Speed"), {{"outer_wall_speed", "",1},{"inner_wall_speed", "",2},{"sparse_infill_speed", "",3},{"top_surface_speed", "",4}, {"internal_solid_infill_speed", "",5},
                     {"enable_overhang_speed", "",6}, {"overhang_speed_classic", "",6}, {"overhang_1_4_speed", "",7}, {"overhang_2_4_speed", "",8}, {"overhang_3_4_speed", "",9}, {"overhang_4_4_speed", "",10},
-                    {"bridge_speed", "",11}, {"gap_infill_speed", "",12}, {"internal_bridge_speed", "", 13}
+                    {"bridge_speed", "",11}, {"gap_infill_speed", "",12}, {"internal_bridge_speed", "", 13},
+                    {"overhang_totally_speed", "",14}
                     }}
 };
 
@@ -1666,6 +1670,56 @@ void MenuFactory::create_bbl_assemble_part_menu()
     append_menu_item_simplify(menu);
     menu->AppendSeparator();
 }
+void MenuFactory::create_filament_action_menu(bool init, int active_filament_menu_id)
+{
+    wxMenu* menu = &m_filament_action_menu;
+
+    if (init) {
+        append_menu_item(
+            menu, wxID_ANY, _L("Edit"), "",
+            [](wxCommandEvent&) {
+                SidebarPrinter& bar = wxGetApp().plater()->sidebar_printer();
+                bar.edit_filament();
+                //plater()->sidebar().edit_filament();
+            },
+            "", nullptr,
+            []() { return true; }, m_parent);
+    }
+
+    if (init) {
+        append_menu_item(
+            menu, wxID_ANY, _L("Delete"), _L("Delete this filament"),
+            [](wxCommandEvent&) {
+                plater()->sidebar().delete_filament(-2); },
+                "", nullptr,
+            []() { 
+                FilamentPanel* filament = dynamic_cast<FilamentPanel*>( plater()->sidebar().filament_panel());
+                return filament->can_delete();
+            },
+            m_parent);
+    }
+
+    const int item_id = menu->FindItem(_L("Merge with"));
+    if (item_id != wxNOT_FOUND)
+        menu->Destroy(item_id);
+
+    wxMenu*                sub_menu      = new wxMenu();
+    std::vector<wxBitmap*> icons         = get_extruder_color_icons(true);
+    int                    filaments_cnt = icons.size();
+    for (int i = 0; i < filaments_cnt; i++) {
+        if (i == active_filament_menu_id)
+            continue;
+
+        auto     preset    = wxGetApp().preset_bundle->filaments.find_preset(wxGetApp().preset_bundle->filament_presets[i]);
+        wxString item_name = preset ? from_u8(preset->label(false)) : wxString::Format(_L("Filament %d"), i + 1);
+
+        append_menu_item(
+            sub_menu, wxID_ANY, item_name, "", [i](wxCommandEvent&) { plater()->sidebar().change_filament(-2, i); }, *icons[i], menu,
+            []() { return true; }, m_parent);
+    }
+    append_submenu(menu, sub_menu, wxID_ANY, _L("Merge with"), "", "", [filaments_cnt]() { return filaments_cnt > 1; }, m_parent);
+}
+
 
 //BBS: add part plate related logic
 void MenuFactory::create_plate_menu()
@@ -1796,6 +1850,7 @@ void MenuFactory::init(wxWindow* parent)
     //BBS: add part plate related logic
     create_plate_menu();
 
+    create_filament_action_menu(true, -1);
     // create "Instance to Object" menu item
     append_menu_item_instance_to_object(&m_instance_menu);
 }
@@ -1950,7 +2005,11 @@ wxMenu* MenuFactory::assemble_multi_selection_menu()
     append_menu_item_change_extruder(menu);
     return menu;
 }
-
+wxMenu* MenuFactory::filament_action_menu(int active_filament_menu_id)
+{
+    create_filament_action_menu(false, active_filament_menu_id);
+    return &m_filament_action_menu;
+}
 
 //BBS: add partplate related logic
 wxMenu* MenuFactory::plate_menu()

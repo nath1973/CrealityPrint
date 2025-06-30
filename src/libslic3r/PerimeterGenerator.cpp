@@ -23,6 +23,8 @@ static const int overhang_sampling_number = 6;
 static const double narrow_loop_length_threshold = 10;
 static const double min_degree_gap = 0.1;
 static const int max_overhang_degree = overhang_sampling_number - 1;
+static const std::vector<double> non_uniform_degree_map       = {0, 10, 25, 50, 75, 100};
+static const int                 insert_point_count           = 3;
 //BBS: when the width of expolygon is smaller than
 //ext_perimeter_width + ext_perimeter_spacing  * (1 - SMALLER_EXT_INSET_OVERLAP_TOLERANCE),
 //we think it's small detail area and will generate smaller line width for it
@@ -337,6 +339,34 @@ public:
     }
 };
 
+static void sampling_at_line_end(Polyline& poly, double mini_length, int insert_count)
+{
+    Point        end_point = poly.last_point();
+    const double length    = poly.length();
+    if (length < mini_length * 2)
+        return;
+
+    if (length < mini_length * (insert_count * 2 - 1))
+        insert_count = 0.5 * length / mini_length;
+
+    poly.points.pop_back();
+    double length_count = 0;
+    Point  dir          = end_point - poly.first_point();
+
+    for (int count = 0; count < insert_count; ++count) {
+        length_count += mini_length;
+        poly.append(poly.first_point() + dir * (length_count / length));
+    }
+
+    dir *= -1;
+    for (int count = 0; count < insert_count; ++count) {
+        poly.append(end_point + dir * (length_count / length));
+
+        length_count -= mini_length;
+    }
+    poly.append(end_point);
+}
+
 static std::deque<PolylineWithDegree> detect_overahng_degree(Polygons        lower_polygons,
                                                              Polylines       middle_overhang_polyines,
                                                              const double    &lower_bound,
@@ -360,32 +390,45 @@ static std::deque<PolylineWithDegree> detect_overahng_degree(Polygons        low
             too_short_polylines.push_back(middle_poly);
             continue;
         }
+        if (middle_poly.size() == 2)
+            sampling_at_line_end(middle_poly, (upper_bound - lower_bound) / 2, insert_point_count);
 
         Polyline polyline_with_insert_points;
         points_overhang.clear();
-        double last_degree = 0;
+        double last_terraced_overhang = 0;
         // BBS : calculate overhang dist
         for (size_t point_idx = 0; point_idx < middle_poly.points.size(); ++point_idx) {
             Point pt = middle_poly.points[point_idx];
 
             float overhang_dist = prev_layer_distancer->distance_from_perimeter(pt.cast<float>());
             overhang_dist       = overhang_dist > upper_bound ? upper_bound : overhang_dist;
-            // BBS : calculate overhang degree
-            int    max_overhang = max_overhang_degree;
-            int    min_overhang = 0;
-            double t            = (overhang_dist - lower_bound) / (upper_bound - lower_bound);
-            t = t > 1.0 ? 1: t;
-            t = t < EPSILON ? 0 : t;
-            double this_degree  = (1.0 - t) * min_overhang + t * max_overhang;
+            // BBS : calculate overhang degree -- overhang length / width
+            double this_degree = (overhang_dist - lower_bound) / (upper_bound - lower_bound) * 100;
+            // BBS: covert to terraced overhang
+            double terraced_overhang = 0;
+            if (this_degree >= 100)
+                terraced_overhang = max_overhang_degree;
+            else if (this_degree > EPSILON * 100) {
+                int upper_bound_idx = std::upper_bound(non_uniform_degree_map.begin(), non_uniform_degree_map.end(), this_degree) -
+                                      non_uniform_degree_map.begin();
+                int lower_bound_idx = upper_bound_idx - 1;
+
+                if (this_degree == non_uniform_degree_map[lower_bound_idx])
+                    terraced_overhang = lower_bound_idx;
+                else {
+                    double t = (this_degree - non_uniform_degree_map[lower_bound_idx]) /
+                               (non_uniform_degree_map[upper_bound_idx] - non_uniform_degree_map[lower_bound_idx]);
+                    terraced_overhang = (1.0 - t) * lower_bound_idx + t * upper_bound_idx;
+                }
+            }
             // BBS: intert points
             if (point_idx > 0) {
-                insert_point_to_line(last_degree, middle_poly.points[point_idx - 1], this_degree, pt, points_overhang, polyline_with_insert_points,
-                                     upper_bound - lower_bound);
+                insert_point_to_line(last_terraced_overhang, middle_poly.points[point_idx - 1], terraced_overhang, pt, points_overhang, polyline_with_insert_points, upper_bound - lower_bound);
             }
-            points_overhang.push_back(this_degree);
+            points_overhang.push_back(terraced_overhang);
 
             polyline_with_insert_points.append(pt);
-            last_degree = this_degree;
+            last_terraced_overhang = terraced_overhang;
 
         }
 
@@ -407,6 +450,26 @@ std::pair<double, double> PerimeterGenerator::dist_boundary(double width)
     out.first = 0;
     out.second = scale_(end_offset) - degree_0;
     return out;
+}
+
+static void detect_bridge_wall(const PerimeterGenerator& perimeter_generator,
+                               ExtrusionPaths&           paths,
+                               const Polylines&          remain_polines,
+                               ExtrusionRole             role,
+                               double                    mm3_per_mm,
+                               float                     width,
+                               float                     height)
+{
+    for (Polyline poly : remain_polines) {
+        // check if the line is straight line, which mean if the wall is bridge
+        Line line(poly.first_point(), poly.last_point());
+        if (line.length() < poly.length()) {
+            extrusion_paths_append(paths, std::move(poly), overhang_sampling_number - 1, int(0), role, mm3_per_mm, width, height);
+            continue;
+        }
+        // bridge wall
+        extrusion_paths_append(paths, std::move(poly), overhang_sampling_number, int(0), role, mm3_per_mm, width, height);
+    }
 }
 
 template<class _T>
@@ -610,10 +673,29 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
             // outside the grown lower slices (thus where the distance between
             // the loop centerline and original lower slices is >= half nozzle diameter
             if (remain_polines.size() != 0) {
-                extrusion_paths_append(paths, std::move(remain_polines), overhang_sampling_number - 1, int(0),
-                                       erOverhangPerimeter, perimeter_generator.mm3_per_mm_overhang(),
+                if (!((perimeter_generator.object_config->enable_support || perimeter_generator.object_config->enforce_support_layers > 0) &&
+                      perimeter_generator.object_config->support_top_z_distance.value == 0)) {
+                    // detect if the overhang perimeter is bridge
+                    detect_bridge_wall(perimeter_generator, 
+                                       paths, 
+                                       remain_polines,
+                                       erOverhangPerimeter,
+                                       perimeter_generator.mm3_per_mm_overhang(), 
                                        perimeter_generator.overhang_flow.width(),
                                        perimeter_generator.overhang_flow.height());
+                } else {
+                    detect_bridge_wall(perimeter_generator, 
+                                       paths, 
+                                       remain_polines, 
+                                       role, 
+                                       extrusion_mm3_per_mm, 
+                                       extrusion_width,
+                                       (float) perimeter_generator.layer_height);
+                }
+                //extrusion_paths_append(paths, std::move(remain_polines), overhang_sampling_number - 1, int(0),
+                //                       erOverhangPerimeter, perimeter_generator.mm3_per_mm_overhang(),
+                //                       perimeter_generator.overhang_flow.width(),
+                //                       perimeter_generator.overhang_flow.height());
             }
 
             // Reapply the nearest point search for starting point.
@@ -636,13 +718,27 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
     }
     
     // Append thin walls to the nearest-neighbor search (only for first iteration)
+    Point zero_point(0, 0);
+    
     if (! thin_walls.empty()) {
+        // CP: update zero_point, this code comes from bambu, can save a few seconds 
+        BoundingBox bbox;
+        for (auto& entity : coll.entities) {
+            bbox.merge(entity->as_polyline().bounding_box());
+        }
+        for (auto& thin_wall : thin_walls) {
+            // find the corner of bbox that's farthest from the thin wall
+            Point corner_far = bbox.min;
+            if ((corner_far.cast<double>() - thin_wall.first_point().cast<double>()).squaredNorm() <
+                (bbox.max.cast<double>() - thin_wall.first_point().cast<double>()).squaredNorm())
+                corner_far = bbox.max;
+            zero_point = corner_far;
+        }
         variable_width(thin_walls, erExternalPerimeter, perimeter_generator.ext_perimeter_flow, coll.entities);
         thin_walls.clear();
     }
     
     // Traverse children and build the final collection.
-	Point zero_point(0, 0);
 	std::vector<std::pair<size_t, bool>> chain = chain_extrusion_entities(coll.entities, &zero_point);
     ExtrusionEntityCollection out;
     for (const std::pair<size_t, bool> &idx : chain) {
@@ -849,6 +945,26 @@ static void smooth_overhang_level(ExtrusionPaths &paths)
     }
 }
 
+static void detect_brigde_wall_arachne(const PerimeterGenerator&  perimeter_generator,
+                                       ExtrusionPaths&            paths,
+                                       const ClipperLib_Z::Paths& path_overhang,
+                                       const ExtrusionRole        role,
+                                       const Flow&                flow)
+{
+    for (ClipperLib_Z::Path path : path_overhang) {
+        // check if the line is straight line, which mean if the wall is bridge
+        ThickPolyline thick_polyline = Arachne::to_thick_polyline(path);
+
+        Line line(thick_polyline.front(), thick_polyline.back());
+        if (line.length() < thick_polyline.length()) {
+            extrusion_path_append(paths, std::move(thick_polyline), role, flow, overhang_sampling_number - 1);
+            continue;
+        }
+
+        extrusion_path_append(paths, std::move(thick_polyline), role, flow, overhang_sampling_number);
+    }
+}
+
 static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator& perimeter_generator, std::vector<PerimeterGeneratorArachneExtrusion>& pg_extrusions,
     bool &steep_overhang_contour, bool &steep_overhang_hole)
 {
@@ -990,8 +1106,19 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator& p
             // get overhang paths by checking what parts of this loop fall
             // outside the grown lower slices (thus where the distance between
             // the loop centerline and original lower slices is >= half nozzle diameter
-            extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference), erOverhangPerimeter,
-                perimeter_generator.overhang_flow);
+            // detect if the overhang perimeter is bridge
+            ClipperLib_Z::Paths path_overhang = clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference);
+
+            bool zero_z_support = (perimeter_generator.object_config->enable_support ||
+                                   perimeter_generator.object_config->enforce_support_layers > 0) &&
+                                  perimeter_generator.object_config->support_top_z_distance.value == 0;
+
+            if (zero_z_support)
+                detect_brigde_wall_arachne(perimeter_generator, paths, path_overhang, role,
+                                           is_external ? perimeter_generator.ext_perimeter_flow : perimeter_generator.perimeter_flow);
+            else
+                detect_brigde_wall_arachne(perimeter_generator, paths, path_overhang, erOverhangPerimeter,
+                                           perimeter_generator.overhang_flow);
 
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
@@ -1878,71 +2005,76 @@ void PerimeterGenerator::process_classic()
 
                 //BBS: refer to superslicer
                 //store surface for top infill if only_one_wall_top
-                if (i == 0 && i!=loop_number && config->only_one_wall_top && !surface.is_bridge() && this->upper_slices != NULL) {
-                    //split the polygons with top/not_top
-                    //get the offset from solid surface anchor
-                    coord_t offset_top_surface = scale_(1.5 * (config->wall_loops.value == 0 ? 0. : unscaled(double(ext_perimeter_width + perimeter_spacing * int(int(config->wall_loops.value) - int(1))))));
-                    // if possible, try to not push the extra perimeters inside the sparse infill
-                    if (offset_top_surface > 0.9 * (config->wall_loops.value <= 1 ? 0. : (perimeter_spacing * (config->wall_loops.value - 1))))
-                        offset_top_surface -= coord_t(0.9 * (config->wall_loops.value <= 1 ? 0. : (perimeter_spacing * (config->wall_loops.value - 1))));
-                    else
-                        offset_top_surface = 0;
-                    //don't takes into account too thin areas
-                    double min_width_top_surface = std::max(double(ext_perimeter_spacing / 2 + 10), 1.0 * (double(perimeter_width)));
+                if (i == 0 && i!=loop_number && config->only_one_wall_top && !surface.is_bridge() && this->upper_slices != NULL)
+                {
+                    this->split_top_surfaces(last, top_fills, last, fill_clip);
 
-                    //BBS: get boungding box of last
-                    BoundingBox last_box   = get_extents(last);
-                    last_box.offset(SCALED_EPSILON);
-
-                    // BBS: get the Polygons upper the polygon this layer
-                    Polygons upper_polygons_series_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(*this->upper_slices, last_box);
-                    upper_polygons_series_clipped = offset(upper_polygons_series_clipped, min_width_top_surface);
-
-                    //set the clip to a virtual "second perimeter"
-                    fill_clip = offset_ex(last, -double(ext_perimeter_spacing));
-                    // get the real top surface
-                    ExPolygons grown_lower_slices;
-                    ExPolygons bridge_checker;
-
-                    ExPolygons top_polygons = diff_ex(last, upper_polygons_series_clipped, ApplySafetyOffset::Yes);
-                    //get the not-top surface, from the "real top" but enlarged by external_infill_margin (and the min_width_top_surface we removed a bit before)
-                    ExPolygons temp_gap        = diff_ex(top_polygons, fill_clip);
-                    ExPolygons inner_polygons = diff_ex(last,
-                                                        offset_ex(top_polygons, offset_top_surface + min_width_top_surface - double(ext_perimeter_spacing / 2)),
-                                                        ApplySafetyOffset::Yes);
-                    // BBS: check whether surface be bridge or not
-                    if (this->lower_slices != NULL) {
-                        // BBS: get the Polygons below the polygon this layer
-                        Polygons lower_polygons_series_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(*this->lower_slices, last_box);
-
-                        double bridge_offset = std::max(double(ext_perimeter_spacing), (double(perimeter_width)));
-                        bridge_checker       = offset_ex(diff_ex(last, lower_polygons_series_clipped, ApplySafetyOffset::Yes), 1.5 * bridge_offset);
-
-                        // BBS: Check which piece the bridge belongs to. If the bridge has a connection with the non-top area, it should belong to the non-top area, otherwise it should belong to the top area to get a better surface.
-                        if (!bridge_checker.empty() && !intersection_ex(bridge_checker, inner_polygons).empty())
-                            inner_polygons = union_ex(inner_polygons, bridge_checker);
-                    }
-                    // get the enlarged top surface, by using inner_polygons instead of upper_slices, and clip it for it to be exactly the polygons to fill.
-                    top_polygons = diff_ex(fill_clip, inner_polygons, ApplySafetyOffset::Yes);
-                    // increase by half peri the inner space to fill the frontier between last and stored.
-                    top_fills = union_ex(top_fills, top_polygons);
-                    //set the clip to the external wall but go back inside by infill_extrusion_width/2 to be sure the extrusion won't go outside even with a 100% overlap.
-                    double infill_spacing_unscaled = this->config->sparse_infill_line_width.value;
-                    fill_clip = offset_ex(last, double(ext_perimeter_spacing / 2) - scale_(infill_spacing_unscaled / 2));
-                    last = intersection_ex(inner_polygons, last);
-                    if (has_gap_fill)
-                        last = union_ex(last,temp_gap);
-                    //{
-                    //    std::stringstream stri;
-                    //    stri << this->layer->id() << "_1_"<< i <<"_only_one_peri"<< ".svg";
-                    //    SVG svg(stri.str());
-                    //    svg.draw(to_polylines(top_fills), "green");
-                    //    svg.draw(to_polylines(inner_polygons), "yellow");
-                    //    svg.draw(to_polylines(top_polygons), "cyan");
-                    //    svg.draw(to_polylines(oldLast), "orange");
-                    //    svg.draw(to_polylines(last), "red");
-                    //    svg.Close();
-                    //}
+//                     //split the polygons with top/not_top
+//                     //get the offset from solid surface anchor
+//                     coord_t offset_top_surface = scale_(1.5 * (config->wall_loops.value == 0 ? 0. : unscaled(double(ext_perimeter_width + perimeter_spacing * int(int(config->wall_loops.value) - int(1))))));
+//                     // if possible, try to not push the extra perimeters inside the sparse infill
+//                     if (offset_top_surface > 0.9 * (config->wall_loops.value <= 1 ? 0. : (perimeter_spacing * (config->wall_loops.value - 1))))
+//                         offset_top_surface -= coord_t(0.9 * (config->wall_loops.value <= 1 ? 0. : (perimeter_spacing * (config->wall_loops.value - 1))));
+//                     else
+//                         offset_top_surface = 0;
+//                     //don't takes into account too thin areas
+//                     double min_width_top_surface = std::max(double(ext_perimeter_spacing / 2 + 10), 1.0 * (double(perimeter_width)));
+// 
+//                     //BBS: get boungding box of last
+//                     BoundingBox last_box   = get_extents(last);
+//                     last_box.offset(SCALED_EPSILON);
+// 
+//                     // BBS: get the Polygons upper the polygon this layer
+//                     Polygons upper_polygons_series_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(*this->upper_slices, last_box);
+//                     upper_polygons_series_clipped = offset(upper_polygons_series_clipped, min_width_top_surface);
+// 
+//                     //set the clip to a virtual "second perimeter"
+//                     fill_clip = offset_ex(last, -double(ext_perimeter_spacing));
+//                     // get the real top surface
+//                     ExPolygons grown_lower_slices;
+//                     ExPolygons bridge_checker;
+// 
+//                     ExPolygons top_polygons = diff_ex(last, upper_polygons_series_clipped, ApplySafetyOffset::Yes);
+//                     //get the not-top surface, from the "real top" but enlarged by external_infill_margin (and the min_width_top_surface we removed a bit before)
+//                     ExPolygons temp_gap        = diff_ex(top_polygons, fill_clip);
+//                     ExPolygons inner_polygons = diff_ex(last,
+//                                                         offset_ex(top_polygons, offset_top_surface + min_width_top_surface - double(ext_perimeter_spacing / 2)),
+//                                                         ApplySafetyOffset::Yes);
+//                     // BBS: check whether surface be bridge or not
+//                     if (this->lower_slices != NULL) 
+//                     {
+//                         // BBS: get the Polygons below the polygon this layer
+//                         Polygons lower_polygons_series_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(*this->lower_slices, last_box);
+// 
+//                         double bridge_offset = std::max(double(ext_perimeter_spacing), (double(perimeter_width)));
+//                         bridge_checker       = offset_ex(diff_ex(last, lower_polygons_series_clipped, ApplySafetyOffset::Yes), 1.5 * bridge_offset);
+// 
+//                         // BBS: Check which piece the bridge belongs to. If the bridge has a connection with the non-top area, it should belong to the non-top area, otherwise it should belong to the top area to get a better surface.
+//                         if (!bridge_checker.empty() && !intersection_ex(bridge_checker, inner_polygons).empty())
+//                             inner_polygons = union_ex(inner_polygons, bridge_checker);
+//                     }
+// 
+//                     // get the enlarged top surface, by using inner_polygons instead of upper_slices, and clip it for it to be exactly the polygons to fill.
+//                     top_polygons = diff_ex(fill_clip, inner_polygons, ApplySafetyOffset::Yes);
+//                     // increase by half peri the inner space to fill the frontier between last and stored.
+//                     top_fills = union_ex(top_fills, top_polygons);
+//                     //set the clip to the external wall but go back inside by infill_extrusion_width/2 to be sure the extrusion won't go outside even with a 100% overlap.
+//                     double infill_spacing_unscaled = this->config->sparse_infill_line_width.value;
+//                     fill_clip = offset_ex(last, double(ext_perimeter_spacing / 2) - scale_(infill_spacing_unscaled / 2));
+//                     last = intersection_ex(inner_polygons, last);
+//                     if (has_gap_fill)
+//                         last = union_ex(last,temp_gap);
+//                     //{
+//                     //    std::stringstream stri;
+//                     //    stri << this->layer->id() << "_1_"<< i <<"_only_one_peri"<< ".svg";
+//                     //    SVG svg(stri.str());
+//                     //    svg.draw(to_polylines(top_fills), "green");
+//                     //    svg.draw(to_polylines(inner_polygons), "yellow");
+//                     //    svg.draw(to_polylines(top_polygons), "cyan");
+//                     //    svg.draw(to_polylines(oldLast), "orange");
+//                     //    svg.draw(to_polylines(last), "red");
+//                     //    svg.Close();
+//                     //}
                 }
 
                 if (i == loop_number && (! has_gap_fill || this->config->sparse_infill_density.value == 0)) {
@@ -2538,11 +2670,13 @@ void PerimeterGenerator::process_arachne()
     // BBS: don't simplify too much which influence arc fitting when export gcode if arc_fitting is enabled
     double surface_simplify_resolution = (print_config->enable_arc_fitting && this->config->fuzzy_skin == FuzzySkinType::None) ? 0.2 * m_scaled_resolution : m_scaled_resolution;
 
-    coord_t allowed_distance            = Slic3r::Arachne::meshfix_maximum_deviation(); 
-    if (surface_simplify_resolution < allowed_distance)
-    {
-        surface_simplify_resolution = allowed_distance;
-    }
+    //增加这个将使得一些案例且不过，见bug  https://zentao.creality.com/zentao/bug-view-6047.html
+    //添加这几行代码，设置上面bug的案例的墙为A墙，将切不过去
+    //coord_t allowed_distance            = Slic3r::Arachne::meshfix_maximum_deviation(); 
+    //if (surface_simplify_resolution < allowed_distance)
+    //{
+    //    surface_simplify_resolution = allowed_distance;
+    //}
     // we need to process each island separately because we might have different
     // extra perimeters for each one
     for (const Surface& surface : all_surfaces) {

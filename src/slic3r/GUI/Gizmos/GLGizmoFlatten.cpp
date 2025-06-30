@@ -6,6 +6,9 @@
 
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include <numeric>
 

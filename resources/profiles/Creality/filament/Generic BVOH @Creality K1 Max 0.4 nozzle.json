@@ -36,7 +36,7 @@
     "filament_deretraction_speed": "0",
     "filament_diameter": "1.75",
     "filament_end_gcode": [
-        "; filament end gcode \n"
+        ";filament end gcode \n"
     ],
     "filament_flow_ratio": "0.926",
     "filament_is_support": "1",
@@ -62,7 +62,7 @@
     "filament_shrink": "100%",
     "filament_soluble": "1",
     "filament_start_gcode": [
-        "; filament start gcode\n{if (position[2] > initial_layer_height) }\nM104 S[nozzle_temperature]\n{else} \nM104 S[first_layer_temperature]\n{endif}\n"
+        ";filament start gcode\n{if (position[2] > initial_layer_height) }\nM104 S[nozzle_temperature]\n{else} \nM104 S[first_layer_temperature]\n{endif}\n"
     ],
     "filament_toolchange_delay": "0",
     "filament_type": [
@@ -97,5 +97,6 @@
     "support_material_interface_fan_speed": "-1",
     "temperature_vitrification": "110",
     "textured_plate_temp": "60",
-    "textured_plate_temp_initial_layer": "60"
+    "textured_plate_temp_initial_layer": "60",
+    "filament_adhesiveness_category": "797"
 }

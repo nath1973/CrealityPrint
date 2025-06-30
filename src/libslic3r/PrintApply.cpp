@@ -1,4 +1,6 @@
 #include "Model.hpp"
+#include "ModelVolume.hpp"
+#include "ModelInstance.hpp"
 #include "Print.hpp"
 
 #include "libslic3r/FDM/MachineVender.hpp"

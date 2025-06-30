@@ -33,7 +33,12 @@ class PartPlate;
 class CxSentToPrinterDialog : public DPIDialog
 {
 public:
-    CxSentToPrinterDialog(Plater* plater = nullptr);
+    enum SendType
+    {
+        Single = 1, // send single plate
+        Multi = 2   // send multiple plates
+    };
+    CxSentToPrinterDialog(Plater* plater = nullptr,SendType type = Single,std::string mapString="");
     ~CxSentToPrinterDialog();
 
     void load_url(const wxString& url, const wxString& apikey = "");
@@ -42,7 +47,6 @@ public:
     void OnError(wxWebViewEvent& evt);
     void OnLoaded(wxWebViewEvent& evt);
     void reload();
-
     void OnScriptMessage(wxWebViewEvent& evt);
     void ExecuteScriptCommand(const std::string& commandInfo, bool async = false);
     void RegisterHandler(const std::string& command, std::function<void(const nlohmann::json&)> handler);
@@ -56,7 +60,6 @@ public:
     void update_plate_preview_img_on_send_page();
 
     int load_machine_preset_data();
-
 private:
     void bind_events();
     void SendAPIKey();
@@ -86,6 +89,7 @@ private:
     void OnCloseWindow(wxCloseEvent& event);
     void handle_set_error_cmd(const nlohmann::json& json_data);
     void replaceIllegalChars(std::string& str);
+    void check_upload_analytics_data(const std::string& device_ip);
 
     wxWebView* m_browser;
     long       m_zoomFactor;
@@ -96,12 +100,14 @@ private:
     bool m_show_status = false;
     Plater*	 m_plater{ nullptr };
     int      m_request_color_match_plateIndex {0};
+    SendType m_sendtype {Single}; // 1: single, 2: multi
     bool     m_is_first_show {true};
     wxString m_uploadingIp = wxEmptyString;
     // when open this SendToPrinterDialog, backup the extruder colors, then restore them when dialog closed
     std::vector<std::string> m_backup_extruder_colors;
 
     std::unordered_map<std::string, std::function<void(const nlohmann::json&)>> m_commandHandlers;
+    std::string m_mapString;
 };
 
 } // namespace GUI

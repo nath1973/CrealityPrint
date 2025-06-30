@@ -5,7 +5,7 @@
     "name": "CR-ABS @Creality Ender-3 S1 Plus 0.4 nozzle",
     "from": "system",
     "instantiation": "true",
-    "inherits": "fdm_filament_common",
+    "inherits": "fdm_filament_abs",
     "activate_air_filtration": "0",
     "activate_chamber_temp_control": "0",
     "additional_cooling_fan_speed": "0",

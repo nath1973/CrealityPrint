@@ -91,7 +91,8 @@ PresetBundle::PresetBundle()
     for (size_t i = 0; i < 1; ++i) {
         // The following ugly switch is to avoid printers.preset(0) to return the edited instance, as the 0th default is the current one.
         Preset &preset = this->printers.default_preset(i);
-        for (const char *key : {"printer_settings_id", "printer_model", "printer_variant", "thumbnails"}) preset.config.optptr(key, true);
+        for (const char* key : {"printer_settings_id", "printer_model", "printer_variant", "thumbnails", "printer_select_mac"})
+            preset.config.optptr(key, true);
         //if (i == 0) {
             preset.config.optptr("default_print_profile", true);
             preset.config.option<ConfigOptionStrings>("default_filament_profile", true);
@@ -694,11 +695,11 @@ PresetsConfigSubstitutions PresetBundle::load_user_presets(AppConfig &          
         }
         try {
             PresetCollection *preset_collection = nullptr;
-            if (type_iter->second == PRESET_IOT_PRINT_TYPE) {
+            if (type_iter->second == PRESET_IOT_PRINT_TYPE || type_iter->second == "process") {
                 preset_collection = &(this->prints);
                 process_added |= preset_collection->load_user_preset(name, value_map, substitutions, substitution_rule);
             }
-            else if (type_iter->second == PRESET_IOT_FILAMENT_TYPE) {
+            else if (type_iter->second == PRESET_IOT_FILAMENT_TYPE || type_iter->second == "materia") {
                 preset_collection = &(this->filaments);
                 filament_added |= preset_collection->load_user_preset(name, value_map, substitutions, substitution_rule);
             }
@@ -849,8 +850,33 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
             collection = &printers;
         else if (config.has("print_settings_id"))
             collection = &prints;
-        else if (config.has("filament_settings_id"))
+        else if (config.has("filament_settings_id")) {
             collection = &filaments;
+            if (m_isCrealityFilament) {
+                size_t pos = name.find("@Creality");
+                if (pos == std::string::npos) {
+                    std::string tmpName = name;
+                    boost::replace_all(name, "@", "@Creality ");
+                    std::string printerName = name.substr(name.find("@")+1, name.length());
+                    key_values[BBL_JSON_KEY_NAME] = name;
+                    ConfigOptionStrings* compatible_printers = config.opt<ConfigOptionStrings>("compatible_printers");
+                    if (compatible_printers != nullptr) {
+                        for (auto& item : compatible_printers->values) {
+                            if (tmpName.find(item) != std::string::npos) {
+                                item = printerName;
+                            }
+                        }
+                    }
+                    ConfigOptionStrings* filament_settings_id = config.opt<ConfigOptionStrings>("filament_settings_id");
+                    if (filament_settings_id != nullptr) {
+                        for (auto& item : filament_settings_id->values) {
+                            item = name;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         if (collection == nullptr) {
             BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Preset type is unknown, not loading: " << name;
             return false;
@@ -1002,7 +1028,6 @@ int PresetBundle::getJsonFileInfo(const std::string& file, STGetJsonFileInfo& st
         if (!version)
             return -1;
 
-        stGetJsonFileInfo.name       = name;
         PresetCollection* collection = nullptr;
         if (config.has("printer_settings_id")) {
             collection = &printers;
@@ -1013,7 +1038,14 @@ int PresetBundle::getJsonFileInfo(const std::string& file, STGetJsonFileInfo& st
         } else if (config.has("filament_settings_id")) {
             collection = &filaments;
             stGetJsonFileInfo.type = 2;
+            if (m_isCrealityFilament) {
+                size_t pos = name.find("@Creality");
+                if (pos == std::string::npos) {
+                    boost::replace_all(name, "@", "@Creality ");
+                }
+            }
         }
+        stGetJsonFileInfo.name = name;
         if (collection == nullptr) {
             BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Preset type is unknown, not loading: " << name;
             return -1;
@@ -1054,6 +1086,8 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
             delete item;
         }
         lstOverrideConfirmFile.clear();
+        m_isCrealityPrinter  = false;
+        m_isCrealityFilament = false;
 
         STOverrideConfirmFile* pSTOverrideConfirmFile = new STOverrideConfirmFile;
         lstOverrideConfirmFile.push_back(pSTOverrideConfirmFile);
@@ -1085,6 +1119,11 @@ PresetsConfigSubstitutions PresetBundle::import_presets_multifile(std::vector<st
         // Determine if it is a preset bundle
         if (boost::iends_with(file, ".creality_printer") || boost::iends_with(file, ".creality_filament") ||
             boost::iends_with(file, ".zip")) {
+            if (boost::iends_with(file, ".creality_printer"))
+                m_isCrealityPrinter = true;
+            if (boost::iends_with(file, ".creality_filament"))
+                m_isCrealityFilament = true;
+
             boost::system::error_code ec;
             // create user folder
             fs::path user_folder(data_dir() + "/" + PRESET_USER_DIR);
@@ -1473,7 +1512,7 @@ void PresetBundle::remove_users_preset(AppConfig &config, std::map<std::string, 
     std::string printer_selected_preset_name = printers.get_selected_preset().name;
     bool need_reset_printer_preset = false;
     for (auto it = printers.begin(); it != printers.end();) {
-        if (it->is_user() && it->user_id.compare(preset_folder_user_id) == 0 && check_removed(*it)) {
+        if (it->is_user() /*&& it->user_id.compare(preset_folder_user_id) == 0*/ && check_removed(*it)) {
             BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(":printers erase %1%, type %2%， user_id %3%") % it->name % Preset::get_type_string(it->type) % it->user_id;
             if (it->name == printer_selected_preset_name)
                 need_reset_printer_preset = true;
@@ -2308,6 +2347,29 @@ void PresetBundle::set_num_filaments(unsigned int n, std::string new_color)
     update_multi_material_filament_presets();
 }
 
+void PresetBundle::update_num_filaments(unsigned int to_del_flament_id)
+{
+    unsigned old_filament_count = this->filament_presets.size();
+    assert(to_del_flament_id < old_filament_count);
+    filament_presets.erase(filament_presets.begin() + to_del_flament_id);
+
+    ConfigOptionStrings* filament_color = project_config.option<ConfigOptionStrings>("filament_colour");
+    //ams_multi_color_filment.resize(old_filament_count);
+    if (filament_color->values.size() > to_del_flament_id) {
+        filament_color->values.erase(filament_color->values.begin() + to_del_flament_id);
+
+    } else {
+        filament_color->values.resize(to_del_flament_id);
+    }
+
+    if (ams_multi_color_filment.size() > to_del_flament_id) {
+        ams_multi_color_filment.erase(ams_multi_color_filment.begin() + to_del_flament_id);
+    } else {
+        ams_multi_color_filment.resize(to_del_flament_id);
+    }
+
+    update_multi_material_filament_presets(to_del_flament_id);
+}
 unsigned int PresetBundle::sync_ams_list(unsigned int &unknowns)
 {
     std::vector<std::string> filament_presets;
@@ -2509,6 +2571,14 @@ bool PresetBundle::is_the_only_edited_filament(unsigned int filament_index)
             index ++;
     }
     return true;
+}
+int PresetBundle::get_printer_extruder_count() const
+{
+    const Preset& printer_preset = this->printers.get_edited_preset();
+
+    int count = printer_preset.config.option<ConfigOptionFloatsNullable>("nozzle_diameter")->values.size();
+
+    return count;
 }
 
 DynamicPrintConfig PresetBundle::full_config() const
@@ -4157,7 +4227,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_vendor_configs_
     return std::make_pair(std::move(substitutions), presets_loaded);
 }
 
-void PresetBundle::update_multi_material_filament_presets()
+void PresetBundle::update_multi_material_filament_presets(size_t to_delete_filament_id)
 {
     if (printers.get_edited_preset().printer_technology() != ptFFF)
         return;
@@ -4175,10 +4245,12 @@ void PresetBundle::update_multi_material_filament_presets()
 #else
     size_t num_filaments = this->filament_presets.size();
 #endif
-
+    if (to_delete_filament_id == -1)
+        to_delete_filament_id = num_filaments;
     // Now verify if flush_volumes_matrix has proper size (it is used to deduce number of extruders in wipe tower generator):
     std::vector<double> old_matrix = this->project_config.option<ConfigOptionFloats>("flush_volumes_matrix")->values;
     size_t old_number_of_filaments = size_t(sqrt(old_matrix.size())+EPSILON);
+    size_t              nozzle_nums             = get_printer_extruder_count();
     if (num_filaments != old_number_of_filaments) {
         // First verify if purging volumes presets for each extruder matches number of extruders
         std::vector<double>& filaments = this->project_config.option<ConfigOptionFloats>("flush_volumes_vector")->values;
@@ -4190,15 +4262,24 @@ void PresetBundle::update_multi_material_filament_presets()
             filaments.pop_back();
             filaments.pop_back();
         }
-
-        std::vector<double> new_matrix;
+        size_t              old_matrix_size = old_number_of_filaments * old_number_of_filaments;
+        size_t              new_matrix_size = num_filaments * num_filaments;
+        //std::vector<double> new_matrix;
+        std::vector<double> new_matrix(new_matrix_size * nozzle_nums, 0);
         for (unsigned int i=0;i< num_filaments;++i)
             for (unsigned int j=0;j< num_filaments;++j) {
-                // append the value for this pair from the old matrix (if it's there):
-                if (i < old_number_of_filaments && j < old_number_of_filaments)
-                    new_matrix.push_back(old_matrix[i* old_number_of_filaments + j]);
-                else
-                    new_matrix.push_back( i == j ? 0. : filaments[2 * i] + filaments[2 * j + 1]); // so it matches new extruder volumes
+                if (i < old_number_of_filaments && j < old_number_of_filaments) {
+                    unsigned int old_i = i >= to_delete_filament_id ? i + 1 : i;
+                    unsigned int old_j = j >= to_delete_filament_id ? j + 1 : j;
+                    for (size_t nozzle_id = 0; nozzle_id < nozzle_nums; ++nozzle_id) {
+                        new_matrix[i * num_filaments + j + new_matrix_size * nozzle_id] =
+                            old_matrix[old_i * old_number_of_filaments + old_j];
+                    }
+                } else {
+                    for (size_t nozzle_id = 0; nozzle_id < nozzle_nums; ++nozzle_id) {
+                        new_matrix[i * num_filaments + j + new_matrix_size * nozzle_id] = (i == j ? 0. :filaments[2 * i] + filaments[2 * j + 1]);
+                    }
+                }
             }
 		this->project_config.option<ConfigOptionFloats>("flush_volumes_matrix")->values = new_matrix;
     }

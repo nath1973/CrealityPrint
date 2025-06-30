@@ -7,6 +7,8 @@
 
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/MeasureUtils.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include <imgui/imgui_internal.h>
 
@@ -1051,7 +1053,13 @@ void GLGizmoMeasure::update_if_needed()
 {
     auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
         m_plane_models_cache.clear();
-        m_plane_models_cache.resize(m_measuring->get_num_of_planes(), GLModel());
+        //m_plane_models_cache.resize(m_measuring->get_num_of_planes(), GLModel());
+        m_plane_models_cache.reserve(m_measuring->get_num_of_planes());
+        for (size_t i = 0; i < m_measuring->get_num_of_planes(); ++i){
+            // use emplace_back to avoid shallow copy of "std::shared_ptr<RenderData> m_render_data" in  class GLModel
+            m_plane_models_cache.emplace_back(GLModel());
+        }
+            
 
         auto& plane_models_cache = m_plane_models_cache;
         const auto& measuring = m_measuring;
@@ -1459,7 +1467,7 @@ void GLGizmoMeasure::render_dimensioning()
         if (!m_dimensioning.arc.is_initialized()) {
             GLModel::Geometry init_data;
             init_data.format = { GLModel::Geometry::EPrimitiveType::LineStrip, GLModel::Geometry::EVertexLayout::P3 };
-            init_data.color = ColorRGBA::WHITE();
+            //init_data.color = ColorRGBA::WHITE();
             init_data.reserve_vertices(resolution + 1);
             init_data.reserve_indices(resolution + 1);
 
@@ -1471,6 +1479,7 @@ void GLGizmoMeasure::render_dimensioning()
                 init_data.add_index(i);
             }
 
+            m_dimensioning.arc.set_color(ColorRGBA::WHITE());
             m_dimensioning.arc.init_from(std::move(init_data));
         }
 
@@ -1621,7 +1630,7 @@ void GLGizmoMeasure::render_dimensioning()
     if (!m_dimensioning.line.is_initialized()) {
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
-        init_data.color = ColorRGBA::WHITE();
+        //init_data.color = ColorRGBA::WHITE();
         init_data.reserve_vertices(2);
         init_data.reserve_indices(2);
 
@@ -1633,12 +1642,13 @@ void GLGizmoMeasure::render_dimensioning()
         init_data.add_line(0, 1);
 
         m_dimensioning.line.init_from(std::move(init_data));
+        m_dimensioning.line.set_color(ColorRGBA::WHITE());
     }
 
     if (!m_dimensioning.triangle.is_initialized()) {
         GLModel::Geometry init_data;
         init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-        init_data.color = ColorRGBA::WHITE();
+        //init_data.color = ColorRGBA::WHITE();
         init_data.reserve_vertices(3);
         init_data.reserve_indices(3);
 
@@ -1651,6 +1661,7 @@ void GLGizmoMeasure::render_dimensioning()
         init_data.add_triangle(0, 1, 2);
 
         m_dimensioning.triangle.init_from(std::move(init_data));
+        m_dimensioning.triangle.set_color(ColorRGBA::WHITE());
     }
 
     if (last_selected_features != m_selected_features)

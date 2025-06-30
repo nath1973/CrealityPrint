@@ -1,6 +1,9 @@
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
+#include "../ModelObject.hpp"
+#include "../ModelVolume.hpp"
+#include "../ModelInstance.hpp"
 #include "../Utils.hpp"
 #include "../LocalesUtils.hpp"
 #include "../GCode.hpp"
@@ -8,6 +11,8 @@
 #include "../GCode/ThumbnailData.hpp"
 #include "../Semver.hpp"
 #include "../Time.hpp"
+#include "../SLA/Hollowing.hpp"
+#include "../SLA/SupportPoint.hpp"
 
 #include "../I18N.hpp"
 

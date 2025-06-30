@@ -63,4 +63,11 @@
 #define ENABLE_RAYCAST_PICKING_DEBUG 0
 
 
+// replace/remove RenderDoc unsupported function used
+#ifdef _DEBUG
+#define ENABLE_RENDERDOC_CAPTURE     1
+#else
+#define ENABLE_RENDERDOC_CAPTURE     0
+#endif //_DEBUG
+
 #endif // _prusaslicer_technologies_h_

@@ -1960,6 +1960,74 @@ Vec2f GLToolbar::get_separator_position(int separator_idx)
     return Vec2f(FLT_MAX, FLT_MAX); 
 }
 
+/* Vec2f GLToolbar::get_item_position(const std::string& name)
+{
+    if (name.empty())
+        return Vec2f(FLT_MAX, FLT_MAX);
+
+    const float icons_size_x   = m_layout.icons_size * m_layout.scale;
+    const float icons_size_y   = m_layout.icons_size * m_layout.scale;
+    const float separator_size = m_layout.separator_size * m_layout.scale;
+    const float gap_size       = m_layout.gap_size * m_layout.scale;
+    const float border_w       = m_layout.border * m_layout.scale;
+    const float border_h       = m_layout.border * m_layout.scale;
+
+    const float separator_stride = separator_size + gap_size;
+    const float icon_stride      = icons_size_x + gap_size;
+
+    float left = m_layout.left + m_layout.scroll;
+    float top  = m_layout.top;
+
+    left += border_w;
+    top += border_h;
+
+    for (size_t i = 0; i < m_items.size(); i++) {
+        const GLToolbarItem* item = m_items.at(i);
+        if (!item->is_visible())
+            continue;
+
+        if (item->is_separator())
+            left += separator_stride;
+        else {
+            if (item->get_name() == name) {
+                return Vec2f(left, top);
+            } else {
+                left += icon_stride;
+            }
+        }
+    }
+
+    return Vec2f(FLT_MAX, FLT_MAX);
+}*/
+
+Vec2f GLToolbar::get_item_position_from_top_left(const GLCanvas3D& parent, const std::string& name)
+{
+    if (name.empty())
+        return Vec2f(FLT_MAX, FLT_MAX);
+    
+    float top  = m_layout.top;
+    const float border_h = m_layout.border * m_layout.scale;
+    top += border_h;
+
+    const Size cnv_size = parent.get_canvas_size();
+
+    for (size_t i = 0; i < m_items.size(); i++) {
+        const GLToolbarItem* item = m_items.at(i);
+        if (item->get_name() == name) {
+            #ifdef __APPLE__
+            float scale = parent.get_scale();
+            return Vec2f((item->render_left_pos + 1.0f) * 0.5f * (float) cnv_size.get_width() / scale, 
+                (top - 0.5f * (float) cnv_size.get_height())/scale);
+            #else
+            return Vec2f((item->render_left_pos + 1.0f) * 0.5f * (float) cnv_size.get_width(), 
+                top - 0.5f * (float) cnv_size.get_height());
+            #endif
+        }
+    }
+
+    return Vec2f(FLT_MAX, FLT_MAX);
+}
+
 void GLToolbar::on_set_virtual_item(const std::string& item_name) 
 {
     if (item_name.empty()) {

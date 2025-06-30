@@ -1,7 +1,10 @@
 #include "Serialization.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/Layer.hpp"
 
 #include <fstream>
 #include "serial.h"

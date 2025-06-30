@@ -107,12 +107,18 @@ namespace DM {
         }
         else//load from current custom folder
         {
+            try{
             boost::nowide::ifstream t(device_file.string());
             std::stringstream buffer;
             buffer << t.rdbuf();
-
+            
             p->data = json::parse(buffer);
-
+            }
+            catch (const std::exception& e)
+            {
+                boost::filesystem::remove(device_file);
+                p->data = json::object();
+            }
             std::vector<std::string> delIP;
             if (p->data.contains("groups"))
             {
@@ -142,13 +148,14 @@ namespace DM {
             this->AddGroup("New Group1");
         }
 
-        if(this->GetCurrentDevice().empty()){
+        // can set current device is empty now
+        /*if(this->GetCurrentDevice().empty()){
             std::string mac = CurrentDeviceCfigV603::get_current_device_mac();
             if(!mac.empty())
             {
                 this->SetCurrentDevice(mac);
             }
-        }
+        }*/
 
         //clear not use default group
         std::vector<int> remove_group_ids;
@@ -202,17 +209,36 @@ namespace DM {
         c << std::setw(4) << p->data << std::endl;
 
     }
-    void DeviceMgr::UpdateDevice(std::string address, Data& data)
+    void DeviceMgr::UpdateDevice(std::string mac, Data& data)
     {
         for (auto& group : p->data["groups"])
         {
             int index = 0;
             for (auto& item : group["list"])
             {
-                std::string ip = item["address"];
+                std::string omac = item["mac"];
+                if (mac == omac)
+                {
+                    item["mac"] = data.mac;
+                    item["address"] = data.address;
+                    item["model"] = data.model;
+                    item["connectType"] = data.connectType;
+                    this->Save();
+                    return;
+                }
+            }
+        }
+        std::string ip = data.address;
+        for (auto& group : p->data["groups"])
+        {
+            int index = 0;
+            for (auto& item : group["list"])
+            {
+                std::string address = item["address"];
                 if (ip == address)
                 {
                     item["mac"] = data.mac;
+                    item["address"] = data.address;
                     item["model"] = data.model;
                     item["connectType"] = data.connectType;
                     this->Save();
@@ -235,6 +261,9 @@ namespace DM {
         item["connectType"] = data.connectType;
         item["oldPrinter"] = data.oldPrinter;
 
+        item["moonrakerPort"] = data.moonrakerPort;
+        item["fluiddPort"] = data.fluiddPort;
+        item["mainsailPort"] = data.mainsailPort;
 
         for (auto& g : p->data["groups"])
         {
@@ -544,9 +573,9 @@ namespace DM {
 
     void DeviceMgr::SetCurrentDevice(std::string mac)
     {
-        if (mac!=""&&!IsPrinterExist(mac)) {
+        /*if (mac!=""&&!IsPrinterExist(mac)) { // now can set empty mac is current deivce 
             return;
-        }
+        }*/
         auto& node = p->data["current_device"];
 
         json item;

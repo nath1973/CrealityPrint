@@ -7,6 +7,7 @@
 #include <wx/dcgraph.h>
 #include <wx/dcmemory.h>
 #include "ImGuiWrapper.hpp"
+#include "wx/menu.h"
 #include "wx/colour.h"
 #include "wx/wx.h"
 #include <wx/colordlg.h>
@@ -20,11 +21,23 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
 #include "slic3r/GUI/print_manage/PrinterBoxFilamentPanel.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include <cstdint> 
 #include "print_manage/data/DataCenter.hpp"
 #include "LoginTip.hpp"
+#ifdef __WXMSW__
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
 
+void ApplyWindowShadow(wxWindow* window) {
+    HWND hwnd = (HWND)window->GetHWND();
+    DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
+    DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
 
+    MARGINS margins = { 1, 1, 1, 1 }; // 阴影厚度
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
+}
+#endif
 static bool ShouldDark(const wxColour& bgColor)
 {
     int brightness = (bgColor.Red() * 299 + bgColor.Green() * 587 + bgColor.Blue() * 114) / 1000;
@@ -116,7 +129,18 @@ FilamentButton::FilamentButton(wxWindow* parent,
     m_child_button = new wxButton(this, wxID_ANY, "", wxPoint(childButtonX, childButtonY), wxSize(childButtonWidth, childButtonHeight));
     m_child_button->Bind(wxEVT_PAINT, &FilamentButton::OnChildButtonPaint, this);
 	m_child_button->Bind(wxEVT_LEFT_DOWN, &FilamentButton::OnChildButtonClick, this);
-
+    m_child_button->Bind(wxEVT_RIGHT_UP, [&](wxMouseEvent& event) {
+        FilamentItem* parentItem = dynamic_cast<FilamentItem*>(GetParent());
+        int           filament_item_index = -1;
+        if (parentItem) {
+            filament_item_index = parentItem->index();
+        }
+        auto    menu = new MaterialContextMenu(this, filament_item_index);
+        wxPoint screenPos = ClientToScreen(event.GetPosition());
+        menu->Position(screenPos, wxSize(0, 0));
+        menu->Cus_Popup();
+        event.Skip();
+        });
     // Load the bitmap
     m_bitmap = create_scaled_bitmap("switch_cfs_tip", nullptr, 16);
 }
@@ -146,7 +170,12 @@ void FilamentButton::SetIcon(wxString dark_icon, wxString light_icon) {
 
 void FilamentButton::SetLabel(wxString lb)
 {
-	m_label = lb;
+	m_label = lb; 
+}
+
+wxString FilamentButton::getLabel() 
+{ 
+    return m_label;
 }
 
 void FilamentButton::mouseDown(wxMouseEvent& event)
@@ -455,6 +484,14 @@ void FilamentButton::doRender(wxDC& dc)
         //m_filamentCombox->SetMaxSize(wxSize(FromDIP(200), -1));
         m_filamentCombox->update();
         m_filamentCombox->clr_picker->Hide();
+        m_filamentCombox->Bind(wxEVT_RIGHT_UP, [&](wxMouseEvent& event) {
+            auto    menu = new MaterialContextMenu(this, index);
+            wxPoint screenPos = ClientToScreen(event.GetPosition());
+            menu->Position(screenPos, wxSize(0, 0));
+            menu->Cus_Popup();
+            event.Skip();
+            });
+
         m_filamentCombox->setSelectedItemCb([&](int selectedItem) -> void { 
             if (m_pFilamentItem != nullptr) {
                 m_pFilamentItem->resetCFS(true);
@@ -689,7 +726,17 @@ FilamentItem::FilamentItem(wxWindow* parent, const Data& data, const wxSize& siz
 		m_btn_color = new FilamentButton(this, wxString(std::to_string(data.index + 1)), wxPoint(this->m_radius * 0.5 + m_border_width * 0.5, this->m_radius * 0.5+ this->m_border_width * 0.5), btn_size);
 		m_btn_color->SetCornerRadius(this->m_radius);
 		m_btn_color->SetColor(m_bk_color);
+        //InitContextMenu();
+        m_btn_color->Bind(wxEVT_RIGHT_UP, [&](wxMouseEvent& event) {
+            auto    menu      = new MaterialContextMenu(this, m_data.index);
+            wxPoint screenPos = ClientToScreen(event.GetPosition());
+            menu->Position(screenPos, wxSize(0, 0));
+            menu->Cus_Popup();
+            event.Skip();
 
+        });
+        
+ 
 		m_btn_color->Bind(wxEVT_BUTTON, [&](wxEvent& e) {
 			//Refresh the status of other items
 			wxCommandEvent event(wxEVT_BUTTON, GetId());
@@ -761,6 +808,14 @@ FilamentItem::FilamentItem(wxWindow* parent, const Data& data, const wxSize& siz
 		m_btn_param_list->SetColor(m_bk_color);
         m_btn_param_list->SetIcon("downBtn_black", "downBtn_white");
         
+        m_btn_param_list->Bind(wxEVT_RIGHT_UP, [&](wxMouseEvent& event) {
+            auto    menu = new MaterialContextMenu(this, m_data.index);
+            wxPoint screenPos = ClientToScreen(event.GetPosition());
+            menu->Position(screenPos, wxSize(0, 0));
+            menu->Cus_Popup();
+            event.Skip();
+            });
+
 		m_btn_param_list->Bind(wxEVT_BUTTON, [&](wxEvent& e) {
 			wxPoint ppos = this->GetParent()->ClientToScreen(wxPoint(0, 0));
 			wxPoint pos = this->ClientToScreen(wxPoint(0, 0));
@@ -773,9 +828,10 @@ FilamentItem::FilamentItem(wxWindow* parent, const Data& data, const wxSize& siz
 		 
 			m_popPanel->SetSize(sz);
  			m_popPanel->Layout();
-
+            m_popPanel->Dismiss();
 			m_popPanel->SetPosition(pos);
 			m_popPanel->Popup();
+            
 
 			wxCommandEvent event(wxEVT_BUTTON, GetId());
 			event.SetEventObject(this);
@@ -824,6 +880,7 @@ void FilamentItem::update_box_sync_state(bool sync, const wxString& box_filament
 	if(m_btn_color)
 	{
 		m_btn_color->update_sync_box_state(sync, box_filament_name);
+        m_data.box_filament_name = box_filament_name.ToStdString();
 	}
 }
 
@@ -1060,8 +1117,21 @@ int FilamentItem::index()
 {
 	return m_data.index;
 }
-
-/*
+wxString FilamentItem::name()
+{ 
+    if(m_popPanel && m_popPanel->m_filamentCombox)
+        return  m_popPanel->m_filamentCombox->GetStringSelection();
+    return wxString("");
+}
+wxString FilamentItem::boxname()
+{
+    return wxString::FromUTF8(m_data.box_filament_name.c_str());
+}
+wxColour FilamentItem::color() 
+{ 
+    return m_bk_color;
+}
+    /*
 * FilamentPanel
 */
 
@@ -1133,9 +1203,18 @@ void FilamentPanel::reset_filament_sync_state()
 	for (auto& f : this->m_vt_filament)
 	{
 		f->update_box_sync_color("#ffffff");
+        f->resetCFS(true);
 	}
 }
 
+std::string FilamentPanel::get_filament_map_string()
+{
+    wxString mapstr = "";
+    for (auto& item : this->m_vt_filament) {
+             mapstr +=  wxString::Format("%s;", item->boxname());
+    }
+    return mapstr.ToStdString();
+}
 void FilamentPanel::resetFilamentToCFS() {
     for (auto& item : this->m_vt_filament) {
         item->resetCFS(true);
@@ -1209,6 +1288,11 @@ bool FilamentPanel::LoadFile(std::string jPath, std::string &sContent)
     }
 
     return true;
+}
+
+std::vector<FilamentItem*> FilamentPanel::get_filament_items() 
+{
+    return m_vt_filament; 
 }
 
 std::string w2s(wxString sSrc)
@@ -2350,4 +2434,335 @@ void FilamentColorSelectionItem::OnPaint(wxPaintEvent& event)
     // 绘制右半部分的文字
     dc.SetTextForeground(*wxBLACK);
     dc.DrawText(m_filament_type_label, rightRect.GetX() + 5, rightRect.GetY() + (rightRect.GetHeight() - dc.GetTextExtent(m_filament_type_label).GetHeight()) / 2);
+}
+void ManagedPopupWindow::init()
+{
+#ifdef __WXMSW__
+    ApplyWindowShadow(this);
+#endif
+}
+void ManagedPopupWindow::OnPaint(wxPaintEvent& event)
+{
+    wxAutoBufferedPaintDC dc(this); // 双缓冲避免闪烁
+    bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+    wxColour bgColor = is_dark ? "#313131" : "#FFFFFF";
+    // 第一步：绘制50%透明阴影 (#768EAB)
+    wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
+    if (gc) {
+        // 阴影参数
+        //const int shadowSize = 10;     // 阴影扩散范围
+        //const wxColour shadowColor(118, 142, 171, 128); // #768EAB 50%透明度
+        wxSize size = GetSize();
+#ifndef __WXMSW__
+        // 1. 绘制阴影 (#768EAB 50%透明度)
+        wxColour shadowColor(118, 142, 171, 128);  // RGBA格式[6,9](@ref)
+        const int shadowBlur = 4;                  // 模糊半径8px
+        const int shadowSpread = shadowBlur * 2;    // 阴影扩散范围
+        // 非Windows平台手动绘制阴影
+
+        gc->SetBrush(wxBrush(shadowColor));
+        gc->SetPen(*wxTRANSPARENT_PEN);
+        gc->DrawRoundedRectangle(
+            -shadowBlur, -shadowBlur,
+            size.x + shadowSpread,
+            size.y + shadowSpread,
+            4 + shadowBlur * 0.5  // 阴影圆角稍大[9,12](@ref)
+        );
+#endif
+        // 2. 绘制主窗口（白色背景+4px圆角）
+        gc->SetBrush(wxBrush(bgColor));
+        gc->SetPen(*wxTRANSPARENT_PEN);
+        gc->DrawRoundedRectangle(0, 0, size.GetWidth(), size.GetHeight(), 4);  // 4px圆角[12](@ref)
+
+        delete gc;
+    }
+}
+
+MaterialSubMenuItem::MaterialSubMenuItem(wxWindow* parent, const wxString& label, const wxColour& color,const int num)
+    : wxWindow(parent, wxID_ANY), m_label(label), m_color(color), m_num(num)
+{
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    Bind(wxEVT_PAINT, &MaterialSubMenuItem::OnPaint, this);
+    
+    
+#ifdef __APPLE__
+    Bind(wxEVT_LEFT_DOWN, &MaterialSubMenuItem::OnMouseRelease, this);
+#else
+    Bind(wxEVT_LEFT_UP, &MaterialSubMenuItem::OnMouseRelease, this);
+    Bind(wxEVT_LEFT_DOWN, &MaterialSubMenuItem::OnMousePressed, this);
+#endif
+    Bind(wxEVT_ENTER_WINDOW, &MaterialSubMenuItem::OnMouseEnter, this);
+    Bind(wxEVT_LEAVE_WINDOW, &MaterialSubMenuItem::OnMouseLeave, this);
+}
+
+void MaterialSubMenuItem::OnPaint(wxPaintEvent&)
+{
+    wxAutoBufferedPaintDC dc(this);
+    dc.Clear();
+    // 绘制完整项背景
+    bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+    wxColour penColor = is_dark ? wxColour("#313131") : wxColour("#FFFFFF");
+    wxColour bgColor = is_dark ? wxColour("#313131") : wxColour("#FFFFFF");
+    dc.SetPen(wxPen(penColor,0));
+    // 绘制边框（hover 或点击时）
+    if (m_clicked) {
+        dc.SetPen(wxPen(wxColour(21, 192, 89), 1)); // 边框颜色
+        dc.SetBrush(wxBrush(is_dark ? wxColour("#1FCA63") :  wxColour(21, 192, 89))); // 点击时的背景色
+        dc.DrawRoundedRectangle(GetClientRect(), 3); // 边角为 5 的边框
+    } else if (m_hovered) {
+        dc.SetPen(wxPen(wxColour(21, 192, 89), 1)); // 边框颜色
+        dc.SetBrush(wxBrush(is_dark ? wxColour("#2E4838") : wxColour("#DCF6E6"))); // hover 时的背景色 = (21, 192, 89,0.15)
+        dc.DrawRoundedRectangle(GetClientRect(), 3); // 边角为 5 的边框
+    } else {
+        dc.SetBrush(wxBrush(bgColor)); // 默认背景色
+        dc.DrawRectangle(GetClientRect());
+    }
+    // 绘制左侧标识块（无边框，垂直居中）
+    wxRect blockRect(5, (GetClientSize().GetHeight() - 16) / 2, 24, 16); // 垂直居中
+    dc.SetBrush(wxBrush(m_color)); // 使用原始颜色配置
+    
+    dc.SetPen(*wxTRANSPARENT_PEN);
+    if (m_clicked)
+        dc.SetPen(wxPen(wxColour(255,255,255), 1));
+    dc.DrawRoundedRectangle(blockRect, 2);
+
+    // 绘制编号文字（白色粗体，居中显示）
+    dc.SetTextForeground(GetTextColorBasedOnBackground(m_color));
+    dc.SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
+    int textWidth, textHeight;
+    dc.GetTextExtent(wxString::Format("%02d", m_num + 1), &textWidth, &textHeight);
+    int textX = blockRect.GetX() + (blockRect.GetWidth() - textWidth) / 2;
+    int textY = blockRect.GetY() + (blockRect.GetHeight() - textHeight) / 2;
+    dc.DrawText(wxString::Format("%02d", m_num + 1), textX, textY);
+
+    // 绘制耗材名称（黑色文字）
+    dc.SetTextForeground(is_dark  ? *wxWHITE : *wxBLACK);
+    int textStartX = blockRect.GetX() + blockRect.GetWidth() + 5; // 标识块右边缘 + 5
+    dc.DrawText(m_label, textStartX, (GetClientSize().GetHeight() - dc.GetTextExtent(m_label).GetHeight()) / 2);
+}
+
+void MaterialSubMenuItem::OnMouseRelease(wxMouseEvent&)
+{
+    m_hovered = false;
+    m_clicked = false;
+    Slic3r::GUI::wxGetApp().plater()->sidebar().delete_filament(m_parentindex,m_num);
+    PopupWindowManager::Get().CloseAll();
+}
+void MaterialSubMenuItem::OnMouseEnter(wxMouseEvent&)
+{
+    m_hovered = true;
+    m_clicked = false;
+    this->SetTransparent(40);
+    Refresh();
+}
+void MaterialSubMenuItem::OnMousePressed(wxMouseEvent&)
+{
+    m_hovered = false;
+    m_clicked = true;
+    this->SetTransparent(255);
+    Refresh();
+}
+  
+void MaterialSubMenuItem::OnMouseLeave(wxMouseEvent&)
+{
+    m_hovered = false;
+    m_clicked = false;
+    this->SetTransparent(255);
+    Refresh();
+}
+
+HoverButton::HoverButton(wxWindow* parent,
+    wxWindowID      id,
+    const wxString& label,
+    const wxPoint& pos,
+    const wxSize& size)
+    : wxButton(parent, id, label, pos, size, wxBORDER_NONE)
+{
+    bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+    m_baseColor = is_dark  ? wxColour("#313131") : * wxWHITE;
+    m_pressedColor = is_dark ? wxColour("#1FCA63") :  wxColour("#DCF6E6");
+    SetBackgroundColour(m_baseColor);
+    SetForegroundColour(is_dark ? *wxWHITE : wxColour("#30373D"));
+    BindEvents();
+}
+
+void HoverButton::SetBaseColors(const wxColour& normal, const wxColour& pressed)
+{
+    m_baseColor = normal;
+    m_pressedColor = pressed;
+    SetBackgroundColour(normal);
+}
+
+void HoverButton::SetBitMap_Cus(wxBitmap bit1, wxBitmap bit2)
+{
+    bitmap = bit1;
+    bitmap_hover = bit2;
+}
+void HoverButton::SetExpendStates(bool expend)
+{
+    m_isExpend = expend;
+    Refresh();
+}
+
+void HoverButton::BindEvents()
+{
+    Bind(wxEVT_ENTER_WINDOW, &HoverButton::OnEnter, this);
+    Bind(wxEVT_LEAVE_WINDOW, &HoverButton::OnLeave, this);
+    Bind(wxEVT_PAINT, &HoverButton::OnPaint, this);
+}
+
+void HoverButton::OnLeftDown(wxMouseEvent& e)
+{
+    SetBackgroundColour(m_pressedColor);
+    Refresh();
+    e.Skip();
+}
+
+void HoverButton::OnLeftUp(wxMouseEvent& e)
+{
+    SetBackgroundColour(m_baseColor);
+    Refresh();
+    e.Skip();
+}
+void HoverButton::OnEnter(wxMouseEvent& e)
+{
+    isHover = true;
+    SetBackgroundColour(m_pressedColor);
+    Refresh();
+    e.Skip();
+}
+void HoverButton::OnLeave(wxMouseEvent& e)
+{
+    isHover = false;
+    SetBackgroundColour(m_baseColor);
+    Refresh();
+    e.Skip();
+}
+
+void HoverButton::OnPaint(wxPaintEvent&)
+{
+    wxAutoBufferedPaintDC dc(this);
+    dc.Clear();
+    bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+    wxColour penColor = is_dark ? wxColour("#313131") : wxColour("#FFFFFF");
+    //wxColour bgColor = is_dark ? wxColour("#313131") : wxColour("#FFFFFF");
+    dc.SetPen(wxPen(penColor, 0));
+    wxSize size = GetSize();
+    wxCoord iconWidth = bitmap.IsOk() ? (bitmap.GetScaledWidth()) : 0;
+    wxColour bgColor = this->GetBackgroundColour();
+    // 绘制边框（hover 或点击时）
+    if (isHover || m_isExpend) {
+        dc.SetPen(wxPen(is_dark ? wxColour("#1FCA63") : wxColour(21, 192, 89), 1)); // 边框颜色
+        dc.SetBrush(wxBrush(is_dark ? wxColour("#2E4838") : wxColour("#DCF6E6"))); // hover 时的背景色 = (21, 192, 89,0.15)
+        SetTransparent(0.15 * 255);
+        dc.DrawRoundedRectangle(GetClientRect(), 3); // 边角为 5 的边框
+    }
+    else {
+        //dc.SetPen(wxPen(wxColour(21, 192, 89), 1)); // 边框颜色
+        dc.SetBrush(wxBrush(bgColor)); // 默认背景色
+        dc.DrawRectangle(GetClientRect());
+    }
+
+    wxString label = GetLabel();
+    // 计算内容区域
+    wxCoord textWidth, textHeight;
+    dc.GetTextExtent(label, &textWidth, &textHeight);
+    const wxCoord spacing = (8); // 图标文字间距
+
+    // 总内容宽度
+    const wxCoord totalContentWidth = textWidth + spacing + iconWidth;
+
+    // 起始绘制位置（水平居中）
+    wxCoord       startX = (size.x - totalContentWidth) / 2;
+    const wxCoord startY = (size.y - textHeight) / 2;
+
+    // 绘制文字
+    dc.SetTextForeground(IsEnabled() ? GetForegroundColour() : wxColour("#C3C7CD"));
+    dc.SetFont(GetFont());
+    dc.DrawText(label, startX, startY);
+
+    // 绘制右侧图标
+    if (bitmap.IsOk()) {
+        const wxCoord iconX = startX + textWidth + spacing;
+        const wxCoord iconY = (size.y - bitmap.GetScaledHeight()) / 2;
+        dc.DrawBitmap((isHover || m_isExpend) ? bitmap_hover : bitmap, iconX, iconY, true);
+    }
+}
+
+
+MaterialSubMenu::MaterialSubMenu(wxWindow* parent, int index) : ManagedPopupWindow(parent), m_index(index)
+{
+}
+void MaterialSubMenu::init()
+{
+    //SetBackgroundColour(*wxWHITE);
+    //SetBackgroundColour(*wxBLUE);
+    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+
+    auto _filamentPanel = dynamic_cast<FilamentPanel*>(wxGetApp().mainframe->plater()->sidebar().filament_panel());
+    std::vector<FilamentItem*> items          = _filamentPanel->get_filament_items();
+
+    //wxColour colors[] = {wxColour(227, 62, 62), wxColour(21, 64, 192), wxColour(21, 177, 192), wxColour(146, 21, 192), 
+    //    wxColour(227, 62, 62), wxColour(21, 64, 192), wxColour(21, 177, 192), wxColour(78, 89, 105)};
+
+    for (int i = 0; i < items.size(); ++i) {
+        if (m_index == i) {
+            continue; // Skip the current item
+        }
+        auto     item_data  = items[i];
+        wxString label = item_data->name(); //wxString::Format("0%d %s", i + 1, item_data->name());
+        auto     item       = new MaterialSubMenuItem(this, label, item_data->color(), i);
+		item->setParentIndex(m_index);
+        item->SetMinSize(wxSize(FromDIP(150), FromDIP(32)));
+        sizer->Add(item, 1, wxEXPAND | wxALL, FromDIP(4));
+    }
+    SetSizerAndFit(sizer);
+}
+
+MaterialContextMenu::MaterialContextMenu(wxWindow* parent, int index) : ManagedPopupWindow(parent), m_index(index)
+{
+    //SetBackgroundColour(*wxRED);
+    // 顶部按钮
+    wxBoxSizer* btnSizer = new wxBoxSizer(wxVERTICAL);
+
+    auto _filamentPanel = dynamic_cast<FilamentPanel*> (wxGetApp().mainframe -> plater()->sidebar().filament_panel());
+
+    auto delBtn = new HoverButton(this, wxID_ANY, _L("Delete"),wxDefaultPosition, wxSize(FromDIP(150), FromDIP(32)));
+    btnSizer->Add(delBtn, 1, wxALL, FromDIP(4));
+    // 合并按钮（带箭头）
+    wxBitmap mergeBitmap = create_scaled_bitmap("material_menu_down", this, FromDIP(20));
+    wxBitmap mergeBitmap_hover = create_scaled_bitmap("material_menu_down_hover", this, FromDIP(20));
+    m_mergeBtn = new HoverButton(this, wxID_ANY, _L("Merge with"), wxDefaultPosition, wxSize(FromDIP(150), FromDIP(32)));
+    m_mergeBtn->SetBitMap_Cus(mergeBitmap, mergeBitmap_hover);
+    btnSizer->Add(m_mergeBtn, 1, wxALL, FromDIP(4));
+    SetSizerAndFit(btnSizer);
+
+    if (!_filamentPanel->can_delete()) {
+        delBtn->Disable();
+    }
+    if (_filamentPanel->get_filament_items().size() <= 1) {
+        m_mergeBtn->Disable();
+    }
+        
+    delBtn->Bind(wxEVT_BUTTON, &MaterialContextMenu::OnDelete, this);
+    m_mergeBtn->Bind(wxEVT_BUTTON, &MaterialContextMenu::OnShowSubmenu, this);
+}
+
+void MaterialContextMenu::OnShowSubmenu(wxCommandEvent&e)
+{
+    m_mergeBtn->SetExpendStates(true);
+    // 创建并显示子菜单
+    auto    submenu = new MaterialSubMenu(this,m_index);
+    submenu->init();
+    wxPoint pos     = m_mergeBtn->GetScreenPosition();
+    pos.y += m_mergeBtn->GetSize().y + FromDIP(8);
+    pos.x -= FromDIP(4);
+    submenu->Position(pos, wxSize(0, 0));
+    submenu->Cus_Popup(true,this);
+}
+
+void MaterialContextMenu::OnDelete(wxCommandEvent&) 
+{
+    Slic3r::GUI::wxGetApp().plater()->sidebar().delete_filament(m_index);
+    PopupWindowManager::Get().CloseAll();
 }

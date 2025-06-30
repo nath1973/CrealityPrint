@@ -1,5 +1,7 @@
 #include "../libslic3r.h"
 #include "../Model.hpp"
+#include "../ModelObject.hpp"
+#include "../ModelVolume.hpp"
 #include "../TriangleMesh.hpp"
 
 #include "svg.hpp"
@@ -381,7 +383,7 @@ bool load_svg(const char *path, Model *model, std::string &message)
         }
     }
 
-    ModelObject *new_object = model->add_object();
+    Slic3r::ModelObject *new_object = model->add_object();
     // new_object->name ?
     new_object->input_file = path;
     auto stage_unit3 = stl.size() / LOAD_STEP_STAGE_UNIT_NUM + 1;

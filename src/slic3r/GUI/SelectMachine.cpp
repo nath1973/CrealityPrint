@@ -5,6 +5,7 @@
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/Color.hpp"
 #include "libslic3r/FDM/Filament.hpp"
+#include "PartPlate.hpp"
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -17,7 +18,8 @@
 #include "ConnectPrinter.hpp"
 #include "Jobs/BoostThreadWorker.hpp"
 #include "Jobs/PlaterWorker.hpp"
-
+#include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/Auxiliary.hpp"
 
 #include <wx/progdlg.h>
 #include <wx/clipbrd.h>

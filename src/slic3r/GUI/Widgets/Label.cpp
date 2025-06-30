@@ -162,6 +162,23 @@ public:
                     #ifdef __WXMSW__
                     if (dc.GetHDC() == nullptr) {
                         BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Null HDC [text=" << logText << "]";
+                        try {
+                            // 获取系统错误码
+                            DWORD err = ::GetLastError();
+                            // 获取进程 GDI/User 对象数
+                            DWORD gdiCount  = ::GetGuiResources(::GetCurrentProcess(), GR_GDIOBJECTS);
+                            DWORD userCount = ::GetGuiResources(::GetCurrentProcess(), GR_USEROBJECTS);
+                          
+
+                            BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Invalid DC state"
+                                                     << ", GetHDC=NULL"
+                                                     << ", GetLastError=0x" << std::hex << err << std::dec << ", InPaintEvent="
+                                                     << ", GDI_objs=" << gdiCount << ", USER_objs=" << userCount;
+                        } catch (const std::exception& e) {
+                            BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Exception in HDC info gathering: " << e.what();
+                        } catch (...) {
+                            BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Unknown exception in HDC info gathering";
+                        }
                         boost::log::core::get()->flush();
                     }
                     #endif

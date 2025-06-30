@@ -2,6 +2,8 @@
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "libslic3r/common_header/common_header.h"
+#include "MsgDialog.hpp"
+#include <wx/dcgraph.h>
 namespace Slic3r {
 namespace GUI {
 

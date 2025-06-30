@@ -6,11 +6,14 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/PresetBundle.hpp"
 //BBS: add convex hull logic for toolpath check
 #include "libslic3r/Geometry/ConvexHull.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "../Config/DispConfig.h"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
@@ -202,6 +205,8 @@ void GCodeViewer::InstanceVBuffer::reset()
     s_ids.shrink_to_fit();
     buffer.clear();
     buffer.shrink_to_fit();
+    offsets.clear();
+    offsets.shrink_to_fit();
     render_ranges.reset();
 }
 
@@ -232,6 +237,7 @@ bool GCodeViewer::Path::matches(const GCodeProcessorResult::MoveVertex& move) co
     case EMoveType::Retract:
     case EMoveType::Unretract:
     case EMoveType::Seam:
+    case EMoveType::Extrude_Alter:
     case EMoveType::Extrude: {
         // use rounding to reduce the number of generated paths
         return type == move.type && extruder_id == move.extruder_id && cp_color_id == move.cp_color_id && role == move.extrusion_role &&
@@ -961,6 +967,7 @@ void GCodeViewer::init(ConfigOptionMode mode, PresetBundle* preset_bundle,bool i
                 //            }
                 break;
             }
+            case EMoveType::Extrude_Alter:
             case EMoveType::Wipe:
             case EMoveType::Extrude: {
                 buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Triangle;
@@ -1084,6 +1091,27 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
 {
     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start";
 
+    ResGuard res([&]
+        {
+            m_bLoaded = false;
+            if (!only_gcode)
+            {
+                wxGetApp().notification_manager()->set_slicing_progress_began();
+                print.set_status(95, _u8L("Loading display data"));
+                wxGetApp().process_msg_loop();
+            }
+        },
+        [&]
+        {
+            if (!only_gcode)
+            {
+                wxGetApp().notification_manager()->set_slicing_progress_hidden();
+                wxGetApp().process_msg_loop();
+            }
+            m_bLoaded = true;
+        });
+    
+    
     // avoid processing if called with the same gcode_result
     if (m_last_result_id == gcode_result.id) {
         //BBS: add logs
@@ -1107,10 +1135,14 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
         return;
     }
 
+	PartPlate* current_plate = wxGetApp().plater()->get_partplate_list().get_curr_plate();
+    bool current_has_print_instances = current_plate->has_printable_instances();
+    bool only_gcode_3mf = current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances;
+
     //BBS: move the id to the end of reset
     m_last_result_id = gcode_result.id;
     m_gcode_result = &gcode_result;
-    m_only_gcode_in_preview = only_gcode;
+    m_only_gcode_in_preview = only_gcode || only_gcode_3mf;
 
     gcode_window.load_gcode(gcode_result.filename, gcode_result.lines_ends);
 
@@ -1193,11 +1225,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     m_fold = false;
     _on_set_fold(false);
 
-    bool only_gcode_3mf = false;
-    PartPlate* current_plate = wxGetApp().plater()->get_partplate_list().get_curr_plate();
-    bool current_has_print_instances = current_plate->has_printable_instances();
-    if (current_plate->is_slice_result_valid() && wxGetApp().model().objects.empty() && !current_has_print_instances) {
-        only_gcode_3mf = true;
+    if (only_gcode_3mf) {
         wxGetApp().plater()->set_only_gcode(true);
         wxGetApp().plater()->check_sidebar_state_in_only_gcode_mode();
     }
@@ -1218,6 +1246,9 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
 
 void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
 {
+    if (!m_bLoaded) {
+        return;
+    }
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto start_time = std::chrono::high_resolution_clock::now();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -1344,6 +1375,7 @@ void GCodeViewer::reset()
     m_last_result_id = -1;
     //BBS: add only gcode mode
     m_only_gcode_in_preview = false;
+    m_is_lite_mode = false;
 
     m_moves_count = 0;
     m_ssid_to_moveid_map.clear();
@@ -2466,6 +2498,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
     m_extruders_count = gcode_result.extruders_count;
 
+    //import gcode file, preview using normal mode(no lite mode) 
+    const bool is_lite_mode = m_is_lite_mode = (wxGetApp().app_config->get_bool("gcode_preview_lite_mode") && (!m_only_gcode_in_preview));
+
     unsigned int progress_count = 0;
     unsigned int progress_threshold = m_moves_count/100;
     //BBS: add only gcode mode
@@ -2592,6 +2627,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
         // skip first vertex
         if (i == 0)
+            continue;
+
+        if (is_lite_mode && !(curr.type == EMoveType::Extrude || curr.type == EMoveType::Seam || curr.type == EMoveType::Unretract))
             continue;
 
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
@@ -2971,18 +3009,32 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         }
     }
 
+#define USE_PARALLEL 1
+
     // move the wipe toolpaths half height up to render them on proper position
     MultiVertexBuffer& wipe_vertices = vertices[buffer_id(EMoveType::Wipe)];
     for (VertexBuffer& v_buffer : wipe_vertices) {
+#if USE_PARALLEL
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, v_buffer.size() / 3), [&v_buffer](const tbb::blocked_range<size_t>& range) {
+            for (size_t i = range.begin(); i != range.end(); ++i) {
+                v_buffer[i * 3 + 2] += 0.5f * GCodeProcessor::Wipe_Height;
+            }
+        });
+#else
         for (size_t i = 2; i < v_buffer.size(); i += 3) {
             v_buffer[i] += 0.5f * GCodeProcessor::Wipe_Height;
         }
+#endif // USE_PARALLEL
     }
 
     // send vertices data to gpu, where needed
     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " send vertices data to gpu, where needed start";
 
     for (size_t i = 0; i < m_buffers.size(); ++i) {
+        
+        if (is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract)))
+            continue;
+        
         TBuffer& t_buffer = m_buffers[i];
         if (t_buffer.render_primitive_type == TBuffer::ERenderPrimitiveType::InstancedModel) {
             const InstanceBuffer& inst_buffer = instances[i];
@@ -3038,7 +3090,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     std::vector<MultiVertexBuffer>().swap(vertices);
     std::vector<InstanceBuffer>().swap(instances);
     std::vector<InstanceIdBuffer>().swap(instances_ids);
-
+    std::vector<InstancesOffsets>().swap(instances_offsets);
+    
     // toolpaths data -> extract indices from result
     // paths may have been filled while extracting vertices,
     // so reset them, they will be filled again while extracting indices
@@ -3065,6 +3118,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
         // skip first vertex
         if (i == 0)
+            continue;
+
+        if (is_lite_mode && !(curr.type == EMoveType::Extrude || curr.type == EMoveType::Seam || curr.type == EMoveType::Unretract))
             continue;
 
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
@@ -3153,6 +3209,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
     // toolpaths data -> send indices data to gpu
     for (size_t i = 0; i < m_buffers.size(); ++i) {
+
+        if (is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract)))
+            continue;
+
         TBuffer& t_buffer = m_buffers[i];
         if (t_buffer.render_primitive_type != TBuffer::ERenderPrimitiveType::InstancedModel) {
             const MultiIndexBuffer& i_multibuffer = indices[i];
@@ -3234,8 +3294,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         size_t move_id = i - seams_count;
         if(move_ids_mapper[move_id] == -1)
             move_ids_mapper[move_id] = i;
-
-        if (move.type == EMoveType::Extrude) {
+        if (move.type == EMoveType::Extrude || move.type == EMoveType::Extrude_Alter) {
+        //if (move.type == EMoveType::Extrude) {
             // layers zs
             const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
             const double z = static_cast<double>(move.position.z());
@@ -3317,11 +3377,25 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     // change color of paths whose layer contains option points
     if (!options_zs.empty()) {
         TBuffer& extrude_buffer = m_buffers[buffer_id(EMoveType::Extrude)];
+
+#if USE_PARALLEL
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, extrude_buffer.paths.size()), [&extrude_buffer, &options_zs](const tbb::blocked_range<size_t>& range) {
+            for (size_t i = range.begin(); i != range.end(); ++i) {
+                Path& path = extrude_buffer.paths[i];
+                const float z = path.sub_paths.front().first.position.z();
+                if (std::find_if(options_zs.begin(), options_zs.end(), [z](float f) { return f - EPSILON <= z && z <= f + EPSILON; }) !=
+                    options_zs.end())
+                    path.cp_color_id = 255 - path.cp_color_id;
+            }
+        });
+#else
         for (Path& path : extrude_buffer.paths) {
             const float z = path.sub_paths.front().first.position.z();
             if (std::find_if(options_zs.begin(), options_zs.end(), [z](float f) { return f - EPSILON <= z && z <= f + EPSILON; }) != options_zs.end())
                 path.cp_color_id = 255 - path.cp_color_id;
         }
+#endif // USE_PARALLEL
+
     }
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -3425,6 +3499,7 @@ void GCodeViewer::load_shells(const Print& print, bool initialized, bool force_p
     while (true) {
         GLVolumePtrs::iterator it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(), [](GLVolume* volume) { return volume->is_modifier; });
         if (it != m_shells.volumes.volumes.end()) {
+            m_shells.volumes.release_volume(*it);
             delete (*it);
             m_shells.volumes.volumes.erase(it);
         }
@@ -3451,6 +3526,9 @@ void GCodeViewer::load_shells(const Print& print, bool initialized, bool force_p
 
 void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const
 {
+    if (!m_bLoaded){
+        return;
+    }
 #if ENABLE_GCODE_VIEWER_STATISTICS
     auto start_time = std::chrono::high_resolution_clock::now();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -3555,6 +3633,11 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
     //BBS
     if (!keep_sequential_current_last) sequential_view->current.last = m_sequential_view.gcode_ids.size();
 
+    /*bool show_surface = m_layers_slider->is_higher_at_max() && m_layers_slider->is_lower_at_min();
+    bool has_surface  = is_visible(ExtrusionRole::erExternalPerimeter) && is_visible(ExtrusionRole::erTopSolidInfill) &&
+                       is_visible(ExtrusionRole::erBottomSurface);
+    show_surface &= has_surface;*/
+
     // first pass: collect visible paths and update sequential view data
     std::vector<std::tuple<unsigned char, unsigned int, unsigned int, unsigned int>> paths;
 
@@ -3595,6 +3678,14 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                     continue;
 
                 if (path.type == EMoveType::Extrude && !is_visible(path))
+                    continue;
+
+                /*if (show_surface) {
+                    if (role_been_filtered_in_lite_mode(path.role))
+                        continue;
+                }*/
+                
+                if (m_tools.m_tool_visibles.size() <= path.extruder_id)
                     continue;
 
                 if (m_view_type == EViewType::ColorPrint && !m_tools.m_tool_visibles[path.extruder_id])
@@ -4008,6 +4099,10 @@ m_no_render_path = false;
 
 void GCodeViewer::render_toolpaths()
 {
+    if (!m_bLoaded) {
+        return;
+    }
+
     const Camera& camera = wxGetApp().plater()->get_camera();
     const double zoom = camera.get_zoom();
 
@@ -4140,6 +4235,10 @@ void GCodeViewer::render_toolpaths()
     const unsigned char end_id   = buffer_id(EMoveType::Count);
 
     for (unsigned char i = begin_id; i < end_id; ++i) {
+
+        if (m_is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract)))
+            continue;
+
         TBuffer& buffer = m_buffers[i];
         if (!buffer.visible || !buffer.has_data())
             continue;
@@ -4701,9 +4800,9 @@ public:
             ImGui::SetNextWindowSize(wsz);
         }
         else
-        {
-            float scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
-            ImGui::SetNextWindowSize(ImVec2(400 * scale, -1));
+        {         
+            auto size = ImVec2(std::max(contentWidth, 300.0f), -1.0f);
+            ImGui::SetNextWindowSize(size);
         }
 
         DispConfig::WindowConfig wcfg;
@@ -4986,7 +5085,7 @@ public:
             }
             append_headers(title_offsets);
 
-            contentWidth = offsets_.empty() ? 0.0f : offsets_.back();
+            contentWidth = offsets_.empty() ? 0.0f : offsets_.back() + ImGui::GetFontSize() + ImGui::GetStyle().ItemSpacing.x + window_padding + ImGui::GetStyle().ScrollbarSize;
 
             break;
         }
@@ -4996,17 +5095,23 @@ public:
 
     void showColorTable(GCodeViewer::EViewType m_view_type
         , const std::vector<CustomGCode::Item>& m_custom_gcode_per_print_z
-        , GCodeViewer::ETools &m_tools
+        , GCodeViewer::ETools &m_tools, bool preview_lite_mode
         , std::function<void()>featureFn, std::function<void()>fadeRateFn) {
 
         switch (m_view_type)
         {
         case Slic3r::GUI::GCodeViewer::EViewType::FeatureType: 
         {
+            const bool is_lite_mode = preview_lite_mode;
+            
             for (size_t i = 0; i < m_roles.size(); ++i) {
                 ExtrusionRole role = m_roles[i];
                 if (role >= erCount)
                     continue;
+                bool enable = true;
+                if (is_lite_mode) {
+                    enable = !(role_been_filtered_in_lite_mode(role));
+                }
                 const bool visible = is_visible(role);
                 std::vector<std::pair<std::string, float>> columns_offsets;
                 columns_offsets.push_back({ labels[i], offsets[0] });
@@ -5016,7 +5121,7 @@ public:
                 //columns_offsets.push_back({ used_filaments_weight[i], offsets[4] });
                 append_item(EItemType::Rect
                     , Extrusion_Role_Colors[static_cast<unsigned int>(role)]
-                    , columns_offsets, true, visible, [&]() {
+                    , columns_offsets, enable, visible, [&]() {
                         m_extrusions.role_visibility_flags = visible ?
                             m_extrusions.role_visibility_flags & ~(1 << role) :
                             m_extrusions.role_visibility_flags | (1 << role);
@@ -5029,10 +5134,10 @@ public:
 
                     const bool visible = m_buffers[buffer_id(type)].visible;
 
-                    auto append_option_item_with_type = [&](const ColorRGBA& color, const std::string& label) {
+                    auto append_option_item_with_type = [&](const ColorRGBA& color, const std::string& label, bool checkbox = true) {
                         append_item(EItemType::Rect
                             , color, { { label , offsets[0] } }
-                            , true, visible, [&]() {
+                            , checkbox, visible, [&]() {
                                 m_buffers[buffer_id(type)].visible = !m_buffers[buffer_id(type)].visible;
                                 featureFn();
                             });
@@ -5041,13 +5146,13 @@ public:
                     if (type == EMoveType::Seam)
                         append_option_item_with_type(Options_Colors[GCodeViewer::Seams], _u8L("Seams"));
                     else if (type == EMoveType::Retract)
-                        append_option_item_with_type(Options_Colors[GCodeViewer::Retractions], _u8L("Retract"));
+                        append_option_item_with_type(Options_Colors[GCodeViewer::Retractions], _u8L("Retract"), !is_lite_mode);
                     else if (type == EMoveType::Unretract)
                         append_option_item_with_type(Options_Colors[GCodeViewer::Unretractions], _u8L("Unretract"));
                     else if (type == EMoveType::Tool_change)
-                        append_option_item_with_type(Options_Colors[GCodeViewer::ToolChanges], _u8L("Filament Changes"));
+                        append_option_item_with_type(Options_Colors[GCodeViewer::ToolChanges], _u8L("Filament Changes"), !is_lite_mode);
                     else if (type == EMoveType::Wipe)
-                        append_option_item_with_type(Wipe_Color, _u8L("Wipe"));
+                        append_option_item_with_type(Wipe_Color, _u8L("Wipe"), !is_lite_mode);
                 }
                 else {
                     //BBS: show travel time in FeatureType view
@@ -5058,7 +5163,7 @@ public:
                     columns_offsets.push_back({ travel_percent, offsets[2] });
                     append_item(EItemType::Rect
                         , Travel_Colors[0], columns_offsets
-                        , true, visible, [&]() {
+                        , !is_lite_mode, visible, [&]() {
                             m_buffers[buffer_id(type)].visible = !m_buffers[buffer_id(type)].visible;
                             featureFn();
                         });
@@ -5115,6 +5220,9 @@ public:
             const std::vector<CustomGCode::Item>& custom_gcode_per_print_z = m_custom_gcode_per_print_z;
             size_t i = 0;
             for (auto extruder_idx : m_extruder_ids) {
+                if (m_tools.m_tool_visibles.size() <= extruder_idx)
+                    continue;
+
                 const bool filament_visible = m_tools.m_tool_visibles[extruder_idx];
                 if (i < model_used_filaments_m.size() && i < model_used_filaments_g.size()) {
                     std::vector<std::pair<std::string, float>> columns_offsets;
@@ -5285,7 +5393,7 @@ private:
         for (size_t i = 1; i < title_columns.size(); i++) {
             ret.push_back(std::max(offsets[i - 1], i * average_col_width));
         }
-
+		
         return ret;
     };
 
@@ -5433,7 +5541,12 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
     glsafe(::glEnable(GL_DEPTH_TEST));
-    render_shells(canvas_width, canvas_height);
+
+    if (!m_roles.empty() && m_layers_slider && m_layers_slider->is_higher_at_max() && m_layers_slider->is_lower_at_min()) {
+    } else {
+        render_shells(canvas_width, canvas_height); 
+    }
+
     if (m_roles.empty())
         return;
 
@@ -5444,8 +5557,9 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
         int bottom_margin = 120 * GCODE_VIEWER_SLIDER_SCALE*sc;
         marker.render(canvas_width, canvas_height - bottom_margin, m_view_type, m_showMark);
     }
-
-    render_toolpaths();
+    
+    if (m_bLoaded)
+        render_toolpaths();
 
     if (m_legend_enabled) {
 
@@ -5499,6 +5613,87 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                 }
 
+                {
+                    if (!m_only_gcode_in_preview) {
+                        
+                        const bool is_lite_mode = m_is_lite_mode;
+                        ImGuiContext&     g            = *GImGui;
+                        ImGuiWindow*      window       = g.CurrentWindow;
+                        const ImGuiStyle& style        = g.Style;
+
+                        ImGui::SameLine();
+
+                        auto label = _u8L("Lite Mode");
+                        auto labelsz = ImGui::CalcTextSize(label.c_str());
+                        
+                        const float h = ImGui::GetTextLineHeight();
+                        ImVec2 switch_size(2.0f * h, h);
+                        ImVec2 grap_size(h, h);
+
+						//draw text
+                        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - grap_size.x - switch_size.x - labelsz.x - 2);
+						ImVec2 p_start = window->DC.CursorPos;
+						bool hover_text = ImGui::IsMouseHoveringRect(p_start, ImVec2(p_start.x + labelsz.x, p_start.y + labelsz.y));
+						ImVec4 text_color = hover_text ? ImGuiWrapper::COL_CREALITY : ImGui::GetStyleColorVec4(ImGuiCol_Text);
+						ImGui::TextColored(text_color, label.c_str());
+
+						ImVec2 textPos = ImGui::GetItemRectMin();
+                        ImGui::GetWindowDrawList()->AddLine(ImVec2(textPos.x, textPos.y + labelsz.y),
+                                                            ImVec2(textPos.x + labelsz.x, textPos.y + labelsz.y),
+                                                            ImGui::ColorConvertFloat4ToU32(text_color));
+
+                        if (ImGui::IsItemHovered()) {
+                            //ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                            if (ImGui::IsMouseClicked(0)) {
+                                wxGetApp().open_browser_with_warning_dialog(wxGetApp().app_config->get("language").find("zh_CN") == 0 ?
+                                                                                "https://wiki.creality.com/zh/software/6-0/lite-mode" :
+                                                                                "https://wiki.creality.com/en/software/6-0/lite-mode");
+                            }
+                        }
+
+                        ImGui::SameLine();
+                        
+						// draw switch
+                        ImVec2 cur_pos = window->DC.CursorPos;
+                        ImVec2 p_min(cur_pos.x, cur_pos.y + g.Style.ItemSpacing.y);
+                        ImVec2 p_max = ImVec2(p_min.x + switch_size.x, p_min.y + switch_size.y);
+
+                        ImVec4 border_color = m_is_dark ? ImVec4(64.0f / 255.0f, 64.0f / 255.0f, 64.0f / 255.0f, 1.0f) : ImVec4(218.0f / 255.0f, 219.0f / 255.0f, 223.0f / 255.0f, 1.0f);
+                        ImGui::PushStyleColor(ImGuiCol_Border, border_color);
+                        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, is_lite_mode ? 0.0f : 1.0f);
+
+                        ImU32 sw_bg = is_lite_mode ? IM_COL32(8, 122, 51, 255) : IM_COL32_BLACK_TRANS;
+                        
+                        ImGui::RenderFrame(p_min, p_max, sw_bg, true, h * 0.5f);
+                        
+                        if (ImGui::IsMouseHoveringRect(p_start, p_max)) {
+                            ImGui::SetTooltip(_u8L("In lite mode, only the essential toolpath data is displayed.\nIf you need to view internal parameters such as infill, please disable this mode and re-slice the model.").c_str());
+                        }
+
+                        if (is_lite_mode) {
+                            // on at right
+                            ImVec2 p = ImVec2(p_min.x + 1.0 * grap_size.x, p_min.y);
+                            ImGui::RenderFrame(p, ImVec2(p.x+grap_size.x, p.y+grap_size.y), ImGui::ColorConvertFloat4ToU32(ImGuiWrapper::COL_CREALITY), true, h * 0.5f);
+                        } else {
+                            // off at left
+                            ImU32 fill_col = m_is_dark ? IM_COL32(3, 3, 3, 255) : IM_COL32(204, 204, 204, 255);
+                            ImGui::RenderFrame(p_min, ImVec2(p_min.x + grap_size.x, p_min.y + grap_size.y), fill_col, true, h * 0.5f);
+                        }
+                        
+                        bool toggled = ImGui::InvisibleButton("##lite_mode_toggle", switch_size);
+
+                        if (toggled) {
+                            bool k = !is_lite_mode;
+                            wxGetApp().app_config->set("gcode_preview_lite_mode", (k ? "true" : "false"));
+                            wxGetApp().plater()->invalid_slice_result_need_reslice();
+                        }
+
+
+                        ImGui::PopStyleColor();
+                        ImGui::PopStyleVar();
+                    }
+                }
+
                 m_contentWidth = -1.0f;
                 helper.showColorHeader(m_view_type,m_contentWidth);
                 if (m_user_mode != wxGetApp().get_mode()) {
@@ -5507,7 +5702,6 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
                 }
 
                 //try to show scrollbar in colortable region 
-                float pos_x = ImGui::GetCursorPosX();
                 ImGui::SetCursorPosX(0);
 
                 const ImGuiWindowFlags child_flags =  ImGuiWindowFlags_NoTitleBar |
@@ -5525,18 +5719,22 @@ void GCodeViewer::render(int canvas_width, int canvas_height)
 
                 const bool child_is_visible = ImGui::BeginChild(child_id, ImVec2(-1.0f, canvas_h - pos_y - reduceHeight),
                     false, child_flags);
-
-                helper.showColorTable(m_view_type, m_custom_gcode_per_print_z, m_tools
-                    , [this]() {
-                        refresh_render_paths(false, false);
-                        update_moves_slider();
-                        wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-                    }, [this]() {
-                        refresh(*m_gcode_result, wxGetApp().plater()->get_extruder_colors_from_plater_config(m_gcode_result));
-                        update_moves_slider();
-                        wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
-                    });
-               
+                
+                if (m_bLoaded)
+                {
+                    helper.showColorTable(
+                        m_view_type, m_custom_gcode_per_print_z, m_tools, m_is_lite_mode,
+                        [this]() {
+                            refresh_render_paths(false, false);
+                            update_moves_slider();
+                            wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+                        },
+                        [this]() {
+                            refresh(*m_gcode_result, wxGetApp().plater()->get_extruder_colors_from_plater_config(m_gcode_result));
+                            update_moves_slider();
+                            wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
+                        });
+                }
 
                ImGui::EndChild();
 

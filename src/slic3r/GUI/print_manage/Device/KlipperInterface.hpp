@@ -4,6 +4,7 @@
 #include <functional>
 #include <future>
 #include <string>
+#include "slic3r/Utils/Http.hpp"
 
 namespace RemotePrint {
 class KlipperInterface
@@ -19,9 +20,13 @@ public:
                                        std::function<void(float,double)> progressCallback,
                                        std::function<void(int)>   errorCallback, 
                                        std::function<void(std::string)> onCompleteCallback);
+    std::string extractIP(const std::string& str); 
+    void cancelSendFileToDevice();
 
 private:
-    const std::string urlSuffixUpload = "/server/files/upload";
+	const std::string urlSuffixUpload = "/server/files/upload";
+    Slic3r::Http*     m_pHttp         = nullptr;
+    bool              m_bCancelSend   = false;
 };
 } // namespace RemotePrint
 

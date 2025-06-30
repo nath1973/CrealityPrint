@@ -784,6 +784,10 @@ bool isDifferentFilament(int i, int j)
     auto preset2    = wxGetApp().preset_bundle->filaments.find_preset(wxGetApp().preset_bundle->filament_presets[j])->config;
     auto type2      = preset2.opt_string("filament_type", 0u);
     bool isDiffType = i != j && type1 != type2;
+    if(is_support_filament(i) || is_support_filament(j))
+    {
+        isDiffType = false;
+    }
     return isDiffType;
 }
 void WipingPanel::update_warning_texts()

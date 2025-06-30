@@ -1,4 +1,4 @@
-#include "BoundingBox.hpp"
+﻿#include "BoundingBox.hpp"
 #include "Config.hpp"
 #include "Polygon.hpp"
 #include "PrintConfig.hpp"
@@ -13,6 +13,7 @@
 #include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
 #include "libslic3r/FDM/MachineVender.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "ShortestPath.hpp"
 #include "Print.hpp"
 #include "Utils.hpp"
@@ -101,6 +102,7 @@ static const float g_min_purge_volume = 100.f;
 static const float g_purge_volume_one_time = 135.f;
 static const int g_max_flush_count = 4;
 // static const size_t g_max_label_object = 64;
+static const double smooth_speed_step = 10;
 
 Vec2d travel_point_1;
 Vec2d travel_point_2;
@@ -495,6 +497,22 @@ static std::vector<Vec2d> get_path_of_change_filament(const Print& print)
             // FIXME: It would be better if the wipe tower set the force_travel flag for all toolchanges,
             // then we could simplify the condition and make it more readable.
             gcode += gcodegen.retract();
+            //gcode += tcr.muti_lapse;
+            
+           if (!gcodegen.config().time_lapse_gcode.value.empty() && gcodegen.config().enable_prime_tower && m_tool_change_idx == 1 &&
+                gcodegen.config().timelapse_type != TimelapseType::tlClose) {
+                DynamicConfig config;
+               config.set_key_value("layer_num", new ConfigOptionInt(gcodegen.m_layer_index));
+                config.set_key_value("layer_z", new ConfigOptionFloat(current_z));
+               config.set_key_value("max_layer_z", new ConfigOptionFloat(gcodegen.m_max_layer_z));
+                config.set_key_value("enable_prime_tower", new ConfigOptionBool(gcodegen.config().enable_prime_tower));
+                gcode += gcodegen.placeholder_parser_process("timelapse_gcode", gcodegen.config().time_lapse_gcode.value,
+                                                          gcodegen.writer().extruder()->id(), &config) +"\n";
+            }
+
+
+
+
             // add for CFS
             if (!hasToolChange)
             {
@@ -1994,7 +2012,8 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     //    DoExport::update_print_estimated_times_stats(m_processor, print->m_print_statistics);
     DoExport::update_print_estimated_stats(m_processor, m_writer.extruders(), print->m_print_statistics, print->config());
     if (result != nullptr) {
-        *result = std::move(m_processor.extract_result());
+        //*result = std::move(m_processor.extract_result());
+        result->take(m_processor.extract_result());   //optimize:replace copy assign
         // set the filename to the correct value
         result->filename = path;
     }
@@ -4272,7 +4291,7 @@ LayerResult GCode::process_layer(
 
     auto insert_timelapse_gcode = [this, print_z, &print]() -> std::string {
         std::string gcode_res;
-        if (!m_config.time_lapse_gcode.value.empty()) {
+        if (!m_config.time_lapse_gcode.value.empty() && m_config.timelapse_type != TimelapseType::tlClose) {
             DynamicConfig config;
             config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
             config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
@@ -4300,11 +4319,12 @@ LayerResult GCode::process_layer(
             }
         }
     } else {
-        if (!m_config.time_lapse_gcode.value.empty()) {
+        if (!m_config.time_lapse_gcode.value.empty() && !m_config.enable_prime_tower && m_config.timelapse_type != TimelapseType::tlClose) {
             DynamicConfig config;
             config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
             config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
             config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
+            config.set_key_value("enable_prime_tower", new ConfigOptionBool(m_config.enable_prime_tower));
             gcode += this->placeholder_parser_process("timelapse_gcode", print.config().time_lapse_gcode.value, m_writer.extruder()->id(),
                                                       &config) +
                      "\n";
@@ -4978,20 +4998,29 @@ LayerResult GCode::process_layer(
                     // ironing
                     gcode += this->extrude_infill(print,by_region_specific, true);
 
-                    // CP: analysis large area
+                    //CP: analysis large area
                     if (m_config.smart_cooling_zones.get_at(extruder_id)) {
+                        std::string filament_type = m_config.filament_type.get_at(extruder_id);
                         if (by_region_specific.size() == 0) {
                             continue;
                         }
                         bool large_area = true;
+                        //CP: check if the layer is thin wall
                         if (!has_infill(by_region_specific)) {
                             large_area = false;
                             continue;
                         }
                         double_t total_area = 0.0;
+                        double_t slice_threshold = 0.0;
+                        if (filament_type == "PETG") {
+                            slice_threshold = 20.0;
+                        } else{
+                            slice_threshold = 10.0;
+                        }
                         for (const auto& lslice : layer.lslices) {
                             double slice_area = unscale_(unscale_(area(lslice)));
-                            if (slice_area > 1 && slice_area < 10) {
+                            //CP: small island should coolling slow down, slice_area must be larger than 1 to ignore the print area of ​​a single point
+                            if (slice_area > 1 && slice_area < slice_threshold) {
                                 large_area = false;
                             }
                             total_area += slice_area;
@@ -4999,11 +5028,19 @@ LayerResult GCode::process_layer(
                         if (total_area < 100) {
                             large_area = false;
                         }
+                        // CP: During the secondary slicing process, layer.loverhangs is cleared, so the bbox determination method is used to improve stability.
+                        double_t overhangs_bbox_area = 0.0;
+                        double_t overhangs_bbo_x     = unscale_(layer.loverhangs_bbox.max(0) - layer.loverhangs_bbox.min(0));
+                        double_t overhangs_bbo_y     = unscale_(layer.loverhangs_bbox.max(1) - layer.loverhangs_bbox.min(1));
+                        overhangs_bbox_area          = unscale_(unscale_(layer.loverhangs_bbox.area()));
+                        if (overhangs_bbox_area > 100 || (overhangs_bbo_x > 1.5 && overhangs_bbo_y > 1.5)) {
+                            large_area = false;
+                        }
                         double_t overhang_area = 0.0;
                         for (const auto& loverhang : layer.loverhangs) {
                             overhang_area += unscale_(unscale_(area(loverhang)));
                         }
-                        if (overhang_area > 0.42 * 5) {
+                        if (overhang_area > 0.40) {
                             large_area = false;
                         }
                         double_t ratio = overhang_area / (total_area + 1e-6);
@@ -5094,6 +5131,7 @@ LayerResult GCode::process_layer(
         }
     }
 
+    //gcode += this->unretract();
     result.gcode = std::move(gcode);
     result.cooling_buffer_flush = object_layer || raft_layer || last_layer;
     return result;
@@ -5405,6 +5443,10 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
     };
 
     if (!enable_seam_slope) {
+        // BBS: smooth speed of discontinuity areas
+        if (m_config.detect_overhang_wall && m_config.overhang_speed_classic.value && m_config.smooth_speed_discontinuity_area &&
+            (loop.role() == erExternalPerimeter || loop.role() == erPerimeter))
+            smooth_speed_discontinuity_area(paths);
         for (ExtrusionPaths::iterator path = paths.begin(); path != paths.end(); ++path) {
             gcode += this->_extrude(*path, description, speed_for_path(*path));
         }
@@ -5434,6 +5476,10 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
         // Calculate the sloped loop
         ExtrusionLoopSloped new_loop(paths, seam_gap, slope_min_length, slope_max_segment_length, start_slope_ratio, loop.loop_role());
         new_loop.clip_slope(seam_gap);
+
+        if (m_config.detect_overhang_wall && m_config.overhang_speed_classic && m_config.smooth_speed_discontinuity_area &&
+            (loop.role() == erExternalPerimeter || loop.role() == erPerimeter))
+            smooth_speed_discontinuity_area(new_loop.paths);
 
         // Then extrude it
         for (const auto& p : new_loop.get_all_paths()) {
@@ -5510,7 +5556,10 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, std::string 
     // extrude along the path
     std::string gcode;
     for (ExtrusionPath path : multipath.paths)
-        gcode += this->_extrude(path, description, speed);
+        // CP: The path may be empty for unknown reasons.
+        if (!path.polyline.points.empty()) {
+            gcode += this->_extrude(path, description, speed);
+        }
 
     // BBS
     if (m_wipe.enable) {
@@ -5561,6 +5610,14 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.perimeters.empty()) {
             m_config.apply(print.get_print_region(&region - &by_region.front()).config());
+            if (m_config.enable_overhang_speed && m_config.overhang_optimization.value) {
+                /*if (m_config.overhang_1_4_speed.value < EPSILON)
+                    m_config.overhang_1_4_speed.value = 50.f;
+                m_config.overhang_1_4_speed.value = std::clamp(m_config.overhang_1_4_speed.value, 1., 50.) ;
+                m_config.overhang_2_4_speed.value = std::clamp(m_config.overhang_2_4_speed.value, 1., 50.) ;
+                m_config.overhang_3_4_speed.value = std::clamp(m_config.overhang_3_4_speed.value, 1., 30.) ;
+                m_config.overhang_4_4_speed.value = std::clamp(m_config.overhang_4_4_speed.value, 1., 10.) ;     */    
+            }
 
             for (const ExtrusionEntity* ee : region.perimeters)
                 gcode += this->extrude_entity(*ee, "perimeter", -1., region.perimeters);
@@ -5751,9 +5808,78 @@ static std::map<int, std::string> overhang_speed_key_map =
     {1, "overhang_1_4_speed"},
     {2, "overhang_2_4_speed"},
     {3, "overhang_3_4_speed"},
-    {4, "overhang_4_4_speed"},
-    {5, "bridge_speed"},
+    {4, "overhang_4_4_speed"}, 
+    {5, "overhang_totally_speed"},
+    {6, "bridge_speed"},
 };
+
+double GCode::get_path_speed(const ExtrusionPath& path)
+{
+    double min_speed = double(m_config.slow_down_min_speed.get_at(m_writer.extruder()->id()));
+    // set speed
+    double speed = 0;
+    if (path.role() == erPerimeter) {
+        speed = m_config.get_abs_value("inner_wall_speed");
+        if (m_config.enable_overhang_speed.value) {
+            double new_speed = 0;
+            new_speed        = get_overhang_degree_corr_speed(speed, path.overhang_degree);
+            speed            = new_speed == 0.0 ? speed : new_speed;
+        }
+    } else if (path.role() == erExternalPerimeter) {
+        speed = m_config.get_abs_value("outer_wall_speed");
+        if (m_config.enable_overhang_speed.value) {
+            double new_speed = 0;
+            new_speed        = get_overhang_degree_corr_speed(speed, path.overhang_degree);
+            speed            = new_speed == 0.0 ? speed : new_speed;
+        }
+    } else if (path.role() == erOverhangPerimeter && path.overhang_degree == 5)
+        speed = m_config.get_abs_value("overhang_totally_speed");
+    else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill || path.role() == erSupportTransition) {
+        speed = m_config.get_abs_value("bridge_speed");
+    }
+    auto _mm3_per_mm = path.mm3_per_mm *
+                       double(m_curr_print->calib_mode() == CalibMode::Calib_Flow_Rate ? this->config().print_flow_ratio.value : 1);
+
+    // BBS: if not set the speed, then use the filament_max_volumetric_speed directly
+    double filament_max_volumetric_speed = EXTRUDER_CONFIG(filament_max_volumetric_speed);
+    if (speed == 0) {
+        if (_mm3_per_mm > 0)
+            speed = filament_max_volumetric_speed / _mm3_per_mm;
+        else
+            speed = filament_max_volumetric_speed / path.mm3_per_mm;
+    }
+    if (this->on_first_layer()) {
+        // BBS: for solid infill of initial layer, speed can be higher as long as
+        // wall lines have be attached
+        if (path.role() != erBottomSurface)
+            speed = m_config.get_abs_value("initial_layer_speed");
+    }
+
+    if (filament_max_volumetric_speed > 0) {
+        double extrude_speed = filament_max_volumetric_speed / path.mm3_per_mm;
+        if (_mm3_per_mm > 0)
+            extrude_speed = filament_max_volumetric_speed / _mm3_per_mm;
+
+        // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
+        speed = std::min(speed, extrude_speed);
+    }
+
+    return speed;
+}
+
+// BBS: f(x)=2x^2
+double GCode::mapping_speed(double dist)
+{
+    if (dist <= 0)
+        return 0;
+    return this->config().smooth_coefficient * pow(dist, 2);
+}
+
+double GCode::get_speed_coor_x(double speed)
+{
+    double temp = speed / this->config().smooth_coefficient;
+    return sqrt(temp);
+}
 
 double GCode::get_overhang_degree_corr_speed(float normal_speed, double path_degree) {
 
@@ -5777,6 +5903,215 @@ double GCode::get_overhang_degree_corr_speed(float normal_speed, double path_deg
 
     double speed_out = lower_speed_bound + (upper_speed_bound - lower_speed_bound) * (path_degree - lower_degree_bound);
     return speed_out;
+}
+
+static bool need_smooth_speed(const ExtrusionPath& other_path, const ExtrusionPath& this_path)
+{
+    if (this_path.smooth_speed - other_path.smooth_speed > smooth_speed_step)
+        return true;
+
+    return false;
+}
+
+ExtrusionPaths GCode::split_and_mapping_speed(
+    double& other_path_v, double& final_v, ExtrusionPath& this_path, double max_smooth_length, bool split_from_left)
+{
+    ExtrusionPaths splited_path;
+    if (this_path.length() <= 0 || this_path.polyline.points.size() < 2) {
+        return splited_path;
+    }
+
+    // reverse if this slowdown the speed
+    Polyline input_polyline = this_path.polyline;
+    if (!split_from_left)
+        std::reverse(input_polyline.begin(), input_polyline.end());
+
+    double this_path_x = scale_(get_speed_coor_x(final_v));
+    double x_base      = scale_(get_speed_coor_x(other_path_v));
+
+    double smooth_length = this_path_x - x_base;
+
+    // this length not support to get final v, adjust final v
+    if (smooth_length > max_smooth_length)
+        final_v = mapping_speed(unscale_(x_base + max_smooth_length));
+
+    double max_step_length = scale_(1.0); // cut path if the path too long
+    double min_step_length = scale_(0.4); // cut step
+
+    double smooth_length_count = 0;
+    double split_line_speed    = 0;
+    Point  line_start_pt       = input_polyline.points.front();
+    Point  line_end_pt         = input_polyline.points[1];
+    bool   get_next_line       = false;
+    size_t end_pt_idx          = 1;
+
+    auto insert_speed = [this](double line_lenght, double& pos_x, double& smooth_length_count, double target_v) {
+        pos_x += line_lenght;
+        double pos_x_speed = mapping_speed(unscale_(pos_x));
+        smooth_length_count += line_lenght;
+
+        if (pos_x_speed > target_v)
+            pos_x_speed = target_v;
+
+        return pos_x_speed;
+    };
+
+    while (split_line_speed < final_v && end_pt_idx < input_polyline.size()) {
+        // move to next line
+        if (get_next_line) {
+            line_start_pt = input_polyline.points[end_pt_idx - 1];
+            line_end_pt   = input_polyline.points[end_pt_idx];
+        }
+        // This line is cut off as a speed transition area
+        Polyline cuted_polyline;
+        Line     line(line_start_pt, line_end_pt);
+
+        cuted_polyline.append(line_start_pt);
+        // split polyline and set speed
+        if (line.length() < max_step_length || line.length() - min_step_length < min_step_length / 2) {
+            split_line_speed = insert_speed(line.length(), x_base, smooth_length_count, final_v);
+            end_pt_idx++;
+            get_next_line = true;
+            cuted_polyline.append(line.b);
+        } else {
+            // path is too long, split it
+            double rate     = min_step_length / line.length();
+            Point  insert_p = line.a + (line.b - line.a) * rate;
+
+            split_line_speed = insert_speed(min_step_length, x_base, smooth_length_count, final_v);
+            line_start_pt    = insert_p;
+            get_next_line    = false;
+            cuted_polyline.append(insert_p);
+        }
+
+        ExtrusionPath path_step(cuted_polyline, this_path);
+        path_step.smooth_speed = split_line_speed;
+        splited_path.push_back(std::move(path_step));
+    }
+
+    // reverse path back
+    Polyline p1, p2;
+    Point&   split_point = splited_path.back().polyline.points.back();
+    this_path.polyline.split_at(split_point, &p1, &p2);
+    if (!split_from_left) {
+        this_path.polyline = p1;
+        std::reverse(splited_path.begin(), splited_path.end());
+        for (ExtrusionPath& path : splited_path) {
+            std::reverse(path.polyline.points.begin(), path.polyline.points.end());
+        }
+    } else {
+        this_path.polyline = p2;
+    }
+
+    return splited_path;
+}
+
+ExtrusionPaths GCode::merge_same_speed_paths(const ExtrusionPaths& paths)
+{
+    ExtrusionPaths               output_paths;
+    std::optional<ExtrusionPath> merged_path;
+
+    for (size_t path_idx = 0; path_idx < paths.size(); ++path_idx) {
+        ExtrusionPath path = paths[path_idx];
+        path.smooth_speed  = get_path_speed(path);
+
+        if (path.role() == erOverhangPerimeter) {
+            if (merged_path.has_value()) {
+                output_paths.push_back(std::move(*merged_path));
+                merged_path = std::nullopt;
+            }
+            output_paths.emplace_back(path);
+            continue;
+        }
+
+        if (!merged_path.has_value()) {
+            merged_path = path;
+            continue;
+        }
+
+        if (merged_path->can_merge(path)) {
+            merged_path->polyline.append(path.polyline);
+        } else {
+            output_paths.push_back(std::move(*merged_path));
+            merged_path = path;
+        }
+    }
+
+    if (merged_path.has_value())
+        output_paths.push_back(std::move(*merged_path));
+
+    return output_paths;
+}
+
+ExtrusionPaths GCode::set_speed_transition(ExtrusionPaths& paths)
+{
+    ExtrusionPaths interpolated_paths;
+    for (int path_idx = 0; path_idx < paths.size(); path_idx++) {
+        // update path
+        ExtrusionPath& path = paths[path_idx];
+
+        double this_path_speed = 0;
+        // 100% overhang speed will not to set smooth speed
+        if (path.role() == erOverhangPerimeter) {
+            interpolated_paths.push_back(path);
+            continue;
+        }
+
+        bool smooth_left_path  = false;
+        bool smooth_right_path = false;
+        // first line do not need to smooth speed on left
+        // prev line speed may change
+        if (path_idx > 0)
+            smooth_left_path = need_smooth_speed(paths[path_idx - 1], path);
+
+        // first line do not need to smooth speed on right
+        if (path_idx < paths.size() - 1)
+            smooth_right_path = need_smooth_speed(paths[path_idx + 1], path);
+
+        // get smooth length
+        double max_smooth_path_length = path.length();
+        if (smooth_right_path && smooth_left_path)
+            max_smooth_path_length /= 2;
+
+        // smooth left
+        ExtrusionPaths left_split_paths;
+        if (smooth_left_path) {
+            left_split_paths = split_and_mapping_speed(paths[path_idx - 1].smooth_speed, path.smooth_speed, path, max_smooth_path_length);
+            if (!left_split_paths.empty())
+                interpolated_paths.insert(interpolated_paths.end(), left_split_paths.begin(), left_split_paths.end());
+            max_smooth_path_length = path.length();
+        }
+
+        // smooth right
+        ExtrusionPaths right_split_paths;
+        if (smooth_right_path) {
+            right_split_paths = split_and_mapping_speed(paths[path_idx + 1].smooth_speed, path.smooth_speed, path, max_smooth_path_length,
+                                                        false);
+        }
+
+        if (!path.empty())
+            interpolated_paths.push_back(path);
+
+        if (!right_split_paths.empty())
+            interpolated_paths.insert(interpolated_paths.end(), right_split_paths.begin(), right_split_paths.end());
+    }
+
+    return interpolated_paths;
+}
+
+void GCode::smooth_speed_discontinuity_area(ExtrusionPaths& paths)
+{
+    if (paths.size() <= 1 || this->config().smooth_coefficient == 0)
+        return;
+
+    // step 1 merge same speed path
+    size_t         path_tail_pos = 0;
+    ExtrusionPaths prepare_paths = merge_same_speed_paths(paths);
+
+    // step 2 split path
+    ExtrusionPaths inter_paths;
+    inter_paths = set_speed_transition(prepare_paths);
+    paths       = std::move(inter_paths);
 }
 
 std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
@@ -5902,7 +6237,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     if (speed == -1) {
         if (path.role() == erPerimeter) {
             speed = m_config.get_abs_value("inner_wall_speed");
-            if (m_config.overhang_speed_classic.value && m_config.enable_overhang_speed.value) {
+            if (m_config.detect_overhang_wall && m_config.overhang_speed_classic.value && m_config.smooth_speed_discontinuity_area &&
+                path.smooth_speed != 0)
+                speed = path.smooth_speed;
+            else if (m_config.overhang_speed_classic.value && m_config.enable_overhang_speed.value) {
                 double new_speed = 0;
                 new_speed = get_overhang_degree_corr_speed(speed, path.overhang_degree);
                 speed = new_speed == 0.0 ? speed : new_speed;
@@ -5913,7 +6251,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
             }
         } else if (path.role() == erExternalPerimeter) {
             speed = m_config.get_abs_value("outer_wall_speed");
-            if (m_config.overhang_speed_classic.value && m_config.enable_overhang_speed.value ) {
+            if (m_config.detect_overhang_wall && m_config.overhang_speed_classic.value && m_config.smooth_speed_discontinuity_area &&
+                path.smooth_speed != 0)
+                speed = path.smooth_speed;
+            else if (m_config.overhang_speed_classic.value && m_config.enable_overhang_speed.value ) {
                 double new_speed = 0;
                 new_speed = get_overhang_degree_corr_speed(speed, path.overhang_degree);
                 speed = new_speed == 0.0 ? speed : new_speed;
@@ -5922,7 +6263,9 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                 speed = std::min(speed, m_config.scarf_joint_speed.get_abs_value(m_config.get_abs_value("outer_wall_speed")));
             }
         } 
-        else if(path.role() == erInternalBridgeInfill) {
+        else if (path.role() == erOverhangPerimeter && path.overhang_degree == 5) {
+            speed = m_config.get_abs_value("overhang_totally_speed");
+        } else if (path.role() == erInternalBridgeInfill) {
             speed = m_config.get_abs_value("internal_bridge_speed");
         } else if (path.role() == erOverhangPerimeter || path.role() == erSupportTransition || path.role() == erBridgeInfill) {
             speed = m_config.get_abs_value("bridge_speed");
@@ -6019,28 +6362,29 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                 ref_speed = std::min(ref_speed, m_config.scarf_joint_speed.get_abs_value(ref_speed));
             }
             
-            ConfigOptionPercents         overhang_overlap_levels({75, 50, 25, 13, 12.99, 0});
+            ConfigOptionPercents         overhang_overlap_levels({90, 60, 35, 13, 12.99, 0});
 
             if (m_config.slowdown_for_curled_perimeters){
                 ConfigOptionFloatsOrPercents dynamic_overhang_speeds(
                     {(m_config.get_abs_value("overhang_1_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_1_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_1_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_2_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_2_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_2_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_3_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_3_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_3_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_4_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_4_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_4_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_4_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_4_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_4_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_4_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_4_4_speed", ref_speed) * 100 / ref_speed, true}});
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_4_4_speed", ref_speed), ref_speed) * 100 / ref_speed,
+                                        true}});
 
                 new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhang_overlap_levels, dynamic_overhang_speeds,
                                                                               ref_speed, speed, m_config.slowdown_for_curled_perimeters);
@@ -6048,24 +6392,24 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                 ConfigOptionFloatsOrPercents dynamic_overhang_speeds(
                     {(m_config.get_abs_value("overhang_1_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_1_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_1_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_2_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_2_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_2_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_3_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_3_4_speed", ref_speed) * 100 / ref_speed, true},
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_3_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
                      (m_config.get_abs_value("overhang_4_4_speed", ref_speed) < 0.5) ?
                          FloatOrPercent{100, true} :
-                         FloatOrPercent{m_config.get_abs_value("overhang_4_4_speed", ref_speed) * 100 / ref_speed, true},
-                     FloatOrPercent{m_config.get_abs_value("bridge_speed") * 100 / ref_speed, true},
-                     FloatOrPercent{m_config.get_abs_value("bridge_speed") * 100 / ref_speed, true}});
+                         FloatOrPercent{std::min(m_config.get_abs_value("overhang_4_4_speed", ref_speed), ref_speed) * 100 / ref_speed, true},
+                     FloatOrPercent{std::min(m_config.get_abs_value("bridge_speed"), ref_speed) * 100 / ref_speed, true},
+                     FloatOrPercent{std::min(m_config.get_abs_value("bridge_speed"), ref_speed) * 100 / ref_speed, true}});
 
                 new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhang_overlap_levels, dynamic_overhang_speeds,
                                                                               ref_speed, speed, m_config.slowdown_for_curled_perimeters);
             }
             variable_speed = std::any_of(new_points.begin(), new_points.end(),
-                                         [speed](const ProcessedPoint &p) { return fabs(double(p.speed) - speed) > EPSILON; });
+                                         [speed](const ProcessedPoint &p) { return fabs(double(p.speed) - speed) > 1; });// Ignore small speed variations (under 1mm/sec)
 
     }
 
@@ -6372,9 +6716,14 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                 continue;
             path_length += line_length;
             double new_speed = pre_processed_point.speed * 60.0;
-            if (last_set_speed != new_speed) {
+            // Ignore small speed variations - emit speed change if the delta between current and new is greater than 60mm/min / 1mm/sec
+            // Reset speed to F if delta to F is less than 1mm/sec
+            if ((std::abs(last_set_speed - new_speed) > 60)) {
                 gcode += m_writer.set_speed(new_speed, "", comment);
                 last_set_speed = new_speed;
+            } else if ((std::abs(F - new_speed) <= 60)) {
+                gcode += m_writer.set_speed(F, "", comment);
+                last_set_speed = F;
             }
             auto dE = e_per_mm * line_length;
             if (m_small_area_infill_flow_compensator  && m_config.small_area_infill_flow_compensation.value) {

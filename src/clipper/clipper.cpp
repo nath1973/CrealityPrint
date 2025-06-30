@@ -40,7 +40,6 @@
 
 #include "clipper.hpp"
 #include <cmath>
-#include <cstdint>
 #include <vector>
 #include <algorithm>
 #include <stdexcept>
@@ -120,6 +119,10 @@ inline cInt Round(double val)
   return static_cast<cInt>((val < 0) ? (val - 0.5) : (val + 0.5));
 }
 
+// Overriding the Eigen operators because we don't want to compare Z coordinate if IntPoint is 3 dimensional.
+inline bool operator==(const IntPoint &l, const IntPoint &r) { return l.x() == r.x() && l.y() == r.y(); }
+inline bool operator!=(const IntPoint &l, const IntPoint &r) { return l.x() != r.x() || l.y() != r.y(); }
+
 //------------------------------------------------------------------------------
 // PolyTree methods ...
 //------------------------------------------------------------------------------
@@ -190,16 +193,22 @@ double Area(const Path &poly)
 }
 //------------------------------------------------------------------------------
 
-double Area(const OutRec &outRec)
+double Area(const OutPt *op)
 {
-  OutPt *op = outRec.Pts;
+  const OutPt *startOp = op;
   if (!op) return 0;
   double a = 0;
   do {
     a +=  (double)(op->Prev->Pt.x() + op->Pt.x()) * (double)(op->Prev->Pt.y() - op->Pt.y());
     op = op->Next;
-  } while (op != outRec.Pts);
+  } while (op != startOp);
   return a * 0.5;
+}
+//------------------------------------------------------------------------------
+
+double Area(const OutRec &outRec)
+{
+  return Area(outRec.Pts);
 }
 //------------------------------------------------------------------------------
 
@@ -537,27 +546,32 @@ bool FirstIsBottomPt(const OutPt* btmPt1, const OutPt* btmPt2)
   p = btmPt2->Next;
   while ((p->Pt == btmPt2->Pt) && (p != btmPt2)) p = p->Next;
   double dx2n = std::fabs(GetDx(btmPt2->Pt, p->Pt));
-  return (dx1p >= dx2p && dx1p >= dx2n) || (dx1n >= dx2p && dx1n >= dx2n);
+
+  if (std::max(dx1p, dx1n) == std::max(dx2p, dx2n) &&
+    std::min(dx1p, dx1n) == std::min(dx2p, dx2n))
+      return Area(btmPt1) > 0; //if otherwise identical use orientation
+  else
+    return (dx1p >= dx2p && dx1p >= dx2n) || (dx1n >= dx2p && dx1n >= dx2n);
 }
 //------------------------------------------------------------------------------
 
 // Called by GetLowermostRec()
 OutPt* GetBottomPt(OutPt *pp)
 {
-  OutPt* dups = 0;
+  OutPt* dups = nullptr;
   OutPt* p = pp->Next;
   while (p != pp)
   {
     if (p->Pt.y() > pp->Pt.y())
     {
       pp = p;
-      dups = 0;
+      dups = nullptr;
     }
     else if (p->Pt.y() == pp->Pt.y() && p->Pt.x() <= pp->Pt.x())
     {
       if (p->Pt.x() < pp->Pt.x())
       {
-        dups = 0;
+        dups = nullptr;
         pp = p;
       } else
       {
@@ -578,6 +592,7 @@ OutPt* GetBottomPt(OutPt *pp)
   }
   return pp;
 }
+
 //------------------------------------------------------------------------------
 
 bool Pt2IsBetweenPt1AndPt3(const IntPoint &pt1,
@@ -1019,7 +1034,7 @@ IntRect ClipperBase::GetBounds()
   result.bottom = lm->LeftBound->Bot.y();
   while (lm != m_MinimaList.end())
   {
-    result.bottom = std::max(result.bottom, (cInt)lm->LeftBound->Bot.y());
+    result.bottom = std::max(result.bottom, lm->LeftBound->Bot.y());
     TEdge* e = lm->LeftBound;
     for (;;) {
       TEdge* bottomE = e;
@@ -1029,11 +1044,11 @@ IntRect ClipperBase::GetBounds()
         if (e->Bot.x() > result.right) result.right = e->Bot.x();
         e = e->NextInLML;
       }
-      result.left = std::min(result.left, (cInt)e->Bot.x());
-      result.right = std::max(result.right, (cInt)e->Bot.x());
-      result.left = std::min(result.left, (cInt)e->Top.x());
-      result.right = std::max(result.right, (cInt)e->Top.x());
-      result.top = std::min(result.top, (cInt)e->Top.y());
+      result.left = std::min(result.left, e->Bot.x());
+      result.right = std::max(result.right, e->Bot.x());
+      result.left = std::min(result.left, e->Top.x());
+      result.right = std::max(result.right, e->Top.x());
+      result.top = std::min(result.top, e->Top.y());
       if (bottomE == lm->LeftBound) e = lm->RightBound;
       else break;
     }
@@ -2291,7 +2306,11 @@ void Clipper::ProcessHorizontal(TEdge *horzEdge)
 
     if (horzEdge->OutIdx >= 0 && !IsOpen)  //note: may be done multiple times
 		{
-            op1 = AddOutPt(horzEdge, e->Curr);
+#ifdef CLIPPERLIB_USE_XYZ
+			if (dir == dLeftToRight) SetZ(e->Curr, *horzEdge, *e);
+			else SetZ(e->Curr, *e, *horzEdge);
+#endif      
+			op1 = AddOutPt(horzEdge, e->Curr);
 			TEdge* eNextHorz = m_SortedEdges;
 			while (eNextHorz)
 			{
@@ -2615,7 +2634,10 @@ void Clipper::ProcessEdgesAtTopOfScanbeam(const cInt topY)
       {
         e->Curr.x() = TopX( *e, topY );
         e->Curr.y() = topY;
-      }
+#ifdef CLIPPERLIB_USE_XYZ
+        e->Curr.z() = topY == e->Top.y() ? e->Top.z() : (topY == e->Bot.y() ? e->Bot.z() : 0);
+#endif
+	  }
 
       //When StrictlySimple and 'e' is being touched by another edge, then
       //make sure both edges have a vertex here ...

@@ -74,7 +74,7 @@ namespace DM{
         std::vector<DeviceBoxColorInfo> boxColorInfos;
         std::vector<MaterialBox> materialBoxes;
 
-        static Device deserialize(nlohmann::json& device);
+        static Device deserialize(nlohmann::json& device, bool need_update_box_info = true);
     };
 
 }

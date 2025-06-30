@@ -10,6 +10,7 @@
 #include "Camera.hpp"
 #include "Plater.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "Widgets/NumberEntryDialog.hpp"
 
 #include "libslic3r/PrintConfig.hpp"
@@ -17,6 +18,8 @@
 #include "libslic3r/Arrange.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #if ENABLE_ENHANCED_PRINT_VOLUME_FIT
 #include "libslic3r/BuildVolume.hpp"
@@ -2285,6 +2288,7 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
     int sel_ret = plate_list.select_plate_by_obj(sel_object_idx, sel_id);
 
     PartPlate* plate = plate_list.get_curr_plate();
+    PrintSequence current_plate_seq = plate->get_print_seq();
     Model& model = plater->model();
     BoundingBox plate_bb = plate->get_bounding_box_crd();
     int plate_cols = plate_list.get_plate_cols();
@@ -2307,6 +2311,9 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
     BoundingBoxf wti_bbox(wti_pos, wti_pos + wti_bb_size);
 
     const Slic3r::DynamicPrintConfig& global_config = wxGetApp().preset_bundle->full_config();
+    auto global_print_sequence_type = global_config.option<ConfigOptionEnum<PrintSequence>>("print_sequence")->value;
+    auto extruder_clearance_radius = global_config.option<ConfigOptionFloat>("extruder_clearance_radius");
+
     ap_selected.reserve(model_object->instances.size());
     for (size_t oidx = 0; oidx < model.objects.size(); ++oidx)
     {
@@ -2316,6 +2323,18 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
             bool selected = (oidx == sel_object_idx);
 
             Slic3r::arrangement::ArrangePolygon ap = get_instance_arrange_poly(mo->instances[inst_idx], global_config);
+
+            // need to consider current plate print sequence
+            if(global_print_sequence_type == PrintSequence::ByLayer) {
+                if(current_plate_seq == PrintSequence::ByObject) {
+                    ap.brim_width += extruder_clearance_radius->getFloat();
+                }
+            } else { // global print sequence is ByObject
+                if(current_plate_seq == PrintSequence::ByDefault || current_plate_seq == PrintSequence::ByObject) {
+                    ap.brim_width += extruder_clearance_radius->getFloat();
+                }
+            }
+
             BoundingBox ap_bb = ap.transformed_poly().contour.bounding_box();
             ap.height = 1;
             ap.name = mo->name;
@@ -2431,14 +2450,13 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
 
         // For by-object printing, brim_width 需要加上 extruder_clearance_radius
         const Slic3r::DynamicPrintConfig& global_config = wxGetApp().preset_bundle->full_config();
-        auto print_sequence_type                        = global_config.option<ConfigOptionEnum<PrintSequence>>("print_sequence")->value;
-        if (print_sequence_type == PrintSequence::ByObject) {
-            // extruder_clearance_radius 只在 ByObject 时考虑
+        auto global_print_seq                        = global_config.option<ConfigOptionEnum<PrintSequence>>("print_sequence")->value;
+        if(current_plate_seq == PrintSequence::ByObject && global_print_seq != PrintSequence::ByObject) {
+             // extruder_clearance_radius 只在 ByObject 时考虑
             // 如果 distance 小于 brim_width，则用 brim_width，否则用 distance
             distance = (settings.distance < brim) ? brim : settings.distance;
         }
         Vec2f step = base_step + Vec2f(distance, distance);
-
 
         std::vector<Vec2f> empty_cells = Plater::get_empty_cells(step);
         size_t n = std::min(ap_selected.size(), empty_cells.size());
@@ -4005,6 +4023,15 @@ void Selection::paste_objects_from_clipboard()
     bool  in_current   = plate->intersects(bbox_all);
     auto  start_point  = in_current ? bbox_all.center() : plate->get_build_volume().center();
 
+    float extra_offset = 1.0f;
+    for(size_t i=0;i<src_objects.size();i++) {
+        float tmp_offset = this->get_layout_extra_offset(src_objects[i]);
+        if(tmp_offset >= extra_offset) {
+            extra_offset = tmp_offset;
+        }
+    }
+
+
     // ======== find empty cells ========
     std::vector<Vec3f> all_displacements;
     // only need to call "get_empty_cells" once
@@ -4030,8 +4057,6 @@ void Selection::paste_objects_from_clipboard()
 
         auto point_offset = start_offset - start_point;
 
-        float extra_offset = this->get_layout_extra_offset(src_objects[i]);
-
         all_empty_cells = wxGetApp().plater()->canvas3D()->get_empty_cells({start_point(0), start_point(1)},
                                                                 {bbox_all.size()(0), bbox_all.size()(1)}, extra_offset,
                                                                 plate->get_index());
@@ -4040,7 +4065,7 @@ void Selection::paste_objects_from_clipboard()
         if (all_empty_cells.size() < 1) {
             BoundingBoxf3 plate_bbox = plate->get_build_volume();
             auto expanded_cells = wxGetApp().plater()->canvas3D()->get_expand_cells(Vec2f(start_point.x(), start_point.y()),
-                                                                                    100,
+                                                                                    1,
                                                                                     {bbox_all.size()(0), bbox_all.size()(1)},
                                                                                     extra_offset,
                                                                                     &plate_bbox);

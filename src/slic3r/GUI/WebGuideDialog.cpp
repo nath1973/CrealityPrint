@@ -7,7 +7,9 @@
 #include "libslic3r/AppConfig.hpp"
 #include "slic3r/GUI/wxExtensions.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/WebViewDialog.hpp"
 #include "libslic3r_version.h"
+#include "3DBed.hpp"
 
 #include <string>
 #include <wx/sizer.h>
@@ -188,11 +190,7 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     // Connect the idle events
     // Bind(wxEVT_IDLE, &GuideFrame::OnIdle, this);
     // Bind(wxEVT_CLOSE_WINDOW, &GuideFrame::OnClose, this);
-#if !CUSTOM_CXCLOUD
-#if UPDATE_ONLINE_MACHINES
-    GUI::wxGetApp().check_machine_list();
-#endif
-#endif
+
     LoadProfile();
 
     // UI
@@ -805,7 +803,15 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
             }
         }
         else if (strCmd == "user_guide_finish") {
+            std::string m_curPrinterPresetName  = GUI::wxGetApp().app_config->get("presets", PRESET_PRINTER_NAME);
+            std::string m_curFilamentPresetName = GUI::wxGetApp().app_config->get("presets", PRESET_FILAMENT_NAME);
+            std::string m_curProcessPresetName  = GUI::wxGetApp().app_config->get("presets", PRESET_PRINT_NAME);
+
             SaveProfile();
+
+           m_curPrinterPresetName  = GUI::wxGetApp().app_config->get("presets", PRESET_PRINTER_NAME);
+           m_curFilamentPresetName = GUI::wxGetApp().app_config->get("presets", PRESET_FILAMENT_NAME);
+           m_curProcessPresetName  = GUI::wxGetApp().app_config->get("presets", PRESET_PRINT_NAME);
 
             std::string oldregion = m_ProfileJson["region"];
             bool        bLogin    = false;

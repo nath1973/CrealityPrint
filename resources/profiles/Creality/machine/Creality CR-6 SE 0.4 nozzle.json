@@ -6,7 +6,7 @@
     "printer_model": "Creality CR-6 SE",
     "printer_structure": "i3",
     "adaptive_bed_mesh_margin": "0",
-    "auxiliary_fan": "1",
+    "auxiliary_fan": "0",
     "bbl_use_printhost": "0",
     "bed_exclude_area": "0x0",
     "bed_mesh_max": "99999,99999",
@@ -14,7 +14,6 @@
     "bed_mesh_probe_distance": "50,50",
     "before_layer_change_gcode": ";BEFORE_LAYER_CHANGE\n;[layer_z]\nG92 E0\n",
     "best_object_pos": "0.5,0.5",
-    "change_filament_gcode": "M600",
     "cooling_tube_length": "5",
     "cooling_tube_retraction": "91.5",
     "default_print_profile": "0.20mm Standard @Creality CR-6 SE 0.4 nozzle",
@@ -32,7 +31,7 @@
     "gcode_flavor": "marlin",
     "high_current_on_filament_swap": "0",
     "host_type": "octoprint",
-    "machine_LED_light_exist": "1",
+    "machine_LED_light_exist": "0",
     "machine_end_gcode": "G91 ;Relative positionning\nG1 E-2 F2700 ;Retract a bit\nG1 E-2 Z0.2 F2400 ;Retract and raise Z\nG1 X5 Y5 F3000 ;Wipe out\nG1 Z10 ;Raise Z more\nG90 ;Absolute positionning\nG1 X0 Y0 ;Present print\nM106 S0 ;Turn-off fan\nM104 S0 ;Turn-off hotend\nM140 S0 ;Turn-off bed\nM84 X Y E ;Disable all steppers but Z",
     "machine_load_filament_time": "0",
     "machine_max_acceleration_e": "5000",
@@ -115,5 +114,5 @@
     "z_hop": "0.4",
     "z_hop_types": "Normal Lift",
     "name": "Creality CR-6 SE 0.4 nozzle",
-    "setting_id": "63424"
+    "setting_id": "22188"
 }

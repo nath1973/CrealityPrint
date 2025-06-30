@@ -17,8 +17,14 @@
 #define CEREAL_FUTURE_EXPERIMENTAL
 #include <cereal/archives/adapters.hpp>
 
+#include <slic3r/GUI/Plater.hpp>
+#include <slic3r/GUI/PartPlate.hpp>
 #include <libslic3r/PrintConfig.hpp>
 #include <libslic3r/ObjectID.hpp>
+#include <libslic3r/Model.hpp>
+#include <libslic3r/ModelObject.hpp>
+#include <libslic3r/ModelVolume.hpp>
+#include <libslic3r/ModelInstance.hpp>
 #include <libslic3r/Utils.hpp>
 
 #include "slic3r/GUI/3DScene.hpp"
@@ -804,7 +810,6 @@ namespace cereal
 	}
 }
 
-#include <libslic3r/Model.hpp>
 #include <libslic3r/TriangleMesh.hpp>
 #include <slic3r/GUI/Selection.hpp>
 #include <slic3r/GUI/Gizmos/GLGizmosManager.hpp>

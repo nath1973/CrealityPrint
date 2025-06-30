@@ -82,7 +82,7 @@ namespace GUI {
         static Quad_UVs FullTextureUVs;
 
     protected:
-        unsigned int m_id{ 0 };
+        unsigned int m_id{INVAILD_ID};
         int m_width{ 0 };
         int m_height{ 0 };
         std::string m_source;
@@ -116,7 +116,7 @@ namespace GUI {
                                                   bool                                     compress);
         
         
-        void reset();
+        void reset(bool bReleaseByCaller = false);
         //BBS: add generate logic for text strings
         int m_original_width;
         int m_original_height;
@@ -136,9 +136,12 @@ namespace GUI {
         void send_compressed_data_to_gpu() { m_compressor.send_compressed_data_to_gpu(); }
         bool all_compressed_data_sent_to_gpu() const { return m_compressor.all_compressed_data_sent_to_gpu(); }
 
+        bool vaild() { return m_id != INVAILD_ID; }
+
         static void render_texture(unsigned int tex_id, float left, float right, float bottom, float top);
         static void render_sub_texture(unsigned int tex_id, float left, float right, float bottom, float top, const Quad_UVs& uvs);
 
+        static constexpr unsigned int INVAILD_ID = 0;
     private:
         bool load_from_png(const std::string& filename, bool use_mipmaps, ECompressionType compression_type, bool apply_anisotropy);
         bool load_from_svg(const std::string& filename, bool use_mipmaps, bool compress, bool apply_anisotropy, unsigned int max_size_px);

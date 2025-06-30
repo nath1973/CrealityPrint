@@ -16,6 +16,7 @@
 #define FILAMENT_BTN_WIDTH  110
 #define FILAMENT_BTN_HEIGHT 41
 
+
 namespace Slic3r { 
 
 namespace GUI {
@@ -75,6 +76,8 @@ public:
 	void SetColor(wxColour bk_color);
     void SetIcon(wxString dark_icon, wxString light_icon);
     void SetLabel(wxString lb);
+    wxString getLabel();
+
 	void update_sync_box_state(bool sync, const wxString& box_filament_name = "");
 	void update_child_button_color(const wxColour& color);
     void resetCFS(bool bCFS);
@@ -91,7 +94,7 @@ protected:
 
 	void OnChildButtonClick(wxMouseEvent& event);
     void OnChildButtonPaint(wxPaintEvent& event);
-
+    
 protected:
 	double m_radius;
 	int m_border_width = 1;
@@ -142,6 +145,17 @@ public:
     FilamentItem*   m_pFilamentItem = nullptr;
 };
 
+const wxColour MENU_COLORS[8] = {
+    wxColour(255, 0, 0),     // 01
+    wxColour(144, 238, 144), // 02
+    wxColour(0, 255, 0),     // 03
+    wxColour(255, 0, 255),   // 04
+    wxColour(255, 0, 0),     // 05
+    wxColour(0, 0, 255),     // 06
+    wxColour(173, 216, 230), // 07
+    wxColour(128, 128, 128)  // 08
+};
+
 /*
 * FilamentItem
 */
@@ -152,6 +166,7 @@ public:
     {
         int index = 0;
         std::string name; 
+        std::string box_filament_name;
         bool small_state = false;
     };
 public:
@@ -173,6 +188,10 @@ public:
     void resetCFS(bool bCFS);
 	void update_button_size();
 	
+    wxString    name();
+    wxString    boxname();
+    wxColour    color();
+
 private:
     wxBoxSizer* m_sizer;
     FilamentButton* m_btn_color;
@@ -193,8 +212,11 @@ private:
 
 	Slic3r::PresetBundle* m_preset_bundle{nullptr};
     Slic3r::PresetCollection* m_collection{nullptr};
+
     DECLARE_EVENT_TABLE()
 };
+
+
 
 /*
 * FilamentPanel
@@ -221,11 +243,14 @@ public:
 	void on_auto_mapping_filament(const DM::Device& deviceData);
 	void update_box_filament_sync_state(bool sync);
 	void reset_filament_sync_state();
+    std::string get_filament_map_string();
     void resetFilamentToCFS();
     void updateLastFilament(const std::vector<std::string>& presetName);
 	void on_sync_one_filament(int filament_index, const std::string& new_filament_color, const std::string& new_filament_name, const wxString& sync_label);
 	void backup_extruder_colors();
 	void restore_prev_extruder_colors();
+
+    std::vector<FilamentItem*> get_filament_items();
 
 private:
     json m_FilamentProfileJson;
@@ -247,6 +272,8 @@ private:
 
 	// when current device changed(from multiColor box to singleColor box), restore filament color
     std::vector<std::string> m_backup_extruder_colors;
+
+    
 };
 
 // draw one color rectangle and text "1A" or "1B" or "1C" or "1D"
@@ -318,6 +345,207 @@ private:
 
     wxDECLARE_EVENT_TABLE();
 
+};
+
+// 弹出窗口管理器（单例）
+class PopupWindowManager
+{
+public:
+    static PopupWindowManager& Get()
+    {
+        static PopupWindowManager instance;
+        return instance;
+    }
+
+    void RegisterPopup(PopupWindow* popup)
+    {
+        if (!popup) return;
+
+        m_popups.push_back(popup);
+
+        // 绑定事件
+        popup->Bind(wxEVT_ACTIVATE, &PopupWindowManager::OnActivate, this);
+        popup->Bind(wxEVT_KILL_FOCUS, &PopupWindowManager::OnFocusLoss, this);
+        popup->Bind(wxEVT_DESTROY, &PopupWindowManager::OnPopupDestroyed, this);
+    }
+
+    void CloseAll()
+    {
+        // 创建副本避免迭代器失效
+        std::vector<PopupWindow*> popupsCopy = m_popups;
+        m_popups.clear();  // 立即清空原列表，防止重复处理
+
+        for (PopupWindow* popup : popupsCopy) {
+            if (popup) {
+                // 确保先解除事件绑定
+                popup->Unbind(wxEVT_ACTIVATE, &PopupWindowManager::OnActivate, this);
+                popup->Unbind(wxEVT_KILL_FOCUS, &PopupWindowManager::OnFocusLoss, this);
+                popup->Unbind(wxEVT_DESTROY, &PopupWindowManager::OnPopupDestroyed, this);
+
+                // 关闭并销毁弹窗
+                popup->Dismiss();
+                popup->Destroy();
+            }
+        }
+    }
+
+private:
+    std::vector<PopupWindow*> m_popups;
+    // 弹窗销毁事件处理
+    void OnPopupDestroyed(wxWindowDestroyEvent& event) {
+        PopupWindow* popup = static_cast<PopupWindow*>(event.GetEventObject());
+        auto it = std::find(m_popups.begin(), m_popups.end(), popup);
+        if (it != m_popups.end()) {
+            m_popups.erase(it);
+        }
+        event.Skip();  // 允许其他处理
+    }
+    void OnActivate(wxActivateEvent& event)
+    {
+        if (!event.GetActive()) {
+            CloseAll();
+        }
+        event.Skip();
+    }
+
+    void OnFocusLoss(wxFocusEvent& event)
+    {
+        CloseAll();
+        event.Skip();
+    }
+};
+
+// 增强型弹出窗口基类
+class ManagedPopupWindow : public PopupWindow
+{
+public:
+    ManagedPopupWindow(wxWindow* parent) : PopupWindow(parent, wxBORDER_NONE) { 
+        SetBackgroundStyle(wxBG_STYLE_PAINT); // 启用自定义绘制
+        SetDoubleBuffered(true); // 启用双缓冲防止闪烁
+
+        Bind(wxEVT_PAINT, &ManagedPopupWindow::OnPaint, this);
+        init();
+    }
+    void init();
+    void Popup(wxWindow* focus = NULL) override
+    {
+        // 先关闭所有已有弹窗
+        PopupWindowManager::Get().CloseAll();
+
+        // 注册新弹窗
+        PopupWindowManager::Get().RegisterPopup(this);
+
+        PopupWindow::Popup(focus);
+    }
+    //直接自定义一个
+    void Cus_Popup(bool needshow_parent = false, wxWindow* focus = NULL)
+    {
+        // 先关闭所有已有弹窗
+        if (!needshow_parent)
+            PopupWindowManager::Get().CloseAll();
+
+        // 注册新弹窗
+        PopupWindowManager::Get().RegisterPopup(this);
+#ifdef __APPLE__
+    PopupWindow::Show();
+#else
+    PopupWindow::Popup(focus);
+#endif
+    }
+
+protected:
+    void OnDismiss() override
+    {
+        PopupWindowManager::Get().CloseAll();
+        //PopupWindow::OnDismiss();
+    }
+    void OnPaint(wxPaintEvent& event);
+    
+};
+
+
+class MaterialSubMenuItem : public wxWindow
+{
+public:
+    MaterialSubMenuItem(wxWindow* parent, const wxString& label, const wxColour& color, const int num);
+    ~MaterialSubMenuItem() = default;
+	void setParentIndex(int index) { m_parentindex = index; }
+private:
+	int      m_parentindex = -1; // 父菜单索引
+    int      m_num = 0;
+    wxString m_label;
+    wxColour m_color;
+    bool     m_hovered = false;
+    bool     m_clicked = false;
+
+    void OnPaint(wxPaintEvent&);
+
+    void OnMouseRelease(wxMouseEvent&);
+
+    void OnMousePressed(wxMouseEvent&);
+    void OnMouseEnter(wxMouseEvent&);
+
+    void OnMouseLeave(wxMouseEvent&);
+};
+
+// 自定义按钮类实现状态管理
+class HoverButton : public wxButton
+{
+public:
+    HoverButton(wxWindow* parent,
+        wxWindowID      id,
+        const wxString& label,
+        const wxPoint& pos = wxDefaultPosition,
+        const wxSize& size = wxDefaultSize);
+
+    void SetBaseColors(const wxColour& normal, const wxColour& pressed);
+
+    void SetBitMap_Cus(wxBitmap bit1, wxBitmap bit2);
+    void SetExpendStates(bool expend);
+
+private:
+    wxColour m_baseColor;
+    wxColour m_pressedColor;
+    wxBitmap bitmap = wxNullBitmap;
+    wxBitmap bitmap_hover = wxNullBitmap;
+    wxSize m_size = wxDefaultSize;
+    bool isHover = false;
+    bool    m_isExpend = false;
+
+    void BindEvents();
+    void OnLeftDown(wxMouseEvent& e);
+
+    void OnLeftUp(wxMouseEvent& e);
+    void OnEnter(wxMouseEvent& e);
+    
+    void OnLeave(wxMouseEvent& e);
+    
+   
+    void OnPaint(wxPaintEvent&);
+};
+
+// 子菜单窗口
+class MaterialSubMenu : public ManagedPopupWindow
+{
+public:
+    MaterialSubMenu(wxWindow* parent,int index = -1);
+
+    void init();
+
+private:
+    int m_index = 0;
+};
+// 自定义右键菜单窗口
+class MaterialContextMenu : public ManagedPopupWindow
+{
+public:
+    MaterialContextMenu(wxWindow* parent,int index);
+private:
+    HoverButton* m_mergeBtn;
+    int       m_index = 0;
+	bool        m_is_clicked = false;
+    void            OnShowSubmenu(wxCommandEvent&);
+    void            OnDelete(wxCommandEvent&);
 };
 
 #endif // 

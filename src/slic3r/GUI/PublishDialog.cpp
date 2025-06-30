@@ -11,6 +11,7 @@
 #include "MainFrame.hpp"
 #include "GUI_App.hpp"
 #include "libslic3r/common_header/common_header.h"
+#include "slic3r/GUI/Widgets/AMSControl.hpp"
 
 static const wxColour TEXT_LIGHT_GRAY = wxColour(107, 107, 107);
 

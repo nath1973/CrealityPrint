@@ -813,7 +813,7 @@ bool Preset::has_cali_lines(PresetBundle* preset_bundle)
 static std::vector<std::string> s_Preset_print_options {
     "layer_height", "initial_layer_print_height", "wall_loops", "alternate_extra_wall", "slice_closing_radius", "ignore_inner_color","spiral_mode", "spiral_mode_smooth", "spiral_mode_max_xy_smoothing", "slicing_mode",
     "top_shell_layers", "top_shell_thickness", "bottom_shell_layers", "bottom_shell_thickness",
-    "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "reduce_crossing_wall", "detect_thin_wall", "detect_overhang_wall", "overhang_reverse", "overhang_reverse_threshold","overhang_reverse_internal_only", "wall_direction",
+    "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "reduce_crossing_wall", "detect_thin_wall", "detect_overhang_wall", "overhang_reverse", "overhang_reverse_threshold","overhang_reverse_internal_only", "wall_direction","smooth_speed_discontinuity_area","smooth_coefficient",
     "seam_position", "staggered_inner_seams", "wall_sequence", "is_infill_first", "sparse_infill_density", "ai_infill","sparse_infill_pattern", "top_surface_pattern", "bottom_surface_pattern",
     "infill_direction", "solid_infill_direction", "rotate_solid_infill_direction",  "counterbore_hole_bridging",
     "minimum_sparse_infill_area", "reduce_infill_retraction","internal_solid_infill_pattern","gap_fill_target",
@@ -846,7 +846,7 @@ static std::vector<std::string> s_Preset_print_options {
      "tree_support_branch_diameter", "tree_support_branch_diameter_angle", "tree_support_branch_diameter_double_wall",
      "detect_narrow_internal_solid_infill",
      "gcode_add_line_number", "enable_arc_fitting","arc_tolerance", "precise_z_height", "infill_combination", /*"adaptive_layer_height",*/
-     "support_bottom_interface_spacing", "enable_overhang_speed", "slowdown_for_curled_perimeters", "overhang_1_4_speed", "overhang_2_4_speed", "overhang_3_4_speed", "overhang_4_4_speed",
+     "support_bottom_interface_spacing", "enable_overhang_speed", "slowdown_for_curled_perimeters", "overhang_1_4_speed", "overhang_2_4_speed", "overhang_3_4_speed", "overhang_4_4_speed","overhang_totally_speed",
      "initial_layer_infill_speed", "only_one_wall_top", 
      "timelapse_type",
      "wall_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
@@ -1512,7 +1512,7 @@ bool PresetCollection::reset_project_embedded_presets()
     return re_select;
 }
 
-void PresetCollection::set_sync_info_and_save(std::string name, std::string setting_id, std::string syncinfo, long long update_time)
+void PresetCollection::set_sync_info_and_save(std::string name, std::string setting_id, std::string syncinfo, long long update_time, std::string user_id/* = ""*/)
 {
     lock();
     for (auto it = m_presets.begin(); it != m_presets.end(); it++) {
@@ -1530,6 +1530,8 @@ void PresetCollection::set_sync_info_and_save(std::string name, std::string sett
                     }
             }
             preset->setting_id = setting_id;
+            if (!user_id.empty())
+                preset->user_id = user_id;
             if (update_time > 0)
                 preset->updated_time = update_time;
             preset->sync_info == "update" ? preset->save(nullptr) : preset->save_info();
@@ -2489,6 +2491,26 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
             preset.config.option<ConfigOptionStrings>("filament_settings_id", true)->values[0] = new_name;
         else if (m_type == Preset::TYPE_PRINTER)
             preset.config.option<ConfigOptionString>("printer_settings_id", true)->value = new_name;
+        // add    printer_select_mac    field in preset when system preset save as a user/project preset
+        if (m_type == Preset::TYPE_PRINTER) {
+            if (curr_preset.is_system) {
+                auto cache         = EasyCache::get_instance().data();
+                auto printer_model = curr_preset.config.opt_string("printer_model");
+                std::string selected_mac;
+                if (cache.contains("system_preset_bundle_deivce") && cache["system_preset_bundle_deivce"].contains(printer_model)) {
+                    std::string json_key   = "unique";
+                    auto        nozzle_dia = curr_preset.config.opt_serialize("nozzle_diameter");
+                    if (!nozzle_dia.empty())
+                        json_key = nozzle_dia;
+
+                    if (cache["system_preset_bundle_deivce"][printer_model].contains(json_key))
+                        selected_mac = cache["system_preset_bundle_deivce"][printer_model][json_key];
+                }
+                if (!selected_mac.empty())
+                    preset.config.set_key_value("printer_select_mac", new ConfigOptionString(selected_mac));
+            }
+        }
+
         //BBS: add lock logic for sync preset in background
         final_inherits = inherits;
     }
@@ -3084,6 +3106,38 @@ void PresetCollection::set_custom_preset_alias(Preset &preset)
             set_printer_hold_alias(preset.alias, preset);
         }
     }
+}
+
+std::deque<Preset>::iterator PresetCollection::find_preset_internal(const std::string &name)
+{
+    auto it = Slic3r::lower_bound_by_predicate(m_presets.begin() + m_num_default_presets, m_presets.end(), [&name](const auto& l) { return l.name < name;  });
+    if (it == m_presets.end() || it->name != name) {
+        // Preset has not been not found in the sorted list of non-default presets. Try the defaults.
+        for (size_t i = 0; i < m_num_default_presets; ++ i)
+            if (m_presets[i].name == name) {
+                it = m_presets.begin() + i;
+                break;
+            }
+    }
+    return it;
+}
+
+std::deque<Preset>::iterator PresetCollection::find_preset_internal_by_id(const std::string& setting_id)
+    {
+    auto it = m_presets.begin() + m_num_default_presets;
+    for (; it != m_presets.end(); ++it) {
+        if (it->setting_id == setting_id)
+            break;
+    }
+    return it;
+}
+
+std::deque<Preset>::iterator 	   PresetCollection::find_preset_renamed(const std::string &name) 
+{
+    auto it_renamed = m_map_system_profile_renamed.find(name);
+    auto it = (it_renamed == m_map_system_profile_renamed.end()) ? m_presets.end() : this->find_preset_internal(it_renamed->second);
+    assert((it_renamed == m_map_system_profile_renamed.end()) || (it != m_presets.end() && it->name == it_renamed->second));
+    return it;
 }
 
 void PresetCollection::set_printer_hold_alias(const std::string &alias, Preset &preset)

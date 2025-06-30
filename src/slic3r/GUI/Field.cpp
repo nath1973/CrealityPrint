@@ -1,4 +1,4 @@
-#include "GUI.hpp"
+﻿#include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
 #include "Field.hpp"
@@ -16,6 +16,7 @@
 #include <wx/notebook.h>
 #include <wx/listbook.h>
 #include <wx/tokenzr.h>
+#include <wx/dcgraph.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include "OG_CustomCtrl.hpp"
 #include "MsgDialog.hpp"
@@ -1315,7 +1316,7 @@ void Choice::BUILD()
         opt_height = (double) temp->GetTextCtrl()->GetSize().GetHeight() / m_em_unit;
 
     // BBS
-    temp->SetTextLabel(m_opt.sidetext);
+    temp->SetTextLabel(_L(m_opt.sidetext));
     m_combine_side_text = true;
 
 #ifdef __WXGTK3__

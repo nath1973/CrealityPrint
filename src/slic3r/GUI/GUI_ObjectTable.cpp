@@ -6,6 +6,8 @@
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelVolume.hpp"
 //#include "libslic3r/Model.hpp"
 //#include "Plater.hpp"
 #include "Widgets/Label.hpp"
@@ -18,6 +20,7 @@
 #include "GUI_ObjectTable.hpp"
 #include "GUI_ObjectList.hpp"
 #include "libslic3r/common_header/common_header.h"
+#include "slic3r/GUI/PartPlate.hpp"
 //use wxGridWindow to compute position
 //#include "wx/generic/private/grid.h"
 

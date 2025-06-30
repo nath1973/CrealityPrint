@@ -751,12 +751,14 @@ bool GLTexture::load_from_svg_files_as_sprites_array(const std::vector<std::stri
     return true;
 }
 
-void GLTexture::reset()
+void GLTexture::reset(bool bReleaseByCaller)
 {
-    if (m_id != 0)
-        glsafe(::glDeleteTextures(1, &m_id));
+    if (!bReleaseByCaller) {
+        if (m_id != INVAILD_ID)
+            glsafe(::glDeleteTextures(1, &m_id));
+    }
 
-    m_id = 0;
+    m_id = INVAILD_ID;
     m_width = 0;
     m_height = 0;
     m_source = "";
@@ -957,8 +959,12 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     glsafe(::glEnable(GL_TEXTURE_2D));
-    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE));
 
+#if ENABLE_RENDERDOC_CAPTURE
+#else
+    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE));
+#endif
+    
     glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id));
 
     GLModel::Geometry init_data;

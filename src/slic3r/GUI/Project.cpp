@@ -10,6 +10,7 @@
 #include <wx/button.h>
 #include <wx/scrolwin.h>
 #include <wx/sizer.h>
+#include <wx/base64.h>
 
 #include <wx/bmpcbox.h>
 #include <wx/bmpbuttn.h>

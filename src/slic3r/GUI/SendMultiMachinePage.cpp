@@ -6,6 +6,9 @@
 #include "MainFrame.hpp"
 #include "Widgets/RadioBox.hpp"
 #include <wx/listimpl.cpp>
+#include "PartPlate.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/Auxiliary.hpp"
 #include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {

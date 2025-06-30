@@ -592,6 +592,7 @@ src/libslic3r/AABBMesh.cpp
 src/libslic3r/AppConfig.cpp
 src/libslic3r/ArcFitter.cpp
 src/libslic3r/Arrange.cpp
+src/libslic3r/AutomationMgr.cpp
 src/libslic3r/baseline.cpp
 src/libslic3r/baselineorcinput.cpp
 src/libslic3r/BlacklistedLibraryCheck.cpp
@@ -644,6 +645,11 @@ src/libslic3r/MinimumSpanningTree.cpp
 src/libslic3r/miniz_extension.cpp
 src/libslic3r/Model.cpp
 src/libslic3r/ModelArrange.cpp
+src/libslic3r/ModelCommon.cpp
+src/libslic3r/ModelInstance.cpp
+src/libslic3r/ModelObject.cpp
+src/libslic3r/ModelVolume.cpp
+src/libslic3r/ModelWipeTower.cpp
 src/libslic3r/MultiMaterialSegmentation.cpp
 src/libslic3r/MultiPoint.cpp
 src/libslic3r/MutablePolygon.cpp
@@ -714,6 +720,7 @@ src/libslic3r/AppConfig.hpp
 src/libslic3r/ArcFitter.hpp
 src/libslic3r/Arrange.hpp
 src/libslic3r/AStar.hpp
+src/libslic3r/AutomationMgr.hpp
 src/libslic3r/baseline.hpp
 src/libslic3r/baselineorcinput.hpp
 src/libslic3r/BlacklistedLibraryCheck.hpp
@@ -780,6 +787,11 @@ src/libslic3r/MinimumSpanningTree.hpp
 src/libslic3r/miniz_extension.hpp
 src/libslic3r/Model.hpp
 src/libslic3r/ModelArrange.hpp
+src/libslic3r/ModelCommon.hpp
+src/libslic3r/ModelInstance.hpp
+src/libslic3r/ModelObject.hpp
+src/libslic3r/ModelVolume.hpp
+src/libslic3r/ModelWipeTower.hpp
 src/libslic3r/MTUtils.hpp
 src/libslic3r/MultiMaterialSegmentation.hpp
 src/libslic3r/MultiPoint.hpp
@@ -868,7 +880,6 @@ src/libslic3r/Arachne/BeadingStrategy/LimitedBeadingStrategy.hpp
 src/libslic3r/Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.hpp
 src/libslic3r/Arachne/BeadingStrategy/RedistributeBeadingStrategy.hpp
 src/libslic3r/Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
-src/libslic3r/Arachne/utils/ExtrusionJunction.cpp
 src/libslic3r/Arachne/utils/ExtrusionLine.cpp
 src/libslic3r/Arachne/utils/PolylineStitcher.cpp
 src/libslic3r/Arachne/utils/SquareGrid.cpp
@@ -885,6 +896,7 @@ src/libslic3r/Arachne/utils/SparseGrid.hpp
 src/libslic3r/Arachne/utils/SparseLineGrid.hpp
 src/libslic3r/Arachne/utils/SparsePointGrid.hpp
 src/libslic3r/Arachne/utils/SquareGrid.hpp
+src/libslic3r/common_header/common_header.cpp
 src/libslic3r/CSGMesh/CSGMesh.hpp
 src/libslic3r/CSGMesh/CSGMeshCopy.hpp
 src/libslic3r/CSGMesh/ModelToCSGMesh.hpp
@@ -1208,6 +1220,7 @@ src/slic3r/GUI/AmsMappingPopup.cpp
 src/slic3r/GUI/AMSMaterialsSetting.cpp
 src/slic3r/GUI/AMSSetting.cpp
 src/slic3r/GUI/AmsWidgets.cpp
+src/slic3r/GUI/AnalyticsDataUploadManager.cpp
 src/slic3r/GUI/Auxiliary.cpp
 src/slic3r/GUI/AuxiliaryDataViewModel.cpp
 src/slic3r/GUI/AuxiliaryDialog.cpp
@@ -1250,11 +1263,13 @@ src/slic3r/GUI/DownloadProgressDialog.cpp
 src/slic3r/GUI/DownloadService.cpp
 src/slic3r/GUI/DragCanvas.cpp
 src/slic3r/GUI/EditGCodeDialog.cpp
+src/slic3r/GUI/EnableLiteModeDialog.cpp
 src/slic3r/GUI/ExtraRenderers.cpp
 src/slic3r/GUI/ExtrusionCalibration.cpp
 src/slic3r/GUI/Field.cpp
 src/slic3r/GUI/FilamentPanel.cpp
 src/slic3r/GUI/FileArchiveDialog.cpp
+src/slic3r/GUI/FileDownloader.cpp
 src/slic3r/GUI/GCodeViewer.cpp
 src/slic3r/GUI/GLCanvas3D.cpp
 src/slic3r/GUI/GLModel.cpp
@@ -1334,6 +1349,7 @@ src/slic3r/GUI/Preferences.cpp
 src/slic3r/GUI/PresetComboBoxes.cpp
 src/slic3r/GUI/PresetHints.cpp
 src/slic3r/GUI/PrinterCloudAuthDialog.cpp
+src/slic3r/GUI/PrinterPresetConfig.cpp
 src/slic3r/GUI/PrinterWebView.cpp
 src/slic3r/GUI/PrintHostDialogs.cpp
 src/slic3r/GUI/PrintOptionsDialog.cpp
@@ -1368,6 +1384,7 @@ src/slic3r/GUI/TabButton.cpp
 src/slic3r/GUI/TaskManager.cpp
 src/slic3r/GUI/TextLines.cpp
 src/slic3r/GUI/TickCode.cpp
+src/slic3r/GUI/UITour.cpp
 src/slic3r/GUI/UnsavedChangesDialog.cpp
 src/slic3r/GUI/UpdateDialogs.cpp
 src/slic3r/GUI/UpdateParams.cpp
@@ -1391,6 +1408,7 @@ src/slic3r/GUI/AmsMappingPopup.hpp
 src/slic3r/GUI/AMSMaterialsSetting.hpp
 src/slic3r/GUI/AMSSetting.hpp
 src/slic3r/GUI/AmsWidgets.hpp
+src/slic3r/GUI/AnalyticsDataUploadManager.hpp
 src/slic3r/GUI/Auxiliary.hpp
 src/slic3r/GUI/AuxiliaryDataViewModel.hpp
 src/slic3r/GUI/AuxiliaryDialog.hpp
@@ -1434,11 +1452,13 @@ src/slic3r/GUI/DownloaderFileGet.hpp
 src/slic3r/GUI/DownloadProgressDialog.hpp
 src/slic3r/GUI/DragCanvas.hpp
 src/slic3r/GUI/EditGCodeDialog.hpp
+src/slic3r/GUI/EnableLiteModeDialog.hpp
 src/slic3r/GUI/Event.hpp
 src/slic3r/GUI/ExtraRenderers.hpp
 src/slic3r/GUI/ExtrusionCalibration.hpp
 src/slic3r/GUI/Field.hpp
 src/slic3r/GUI/FileArchiveDialog.hpp
+src/slic3r/GUI/FileDownloader.hpp
 src/slic3r/GUI/format.hpp
 src/slic3r/GUI/GCodeViewer.hpp
 src/slic3r/GUI/GLCanvas3D.hpp
@@ -1511,6 +1531,7 @@ src/slic3r/GUI/Preferences.hpp
 src/slic3r/GUI/PresetComboBoxes.hpp
 src/slic3r/GUI/PresetHints.hpp
 src/slic3r/GUI/PrinterCloudAuthDialog.hpp
+src/slic3r/GUI/PrinterPresetConfig.hpp
 src/slic3r/GUI/PrinterWebView.hpp
 src/slic3r/GUI/PrintHostDialogs.hpp
 src/slic3r/GUI/PrintOptionsDialog.hpp
@@ -1544,6 +1565,7 @@ src/slic3r/GUI/TabButton.hpp
 src/slic3r/GUI/TaskManager.hpp
 src/slic3r/GUI/TextLines.hpp
 src/slic3r/GUI/TickCode.hpp
+src/slic3r/GUI/UITour.hpp
 src/slic3r/GUI/UnsavedChangesDialog.hpp
 src/slic3r/GUI/UpdateDialogs.hpp
 src/slic3r/GUI/UpdateParams.hpp
@@ -1710,6 +1732,7 @@ src/slic3r/GUI/Widgets/HoverBorderBox.cpp
 src/slic3r/GUI/Widgets/HoverBorderIcon.cpp
 src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
 src/slic3r/GUI/Widgets/Label.cpp
+src/slic3r/GUI/Widgets/NumberEntryDialog.cpp
 src/slic3r/GUI/Widgets/PopupWindow.cpp
 src/slic3r/GUI/Widgets/ProgressBar.cpp
 src/slic3r/GUI/Widgets/ProgressDialog.cpp
@@ -1745,6 +1768,7 @@ src/slic3r/GUI/Widgets/HoverBorderBox.hpp
 src/slic3r/GUI/Widgets/HoverBorderIcon.hpp
 src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
 src/slic3r/GUI/Widgets/Label.hpp
+src/slic3r/GUI/Widgets/NumberEntryDialog.hpp
 src/slic3r/GUI/Widgets/PopupWindow.hpp
 src/slic3r/GUI/Widgets/ProgressBar.hpp
 src/slic3r/GUI/Widgets/ProgressDialog.hpp

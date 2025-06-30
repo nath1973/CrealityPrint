@@ -14,6 +14,8 @@
 #include <boost/rational.hpp>
 // for minimun support
 #include "libslic3r/AABBMesh.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include <chrono>
 //#include "omp.h"

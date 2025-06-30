@@ -397,6 +397,7 @@ public:
     float nodes_angle = 0;
     bool  has_sharp_tails = false;
     bool  has_cantilever = false;
+    bool  has_bridge = false;
     double max_cantilever_dist = 0;
     SupportType support_type;
 

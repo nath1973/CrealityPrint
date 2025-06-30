@@ -7,6 +7,7 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "bambu_networking.hpp"
 
 namespace Slic3r {

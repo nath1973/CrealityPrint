@@ -5,7 +5,9 @@
 #include "MainFrame.hpp"
 #include "libslic3r/Time.hpp"
 #include "MsgDialog.hpp"
-
+#include "LoginTip.hpp"
+#include "ParamsDialog.hpp"
+#include "slic3r/GUI/FileDownloader.hpp"
 namespace Slic3r { 
 namespace GUI {
 SyncUserPresets::SyncUserPresets(){
@@ -41,14 +43,14 @@ void SyncUserPresets::shutdown()
     lock.unlock();
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets shutdown end";
 }
-void SyncUserPresets::startSync() //  Õ¨≤Ωπ§◊˜µƒ∆Ù∂Ø
+void SyncUserPresets::startSync() // ÂêåÊ≠•Â∑•‰ΩúÁöÑÂêØÂä®
 {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets startSync";
     CXCloudDataCenter::getInstance().updateCXCloutLoginInfo(GUI::wxGetApp().app_config->get("cloud", "user_id"),
                                                             GUI::wxGetApp().app_config->get("cloud", "token"));
     m_bSync.store(true);
 }
-void SyncUserPresets::stopSync() //  Õ¨≤Ωπ§◊˜µƒ≤ª∆Ù∂Ø
+void SyncUserPresets::stopSync() // ÂêåÊ≠•Â∑•‰ΩúÁöÑ‰∏çÂêØÂä®
 {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets stopSync";
     m_bSync.store(false);
@@ -58,8 +60,10 @@ void SyncUserPresets::syncUserPresetsToLocal()
 {
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets syncUserPresetsToLocal";
     m_mutexLstSyncCmd.lock();
-    if (std::find(m_lstSyncCmd.begin(), m_lstSyncCmd.end(), ENSyncCmd::ENSC_SYNC_TO_LOCAL) == m_lstSyncCmd.end()) {
+    if (std::find(m_lstSyncCmd.begin(), m_lstSyncCmd.end(), ENSyncCmd::ENSC_SYNC_TO_LOCAL) == m_lstSyncCmd.end()
+        && !m_bHasSyncToLocal) {
         m_lstSyncCmd.push_back(ENSyncCmd::ENSC_SYNC_TO_LOCAL);
+        m_bHasSyncToLocal = true;
     }
     m_mutexLstSyncCmd.unlock();
 }
@@ -97,6 +101,13 @@ void SyncUserPresets::syncConfigToCXCloud()
     m_mutexLstSyncCmd.unlock();
 }
 
+void SyncUserPresets::setAppHasStartuped() { 
+    m_bAppHasStartuped.store(true);
+}
+void SyncUserPresets::logout() {
+    m_bHasSyncToLocal = false;
+}
+
 void SyncUserPresets::onRun()
 {
     m_bRunning.store(true);
@@ -107,9 +118,23 @@ void SyncUserPresets::onRun()
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
-        
-        if (!CXCloudDataCenter::getInstance().isTokenValid()) 
+        std::string res = GUI::wxGetApp().app_config->get("is_first_install");
+        if (!CXCloudDataCenter::getInstance().isTokenValid()&&res=="1") 
         {
+            if (m_bAppHasStartuped.load() && !m_bTokenInvalidHasTip) {
+                wxGetApp().CallAfter([=] {
+                    wxGetApp().mainframe->m_param_dialog->Close();
+                    wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+                    wxGetApp().swith_community_sub_page("token_expired");
+                });
+                m_bTokenInvalidHasTip = true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+        m_bTokenInvalidHasTip = false;
+
+        if (CXCloudDataCenter::getInstance().isNetworkError() && !CXCloudDataCenter::getInstance().isNetworkErrorRetryTimeout()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -146,24 +171,24 @@ void SyncUserPresets::onRun()
                 if (CXCloudDataCenter::getInstance().isUpdateConfigFileTimeout() &&
                     CXCloudDataCenter::getInstance().getDownloadConfigToLocalState() != ENDownloadConfigState::ENDCS_NOT_DOWNLOAD) {
                     CXCloudDataCenter::getInstance().resetUpdateConfigFileTime();
-                    //  ºÏ≤‚ «∑Ò≈‰÷√Œƒº˛–Ë“™Õ¨≤ΩµΩ¥¥œÎ‘∆
+                    //  Ê£ÄÊµãÊòØÂê¶ÈÖçÁΩÆÊñá‰ª∂ÈúÄË¶ÅÂêåÊ≠•Âà∞ÂàõÊÉ≥‰∫ë
                     doCheckNeedSyncConfigToCXCloud();
                 } else {
-                    syncConfigToCXCloud();
+                    //syncConfigToCXCloud();
                 }
             }
         }
 
-        //  ºÏ≤‚ «∑Ò”– ˝æ›–Ë“™Õ¨≤ΩµΩ¥¥œÎ‘∆
+        //  Ê£ÄÊµãÊòØÂê¶ÊúâÊï∞ÊçÆÈúÄË¶ÅÂêåÊ≠•Âà∞ÂàõÊÉ≥‰∫ë
         if (CXCloudDataCenter::getInstance().isTokenValid()) {
             doCheckNeedSyncToCXCloud();
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    //  ÕÀ≥ˆ ±£¨Õ¨≤Ω“ª¥Œ≈‰÷√Œƒº˛µΩ¥¥œÎ‘∆
+    //  ÈÄÄÂá∫Êó∂ÔºåÂêåÊ≠•‰∏ÄÊ¨°ÈÖçÁΩÆÊñá‰ª∂Âà∞ÂàõÊÉ≥‰∫ë
     if (m_bSync.load() && CXCloudDataCenter::getInstance().getDownloadConfigToLocalState() != ENDownloadConfigState::ENDCS_NOT_DOWNLOAD) {
-        //  ºÏ≤‚ «∑Ò≈‰÷√Œƒº˛–Ë“™Õ¨≤ΩµΩ¥¥œÎ‘∆
+        //  Ê£ÄÊµãÊòØÂê¶ÈÖçÁΩÆÊñá‰ª∂ÈúÄË¶ÅÂêåÊ≠•Âà∞ÂàõÊÉ≥‰∫ë
         doCheckNeedSyncConfigToCXCloud();
     }
     m_bStoped.store(true);
@@ -183,7 +208,7 @@ void SyncUserPresets::reloadPresetsInUiThread()
     //app_config->set("presets", PRESET_FILAMENT_NAME, filamentName);
     //std::string processName = GUI::wxGetApp().preset_bundle->m_curProcessPresetName;
     //app_config->set("presets", PRESET_PRINT_NAME, processName);
-    //  ÷ÿ–¬º”‘ÿ‘§…ËŒƒº˛
+    //  ÈáçÊñ∞Âä†ËΩΩÈ¢ÑËÆæÊñá‰ª∂
     //GUI::wxGetApp().preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
     //GUI::wxGetApp().load_current_presets();
     //GUI::wxGetApp().plater()->set_bed_shape();
@@ -213,32 +238,71 @@ int SyncUserPresets::doSyncToLocal(SyncToLocalRetInfo& syncToLocalRetInfo)
 
     CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_CXCLOUD_NO_CONFIG);
     int i = 0;
-    for (auto item : vtUserProfileListItem) {
+    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset ...";
+    fs::path tmpPath = fs::path(fs::temp_directory_path()).append("creality_presets");
+    if (!fs::exists(tmpPath)) {
+            fs::create_directory(tmpPath);
+        }else{
+            fs::remove_all(tmpPath);
+            fs::create_directory(tmpPath);
+        }
+    CurlConnectionPool pool(3);
+    for (auto iter = vtUserProfileListItem.begin(); iter != vtUserProfileListItem.end() && m_bRunning.load(); iter++) {
+        int         start_pos = iter->zipUrl.find_last_of("/");
+        fs::path tmp_path = fs::path(tmpPath).append(iter->zipUrl.substr(start_pos + 1));
+        pool.addDownload(iter->zipUrl, tmp_path.string());
+    }
+    pool.performDownloads();
+    for (auto iter = vtUserProfileListItem.begin(); iter != vtUserProfileListItem.end() && m_bRunning.load(); iter++) {
+        int         start_pos = iter->zipUrl.find_last_of("/");
+        fs::path tmp_path = fs::path(tmpPath).append(iter->zipUrl.substr(start_pos + 1));
+        if(fs::exists(tmp_path)&&fs::file_size(tmp_path)>0){
+            try{
+                //Á°Æ‰øù‰∏ãËΩΩÁöÑÊñá‰ª∂ÂÜÖÂÆπÂÆåÊï¥
+                json valid_json;
+                boost::nowide::ifstream ifs(tmp_path.string());
+                ifs >> valid_json;
+                iter->zipUrl = wxString::Format("http://127.0.0.1:%d/creality_presets/%s",GUI::wxGetApp().get_server_port(),iter->zipUrl.substr(start_pos + 1)).ToStdString();
+            }catch (std::exception& e){
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset download" << i++ << " error=" << e.what();
+                continue;
+            }
+           
+        }
+    }
+    for (auto iter = vtUserProfileListItem.begin(); iter != vtUserProfileListItem.end() && m_bRunning.load(); iter++) {
+        const UserProfileListItem& item = *iter;
         BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset " << i++;
-        std::string saveJsonFile = "";
-        nRet = m_commWithCXCloud.downloadUserPreset(item, saveJsonFile);
-        if (item.type == "sync_data") { //  ≈‰÷√Œƒº˛
-            if (nRet == 0) {
-                CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_DOWNLOAD_SUCCESS);
+        do {
+            std::string saveJsonFile = "";
+            nRet = m_commWithCXCloud.downloadUserPreset(item, saveJsonFile);
+            if (item.type == "sync_data") { //  ÈÖçÁΩÆÊñá‰ª∂
+                if (nRet == 0) {
+                    CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_DOWNLOAD_SUCCESS);
+                } else {
+                    CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_DOWNLOAD_FAIL);
+                }
+            }
+            if (nRet != 0) {
+                if (item.type == "printer") {
+                    syncToLocalRetInfo.bPrinterAllOk = false;
+                } else if (item.type == "filament" || item.type == "materia") {
+                    syncToLocalRetInfo.bFilamentAllOk = false;
+                } else if (item.type == "process") {
+                    syncToLocalRetInfo.bProcessAllOk = false;
+                }
             } else {
-                CXCloudDataCenter::getInstance().setDownloadConfigToLocalState(ENDownloadConfigState::ENDCS_DOWNLOAD_FAIL);
+                auto iter = std::find_if(syncToLocalRetInfo.vtLocalUserPreset.begin(), syncToLocalRetInfo.vtLocalUserPreset.end(),
+                                         [saveJsonFile](const LocalUserPreset& preset) { return preset.file == saveJsonFile; });
+                if (iter != syncToLocalRetInfo.vtLocalUserPreset.end()) {
+                    iter->needDel = false;
+                }
             }
-        }
-        if (nRet != 0) {
-            if (item.type == "printer") {
-                syncToLocalRetInfo.bPrinterAllOk = false;
-            } else if (item.type == "filament" || item.type == "materia") {
-                syncToLocalRetInfo.bFilamentAllOk = false;
-            } else if (item.type == "process") {
-                syncToLocalRetInfo.bProcessAllOk = false;
+            if (nRet != 0) {
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset error=" << nRet << ". Retry.";
+                std::this_thread::sleep_for(std::chrono::milliseconds(300));
             }
-        } else {
-            auto iter = std::find_if(syncToLocalRetInfo.vtLocalUserPreset.begin(), syncToLocalRetInfo.vtLocalUserPreset.end(),
-                                     [saveJsonFile](const LocalUserPreset& preset) { return preset.file == saveJsonFile; });
-            if (iter != syncToLocalRetInfo.vtLocalUserPreset.end()) {
-                iter->needDel = false;
-            }
-        }
+        } while (nRet != 0 && m_bRunning.load());
     }
 
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doSyncToLocal end";
@@ -249,15 +313,27 @@ int SyncUserPresets::doCheckNeedSyncToCXCloud() {
     int nRet = 0;
     if (doCheckNeedSyncPrinterToCXCloud() != 0) {
         nRet = 1;
+        if (CXCloudDataCenter::getInstance().isNetworkError()) {
+            return nRet;
+        }
     }
     if (doCheckNeedSyncFilamentToCXCloud() != 0) {
         nRet = 1;
+        if (CXCloudDataCenter::getInstance().isNetworkError()) {
+            return nRet;
+        }
     }
     if (doCheckNeedSyncProcessToCXCloud() != 0) {
         nRet = 1;
+        if (CXCloudDataCenter::getInstance().isNetworkError()) {
+            return nRet;
+        }
     }
     if (doCheckNeedDeleteFromCXCloud() != 0) {
         nRet = 1;
+        if (CXCloudDataCenter::getInstance().isNetworkError()) {
+            return nRet;
+        }
     }
     if (nRet != 0) {
         syncUserPresetsToFrontPage();
@@ -270,7 +346,7 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
     std::vector<Preset> presets_to_sync;
     PresetBundle*       preset_bundle = GUI::wxGetApp().preset_bundle;
 
-    //  ªÒ»°–Ë“™ÃÌº”∫Õ∏¸–¬µƒpreset
+    //  Ëé∑ÂèñÈúÄË¶ÅÊ∑ªÂä†ÂíåÊõ¥Êñ∞ÁöÑpreset
     int                 sync_count = 0;
     sync_count = preset_bundle->printers.get_user_presets(preset_bundle, presets_to_sync);
     if (sync_count > 0) {
@@ -279,6 +355,7 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
             auto setting_id = preset.setting_id;
 
             if ((preset.setting_id.empty() && preset.sync_info.empty()) || 
+                (preset.setting_id.empty() && preset.sync_info.compare("update") == 0) ||
                 preset.sync_info.compare("create") == 0) 
             {
                 std::map<std::string, std::string> values_map;
@@ -291,6 +368,7 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
                     fileInfo.type = preset.get_cloud_type_string(preset.type);
 
                     ret = m_commWithCXCloud.preUpdateProfile_create(fileInfo, retInfo);
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncPrinterToCXCloud preUpdateProfile_create ret=" << ret;
                     if (ret == 0) {
                         // preset_bundle->printers.set_sync_info_and_save(preset.name, setting_id, updated_info, update_time);
                     }
@@ -301,7 +379,8 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
                         if (retInfo.updateTime == 0) {
                             retInfo.updateTime    = Slic3r::Utils::get_current_time_utc();
                         }
-                        preset_bundle->printers.set_sync_info_and_save(preset.name, retInfo.settingId, retInfo.updatedInfo, retInfo.updateTime);
+                        preset_bundle->printers.set_sync_info_and_save(preset.name, retInfo.settingId, retInfo.updatedInfo,
+                                                                       retInfo.updateTime, wxGetApp().get_user().userId);
                         values_map["updated_time"] = std::to_string(retInfo.updateTime);
                         values_map.emplace("name", preset.name);
                         values_map.emplace("setting_id", retInfo.settingId);
@@ -310,8 +389,10 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
                 }
                 nRet = 1;
             } else if (preset.sync_info.compare("update") == 0) {
-                if (preset.setting_id.empty())
+                if (preset.setting_id.empty()) {
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncPrinterToCXCloud sync_info=update, setting_id is empty,name=" << preset.name;
                     continue;
+                }
 
                 std::map<std::string, std::string> values_map;
                 int                                ret = preset_bundle->get_differed_values_to_update(preset, values_map);
@@ -323,6 +404,7 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
                     fileInfo.settingId = preset.setting_id;
 
                     ret = m_commWithCXCloud.preUpdateProfile_update(fileInfo, retInfo);
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncPrinterToCXCloud preUpdateProfile_update ret=" << ret;
                     if (ret == 0 || ret == 1 || ret == 21) {
                         if (ret == 0) {
                             retInfo.updateTime = Slic3r::Utils::get_current_time_utc();
@@ -332,13 +414,16 @@ int SyncUserPresets::doCheckNeedSyncPrinterToCXCloud() {
                                 retInfo.updateTime = std::atoll(update_time_str.c_str());
                         }
                         preset_bundle->printers.set_sync_info_and_save(preset.name, preset.setting_id, retInfo.updatedInfo,
-                                                                       retInfo.updateTime);
+                                                                       retInfo.updateTime, wxGetApp().get_user().userId);
                         values_map["updated_time"] = std::to_string(retInfo.updateTime);
                         values_map.emplace("name", preset.name);
                         CXCloudDataCenter::getInstance().updateUserCloudPresets(preset.name, preset.setting_id, values_map);
                         nRet = 1;
                     }
                 }
+            } else {
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncPrinterToCXCloud err sync_info=" << preset.sync_info
+                                           << ",setting_id=" << preset.setting_id << ",name=" << preset.name;
             }
             boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
         }
@@ -353,7 +438,7 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
     std::vector<Preset> presets_to_sync;
     PresetBundle*       preset_bundle = GUI::wxGetApp().preset_bundle;
 
-    //  ªÒ»°–Ë“™ÃÌº”∫Õ∏¸–¬µƒpreset
+    //  Ëé∑ÂèñÈúÄË¶ÅÊ∑ªÂä†ÂíåÊõ¥Êñ∞ÁöÑpreset
     int sync_count = 0;
     sync_count     = preset_bundle->filaments.get_user_presets(preset_bundle, presets_to_sync);
     if (sync_count > 0) {
@@ -361,7 +446,9 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
         for (Preset& preset : presets_to_sync) {
             auto setting_id = preset.setting_id;
 
-            if ((preset.setting_id.empty() && preset.sync_info.empty()) || preset.sync_info.compare("create") == 0) {
+            if ((preset.setting_id.empty() && preset.sync_info.empty()) || 
+                (preset.setting_id.empty() && preset.sync_info.compare("update") == 0) ||
+                preset.sync_info.compare("create") == 0) {
                 std::map<std::string, std::string> values_map;
                 int                                ret = preset_bundle->get_differed_values_to_update(preset, values_map);
                 auto                               iter = values_map.find("compatible_printers");
@@ -378,6 +465,7 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
                     fileInfo.type = preset.get_cloud_type_string(preset.type);
 
                     ret = m_commWithCXCloud.preUpdateProfile_create(fileInfo, retInfo);
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncFilamentToCXCloud preUpdateProfile_create ret=" << ret;
                     if (ret == 0) {
                         // preset_bundle->printers.set_sync_info_and_save(preset.name, setting_id, updated_info, update_time);
                     }
@@ -389,7 +477,7 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
                             retInfo.updateTime = Slic3r::Utils::get_current_time_utc();
                         }
                         preset_bundle->filaments.set_sync_info_and_save(preset.name, retInfo.settingId, retInfo.updatedInfo,
-                                                                       retInfo.updateTime);
+                                                                        retInfo.updateTime, wxGetApp().get_user().userId);
                         values_map["updated_time"] = std::to_string(retInfo.updateTime);
                         values_map.emplace("name", preset.name);
                         values_map.emplace("setting_id", retInfo.settingId);
@@ -398,8 +486,10 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
                 }
                 nRet = 1;
             } else if (preset.sync_info.compare("update") == 0) {
-                if (preset.setting_id.empty())
+                if (preset.setting_id.empty()) {
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncFilamentToCXCloud sync_info=update, setting_id is empty,name=" << preset.name;
                     continue;
+                }
 
                 std::map<std::string, std::string> values_map;
                 int                                ret  = preset_bundle->get_differed_values_to_update(preset, values_map);
@@ -417,6 +507,7 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
                     fileInfo.settingId = preset.setting_id;
 
                     ret = m_commWithCXCloud.preUpdateProfile_update(fileInfo, retInfo);
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncFilamentToCXCloud preUpdateProfile_update ret=" << ret;
                     if (ret == 0 || ret == 1 || ret == 21) {
                         if (ret == 0) {
                             retInfo.updateTime = Slic3r::Utils::get_current_time_utc();
@@ -426,13 +517,16 @@ int SyncUserPresets::doCheckNeedSyncFilamentToCXCloud()
                                 retInfo.updateTime = std::atoll(update_time_str.c_str());
                         }
                         preset_bundle->filaments.set_sync_info_and_save(preset.name, preset.setting_id, retInfo.updatedInfo,
-                                                                       retInfo.updateTime);
+                                                                        retInfo.updateTime, wxGetApp().get_user().userId);
                         values_map["updated_time"] = std::to_string(retInfo.updateTime);
                         values_map.emplace("name", preset.name);
                         CXCloudDataCenter::getInstance().updateUserCloudPresets(preset.name, preset.setting_id, values_map);
                         nRet = 1;
                     }
                 }
+            } else {
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncFilamentToCXCloud err sync_info=" << preset.sync_info 
+                    << ",setting_id=" << preset.setting_id << ",name=" << preset.name;
             }
             boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
         }
@@ -448,7 +542,7 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
     std::vector<Preset> presets_to_sync;
     PresetBundle*       preset_bundle = GUI::wxGetApp().preset_bundle;
 
-    //  ªÒ»°–Ë“™ÃÌº”∫Õ∏¸–¬µƒpreset
+    //  Ëé∑ÂèñÈúÄË¶ÅÊ∑ªÂä†ÂíåÊõ¥Êñ∞ÁöÑpreset
     int sync_count = 0;
     sync_count     = preset_bundle->prints.get_user_presets(preset_bundle, presets_to_sync);
     if (sync_count > 0) {
@@ -456,7 +550,9 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
         for (Preset& preset : presets_to_sync) {
             auto setting_id = preset.setting_id;
 
-            if ((preset.setting_id.empty() && preset.sync_info.empty()) || preset.sync_info.compare("create") == 0) {
+            if ((preset.setting_id.empty() && preset.sync_info.empty()) || 
+                (preset.setting_id.empty() && preset.sync_info.compare("update") == 0) ||
+                preset.sync_info.compare("create") == 0) {
                 std::map<std::string, std::string> values_map;
                 int                                ret = preset_bundle->get_differed_values_to_update(preset, values_map);
                 auto                               iter = values_map.find("compatible_printers");
@@ -473,6 +569,7 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
                     fileInfo.type = preset.get_cloud_type_string(preset.type);
 
                     ret = m_commWithCXCloud.preUpdateProfile_create(fileInfo, retInfo);
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncProcessToCXCloud preUpdateProfile_create ret=" << ret;
                     if (ret == 0) {
                         // preset_bundle->printers.set_sync_info_and_save(preset.name, setting_id, updated_info, update_time);
                     }
@@ -484,7 +581,7 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
                             retInfo.updateTime = Slic3r::Utils::get_current_time_utc();
                         }
                         preset_bundle->prints.set_sync_info_and_save(preset.name, retInfo.settingId, retInfo.updatedInfo,
-                                                                        retInfo.updateTime);
+                                                                     retInfo.updateTime, wxGetApp().get_user().userId);
                         values_map["updated_time"] = std::to_string(retInfo.updateTime);
                         values_map.emplace("name", preset.name);
                         values_map.emplace("setting_id", retInfo.settingId);
@@ -493,8 +590,10 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
                 }
                 nRet = 1;
             } else if (preset.sync_info.compare("update") == 0) {
-                if (preset.setting_id.empty())
+                if (preset.setting_id.empty()) {
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncProcessToCXCloud sync_info=update, setting_id is empty,name=" << preset.name;
                     continue;
+                }
 
                 std::map<std::string, std::string> values_map;
                 int                                ret  = preset_bundle->get_differed_values_to_update(preset, values_map);
@@ -512,6 +611,7 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
                     fileInfo.settingId = preset.setting_id;
 
                     ret = m_commWithCXCloud.preUpdateProfile_update(fileInfo, retInfo);
+                    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncProcessToCXCloud preUpdateProfile_update ret=" << ret;
                     if (ret == 0 || ret == 1 || ret == 21) {
                         if (ret == 0) {
                             retInfo.updateTime = Slic3r::Utils::get_current_time_utc();
@@ -521,13 +621,16 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
                                 retInfo.updateTime = std::atoll(update_time_str.c_str());
                         }
                         preset_bundle->prints.set_sync_info_and_save(preset.name, preset.setting_id, retInfo.updatedInfo,
-                                                                        retInfo.updateTime);
+                                                                     retInfo.updateTime, wxGetApp().get_user().userId);
                         values_map["updated_time"] = std::to_string(retInfo.updateTime);
                         values_map.emplace("name", preset.name);
                         CXCloudDataCenter::getInstance().updateUserCloudPresets(preset.name, preset.setting_id, values_map);
                         nRet = 1;
                     }
                 }
+            } else {
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncProcessToCXCloud err sync_info=" << preset.sync_info
+                                           << ",setting_id=" << preset.setting_id << ",name=" << preset.name;
             }
             boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
         }
@@ -540,7 +643,7 @@ int SyncUserPresets::doCheckNeedSyncProcessToCXCloud()
 int SyncUserPresets::doCheckNeedDeleteFromCXCloud() 
 { 
     int nRet = 0;
-    //  ªÒ»°–Ë“™…æ≥˝µƒpreset
+    //  Ëé∑ÂèñÈúÄË¶ÅÂà†Èô§ÁöÑpreset
     std::vector<string> delete_cache_presets = GUI::wxGetApp().get_delete_cache_presets_lock();
     for (auto it = delete_cache_presets.begin(); it != delete_cache_presets.end(); it++) {
         if ((*it).empty())
@@ -554,7 +657,7 @@ int SyncUserPresets::doCheckNeedDeleteFromCXCloud()
         }
     }
 
-    return nRet; // 0:√ª”–…æ≥˝¥¥œÎ‘∆ ˝æ›, 1:…æ≥˝¡À¥¥œÎ‘∆ ˝æ›
+    return nRet; // 0:Ê≤°ÊúâÂà†Èô§ÂàõÊÉ≥‰∫ëÊï∞ÊçÆ, 1:Âà†Èô§‰∫ÜÂàõÊÉ≥‰∫ëÊï∞ÊçÆ
 }
 
 int SyncUserPresets::doCheckNeedSyncConfigToCXCloud()
@@ -562,7 +665,7 @@ int SyncUserPresets::doCheckNeedSyncConfigToCXCloud()
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets doCheckNeedSyncConfigToCXCloud start...";
     int nRet = 0;
 
-    if (CXCloudDataCenter::getInstance().getDownloadConfigToLocalState() == ENDownloadConfigState::ENDCS_CXCLOUD_NO_CONFIG) { //  ¥¥œÎ‘∆√ª”–≈‰÷√Œƒº˛
+    if (CXCloudDataCenter::getInstance().getDownloadConfigToLocalState() == ENDownloadConfigState::ENDCS_CXCLOUD_NO_CONFIG) { //  ÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩ√ªÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩƒºÔøΩ
         PreUpdateProfileRetInfo retInfo;
         UploadFileInfo          fileInfo;
         std::string             outFileName = "";
@@ -615,7 +718,7 @@ int SyncUserPresets::getSyncDataToFile(std::string& outJsonFile)
         if (fs::exists(path)) {
             boost::nowide::ifstream ifs(path.string());
             if (!ifs.is_open()) {
-                // ªÒ»°¥ÌŒÛ¬Î
+                // Ëé∑ÂèñÈîôËØØÁ†Å
                 std::error_code error_code = std::make_error_code(std::errc::no_such_file_or_directory);
                 // setLastError(std::to_string(error_code.value()), error_code.message());
             } else {

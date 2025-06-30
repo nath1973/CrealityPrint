@@ -10,19 +10,19 @@
 
 #include <memory>
 #include <string>
-#include "ImGuiWrapper.hpp"
+//#include "ImGuiWrapper.hpp"
 #include "ConfigWizard.hpp"
 #include "OpenGLManager.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#include "slic3r/GUI/DeviceManager.hpp"
+//#include "slic3r/GUI/DeviceManager.hpp"
 #include "slic3r/GUI/UserNotification.hpp"
-#include "slic3r/Utils/NetworkAgent.hpp"
-#include "slic3r/GUI/WebViewDialog.hpp"
-#include "slic3r/GUI/WebUserLoginDialog.hpp"
+// #include "slic3r/Utils/NetworkAgent.hpp"
+// #include "slic3r/GUI/WebViewDialog.hpp"--
+// #include "slic3r/GUI/WebUserLoginDialog.hpp"--
 #include "slic3r/GUI/BindDialog.hpp"
-#include "slic3r/GUI/HMS.hpp"
-#include "slic3r/GUI/Jobs/UpgradeNetworkJob.hpp"
+// #include "slic3r/GUI/HMS.hpp"
+ #include "slic3r/GUI/Jobs/UpgradeNetworkJob.hpp"
 #include "slic3r/GUI/HttpServer.hpp"
 #include "../Utils/PrintHost.hpp"
 
@@ -66,6 +66,10 @@ class TaskManager;
 
 namespace GUI{
 
+class WebViewPanel;
+class ZUserLogin;
+class UpgradeNetworkJob;
+class ImGuiWrapper;
 class RemovableDriveManager;
 class OtherInstanceMessageHandler;
 class MainFrame;
@@ -84,6 +88,7 @@ class HMSQuery;
 class ModelMallDialog;
 class PingCodeBindDialog;
 class PrinterPresetConfig;
+class UITour;
 
 enum FileType
 {
@@ -162,29 +167,8 @@ public:
     std::string url;
     bool        force_upgrade{ false };
     int      ver_items[VERSION_LEN];  // AA.BB.CC.DD
-    VersionInfo() {
-        for (int i = 0; i < VERSION_LEN; i++) {
-            ver_items[i] = 0;
-        }
-        force_upgrade = false;
-        version_str = "";
-    }
-
-    void parse_version_str(std::string str) {
-        version_str = str;
-        std::vector<std::string> items;
-        boost::split(items, str, boost::is_any_of("."));
-        if (items.size() == VERSION_LEN) {
-            try {
-                for (int i = 0; i < VERSION_LEN; i++) {
-                    ver_items[i] = stoi(items[i]);
-                }
-            }
-            catch (...) {
-                ;
-            }
-        }
-    }
+    VersionInfo();
+    void parse_version_str(std::string str);
     static std::string convert_full_version(std::string short_version);
     static std::string convert_short_version(std::string full_version);
     static std::string get_full_version() {
@@ -192,33 +176,7 @@ public:
     }
 
     /* return > 0, need update */
-    int compare(std::string ver_str) {
-        if (version_str.empty()) return -1;
-
-        int      ver_target[VERSION_LEN];
-        std::vector<std::string> items;
-        boost::split(items, ver_str, boost::is_any_of("."));
-        if (items.size() == VERSION_LEN) {
-            try {
-                for (int i = 0; i < VERSION_LEN; i++) {
-                    ver_target[i] = stoi(items[i]);
-                    if (ver_target[i] < ver_items[i]) {
-                        return 1;
-                    }
-                    else if (ver_target[i] == ver_items[i]) {
-                        continue;
-                    }
-                    else {
-                        return -1;
-                    }
-                }
-            }
-            catch (...) {
-                return -1;
-            }
-        }
-        return -1;
-    }
+    int compare(std::string ver_str);
 };
 
 struct UserInfo
@@ -329,6 +287,21 @@ private:
     boost::thread    m_check_network_thread;
 
     std::string             m_openlink_url = "";
+
+    //when software is launched for the first time (when "AppData\Roaming\Creality" directory first created)
+    bool             m_app_first_launch{false};
+
+    bool            m_app_launch_initialized { false };
+
+    //app startup start time
+    std::chrono::steady_clock::time_point m_app_start_time;
+
+    //app startup end time
+    std::chrono::steady_clock::time_point m_app_end_time;
+
+    //app close time
+    std::chrono::steady_clock::time_point m_app_close_time;
+
   public:
       //try again when subscription fails
     void            on_start_subscribe_again(std::string dev_id);
@@ -342,6 +315,8 @@ private:
     bool            initialized() const { return m_initialized; }
     inline bool     is_enable_multi_machine() { return this->app_config&& this->app_config->get("enable_multi_machine") == "true"; }
     int             get_server_port() { return m_http_server.get_port(); }
+    bool            is_privacy_checked() { return m_privacy_checked;}
+    bool            m_privacy_checked { false }; // true if user has accepted the privacy policy
     HttpServer*     get_server() { return &m_http_server;}
     std::map<std::string, bool> test_url_state;
     void            reinit_downloader();
@@ -392,6 +367,7 @@ private:
     void            init_download_path();
     void            post_openlink_cmd(std::string link);  //CP
     void            swith_community_sub_page(const std::string& pageName);
+    void            switch_to_tab(const std::string& tabName);
 #if wxUSE_WEBVIEW_EDGE
     void            init_webview_runtime();
 #endif
@@ -423,6 +399,8 @@ private:
     bool            get_side_menu_popup_status();
     void            set_side_menu_popup_status(bool status);
     void            link_to_network_check();
+
+    void webGetDevicesInfo(json& result);
         
 
     const wxColour& get_label_clr_modified(){ return m_color_label_modified; }
@@ -501,6 +479,9 @@ private:
     // BBS
     bool            is_studio_active();
     void            reset_to_active();
+    //Processing message events and user UI events in the main thread can be used in for code, but it is necessary to primarily determine whether to exit.
+    void            process_msg_loop();
+    //
     bool            m_studio_active = true;
     std::chrono::system_clock::time_point  last_active_point;
 
@@ -540,9 +521,11 @@ private:
     bool            check_privacy_update();
     void            check_privacy_version(int online_login = 0);
     void            check_track_enable();
-    void            check_creality_privacy_version();
+    void            check_creality_privacy_version(bool bShowDlg = true);
     void            save_privacy_version();
-
+	
+	void			check_user_lite_mode_dlg();
+	
     static bool     catch_error(std::function<void()> cb, const std::string& err);
 
     void            persist_window_geometry(wxTopLevelWindow *window, bool default_maximized = false);
@@ -641,11 +624,18 @@ private:
 
     void            popup_ping_bind_dialog();
     void            remove_ping_bind_dialog();
+    void            SaveProfile(json profileJson);
+    bool            apply_config(AppConfig*           app_config,
+                                 AppConfig*           app_config_new,
+                                 PresetBundle*        preset_bundle,
+                                 const PresetUpdater* updater,
+                                 bool&                apply_keeped_changes);
 
     // Parameters extracted from the command line to be passed to GUI after initialization.
     GUI_InitParams* init_params { nullptr };
 
     AppConfig*      app_config{ nullptr };
+    AppConfig*           m_appconfig_new{nullptr};
     PresetBundle*   preset_bundle{ nullptr };
     PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
@@ -706,6 +696,8 @@ private:
 
     // URL download - PrusaSlicer gets system call to open prusaslicer:// URL which should contain address of download
     void            start_download(std::string url);
+    int             load_machine_preset_data();
+    bool            LoadFile(std::string jPath, std::string& sContent);
 
     std::string     get_plugin_url(std::string name, std::string country_code);
     int             download_plugin(std::string name, std::string package_name, InstallProgressFn pro_fn = nullptr, WasCancelledFn cancel_fn = nullptr);
@@ -724,7 +716,19 @@ private:
     std::string preset_type_local_device() { return "local_device"; }
     std::string get_local_device_dir();
 
+    long long get_app_startup_duration();
+    long get_app_running_duration();
+    void mark_app_close_time();
+    json& get_app_launch_info() { return m_app_first_launch_data;}
+    std::string get_client_id();
+    json& get_privacy_data() { return privacyData;}
+    bool  get_send_crash_report() { return m_send_crash_report;}
+
+    void startTour(int startIndex = 0);
+    void startTour_Apple();
+
 private:
+    UITour*          m_UITour = nullptr;
     int             updating_bambu_networking();
     bool            on_init_inner();
     void            parse_args();
@@ -747,6 +751,9 @@ private:
     bool            config_wizard_startup();
 	void            check_updates(const bool verbose);
 
+    void            save_app_first_launch_info();
+    void            check_app_first_launch_info();
+
     bool                    m_init_app_config_from_older { false };
     bool                    m_datadir_redefined { false };
     std::string             m_older_data_dir_path;
@@ -755,6 +762,11 @@ private:
     std::string             m_open_method;
     bool                    need_exit_{false};
     json                    privacyData;
+
+    //used to store a uuid when software launch for the first time, (used as a faked computer id for uploading analytics)
+    json                    m_app_first_launch_data;
+
+    bool                    m_send_crash_report {false};
     
     std::mutex                                                                         download_mtx_;
     std::list<std::tuple<wxString, wxString, wxString, wxString, wxString>> download_tasks_;

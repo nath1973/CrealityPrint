@@ -31,6 +31,14 @@ static const float SLIDER_DEFAULT_RIGHT_MARGIN  = 10.0f;
 static const float SLIDER_DEFAULT_BOTTOM_MARGIN = 10.0f;
 static const float GCODE_REDUCE_HEIGHT = 150.0f;
 
+static bool role_been_filtered_in_lite_mode(ExtrusionRole role)
+{
+    return (role == ExtrusionRole::erInternalInfill ||
+            role == ExtrusionRole::erSolidInfill ||
+            role == ExtrusionRole::erInternalBridgeInfill ||
+			role == ExtrusionRole::erIroning);
+}
+
 class GCodeViewer
 {
     using IBufferType = unsigned short;
@@ -669,7 +677,7 @@ public:
 
     //BBS
     ConflictResultOpt m_conflict_result;
-    bool m_showBed{ true }, m_showMark{ true }, m_showColor{true};
+    bool m_showBed{ true }, m_showMark{ true }, m_showColor{true}, m_bLoaded{true};
 private:
     std::vector<int> m_plater_extruder;
     bool m_gl_data_initialized{ false };
@@ -682,7 +690,7 @@ private:
     bool m_only_gcode_in_preview {false};
     std::vector<size_t> m_ssid_to_moveid_map;
 
-    std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
+    std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude_Alter) };
     // bounding box of toolpaths
     BoundingBoxf3 m_paths_bounding_box;
     // bounding box of toolpaths + marker tools
@@ -737,6 +745,7 @@ private:
     bool m_contained_in_bed{ true };
 mutable bool m_no_render_path { false };
     bool m_is_dark = false;
+    bool m_is_lite_mode {false};
 
 public:
     GCodeViewer();

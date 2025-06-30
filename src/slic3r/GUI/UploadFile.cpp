@@ -50,7 +50,11 @@ int UploadFile::getAliyunInfo()
             json jBody = json::parse(body);
             if (jBody["code"].is_number_integer()) {
                 nRet = jBody["code"];
+                if (jBody["code"].get<int>() == 4) {
+                    nRet = 4;
+                    return;
                 }
+            }
             if (nRet != 0)
             {
                 throw ErrorCodeException("getAliyunInfo", nRet,jBody["msg"].get<std::string>());
@@ -105,6 +109,10 @@ int UploadFile::getOssInfo()
             json jBody = json::parse(body);
             if (jBody["code"].is_number_integer()) {
                 nRet = jBody["code"];
+                if (jBody["code"].get<int>() == 4) {
+                    nRet = 4;
+                    return;
+                }
             }
             if (nRet != 0)
             {
@@ -165,6 +173,10 @@ int UploadFile::uploadGcodeToCXCloud(const std::string& name, const std::string&
                 nRet = jBody["code"];
                 if(nRet !=0)
                 {
+                    if (jBody["code"].get<int>() == 4) {
+                        nRet = 4;
+                        return;
+                    }
                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "uploadGcodeToCXCloud body: " << body;
                    std::string errMsg = jBody["msg"].get<std::string>();
                    throw ErrorCodeException("uploadGcodeToCXCloud", nRet,errMsg);

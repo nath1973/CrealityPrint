@@ -3,6 +3,8 @@
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Thread.hpp"
+#include "Plater.hpp"
+#include "PartPlate.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "GUI_Preview.hpp"
@@ -22,6 +24,8 @@
 #include <algorithm>
 #include "BitmapCache.hpp"
 #include "libslic3r/common_header/common_header.h"
+#include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/Auxiliary.hpp"
 namespace Slic3r {
 namespace GUI {
 

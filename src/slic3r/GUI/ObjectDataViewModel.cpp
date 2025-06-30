@@ -7,8 +7,11 @@
 #include "GUI.hpp"
 #include "I18N.hpp"
 #include "PartPlate.hpp"
+#include "Plater.hpp"
 
+#include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
 
 #include <wx/bmpcbox.h>
 #include <wx/dc.h>

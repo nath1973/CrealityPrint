@@ -12,10 +12,15 @@
 #endif
 #include <imgui/imgui_internal.h>
 #include "libslic3r/Model.hpp"
+//#include "libslic3r/ModelWipeTower.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelObject.hpp"
+#include "libslic3r/ModelVolume.hpp"
 namespace Slic3r {
 namespace GUI {
 
-static const std::string warning_text = _u8L("Unable to perform boolean operation on selected parts");
+//static const std::string warning_text = _u8L("Unable to perform boolean operation on selected parts");
+static const std::string warning_text = "Unable to perform boolean operation on selected parts";
 
 GLGizmoMeshBoolean::GLGizmoMeshBoolean(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
@@ -315,7 +320,8 @@ void GLGizmoMeshBoolean::on_set_state()
          bool m_inter_delete_input = false;
          m_operation_mode = MeshBooleanOperation::Undef;
          m_selecting_state = MeshBooleanSelectingState::Undef;
-         wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+         //wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+         m_show_warning = false;
          m_current_obj_idx = -1;
      }
 }
@@ -485,6 +491,13 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         if (window->SkipItems)
             return false;
 
+     if (m_show_warning) {
+            ImGui::PushTextWrapPos(200);
+            ImGui::TextWrapped(_u8L(warning_text.c_str()).c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::SameLine(0, 0);
+        }
+
         const float frame_padding = 2.0f;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(frame_padding, frame_padding));
 
@@ -498,8 +511,9 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         float  view_scale = wxGetApp().plater()->get_current_canvas3D()->get_scale();
         ImVec2 size(100 * view_scale, 24 * view_scale);
         float  windowWidth = ImGui::GetWindowWidth() - 2.0 * ImGui::GetStyle().WindowPadding.x;
-        ImVec2 pos  = window->DC.CursorPos;
-         pos.x += (windowWidth - size.x) * 0.5f;
+        ImVec2 pos  = ImVec2(window->DC.CursorStartPos.x, window->DC.CursorPos.y); 
+        pos.x += (windowWidth - size.x);
+       
          //pos.x = 0;
         ImVec2 win_size = ImGui::GetContentRegionAvail();
         const ImRect bb(pos, pos + size);
@@ -520,21 +534,15 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         if (!enable)
         {
             ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-            //normal = isDark ? ImGui::GetColorU32(IM_COL32(39.0f, 39.0f, 39.0f, 255)) : ImGui::GetColorU32(IM_COL32(230.0f, 230.0f, 230.0f, 125));
             normal = ImGui::GetColorU32(IM_COL32(230.0f, 230.0f, 230.0f, 125));
             if (isDark)
-            {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(108.0f / 255.0f, 108.0f / 255.0f, 108.0f / 255.0f, 1.0f));
-            }
             else 
-            {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(163.0f / 255.0f, 163.0f / 255.0f, 163.0f / 255.0f, 1.0f));
-            }
         }
         else 
         {
             normal = isDark ? ImGui::GetColorU32(IM_COL32(110, 110, 115, 255)) : ImGui::GetColorU32(IM_COL32(75, 75, 77, 125));
-        
             ImGui::PushStyleColor(ImGuiCol_Text, hovered ? ImGui::GetColorU32(IM_COL32_WHITE) : ImGui::GetColorU32(ImGuiCol_Text, 1.0f)); 
         }
         
@@ -577,16 +585,25 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
         ImVec2 selectable_size = ImVec2(std::max((float) max_tab_length, 96.0f * view_scale), 43 * view_scale);
 
         if (selectable(_u8L("Union"), ImGui::UnionBooleanButton, m_operation_mode == MeshBooleanOperation::Union, selectable_size)) {
+            if (m_operation_mode != MeshBooleanOperation::Union)
+                m_show_warning = false;
+            
             m_operation_mode = MeshBooleanOperation::Union;
         }
         ImGui::SameLine(0, 0);
         if (selectable(_u8L("Difference"), ImGui::DifferenceBooleanButton, m_operation_mode == MeshBooleanOperation::Difference,
                        selectable_size)) {
+            if (m_operation_mode != MeshBooleanOperation::Difference)
+                m_show_warning = false;
+
             m_operation_mode = MeshBooleanOperation::Difference;
         }
         ImGui::SameLine(0, 0);
         if (selectable(_u8L("Intersection"), ImGui::IntersectionBooleanButton, m_operation_mode == MeshBooleanOperation::Intersection,
                        selectable_size)) {
+            if (m_operation_mode != MeshBooleanOperation::Intersection)
+                m_show_warning = false;
+            
             m_operation_mode = MeshBooleanOperation::Intersection;
         }
 
@@ -687,10 +704,12 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
             Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "UNION");
             if (temp_mesh_resuls.size() != 0) {
                 generate_new_volume(true, *temp_mesh_resuls.begin());
-                wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+                //wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+                m_show_warning = false;
             }
             else {
-                wxGetApp().notification_manager()->push_plater_warning_notification(warning_text);
+                //wxGetApp().notification_manager()->push_plater_warning_notification(warning_text);
+                m_show_warning = true;
             }
         }
     }
@@ -705,10 +724,12 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
             Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "A_NOT_B");
             if (temp_mesh_resuls.size() != 0) {
                 generate_new_volume(m_diff_delete_input, *temp_mesh_resuls.begin());
-                wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+                //wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+                m_show_warning = false;
             }
             else {
-                wxGetApp().notification_manager()->push_plater_warning_notification(warning_text);
+                //wxGetApp().notification_manager()->push_plater_warning_notification(warning_text);
+                m_show_warning = true;
             }
         }
     }
@@ -723,10 +744,12 @@ void GLGizmoMeshBoolean::on_render_input_window(float x, float y, float bottom_l
             Slic3r::MeshBoolean::mcut::make_boolean(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls, "INTERSECTION");
             if (temp_mesh_resuls.size() != 0) {
                 generate_new_volume(m_inter_delete_input, *temp_mesh_resuls.begin());
-                wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+                //wxGetApp().notification_manager()->close_plater_warning_notification(warning_text);
+                m_show_warning = false;
             }
             else {
-                wxGetApp().notification_manager()->push_plater_warning_notification(warning_text);
+                //wxGetApp().notification_manager()->push_plater_warning_notification(warning_text);
+                m_show_warning = true;
             }
         }
     }

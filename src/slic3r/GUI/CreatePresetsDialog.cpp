@@ -18,6 +18,8 @@
 #include "MainFrame.hpp"
 #include "libslic3r_version.h"
 #include "libslic3r/common_header/common_header.h"
+#include "slic3r/GUI/PresetComboBoxes.hpp"
+#include "libslic3r/Time.hpp"
 #include <filesystem>
 
 #define NAME_OPTION_COMBOBOX_SIZE wxSize(FromDIP(200), FromDIP(24))
@@ -6446,6 +6448,7 @@ void                            ExportConfigsDialog::cancelExport() { EndModal(w
 ExportConfigsDialog::ExportCase ExportConfigsDialog::archivePresetToFile() {
     wxDirDialog dlg(this, _L("Choose a directory"), "", wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
     wxString    path;
+    std::string export_file_format = "";
     if (dlg.ShowModal() == wxID_OK)
         path = dlg.GetPath();
     ExportCase export_case = ExportCase::EXPORT_CANCEL;
@@ -6462,8 +6465,8 @@ ExportConfigsDialog::ExportCase ExportConfigsDialog::archivePresetToFile() {
         // if (export_file.empty() || "initial_failed" == export_file)
         //    return ExportCase::EXPORT_CANCEL;
 
-
         if (m_index == 0) {
+            export_file_format = "creality_printer";
             std::list<std::shared_ptr<ExportMidPanel::STLineDataNode>> lstCheckedPrinterPresets;
             m_exportMidPanel->getCheckedPrinterPresets(lstCheckedPrinterPresets);
 
@@ -6592,6 +6595,7 @@ ExportConfigsDialog::ExportCase ExportConfigsDialog::archivePresetToFile() {
             }
 
         } else if (m_index == 1) {
+            export_file_format = "creality_filament";
             std::list<std::shared_ptr<ExportMidPanel::STLineDataNode>> lstCheckedFilamentPresets;
             m_exportMidPanel->getCheckedFilamentPresets(lstCheckedFilamentPresets);
             for (const auto& item : lstCheckedFilamentPresets) {
@@ -6618,6 +6622,7 @@ ExportConfigsDialog::ExportCase ExportConfigsDialog::archivePresetToFile() {
             }
 
         } else if (m_index == 2) {
+            export_file_format = "zip";
             std::list<std::shared_ptr<ExportMidPanel::STLineDataNode>> lstCheckedProcessPresets;
             m_exportMidPanel->getCheckedProcessPresets(lstCheckedProcessPresets);
             for (const auto& item : lstCheckedProcessPresets) {
@@ -6655,6 +6660,25 @@ ExportConfigsDialog::ExportCase ExportConfigsDialog::archivePresetToFile() {
         return ExportCase::EXPORT_SUCCESS;
 
     EndModal(wxID_OK);
+
+    try
+    {
+        if(wxGetApp().is_privacy_checked()) {
+            json js;
+            js["type_code"] = "slice810";
+            js["client_id"] = wxGetApp().get_client_id();
+
+            js["function_item"] = 7 ;  // 7 -- 导出预设; 
+                
+            js["file_format"] = export_file_format;
+            js["operation_date"] = Slic3r::Utils::utc_timestamp(Slic3r::Utils::get_current_time_utc());
+            js["app_version"] = GUI_App::format_display_version().c_str();
+
+            wxGetApp().track_event("export_file", js.dump());
+        }
+    }
+    catch (...){}
+
     return ExportCase::EXPORT_SUCCESS;
 }
 

@@ -22,6 +22,9 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,7 +103,6 @@ Slic3r::ColorRGBA adjust_color_for_rendering(const Slic3r::ColorRGBA &colors)
 
 namespace Slic3r {
 
-
 const float GLVolume::SinkingContours::HalfWidth = 0.25f;
 
 void GLVolume::SinkingContours::render()
@@ -141,7 +143,7 @@ void GLVolume::SinkingContours::update()
             m_model.reset();
             GUI::GLModel::Geometry init_data;
             init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
-            init_data.color = ColorRGBA::WHITE();
+            //init_data.color = ColorRGBA::WHITE();
             unsigned int vertices_counter = 0;
             MeshSlicingParams slicing_params;
             //slicing_params.trafo = m_parent.world_matrix();          
@@ -163,6 +165,7 @@ void GLVolume::SinkingContours::update()
                 }
             }
             m_model.init_from(std::move(init_data));
+            m_model.set_color(ColorRGBA::WHITE());
         }
         else
             m_shift = box.center() - m_old_box.center();
@@ -216,7 +219,7 @@ void GLVolume::load_render_colors()
     RenderColor::colors[RenderCol_Model_Unprintable] = GUI::ImGuiWrapper::to_ImVec4(GLVolume::UNPRINTABLE_COLOR);
 }
 
-GLVolume::GLVolume(float r, float g, float b, float a)
+GLVolume::GLVolume(float r, float g, float b, float a, bool create_index_data)
     : m_sla_shift_z(0.0)
     , m_sinking_contours(*this)
     // geometry_id == 0 -> invalid
@@ -241,6 +244,7 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , force_sinking_contours(false)
     , picking(false)
     , tverts_range(0, size_t(-1))
+    , model(create_index_data)
 {
     color = { r, g, b, a };
     set_render_color(color);
@@ -699,6 +703,7 @@ bool GLWipeTowerVolume::IsTransparent() {
     return false; 
 }
 
+std::map<const TriangleMesh*, std::set<GLVolume*>> GLVolumeCollection::g_mesh_volumes;
 void GLVolumeCollection::apply_custom_gcode(GLShaderProgram* shader, const CustomGCode::Info& gcode_info, const std::vector<std::string>& filament_std_colors)
 {
     shader->set_uniform("layersCount", 0);
@@ -766,7 +771,6 @@ std::vector<int> GLVolumeCollection::load_object(
     return volumes_idx;
 }
 
-
 int GLVolumeCollection::load_object_volume(
     const ModelObject   *model_object,
     int                  obj_idx,
@@ -783,8 +787,33 @@ int GLVolumeCollection::load_object_volume(
     auto color = GLVolume::MODEL_COLOR[((color_by == "volume") ? volume_idx : obj_idx) % 4];
     color.a(model_volume->is_model_part() ? 0.7f : 0.4f);
 
-    std::shared_ptr<const TriangleMesh> mesh = model_volume->mesh_ptr();
-    this->volumes.emplace_back(new GLVolume(color));
+    //
+    const TriangleMesh* mesh_ptr = model_volume->mesh_ptr().get();
+    GLVolume* exist_volume = nullptr;
+    auto itr = g_mesh_volumes.find(mesh_ptr);
+    if (itr != g_mesh_volumes.end()) {
+        std::set<GLVolume*> volume_arr = itr->second;
+        if (!volume_arr.empty()) {
+            exist_volume = *(volume_arr.begin());
+        }
+    }
+
+    GLVolume* new_volume = nullptr;
+    if (exist_volume!=nullptr) {//Reuse vertex data when the mesh is the same.
+        new_volume = new GLVolume(color[0], color[1], color[2], color[3], false);
+        new_volume->model.set_render_data(exist_volume->model.get_render_data());
+        g_mesh_volumes[mesh_ptr].emplace(new_volume);
+    }
+    else {
+        new_volume = new GLVolume(color[0], color[1], color[2], color[3]);
+        std::set<GLVolume*> volume_arr{new_volume};
+        g_mesh_volumes.emplace(mesh_ptr, std::move(volume_arr));
+    }
+
+    new_volume->ori_mesh = mesh_ptr;
+    new_volume->model.set_render_data_share_state(true);
+    this->volumes.emplace_back(new_volume);
+
     GLVolume& v = *this->volumes.back();
     v.set_color(color_from_model_volume(*model_volume));
     v.name = model_volume->name;
@@ -792,8 +821,17 @@ int GLVolumeCollection::load_object_volume(
 #if ENABLE_SMOOTH_NORMALS
     v.model.init_from(mesh, true);
 #else
-    v.model.init_from(*mesh);
-    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(mesh);
+    if (!v.model.is_initialized())
+        v.model.init_from(*mesh_ptr);
+
+    if (exist_volume != nullptr) {
+        v.mesh_raycaster = exist_volume->mesh_raycaster;
+    }
+    else
+    {
+        v.mesh_raycaster = std::make_shared<GUI::MeshRaycaster>(model_volume->mesh_ptr());
+    }
+
 #endif // ENABLE_SMOOTH_NORMALS
     v.composite_id = GLVolume::CompositeID(obj_idx, volume_idx, instance_idx);
 
@@ -850,7 +888,7 @@ void GLVolumeCollection::load_object_auxiliary(
 #else
         v.model.init_from(mesh);
         v.model.set_color((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR);
-        v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
+        v.mesh_raycaster = std::make_shared<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
 #endif // ENABLE_SMOOTH_NORMALS
         v.composite_id = GLVolume::CompositeID(obj_idx, -int(milestone), (int)instance_idx.first);
         v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
@@ -902,7 +940,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
         v.model_per_colors[i].init_from(color_part);
     }
     v.model.init_from(wipe_tower_shell);
-    v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(wipe_tower_shell));
+    v.mesh_raycaster = std::make_shared<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(wipe_tower_shell));
     v.set_convex_hull(wipe_tower_shell);
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
@@ -1503,6 +1541,30 @@ const std::array<float, 2>& GLVolumeCollection::get_z_range() const
 const std::array<double, 4>& GLVolumeCollection::get_clipping_plane() const
 {
     return m_clipping_plane;
+}
+
+void GLVolumeCollection::clear()
+{
+    for (auto* v : volumes) {
+        release_volume(v);
+        delete v;
+    }
+
+    volumes.clear();
+}
+
+void GLVolumeCollection::release_volume(GLVolume* volume)
+{
+    if (volume->ori_mesh) {
+        auto itr = g_mesh_volumes.find(volume->ori_mesh);
+        if (itr != g_mesh_volumes.end()) {
+            std::set<GLVolume*>& volume_arr = itr->second;
+
+            volume_arr.erase(volume);
+            if (volume_arr.empty())
+                g_mesh_volumes.erase(itr);
+        }
+    }
 }
 
 static void thick_lines_to_geometry(

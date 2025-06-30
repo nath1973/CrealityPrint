@@ -29,6 +29,10 @@
 #include "FillTpmsD.hpp"
 
 // #define INFILL_DEBUG_OUTPUT
+#define FRIST_LINE_LAYER 85732
+#define STANDARD_LAYER 100000
+#define LINE_WIDTH 520
+#define EPS 1e-2
 
 namespace Slic3r {
 
@@ -129,30 +133,1875 @@ ThickPolylines Fill::fill_surface_arachne(const Surface* surface, const FillPara
 // BBS: this method is used to fill the ExtrusionEntityCollection. It call fill_surface by default
 void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out)
 {
-    Polylines polylines;
+    //-----------try  angle---------------------
+    // int max_angle = 0;
+    // int output_angle = 0;
+    // std::pair<int, float> best_angle(0,std::numeric_limits<float>::max());
+    // for (int a = 0; a < 4; a++)
+    //{
+    //    double auoi = M_PI / 4;
+    //    Points point_container;
+    //    for (int i = 0; i < surface->expolygon.contour.points.size(); i++)
+    //    {
+    //        Eigen::Vector2d point(surface->expolygon.contour.points[i][0], surface->expolygon.contour.points[i][1]);
+    //        double angle = auoi*a;
+    //        Eigen::Rotation2D rotation(angle);
+    //        Eigen::Vector2d rotated_point = rotation * point;
+    //        point_container.push_back(Point(rotated_point[0], rotated_point[1]));
+    //    }
+    //    if (!surface->expolygon.holes.empty())
+    //        point_container.push_back(Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max()));
+    //    for (int i = 0; i < surface->expolygon.holes.size(); i++)
+    //    {
+    //        for (int j = 0; j < surface->expolygon.holes[i].points.size(); j++)
+    //        {
+    //            point_container.push_back(Point(surface->expolygon.holes[i].points[j][0], surface->expolygon.holes[i].points[j][1]));
+    //        }
+    //        if (i != surface->expolygon.holes.size() - 1)
+    //            point_container.push_back(Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max()));
+    //    }
+
+    //    std::vector<int> point_y_container;
+    //    std::vector<int> point_x_container;
+    //    for (int i = 0; i < point_container.size(); i++)
+    //    {
+    //        point_y_container.push_back(point_container[i][1]);
+    //        point_x_container.push_back(point_container[i][0]);
+    //    }
+    //    /* for (int i = 0; i < surface->expolygon.contour.points.size(); i++)
+    //         point_y_container.push_back(surface->expolygon.contour.points[i][1]);
+    //     if(!surface->expolygon.holes.empty())
+    //         point_y_container.push_back(std::numeric_limits<int>::max());
+    //     for (int i = 0; i < surface->expolygon.holes.size(); i++)
+    //     {
+    //         for (int j = 0; j < surface->expolygon.holes[i].points.size(); j++)
+    //         {
+    //             point_y_container.push_back(surface->expolygon.holes[i].points[j][1]);
+    //         }
+    //         if(i!=surface->expolygon.holes.size()-1)
+    //             point_y_container.push_back(std::numeric_limits<int>::max());
+    //     }*/
+
+    //    std::vector<std::pair<int, int>>  path_loop;
+    //    std::vector<std::pair<int, int>> path_loop_x;
+    //    int min_z = std::numeric_limits<int>::max();
+    //    int max_z = std::numeric_limits<int>::min();
+    //    int mark_ptr = 0;
+    //    for (int i = 0; i < point_y_container.size(); i++)
+    //    {
+    //        int index = i + 1;
+    //        if (i == point_y_container.size() - 1)
+    //            index = 0;
+
+    //        if (point_y_container[index] != std::numeric_limits<int>::max())
+    //        {
+    //            path_loop.push_back(std::make_pair(point_y_container[i], point_y_container[index]));
+    //            path_loop_x.push_back(std::make_pair(point_x_container[i], point_x_container[index]));
+    //        }
+    //        else
+    //        {
+    //            index = mark_ptr;
+    //            path_loop.push_back(std::make_pair(point_y_container[i], point_y_container[index]));
+    //            path_loop_x.push_back(std::make_pair(point_x_container[i], point_x_container[index]));
+    //            i++;
+    //            mark_ptr = i + 1;
+    //        }
+
+    //        if (point_y_container[i] != std::numeric_limits<int>::max())
+    //        {
+    //            if (min_z > point_y_container[i])
+    //            {
+    //                min_z = point_y_container[i];
+    //            }
+    //            if (max_z < point_y_container[i])
+    //            {
+    //                max_z = point_y_container[i];
+    //            }
+    //        }
+    //    }
+
+    //    std::vector<int> mark_lines;
+    //    std::vector<std::vector<int>> mark_indexs;
+    //    int begin_ptr = min_z + STANDARD_LAYER;
+
+    //    while (begin_ptr < max_z)
+    //    {
+    //        bool first_into = false;
+    //        for (int i = 0; i < path_loop.size(); i++)
+    //        {
+    //            if ((begin_ptr > path_loop[i].first && begin_ptr < path_loop[i].second) || (begin_ptr<path_loop[i].first &&
+    //            begin_ptr>path_loop[i].second))
+    //            {
+    //                if (!first_into)
+    //                {
+    //                    mark_lines.push_back(1);
+    //                    mark_indexs.push_back(std::vector<int>(1,i));
+    //                    first_into = true;
+    //                }
+    //                else
+    //                {
+    //                    mark_lines.back() = (mark_lines.back() + 1);
+    //                    mark_indexs.back().push_back(i);
+    //                }
+    //            }
+    //        }
+
+    //        int next_ptr = begin_ptr + STANDARD_LAYER;
+    //        if (begin_ptr < 0 && next_ptr>0)
+    //        {
+    //            begin_ptr += FRIST_LINE_LAYER;
+    //        }
+    //        else
+    //        {
+    //            begin_ptr += STANDARD_LAYER;
+    //        }
+    //    }
+
+    //    for (int i = 0; i < mark_indexs.size(); i++)
+    //    {
+    //        std::sort(mark_indexs[i].begin(), mark_indexs[i].end(), [&](int a,int b) {
+    //            if (path_loop_x[a] < path_loop_x[b])
+    //                return a;
+    //            else
+    //                return b;
+    //            });
+    //    }
+
+    //    int ares_num = 1;
+    //    int ptr = 1;
+    //    int last_index = 0;
+    //    int distance = 0;
+    //    for (int i = 0; i < mark_lines.size(); i++)
+    //    {
+    //        int ares_n = mark_lines[i] / 2;
+    //        if (ptr != ares_n)
+    //        {
+    //            if (ares_n > ptr)
+    //            {
+    //                ares_num++;
+    //                /*if(i != 0)
+    //                    for (int j = 0; j < mark_indexs[i].size() - 1; j += 2)
+    //                    {
+    //                        distance +=
+    //                        std::abs((path_loop[mark_indexs[last_index][j]].first+path_loop[mark_indexs[last_index][j]].second)/2 -
+    //                            (path_loop[mark_indexs[last_index][j+1]].first+path_loop[mark_indexs[last_index][j+1]].second)/2);
+    //                    }*/
+    //            }
+
+    //            last_index = i;
+    //            ptr = ares_n;
+    //        }
+
+    //        if (i != mark_lines.size() - 1)
+    //        {
+    //            if (mark_indexs[i].size() != mark_indexs[i + 1].size())
+    //            {
+    //                if (mark_indexs[i].size() > mark_indexs[i + 1].size())
+    //                {
+    //                    std::vector<int> distance_line;
+    //                    for (int j = 0; j < mark_indexs[i].size()-1; j+=2)
+    //                    {
+    //                        distance_line.push_back(std::abs((path_loop[mark_indexs[i][j]].first+path_loop[mark_indexs[i][j]].second)/2 -
+    //                            (path_loop[mark_indexs[i][j+1]].first+path_loop[mark_indexs[i][j+1]].second)/2));
+    //                    }
+    //                    std::sort(distance_line.begin(), distance_line.end(), [](int a,int b) {
+    //                        if (a > b)
+    //                            return a;
+    //                        });
+    //                    distance_line.erase(distance_line.begin());
+    //                    distance+=std::accumulate(distance_line.begin(), distance_line.end(), 0);
+    //                }
+    //                else if (mark_indexs[i].size() < mark_indexs[i + 1].size())
+    //                {
+    //                     std::vector<int> distance_line;
+    //                    for (int j = 0; j < mark_indexs[i+1].size()-1; j+=2)
+    //                    {
+    //                          distance_line.push_back(std::abs((path_loop[mark_indexs[i+1][j]].first+path_loop[mark_indexs[i+1][j]].second)/2
+    //                          -
+    //                            (path_loop[mark_indexs[i+1][j+1]].first+path_loop[mark_indexs[i+1][j+1]].second)/2));
+    //                    }
+    //                     std::sort(distance_line.begin(), distance_line.end(), [](int a,int b) {
+    //                        if (a > b)
+    //                            return a;
+    //                        });
+    //                     distance_line.erase(distance_line.begin());
+    //                     distance+=std::accumulate(distance_line.begin(), distance_line.end(), 0);
+    //                }
+    //            }
+    //        }
+
+    //    }
+    //    if (best_angle.second > distance)
+    //    {
+    //        best_angle.first = a;
+    //        best_angle.second = distance;
+    //    }
+    //    if (ares_num > max_angle)
+    //    {
+    //        max_angle = ares_num;
+    //        output_angle = a;
+    //    }
+    //}
+
+    Polylines      polylines;
     ThickPolylines thick_polylines;
     try {
         if (params.use_arachne)
             thick_polylines = this->fill_surface_arachne(surface, params);
         else
             polylines = this->fill_surface(surface, params);
-    }
-    catch (InfillFailedException&) {}
+        // polylines = this->fill_surface_angle(surface,params,best_angle.first*M_PI/4.f);
+    } catch (InfillFailedException&) {}
 
+    //----------------test------------------
+    /* std::ofstream outfile_input("input.txt");
+     for (int i = 0; i < surface->expolygon.contour.points.size(); i++)
+     {
+         outfile_input << "(" << surface->expolygon.contour.points[i][0]/1000.f << "," << surface->expolygon.contour.points[i][1]/1000.f <<
+     ")" << std::endl;
+     }
+     outfile_input.close();*/
+
+    //-----output------stTop
+    long long aaarree = surface->expolygon.contour.area();
+
+    // while(0)
+    while (1 /*&&aaarree>2e15*/ && surface->is_top() && !surface->is_internal()) {
+        if (polylines.empty())
+            break;
+
+        std::vector<std::vector<std::pair<double, double>>> rot_points;
+        // std::ofstream outfile("output.txt");
+
+        Eigen::Vector2d   point1(polylines[0].points[0][0], polylines[0].points[0][1]);
+        Eigen::Vector2d   point2(polylines[0].points[1][0], polylines[0].points[1][1]);
+        double            fir_angle = -(double) (this->angle);
+        Eigen::Rotation2D rotation(fir_angle);
+        Eigen::Vector2d   rotated_point1 = rotation * point1;
+        Eigen::Vector2d   rotated_point2 = rotation * point2;
+        double            rot_angle      = std::abs(rotated_point1[1] - rotated_point2[1]) < 10 ? this->angle :
+                                           this->angle < M_PI / 2.0                             ? this->angle + M_PI / 2.0 :
+                                                                                                  this->angle - M_PI / 2.0;
+
+        Polylines polyline_baseline;
+        for (int z = 0; z < polylines.size(); z++) {
+            rot_points.push_back(std::vector<std::pair<double, double>>());
+            polyline_baseline.push_back(Polyline());
+            for (int i = 0; i < polylines[z].points.size(); i++) {
+                Eigen::Vector2d   point(polylines[z].points[i][0], polylines[z].points[i][1]);
+                double            angle = -(double) rot_angle;
+                Eigen::Rotation2D rotation(angle);
+                Eigen::Vector2d   rotated_point = rotation * point;
+                rot_points.back().push_back(std::make_pair(rotated_point[0] / 1000.f, rotated_point[1] / 1000.f));
+                polyline_baseline.back().points.push_back(Point(rotated_point[0], rotated_point[1]));
+                // outfile << "(" << std::fixed <<rotated_point[0]/1000.f<< "," << std::fixed <<rotated_point[1]/1000.f<< ")" << std::endl;
+            }
+            // outfile << " " << std::endl;
+        }
+        // outfile.close();
+
+        //--------------------------------------------------------------------
+        bool plan_a = false;
+#if plan_a
+        std::vector<std::vector<float>>                   distance_block;
+        std::vector<std::vector<std::pair<Vec2d, Vec2d>>> pair_points_block;
+        std::vector<std::pair<double, int>>               areas_container;
+#else
+
+        //-------------big   CODE--------------------------
+
+        //            std::vector<std::vector<std::pair<Point, Point>>> endpoints_block;
+        //            std::vector<std::vector<bool>> endpoints_mark;
+        //            Polylines polyline_temp;
+        //            Polylines polyline_copy;
+        //            //std::vector<float> connect_for_one;
+        // #endif
+        //            for (int i = 0; i < rot_points.size(); i++)
+        //            {
+        //                polyline_temp.push_back(Polyline());
+        //                std::vector<std::pair<double, double>> new_points;
+        //                for (int j = 0; j < rot_points[i].size() - 1; j += 2)
+        //                {
+        //                    if (std::abs(rot_points[i][j].second - rot_points[i][j + 1].second) < EPS)
+        //                    {
+        //                        new_points.push_back(rot_points[i][j]);
+        //                        new_points.push_back(rot_points[i][j + 1]);
+        //                       // outfile << "(" << rot_points[i][j].first << "," << rot_points[i][j].second << ")" << std::endl;
+        //                       // outfile << "(" << rot_points[i][j + 1].first << "," << rot_points[i][j + 1].second << ")" << std::endl;
+        //                        polyline_temp.back().points.push_back(polylines[i].points[j]);
+        //                        polyline_temp.back().points.push_back(polylines[i].points[j+1]);
+        //                    }
+        //                    else {
+        //                         polyline_temp.back().points.push_back(polylines[i].points[j]);
+        //                        j--;
+        //                    }
+        //                }
+        //                //outfile << " " << std::endl;
+        //
+        //                //-----------cal areas---------------
+        //               /* double areas = 0.f;
+        //                for (int j = 0; j < new_points.size() - 3; j += 2)
+        //                {
+        //                    double bot_x_distance = std::abs(new_points[j].first - new_points[j + 1].first);
+        //                    double top_x_distance = std::abs(new_points[j + 2].first - new_points[j + 3].first);
+        //                    double height = std::abs(new_points[j + 2].second - new_points[j].second);
+        //                    double area = (bot_x_distance + top_x_distance) * height / 2.0f;
+        //                    areas += area;
+        //                }
+        //                areas_container.push_back(std::make_pair(areas, i));*/
+        //
+        // #if plan_a
+        //                std::vector<float> distance_span;
+        //                std::vector<std::pair<Vec2d, Vec2d>> pair_points;
+        //                std::vector<int> index_span;
+        //                for (int j = 0; j < new_points.size(); j += 2)
+        //                {
+        //                    if (j == 0 || j == new_points.size() - 2)
+        //                    {
+        //                        if (std::abs(new_points[j].first - new_points[j + 1].first) > 1800)
+        //                        {
+        //                            distance_span.push_back(std::abs(new_points[j].first - new_points[j + 1].first));
+        //                            pair_points.push_back(std::make_pair(Vec2d(new_points[j].first, new_points[j].second),
+        //                            Vec2d(new_points[j + 1].first, new_points[j + 1].second))); index_span.push_back(j);
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        // judge orient and distanca
+        //                        float d1 = new_points[j].first - new_points[j + 1].first;
+        //                        float d2 = new_points[j - 2].first - new_points[j - 1].first;
+        //                        float distance1 = std::abs(d1);
+        //                        float distance2 = std::abs(d2);
+        //                        if (d1 * d2 > 0)
+        //                        {
+        //                            /* distance_span.push_back(std::abs(new_points[j].first - new_points[j + 1].first));
+        //                             pair_points.push_back(std::make_pair(Vec2d(new_points[j].first,new_points[j].second),Vec2d(new_points[j+1].first,new_points[j+1].second)));
+        //                             index_span.push_back(j);*/
+        //                        }
+        //                        else
+        //                        {
+        //                            if (std::abs(distance1 - distance2) > 1800)
+        //                            {
+        //                                distance_span.push_back(std::abs(distance1 - distance2));
+        //                                pair_points.push_back(std::make_pair(Vec2d(new_points[j].first, new_points[j].second),
+        //                                Vec2d(new_points[j + 1].first, new_points[j + 1].second))); index_span.push_back(j);
+        //                            }
+        //                        }
+        //
+        //                    }
+        //                }
+        //                distance_block.push_back(distance_span);
+        //                pair_points_block.push_back(pair_points);
+        // #else
+        //                for (int j = 0; j < new_points.size(); j += 2)
+        //                {
+        //                    if (new_points[j].first > new_points[j + 1].first)
+        //                    {
+        //                        std::swap(new_points[j], new_points[j + 1]);
+        //                    }
+        //                }
+        //
+        //                //endpoints_block.push_back(std::vector<std::pair<Vec2d, Vec2d>>());
+        //                //endpoints_mark.push_back(std::vector<bool>());
+        //                /*for (int j = 0; j<new_points.size(); j+=2)
+        //                {
+        //                    if (j == 0||j == new_points.size()-2)
+        //                    {
+        //                        if (std::abs(new_points[j].first - new_points[j + 1].first) > 1600)
+        //                        {
+        //                            endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j].first,new_points[j].second),
+        //                                Vec2d(new_points[j + 1].first,new_points[j + 1].second)));
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        Vec2d p1(new_points[j].first,new_points[j].second);
+        //                        Vec2d p2(new_points[j+1].first,new_points[j+1].second);
+        //                        Vec2d p3(new_points[j+2].first,new_points[j+2].second);
+        //                        Vec2d p4(new_points[j+3].first,new_points[j+3].second);
+        //
+        //                        if (std::abs(p1.x() - p3.x()) > 1600 || std::abs(p2.x() - p4.x()) > 1600)
+        //                        {
+        //                            endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j].first,new_points[j].second),
+        //                                Vec2d(new_points[j + 1].first,new_points[j + 1].second)));
+        //                        }
+        //                    }
+        //                }*/
+        //
+        //                //----find potential targets-----method 1 ------
+        //                //for (int j = 0; j < new_points.size(); j+=2)
+        //                //{
+        //                //    float dist_l = std::abs(new_points[j].first - new_points[j + 1].first)/5.0f;
+        //                //    int connect_num_bot = 0;
+        //                //    int connect_num_up = 0;
+        //                //    //----------div 4--------------
+        //                //    if (j == 0||j == new_points.size() - 2)
+        //                //    {
+        //                //        if (dist_l * 5.0f > 1800.f)
+        //                //            connect_num_bot++;
+        //                //    }
+        //                //    else
+        //                //    {
+        //                //        for (int k = 1; k <= 1; k++)
+        //                //        {
+        //                //            for (int z = 1; z <= 4; z++)
+        //                //            {
+        //                //                float c = new_points[j].first + dist_l * z;
+        //                //                if (c > new_points[j - 2 * k].first && c < new_points[j - 2 * k + 1].first)
+        //                //                {
+        //                //                    if (new_points[j - 2 * k].second > new_points[j].second)
+        //                //                        connect_num_up++;
+        //                //                    if (new_points[j - 2 * k].second < new_points[j].second)
+        //                //                        connect_num_bot++;
+        //                //
+        //                //                }
+        //                //                if (c > new_points[j + 2 * k].first && c < new_points[j + 2 * k + 1].first)
+        //                //                {
+        //                //                    if (new_points[j + 2 * k].second > new_points[j].second)
+        //                //                        connect_num_up++;
+        //                //                    if (new_points[j + 2 * k].second < new_points[j].second)
+        //                //                        connect_num_bot++;
+        //                //
+        //                //                }
+        //                //            }
+        //                //            //if (connect_num_bot > 0 && connect_num_up > 0)
+        //                //            //{
+        //                //            //    /*float dist_2 = std::abs(new_points[j + 2].first - new_points[j + 3].first);
+        //                //            //    if (std::abs(dist_l * 5.0f - dist_2) > 2000)
+        //                //            //    {
+        //                //            //        connect_num_bot = 1;
+        //                //            //        connect_num_up = 0;
+        //                //            //    }*/
+        //                //            //    break;
+        //                //            //}
+        //                //        }
+        //                //
+        //                //    }
+        //                //    //-------potential targets---
+        //                //    //if ((connect_num_bot > 0 && connect_num_up == 0)||(connect_num_bot == 0 && connect_num_up > 0))
+        //                //    if(connect_num_bot!=4||connect_num_up!=4)
+        //                //    {
+        //                //        if(std::abs(new_points[j].first-new_points[j + 1].first)>1600)
+        //                //            endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j].first, new_points[j].second),
+        //                //                Vec2d(new_points[j + 1].first, new_points[j + 1].second)));
+        //                //    }
+        //                //}
+        //
+        //
+        //                //-------------------------------method 2 -----------------------
+        //
+        //                /*for (int j = 0; j < new_points.size(); j += 2)
+        //                {
+        //                    if (j == 0 || j == new_points.size() - 2)
+        //                    {
+        //                        if (std::abs(new_points[j].first - new_points[j + 1].first) > 1800.f)
+        //                        {
+        //                            endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j].first, new_points[j].second),
+        //                                Vec2d(new_points[j + 1].first, new_points[j + 1].second)));
+        //                            endpoints_mark.back().push_back(false);
+        //                        }
+        //                    }
+        //                    else {
+        //                        if (std::abs(new_points[j].first - new_points[j - 2].first) > 1800.f)
+        //                        {
+        //                            if (std::abs(new_points[j].second - new_points[j - 2].second) < 100.f)
+        //                            {
+        //                                endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j - 2].first, new_points[j -
+        //                                2].second),
+        //                                    Vec2d(new_points[j - 1].first, new_points[j - 1].second)));
+        //                                endpoints_mark.back().push_back(true);
+        //                            }
+        //                            else {
+        //                                if (new_points[j].first - new_points[j - 2].first > 0.f)
+        //                                {
+        //                                    endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j - 2].first, new_points[j -
+        //                                    2].second),
+        //                                        Vec2d(new_points[j].first, new_points[j].second)));
+        //                                    endpoints_mark.back().push_back(true);
+        //                                }
+        //                                else {
+        //                                    endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j].first,
+        //                                    new_points[j].second),
+        //                                        Vec2d(new_points[j - 2].first, new_points[j - 2].second)));
+        //                                    endpoints_mark.back().push_back(true);
+        //                                }
+        //                            }
+        //                        }
+        //                        if (std::abs(new_points[j + 1].first - new_points[j - 1].first) > 1800.f)
+        //                        {
+        //                            if (std::abs(new_points[j + 1].second - new_points[j - 1].second) < 100.f)
+        //                            {
+        //                                endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j - 2].first, new_points[j -
+        //                                2].second),
+        //                                    Vec2d(new_points[j - 1].first, new_points[j - 1].second)));
+        //                                endpoints_mark.back().push_back(true);
+        //                            }
+        //                            else {
+        //                                if (new_points[j + 1].first - new_points[j - 1].first > 0.f)
+        //                                {
+        //                                    endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j - 1].first, new_points[j +
+        //                                    1].second),
+        //                                        Vec2d(new_points[j + 1].first, new_points[j + 1].second)));
+        //                                    endpoints_mark.back().push_back(true);
+        //                                }
+        //                                else {
+        //                                    endpoints_block.back().push_back(std::make_pair(Vec2d(new_points[j + 1].first, new_points[j -
+        //                                    1].second),
+        //                                        Vec2d(new_points[j - 1].first, new_points[j - 1].second)));
+        //                                    endpoints_mark.back().push_back(true);
+        //                                }
+        //                            }
+        //                        }
+        //                    }
+        //                }
+        //
+        //                for (int j = 1; j < endpoints_block.back().size(); j++)
+        //                {
+        //                    if (std::abs(endpoints_block.back().at(j).first.x() - endpoints_block.back().at(j - 1).first.x()) < 1e-2 &&
+        //                        std::abs(endpoints_block.back().at(j).first.y() - endpoints_block.back().at(j - 1).first.y()) < 1e-2 &&
+        //                        std::abs(endpoints_block.back().at(j).second.x() - endpoints_block.back().at(j - 1).second.x()) < 1e-2 &&
+        //                        std::abs(endpoints_block.back().at(j).second.y() - endpoints_block.back().at(j - 1).second.y()) < 1e-2)
+        //                    {
+        //                        endpoints_block.back().erase(endpoints_block.back().begin() + j);
+        //                        endpoints_mark.back().erase(endpoints_mark.back().begin() + j);
+        //                        j--;
+        //                    }
+        //                }*/
+        //
+        //                //---------------------method3-------------------------
+        //                std::pair<Point, Point> last_point;
+        //                int begin_input = 0; // 1.beign 2.end 3.add now 4.add next 5.stop
+        //                for (int j = 0; j < new_points.size(); j += 2)
+        //                {
+        //                   // outfile << "(" << new_points[j].first<<","<<new_points[j].second<<")"<<std::endl;
+        //                    //outfile << "(" << new_points[j+1].first<<","<<new_points[j+1].second<<")"<<std::endl;
+        //                    if (begin_input == 3 || begin_input == 4 || begin_input == 5)
+        //                    {
+        //                        endpoints_block.back().push_back(last_point);
+        //                    }
+        //                    begin_input = 0;
+        //                    if (j == 0)
+        //                    {
+        //                        begin_input = 1;
+        //                    }
+        //                    else if (j == new_points.size() - 2)
+        //                    {
+        //                        begin_input = 2;
+        //                    }
+        //                    else
+        //                    {
+        //                        if (std::abs(new_points[j+1].second - new_points[j+3 ].second) < 100.f)
+        //                        {
+        //                            begin_input = 4;
+        //                        }
+        //                        else {
+        //                            if (std::abs(new_points[j].first - new_points[j + 2].first) > 1800.f)
+        //                                begin_input = 5;
+        //                            if (std::abs(new_points[j+1].first - new_points[j + 3].first) > 1800.f)
+        //                                begin_input = 3;
+        //                            if (std::abs(new_points[j + 2].second - new_points[j + 4].second) < 100.f)
+        //                                begin_input = 0;
+        //                        }
+        //                    }
+        //
+        //                    switch (begin_input)
+        //                    {
+        //                    case 1:
+        //                        polyline_copy.push_back(Polyline());
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+1]);
+        //                        endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                        if (std::abs(new_points[j].first - new_points[j + 1].first) > 1800)
+        //                        {
+        //                            endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first, new_points[j].second),
+        //                            Point(new_points[j + 1].first, new_points[j + 1].second)));
+        //                        }
+        //                        break;
+        //                    case 2:
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+1]);
+        //                        if(std::abs(new_points[j].first - new_points[j + 1].first)>1800)
+        //                            endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first,new_points[j].second),Point(new_points[j+1].first,new_points[j+1].second)));
+        //                        break;
+        //                    case 3:
+        //                    case 5:
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+1]);
+        //                        polyline_copy.push_back(Polyline());
+        //                        if (begin_input == 5)
+        //                        {
+        //                            if (new_points[j].first > new_points[j + 2].first)
+        //                            {
+        //                                 endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first, new_points[j].second),
+        //                                 Point(new_points[j + 1].first, new_points[j + 1].second)));
+        //                                 endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                                 endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first, new_points[j].second),
+        //                                 Point(new_points[j + 1].first, new_points[j + 1].second))); last_point =
+        //                                 std::make_pair(Point(new_points[j+2].first, new_points[j].second), Point(new_points[j ].first,
+        //                                 new_points[j].second));
+        //                            }
+        //                            else
+        //                            {
+        //                                 endpoints_block.back().push_back(std::make_pair(Point(new_points[j+2].first,
+        //                                 new_points[j+2].second), Point(new_points[j + 3].first, new_points[j + 3].second)));
+        //                                 endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first,
+        //                                 new_points[j+2].second), Point(new_points[j + 2].first, new_points[j + 2].second)));
+        //                                 endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                                 last_point = std::make_pair(Point(new_points[j+2].first, new_points[j+2].second),
+        //                                 Point(new_points[j+3].first, new_points[j+3].second));
+        //                            }
+        //                            //endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first, new_points[j +
+        //                            2].second), Point(new_points[j + 2].first, new_points[j + 2].second)));
+        //                        }
+        //                        else if (begin_input == 3)
+        //                        {
+        //                            if (new_points[j + 1].first > new_points[j + 3].first)
+        //                            {
+        //                                endpoints_block.back().push_back(std::make_pair(Point(new_points[j+2].first,
+        //                                new_points[j+2].second), Point(new_points[j + 3].first, new_points[j + 3].second)));
+        //                                endpoints_block.back().push_back(std::make_pair(Point(new_points[j+3].first,
+        //                                new_points[j+3].second), Point(new_points[j + 1].first, new_points[j + 3].second)));
+        //                                endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                                //endpoints_block.back().push_back(std::make_pair(Point(new_points[j + 2].first, new_points[j +
+        //                                2].second), Point(new_points[j + 3].first, new_points[j + 3].second))); last_point =
+        //                                std::make_pair(Point(new_points[j+2].first, new_points[j+2].second), Point(new_points[j+3].first,
+        //                                new_points[j+3].second));
+        //                            }
+        //                            else {
+        //                                endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first, new_points[j].second),
+        //                                Point(new_points[j + 1].first, new_points[j + 1].second)));
+        //                                endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                                endpoints_block.back().push_back(std::make_pair(Point(new_points[j+1].first,
+        //                                new_points[j].second), Point(new_points[j + 3].first, new_points[j ].second))); last_point =
+        //                                std::make_pair(Point(new_points[j].first, new_points[j].second), Point(new_points[j + 1].first,
+        //                                new_points[j + 1].second));
+        //                            }
+        //                            //endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first, new_points[j].second),
+        //                            Point(new_points[j + 1].first, new_points[j + 1].second)));
+        //                            //endpoints_block.back().push_back(std::make_pair(Point(new_points[j + 1].first, new_points[j +
+        //                            1].second), Point(new_points[j + 3].first, new_points[j + 1].second)));
+        //                        }
+        //                       // endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                       // last_point = std::make_pair(Point(new_points[j].first, new_points[j].second), Point(new_points[j +
+        //                       1].first, new_points[j + 1].second));
+        //
+        //                       /* connect_for_one.push_back(polyline_copy.size() - 1);
+        //                        connect_for_one.push_back(polyline_copy.size());
+        //                        if (begin_input == 5)
+        //                            connect_for_one.push_back(std::abs(new_points[j].first - new_points[j+2].first));
+        //                        else if(begin_input == 3)
+        //                            connect_for_one.push_back(std::abs(new_points[j+1].first - new_points[j+3].first));*/
+        //                        break;
+        //                    case 4:
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+1]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+2]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+3]);
+        //                        polyline_copy.push_back(Polyline());
+        //                        endpoints_block.back().push_back(std::make_pair(Point(new_points[j].first,new_points[j].second),Point(new_points[j+1].first,new_points[j+1].second)));
+        //                        endpoints_block.back().push_back(std::make_pair(Point(new_points[j+2].first,new_points[j+2].second),Point(new_points[j+3].first,new_points[j+3].second)));
+        //                        endpoints_block.push_back(std::vector<std::pair<Point, Point>>());
+        //                        //endpoints_block.back().push_back(std::make_pair(Point(new_points[j+2].first,new_points[j+2].second),Point(new_points[j+3].first,new_points[j+3].second)));
+        //                       /* connect_for_one.push_back(polyline_copy.size() - 1);
+        //                        connect_for_one.push_back(polyline_copy.size());
+        //                        connect_for_one.push_back(std::abs(new_points[j+2].first-new_points[j+3].first));*/
+        //
+        //                        last_point =
+        //                        std::make_pair(Point(new_points[j+2].first,new_points[j+2].second),Point(new_points[j+3].first,new_points[j+3].second));
+        //
+        //                        j += 2;
+        //                        break;
+        //                    default:
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j]);
+        //                        polyline_copy.back().points.push_back(polyline_temp[i].points[j+1]);
+        //                        break;
+        //                    }
+        //                }
+        //                //outfile << " " << std::endl;
+        // #endif
+        //            }
+        //
+        //            //outfile.close();
+        //
+        //
+        //            /*float distance_max = std::numeric_limits<float>::min();
+        //            int index_dis = 0;
+        //            for (int i = 0; i < distance_block.size(); i++)
+        //            {
+        //                for (int j = 0; j < distance_block[i].size(); j++)
+        //                {
+        //                    if (distance_block[i][j] > distance_max)
+        //                    {
+        //                        distance_max = distance_block[i][j];
+        //                        index_dis = i;
+        //                    }
+        //                }
+        //            }*/
+        //
+        //            Polylines polyline_rot;
+        //            for (int i = 0; i < polyline_copy.size(); i++)
+        //            {
+        //                if(!polyline_copy[i].points.empty())
+        //                    polyline_rot.push_back(Polyline());
+        //                for (int j = 0; j < polyline_copy[i].points.size(); j++)
+        //                {
+        //                    Eigen::Vector2d point(polyline_copy[i].points[j][0] / 1000.f, polyline_copy[i].points[j][1] / 1000.f);
+        //                    double angle = -M_PI / 4.0f;
+        //                    Eigen::Rotation2D rotation(angle);
+        //                    Eigen::Vector2d rotated_point = rotation * point;
+        //                    polyline_rot.back().points.push_back(Point(rotated_point[0],rotated_point[1]));
+        //                    //outfile << "(" << rotated_point[0]<< "," << rotated_point[1] << ")" << std::endl;
+        //                }
+        //                //outfile << " " << std::endl;
+        //            }
+        //            //outfile.close();
+        //
+        //
+        //
+        // #if plan_a
+        //            auto dist = [&](int in) {
+        //                int re = std::numeric_limits<float>::min();
+        //                for (int i = 0; i < distance_block[in].size(); i++)
+        //                {
+        //                    if (distance_block[in][i] > re)
+        //                        re = distance_block[in][i];
+        //                }
+        //                return re;
+        //            };
+        //
+        //
+        //            std::vector<int> sort_distance(distance_block.size());
+        //            std::iota(sort_distance.begin(), sort_distance.end(), 0);
+        //            std::sort(sort_distance.begin(), sort_distance.end(), [&](int a, int b) {
+        //                float d1 = dist(a);
+        //                float d2 = dist(b);
+        //                if (d1 > d2)
+        //                    return a;
+        //                else
+        //                    return b;
+        //                });
+        //
+        //            // begin path planning
+        //            // merge block
+        //            // find connect block
+        //            for (int i = 0; i < sort_distance.size(); i++)
+        //            {
+        //                pair_points_block[sort_distance[i]];
+        //            }
+        // #else
+        //            //--resize blocks-----
+        //            //----method 2----
+        //            //std::vector<std::vector<float>> map_distance(endpoints_block.size(), std::vector<float>());
+        //            //for (int i = 0; i < endpoints_block.size(); i++)
+        //            //{
+        //            //    map_distance[i].resize(endpoints_block.size(), -1);
+        //            //}
+        //
+        //            std::vector<int> mark_block(polyline_rot.size(),0);//0. normal 1.top 2.bottom
+        //            for (int i = 0; i < polyline_rot.size(); i++)
+        //            {
+        //                if (polyline_copy[i].points.empty())
+        //                    continue;
+        //                if (std::abs(polyline_rot[i].points.back().y() - polyline_rot[i].points[polyline_rot[i].size() - 3].y()) < 100)
+        //                {
+        //                    mark_block[i] = 1;
+        //                }
+        //                if (std::abs(polyline_rot[i].points[0].y() - polyline_rot[i].points[2].y()) < 100)
+        //                {
+        //                    mark_block[i] = 2;
+        //                    if(mark_block[i])
+        //                        mark_block[i] = 3;
+        //                }
+        //            }
+        //
+        //            std::vector<std::vector<float>> map_distance(polyline_rot.size(), std::vector<float>());
+        //            for (int i = 0; i < polyline_rot.size(); i++)
+        //            {
+        //                map_distance[i].resize(polyline_rot.size(), -1);
+        //            }
+        //
+        //            auto point_distance=[&](Point&a,Point &b)->float{
+        //                float a_x = a.x();
+        //                float a_y = a.y();
+        //                float b_x = b.x();
+        //                float b_y = b.y();
+        //                float ab_x = std::abs(a_x - b_x);
+        //                float ab_y = std::abs(a_y - b_y);
+        //                float d = std::sqrtf(ab_x*ab_x+ab_y*ab_y);
+        //                return d;
+        //            };
+        //
+        //            auto point_jug = [&](Point&a,Point &b)->bool{
+        //                bool h_jug = std::abs(a.y() - b.y()) < LINE_WIDTH ? 1 : 0;
+        //                bool w_jug = std::abs(a.x() - b.x()) < 800 ? 1 : 0;
+        //                return h_jug & w_jug;
+        //            };
+        //
+        //            std::vector<std::vector<Point>> point_container;
+        //            for (int i = 0; i < polyline_rot.size(); i++)
+        //            {
+        //                point_container.push_back(std::vector<Point>());
+        //                if (mark_block[i] == 0)
+        //                {
+        //                    point_container.back()={polyline_rot[i][0],polyline_rot[i][1],polyline_rot[i].back(),polyline_rot[i][polyline_rot[i].size()-2]};
+        //                }
+        //                else if (mark_block[i] == 1)
+        //                {
+        //                    point_container.back()={polyline_rot[i][0],polyline_rot[i][1],polyline_rot[i].back(),polyline_rot[i][polyline_rot[i].size()-2],
+        //                                polyline_rot[i][polyline_rot[i].size()-3], polyline_rot[i][polyline_rot[i].size()-4]};
+        //                }
+        //                else if (mark_block[i] == 2)
+        //                {
+        //                    point_container.back()={polyline_rot[i][0],polyline_rot[i][1],polyline_rot[i].back(),polyline_rot[i][polyline_rot[i].size()-2],
+        //                                polyline_rot[i][2],polyline_rot[i][3]};
+        //                }
+        //                else if (mark_block[i] == 3)
+        //                {
+        //                    point_container.back()={polyline_rot[i][0],polyline_rot[i][1],polyline_rot[i].back(),polyline_rot[i][polyline_rot[i].size()-2],
+        //                                polyline_rot[i][2],polyline_rot[i][3],
+        //                                polyline_rot[i][polyline_rot[i].size()-3], polyline_rot[i][polyline_rot[i].size()-4]};
+        //                }
+        //            }
+        //
+        //
+        //            for (int i = 0; i < polyline_rot.size(); i++)
+        //            {
+        //                for (int j = 0; j < polyline_rot.size(); j++)
+        //                {
+        //                    if (i != j)
+        //                    {
+        //                        float dist = std::numeric_limits<float>::min();
+        //                        for (int n = 0; n < point_container[i].size(); n++)
+        //                        {
+        //                            for (int m = 0; m < point_container[j].size(); m++)
+        //                            {
+        //                                if (std::abs(point_container[i][n].y() - point_container[j][m].y()) < 100)
+        //                                    continue;
+        //                                if (point_distance(point_container[i][n], point_container[j][m])<1200.f)
+        //                                {
+        //                                    float x1; float x2;
+        //                                    if(n%2==1)
+        //                                        x1 = std::abs(point_container[i][n].x() - point_container[i][n-1].x());
+        //                                    else
+        //                                        x1 = std::abs(point_container[i][n].x() - point_container[i][n+1].x());
+        //                                    if (m % 2 == 1)
+        //                                        x2 = std::abs(point_container[j][m].x() - point_container[j][m - 1].x());
+        //                                    else
+        //                                        x2 = std::abs(point_container[j][m].x() - point_container[j][m + 1].x());
+        //                                    float d = x1 < x2 ? x1 : x2;
+        //                                    dist = dist > d ? dist : d;
+        //                                }
+        //                            }
+        //                        }
+        //                        if (dist != std::numeric_limits<float>::min())
+        //                        {
+        //                            map_distance[i][j] = dist;
+        //                            map_distance[j][i] = dist;
+        //                        }
+        //                    }
+        //                }
+        //
+        //            }
+        //
+        //
+        //            /*for (int i = 0; i < connect_for_one.size(); i+=3)
+        //            {
+        //                int x = connect_for_one[i];
+        //                int y = connect_for_one[i + 1];
+        //                int d = connect_for_one[i + 2];
+        //                map_distance[x-1][y-1] = d;
+        //            }*/
+        //
+        //            ////----- merge line -----------
+        //           /* std::vector<std::vector<int>> merge_block(endpoints_block.size(), std::vector<int>());
+        //            std::vector<std::pair<Vec2d, Vec2d>> merge_point;
+        //            for (int i = 0; i < endpoints_block.size(); i++)
+        //            {
+        //                merge_block[i].resize(endpoints_block[i].size(), -1);
+        //            }
+        //            for (int i = 0; i < endpoints_block.size(); i++)
+        //            {
+        //                for (int j = 0; j < endpoints_block.size(); j++)
+        //                {
+        //                    if (i != j)
+        //                    {
+        //                        for (int n = 0; n < endpoints_block[i].size(); n++)
+        //                            for (int m = 0; m < endpoints_block[j].size(); m++)
+        //                            {
+        //                                if (std::abs(endpoints_block[i][n].first.y() - endpoints_block[j][m].first.y()) < 100 &&
+        //                                    std::abs(endpoints_block[i][n].second.y() - endpoints_block[j][m].second.y()) < 100)
+        //                                {
+        //                                    Vec2d left_p = endpoints_block[i][n].first.x() < endpoints_block[j][m].first.x() ?
+        //                                        Vec2d(endpoints_block[i][n].first.x(), endpoints_block[i][n].first.y()) :
+        //                                        Vec2d(endpoints_block[j][m].first.x(), endpoints_block[j][m].first.y());
+        //                                    Vec2d right_p = endpoints_block[i][n].second.x() > endpoints_block[j][m].second.x() ?
+        //                                        Vec2d(endpoints_block[i][n].second.x(), endpoints_block[i][n].second.y()) :
+        //                                        Vec2d(endpoints_block[j][m].second.x(), endpoints_block[j][m].second.y());
+        //
+        //                                    merge_point.push_back(std::make_pair(left_p, right_p));
+        //                                    merge_block[i][n] = merge_point.size() - 1;
+        //                                    merge_block[j][m] = merge_point.size() - 1;
+        //                                }
+        //                            }
+        //                    }
+        //                }
+        //            }*/
+        //
+        //            ////----- filter line -------------
+        //            //for (int i = 0; i < endpoints_block.size(); i++)
+        //            //{
+        //            //    for (int j = i; j < endpoints_block.size(); j++)
+        //            //    {
+        //            //        if (i != j)
+        //            //        {
+        //            //            for (int n = 0; n < endpoints_block[i].size(); n++)
+        //            //                for (int m = 0; m < endpoints_block[j].size(); m++)
+        //            //                {
+        //            //                    //--judge merge--- and big change
+        //            //                    bool is_merge = false;
+        //            //                    if (merge_block[i][n] != -1 && merge_block[j][m] != -1)
+        //            //                        continue;
+        //            //                    float dist1 = std::abs(endpoints_block[i][n].first.x() - endpoints_block[i][n].second.x());
+        //            //                    float dist2 = std::abs(endpoints_block[j][m].first.x() - endpoints_block[j][m].second.x());
+        //            //                    float x_span1 = std::abs(endpoints_block[i][n].first.x() - endpoints_block[j][m].first.x());
+        //            //                    float x_span2 = std::abs(endpoints_block[i][n].second.x() - endpoints_block[j][m].second.x());
+        //            //                    float y_span1 = std::abs(endpoints_block[i][n].first.y() - endpoints_block[j][m].first.y());
+        //            //                    float y_span2 = std::abs(endpoints_block[i][n].second.y() - endpoints_block[j][m].second.y());
+        //            //                    if (merge_block[i][n] != -1 && merge_block[j][m] == -1)
+        //            //                    {
+        //            //                        dist1 = std::abs(merge_point[merge_block[i][n]].first.x() -
+        //            merge_point[merge_block[i][n]].second.x());
+        //            //                        x_span1 = std::abs(merge_point[merge_block[i][n]].first.x() -
+        //            endpoints_block[j][m].first.x());
+        //            //                        y_span1 = std::abs(merge_point[merge_block[i][n]].first.y() -
+        //            endpoints_block[j][m].first.y());
+        //            //                        x_span2 = std::abs(merge_point[merge_block[i][n]].second.x() -
+        //            endpoints_block[j][m].second.x());
+        //            //                        y_span2 = std::abs(merge_point[merge_block[i][n]].second.y() -
+        //            endpoints_block[j][m].second.y());
+        //            //                        is_merge = true;
+        //            //                    }
+        //            //                    if (merge_block[j][m] != -1 && merge_block[i][n] == -1)
+        //            //                    {
+        //            //                        dist2 = std::abs(merge_point[merge_block[j][m]].first.x() -
+        //            merge_point[merge_block[j][m]].second.x());
+        //            //                        x_span1 = std::abs(merge_point[merge_block[j][m]].first.x() -
+        //            endpoints_block[i][n].first.x());
+        //            //                        y_span1 = std::abs(merge_point[merge_block[j][m]].first.y() -
+        //            endpoints_block[i][n].first.y());
+        //            //                        x_span2 = std::abs(merge_point[merge_block[j][m]].second.x() -
+        //            endpoints_block[i][n].second.x());
+        //            //                        y_span2 = std::abs(merge_point[merge_block[j][m]].second.y() -
+        //            endpoints_block[i][n].second.y());
+        //            //                        is_merge = true;
+        //            //                    }
+        //            //                    if (x_span1 < 1600 && y_span1 < LINE_WIDTH && x_span2 < 1600 && y_span2 < LINE_WIDTH)
+        //            //                    {
+        //            //                        /* float dist1 = std::abs(endpoints_block[i][n].first.x()-endpoints_block[i][n].second.x());
+        //            //                        float dist2 = std::abs(endpoints_block[j][m].first.x()-endpoints_block[j][m].second.x());*/
+        //            //                        if (std::abs(dist1 - dist2) < 1980)
+        //            //                        {
+        //            //                            float dist_final = (dist1 + dist2) / 2.0f;
+        //            //                            if (is_merge)
+        //            //                            {
+        //            //                                dist1 = std::abs(endpoints_block[i][n].first.x() -
+        //            endpoints_block[i][n].second.x());
+        //            //                                dist2 = std::abs(endpoints_block[j][m].first.x() -
+        //            endpoints_block[j][m].second.x());
+        //            //                                dist_final = dist1 < dist2 ? dist1 : dist2;
+        //            //                            }
+        //            //                            if (!endpoints_mark[i][n] && endpoints_mark[j][m])
+        //            //                            {
+        //            //                            }
+        //            //                            else
+        //            //                            {
+        //            //                                map_distance[i][j] = dist_final;
+        //            //                                map_distance[j][i] = dist_final;
+        //            //                            }
+        //            //                        }
+        //            //                    }
+        //            //                }
+        //            //        }
+        //            //        else
+        //            //        {
+        //            //            map_distance[i][j] = 0;
+        //            //        }
+        //            //    }
+        //            //}
+        //
+        //            //----------other method-------------------
+        //
+        //            /*for (int i = 0; i < endpoints_block.size(); i++)
+        //            {
+        //                for (int j = i; j < endpoints_block.size(); j++)
+        //                {
+        //                    if (i != j)
+        //                    {
+        //                         for (int n = 0; n < endpoints_block[i].size(); n++)
+        //                             for (int m = 0; m < endpoints_block[j].size(); m++)
+        //                             {
+        //                                 bool is_merge = false;
+        //                                 if (merge_block[i][n] != -1 && merge_block[j][m] != -1)
+        //                                     continue;
+        //                                 float dist1 = std::abs(endpoints_block[i][n].first.x() - endpoints_block[i][n].second.x());
+        //                                 float dist2 = std::abs(endpoints_block[j][m].first.x() - endpoints_block[j][m].second.x());
+        //                                 float x_span1 = std::abs(endpoints_block[i][n].first.x() - endpoints_block[j][m].first.x());
+        //                                 float x_span2 = std::abs(endpoints_block[i][n].second.x() - endpoints_block[j][m].second.x());
+        //                                 float y_span1 = std::abs(endpoints_block[i][n].first.y() - endpoints_block[j][m].first.y());
+        //                                 float y_span2 = std::abs(endpoints_block[i][n].second.y() - endpoints_block[j][m].second.y());
+        //                                 if (merge_block[i][n] != -1 && merge_block[j][m] == -1)
+        //                                 {
+        //                                     dist1 = std::abs(merge_point[merge_block[i][n]].first.x() -
+        //                                     merge_point[merge_block[i][n]].second.x()); x_span1 =
+        //                                     std::abs(merge_point[merge_block[i][n]].first.x() - endpoints_block[j][m].first.x()); y_span1
+        //                                     = std::abs(merge_point[merge_block[i][n]].first.y() - endpoints_block[j][m].first.y());
+        //                                     x_span2 = std::abs(merge_point[merge_block[i][n]].second.x() -
+        //                                     endpoints_block[j][m].second.x()); y_span2 =
+        //                                     std::abs(merge_point[merge_block[i][n]].second.y() - endpoints_block[j][m].second.y());
+        //                                     is_merge = true;
+        //                                 }
+        //                                 if (merge_block[j][m] != -1 && merge_block[i][n] == -1)
+        //                                 {
+        //                                     dist2 = std::abs(merge_point[merge_block[j][m]].first.x() -
+        //                                     merge_point[merge_block[j][m]].second.x()); x_span1 =
+        //                                     std::abs(merge_point[merge_block[j][m]].first.x() - endpoints_block[i][n].first.x()); y_span1
+        //                                     = std::abs(merge_point[merge_block[j][m]].first.y() - endpoints_block[i][n].first.y());
+        //                                     x_span2 = std::abs(merge_point[merge_block[j][m]].second.x() -
+        //                                     endpoints_block[i][n].second.x()); y_span2 =
+        //                                     std::abs(merge_point[merge_block[j][m]].second.y() - endpoints_block[i][n].second.y());
+        //                                     is_merge = true;
+        //                                 }
+        //
+        //                                  if (x_span1 < 1600 && y_span1 < LINE_WIDTH && x_span2 < 1600 && y_span2 < LINE_WIDTH)
+        //                                  {
+        //
+        //                                      if (std::abs(dist1 - dist2) < 1980)
+        //                                      {
+        //                                          float dist_final = (dist1 + dist2) / 2.0f;
+        //                                          if (is_merge)
+        //                                          {
+        //                                              dist1 = std::abs(endpoints_block[i][n].first.x() -
+        //                                              endpoints_block[i][n].second.x()); dist2 = std::abs(endpoints_block[j][m].first.x()
+        //                                              - endpoints_block[j][m].second.x()); dist_final = dist1 < dist2 ? dist1 : dist2;
+        //                                          }
+        //                                            map_distance[i][j] = dist_final;
+        //                                            map_distance[j][i] = dist_final;
+        //                                      }
+        //                                  }
+        //                             }
+        //                    }
+        //                }
+        //            }*/
+        //
+        //
+        //
+        //
+        //            //-----find path-----------
+        //            //std::vector<int> path = { 0 };
+        //            //std::vector<bool> path_mark(map_distance.size(),false);
+        //            //path_mark[0] = true;
+        //            //int index_ptr = 0;
+        //
+        //            //while (1)
+        //            //{
+        //            //    bool brk = true;
+        //            //    for (int i = 0; i < path_mark.size(); i++)
+        //            //    {
+        //            //        if (!path_mark[i])
+        //            //            brk = false;
+        //            //    }
+        //            //    if (brk)
+        //            //        break;
+        //            //    path_mark[index_ptr] = true;
+        //            //    float max_dist = std::numeric_limits<float>::min();
+        //            //    int index_temp = index_ptr;
+        //            //    bool is_next = true;
+        //            //    for (int i = 0; i < map_distance[index_ptr].size(); i++)
+        //            //    {
+        //            //        if (map_distance[index_ptr][i] != -1 && map_distance[index_ptr][i] != 0 && !path_mark[i] &&
+        //            map_distance[index_ptr][i] > max_dist)
+        //            //        {
+        //            //            max_dist = map_distance[index_ptr][i];
+        //            //            index_temp = i;
+        //            //            is_next = false;
+        //            //        }
+        //            //    }
+        //
+        //            //    if (is_next)
+        //            //    {
+        //            //        for (int i = 0; i < path_mark.size(); i++)
+        //            //        {
+        //            //            if (!path_mark[i])
+        //            //            {
+        //            //                index_ptr = i;
+        //            //                path.push_back(index_ptr);
+        //            //                break;
+        //            //            }
+        //            //        }
+        //            //    }
+        //            //    else
+        //            //    {
+        //            //        path.push_back(index_temp);
+        //            //         index_ptr = index_temp;
+        //            //    }
+        //            //    //path_mark[index_temp] = true;
+        //            //}
+        //
+        //            //------------------merge--------------
+        //
+        //            std::vector<std::vector<int>> path_container;
+        //            std::vector<std::vector<bool>> mark_map(map_distance.size(), std::vector<bool>(map_distance.size(), false));
+        //            while (true)
+        //            {
+        //                float v = std::numeric_limits<float>::min();
+        //                int begin_idx = -1;
+        //                int end_idx = -1;
+        //                for (int i = 0; i < map_distance.size(); i++)
+        //                {
+        //                    for (int j = i + 1; j < map_distance[i].size(); j++)
+        //                    {
+        //                        if (!mark_map[i][j] && map_distance[i][j] > v)
+        //                        {
+        //                            v = map_distance[i][j];
+        //                            begin_idx = i;
+        //                            end_idx = j;
+        //                        }
+        //                    }
+        //                }
+        //                if (begin_idx == -1 || end_idx == -1)
+        //                {
+        //                    break;
+        //                }
+        //                mark_map[begin_idx][end_idx] = true;
+        //                mark_map[end_idx][begin_idx] = true;
+        //                path_container.push_back(std::vector<int>());
+        //                path_container.back().push_back(begin_idx);
+        //                path_container.back().push_back(end_idx);
+        //            }
+        //
+        //            if (path_container.empty())
+        //                goto outdoor;
+        //
+        //            std::vector<bool> path_mark(path_container.size(),false);
+        //            std::vector<bool> block_mark(polyline_rot.size(),false);
+        //
+        //            auto find_next_block = [&](int in)->std::vector<std::pair<int,int>>{
+        //                std::vector<std::pair<int,int>> result;
+        //                for (int i = 0; i < path_container.size(); i++)
+        //                {
+        //                    if (!path_mark[i])
+        //                    {
+        //                        if (path_container[i][0] == in)
+        //                        {
+        //                            if(!block_mark[path_container[i][1]])
+        //                                result.push_back(std::make_pair(path_container[i][1],i));
+        //                        }
+        //                        else if (path_container[i][1] == in)
+        //                        {
+        //                            if(!block_mark[path_container[i][0]])
+        //                                result.push_back(std::make_pair(path_container[i][0],i));
+        //                        }
+        //                    }
+        //                }
+        //                return result;
+        //            };
+        //
+        //
+        //            //0:down 1:up
+        //            auto find_path = [&](int next_step,bool orient)->std::vector<int> {
+        //                int nx = next_step;
+        //                std::vector<int> result;
+        //                if(!block_mark[nx])
+        //                    result = { nx };
+        //                block_mark[nx] = true;
+        //                while (1)
+        //                {
+        //                    float max_dist = std::numeric_limits<float>::min();
+        //                    std::vector<std::pair<int, int>> sl = find_next_block(nx);
+        //                    if (sl.empty())
+        //                        return result;
+        //
+        //                    int index = -1;
+        //                    for (int i = 0; i < sl.size(); i++)
+        //                    {
+        //                        if (orient)
+        //                        {
+        //                            if (polyline_rot[sl[i].first][0].y() < polyline_rot[nx].points[0].y())
+        //                                continue;
+        //                        }
+        //                        else {
+        //                            if (polyline_rot[sl[i].first][0].y() > polyline_rot[nx].points[0].y())
+        //                                continue;
+        //                        }
+        //                        int x = path_container[sl[i].second][0];
+        //                        int y = path_container[sl[i].second][1];
+        //                        if (max_dist < map_distance[x][y])
+        //                        {
+        //                            max_dist = map_distance[x][y];
+        //                            index = i;
+        //                        }
+        //                    }
+        //                    if (index != -1)
+        //                    {
+        //                        path_mark[sl[index].second] = true;
+        //                        if(!block_mark[sl[index].first])
+        //                            result.push_back(sl[index].first);
+        //                        block_mark[sl[index].first] = true;
+        //                        nx = sl[index].first;
+        //                    }
+        //                    else
+        //                        return result;
+        //                }
+        //            };
+        //
+        //            auto find_lines = [&](int bn)->std::vector<int> {
+        //                int in1 = path_container[bn][0];
+        //                int in2 = path_container[bn][1];
+        //                path_mark[bn] = true;
+        //                std::vector<int> tr;
+        //                std::vector<int> br;
+        //                if (polyline_rot[in1][0].y() > polyline_rot[in2][0].y())
+        //                {
+        //                    tr=find_path(in1,1);
+        //                    std::sort(tr.begin(), tr.end());
+        //                    br=find_path(in2,0);
+        //                    std::sort(br.begin(),br.end());
+        //                }
+        //                else {
+        //                    tr=find_path(in1,0);
+        //                    std::sort(tr.begin(), tr.end());
+        //                    br=find_path(in2,1);
+        //                    std::sort(br.begin(),br.end());
+        //                }
+        //                tr.reserve(tr.size()+br.size());
+        //                tr.insert(tr.end(),br.begin(),br.end());
+        //                return tr;
+        //            };
+        //
+        //            std::vector<int> path;
+        //            std::vector<std::vector<int>> path_array;
+        //            for (int i = 0; i < path_container.size(); i++)
+        //            {
+        //                if (!path_mark[i])
+        //                {
+        //                    path_array.push_back(std::vector<int>());
+        //                    path_array.back() = find_lines(i);
+        //                }
+        //            }
+        //            for (int i = 0; i < path_array.size(); i++)
+        //            {
+        //                path.insert(path.end(), path_array[i].begin(), path_array[i].end());
+        //            }
+
+        //---other----
+
+        Polylines poly_vec;
+        Polylines return_polylines;
+        for (size_t i = 0; i < polyline_baseline.size(); i++) {
+            poly_vec.push_back(Polyline());
+            return_polylines.push_back(Polyline());
+            for (size_t j = 0; j < polyline_baseline[i].size(); j++) {
+                if (j == 0) {
+                    poly_vec.back().points.push_back(polyline_baseline[i][j]);
+                    poly_vec.back().points.push_back(polyline_baseline[i][j + 1]);
+                    return_polylines.back().points.push_back(polylines[i][j]);
+                    return_polylines.back().points.push_back(polylines[i][j + 1]);
+                    j++;
+                    continue;
+                } else if (!poly_vec.back().empty() && std::abs(polyline_baseline[i][j].y() - polyline_baseline[i][j + 1].y()) < 10) {
+                    long long              d1   = std::abs(polyline_baseline[i][j].x() - polyline_baseline[i][j + 1].x());
+                    long long              d2   = std::abs(poly_vec.back().points.back().x() -
+                                            poly_vec.back().points[poly_vec.back().points.size() - 2].x());
+                    std::vector<long long> dist = {polyline_baseline[i][j].x(), polyline_baseline[i][j + 1].x(),
+                                                   poly_vec.back().points.back().x(),
+                                                   poly_vec.back().points[poly_vec.back().points.size() - 2].x()};
+                    std::sort(dist.begin(), dist.end());
+                    long long d = std::abs(dist.back() - dist.front());
+
+                    poly_vec.back().points.push_back(polyline_baseline[i][j]);
+                    poly_vec.back().points.push_back(polyline_baseline[i][j + 1]);
+                    return_polylines.back().points.push_back(polylines[i][j]);
+                    return_polylines.back().points.push_back(polylines[i][j + 1]);
+                    if (d >= d1 + d2 + 1800000 || std::abs(d1 - d2) > 2000000) {
+                        poly_vec.push_back(Polyline());
+                    }
+                    j++;
+                } else if (poly_vec.back().empty() && std::abs(polyline_baseline[i][j].y() - polyline_baseline[i][j + 1].y()) < 10) {
+                    poly_vec.back().points.push_back(polyline_baseline[i][j]);
+                    poly_vec.back().points.push_back(polyline_baseline[i][j + 1]);
+                    return_polylines.back().points.push_back(polylines[i][j]);
+                    return_polylines.back().points.push_back(polylines[i][j + 1]);
+                    j++;
+                } else if (std::abs(polyline_baseline[i][j].y() - polyline_baseline[i][j + 1].y()) > 5) {
+                    poly_vec.back().points.push_back(polyline_baseline[i][j]);
+                    return_polylines.back().points.push_back(polylines[i][j]);
+                } else {
+                    poly_vec.back().points.push_back(polyline_baseline[i][j]);
+                }
+            }
+        }
+
+        for (int i = 0; i < poly_vec.size(); i++)
+            if (poly_vec[i].points.empty()) {
+                poly_vec.erase(poly_vec.begin() + i);
+                i--;
+            }
+
+        std::sort(poly_vec.begin(), poly_vec.end(), [&](Polyline& a, Polyline& b) { return a.points[0].y() < b.points[0].y(); });
+
+        std::vector<bool> poly_vec_mark(poly_vec.size(), false);
+        int               index_ptr                  = 0;
+        poly_vec_mark[0]                             = true;
+        std::vector<int>              path_polylines = {0};
+        std::vector<std::vector<int>> path_demo;
+        path_demo.push_back(std::vector<int>() = {0});
+        while (1) {
+            std::vector<int> save_poly;
+            std::vector<int> pi_c;
+            for (int i = 0; i < poly_vec.size(); i++) {
+                if (!poly_vec_mark[i]) {
+                    int pi        = 0;
+                    int back_size = poly_vec[index_ptr].size();
+                    for (int j = 0; j < poly_vec[i].size(); j++) {
+                        if (std::abs(poly_vec[i][j].y() - poly_vec[i][j + 1].y()) < 20) {
+                            pi = j;
+                            break;
+                        }
+                    }
+
+                    if (std::abs(poly_vec[i][pi].y() - poly_vec[index_ptr].back().y()) < LINE_WIDTH * 1000.) {
+                        pi_c.push_back(pi);
+                        save_poly.push_back(i);
+                    }
+                }
+            }
+
+            //------------maybe big change--------------
+            int p_size = poly_vec[index_ptr].size();
+
+            long long left  = poly_vec[index_ptr].back().x();
+            long long right = poly_vec[index_ptr][poly_vec[index_ptr].size() - 2].x();
+            if (p_size >= 4) {
+                if (std::abs(poly_vec[index_ptr][p_size - 3].y() - poly_vec[index_ptr][p_size - 4].y()) < 20) {
+                    std::vector<long long> x1 = {poly_vec[index_ptr][p_size - 1].x(), poly_vec[index_ptr][p_size - 2].x()};
+                    std::sort(x1.begin(), x1.end());
+                    std::vector<long long> x2 = {poly_vec[index_ptr][p_size - 3].x(), poly_vec[index_ptr][p_size - 4].x()};
+                    std::sort(x2.begin(), x2.end());
+                    if (std::abs(x1.front() - x2.front()) > 2800 * 1000) {
+                        if (std::abs(x1.front() - x2.front()) >
+                            std::abs(poly_vec[index_ptr].back().x() - poly_vec[index_ptr][poly_vec[index_ptr].size() - 2].x())) {
+                            left  = x1.front() > x2.front() ? x2.front() : x1.front();
+                            right = x1.front() > x2.front() ? x1.front() : x2.front();
+                        }
+                    }
+                    if (std::abs(x1.back() - x2.back()) > 2800 * 1000) {
+                        if (std::abs(x1.back() - x2.back()) >
+                            std::abs(poly_vec[index_ptr].back().x() - poly_vec[index_ptr][poly_vec[index_ptr].size() - 2].x())) {
+                            left  = x1.back() > x2.back() ? x2.back() : x1.back();
+                            right = x1.back() > x2.back() ? x1.back() : x2.back();
+                        }
+                    }
+                }
+            }
+        
+
+            std::vector<int> index_container;
+            for (int i = 0; i < save_poly.size(); i++) {
+                long long              bs     = std::abs(poly_vec[save_poly[i]][pi_c[i]].x() - poly_vec[save_poly[i]][pi_c[i] + 1].x());
+                long long              ts     = std::abs(left - right);
+                std::vector<long long> x_sort = {poly_vec[save_poly[i]][pi_c[i]].x(), poly_vec[save_poly[i]][pi_c[i] + 1].x(), left, right};
+
+                std::sort(x_sort.begin(), x_sort.end());
+                long long dd = x_sort.back() - x_sort.front();
+
+                if (dd < bs + ts && (bs - ts) < ts) {
+                    index_container.push_back(save_poly[i]);
+                }
+            }
+
+            int       index      = -1;
+            long long max_x_span = std::numeric_limits<long long>::min();
+            for (int i = 0; i < index_container.size(); i++) {
+                long long x_span = std::abs(poly_vec[index_container[i]][0].x() - poly_vec[index_container[i]][1].x());
+                if (x_span > max_x_span) {
+                    index      = index_container[i];
+                    max_x_span = x_span;
+                }
+            }
+
+            if (index != -1) {
+                path_polylines.push_back(index);
+                path_demo.back().push_back(index);
+                poly_vec_mark[index] = true;
+                index_ptr            = index;
+            }
+
+            bool is_brk = true;
+            for (int i = 0; i < poly_vec_mark.size(); i++) {
+                if (!poly_vec_mark[i]) {
+                    if (index == -1) {
+                        index_ptr = i;
+                        path_polylines.push_back(i);
+                        path_demo.push_back(std::vector<int>());
+                        path_demo.back().push_back(i);
+                        poly_vec_mark[i] = true;
+                    }
+                    is_brk = false;
+                    break;
+                }
+            }
+            if (is_brk)
+                break;
+        }
+
+        //---------------------------------------------------------
+
+        /*std::sort(path_demo.begin(), path_demo.end(), [&](std::vector<int>& a,std::vector<int>& b) {
+            return poly_vec[a[0]].points[0].y() > poly_vec[b[0]].points[0].y();
+            });*/
+
+        // std::vector<bool> reverse_bool(poly_vec.size(),false);
+        // std::vector<int> ys;
+        // for (int i = 0; i < poly_vec.size(); i++)
+        //{
+        //     for (int j = 0; j < poly_vec.size(); j++)
+        //     {
+        //         if (i != j&&!reverse_bool[i]&&!reverse_bool[j])
+        //         {
+        //             if (std::abs(poly_vec[i].back().y() - poly_vec[j][0].y()) < LINE_WIDTH * 1000)
+        //             {
+        //                 long long bs = std::abs(poly_vec[i].back().x() - poly_vec[i][poly_vec[i].size()-2].x());
+        //                 long long ts = std::abs(poly_vec[j][0].x() - poly_vec[j][1].y());
+        //                 std::vector<long long> x_sort = {poly_vec[i].back().x(),poly_vec[i][poly_vec[i].size()-2].x(),
+        //                    poly_vec[j][0].x(),poly_vec[j][1].y()};
+
+        //                std::sort(x_sort.begin(), x_sort.end());
+        //                long long dd = x_sort.back() - x_sort.front();
+        //
+        //                if (dd < bs + ts)
+        //                {
+        //                    //poly_vec[i][poly_vec[i].size() - 1] =
+        //                    Point(poly_vec[i][poly_vec[i].size()-1].x(),poly_vec[i][poly_vec[i].size() - 1].y()-5800);
+        //                    //poly_vec[i][poly_vec[i].size() - 2] =
+        //                    Point(poly_vec[i][poly_vec[i].size()-2].x(),poly_vec[i][poly_vec[i].size() - 2].y()-5800); int index =
+        //                    poly_vec[i][0].y() > poly_vec[j][0].y() ? j : i; ys.push_back(index); reverse_bool[index] = true;
+        //                }
+        //                break;
+        //            }
+        //        }
+        //    }
+        //}
+
+        /* std::ofstream outfile("output.txt");
+         for (int i = 0; i < poly_vec.size(); i++)
+         {
+             outfile << "------" << i << "---------" << std::endl;
+             for (int j = 0; j < poly_vec[i].size(); j++)
+             {
+                 outfile << "(" << poly_vec[i][j].x() << "," << poly_vec[i][j].y() << ")" << std::endl;
+             }
+             outfile << " " << std::endl;
+         }
+         outfile.close();*/
+
+        std::vector<std::vector<int>> path_demo1;
+        std::vector<bool>             mark_path_demo(path_demo.size(), false);
+        for (int i = 0; i < path_demo.size(); i++) {
+            for (int n = 0; n < path_demo[i].size(); n++) {
+                for (int j = 0; j < path_demo.size(); j++) {
+                    if (i != j && !mark_path_demo[j]) {
+                        // for (int k = 0; k < poly_vec[path_demo[i][n]].points.size(); k++)
+                        {
+                            float by = poly_vec[path_demo[i][n]].points[0].y(); //...
+                            float ty = poly_vec[path_demo[j].back()].points.back().y();
+                            if ((by - ty) < LINE_WIDTH * 1000 && (by - ty) > 0) {
+                                //----is cover----------
+                                long long bs = std::abs(poly_vec[path_demo[i][n]].points[0].x() - poly_vec[path_demo[i][n]].points[1].x());
+                                long long ts = std::abs(
+                                    poly_vec[path_demo[j].back()].points.back().x() -
+                                    poly_vec[path_demo[j].back()].points[poly_vec[path_demo[j].back()].points.size() - 2].x());
+                                std::vector<long long> x_sort =
+                                    {poly_vec[path_demo[i][n]].points[0].x(), poly_vec[path_demo[i][n]].points[1].x(),
+                                     poly_vec[path_demo[j].back()].points.back().x(),
+                                     poly_vec[path_demo[j].back()].points[poly_vec[path_demo[j].back()].points.size() - 2].x()};
+
+                                std::sort(x_sort.begin(), x_sort.end());
+                                long long dd = x_sort.back() - x_sort.front();
+                                if (dd < bs + ts) {
+                                    mark_path_demo[j] = true;
+                                    path_demo1.push_back(std::vector<int>());
+                                    for (int m = 0; m < n; m++) {
+                                        path_demo1.back().push_back(path_demo[i][m]);
+                                    }
+                                    path_demo1.push_back(std::vector<int>());
+                                    for (int m = 0; m < path_demo[j].size(); m++) {
+                                        path_demo1.back().push_back(path_demo[j][m]);
+                                    }
+                                    path_demo1.push_back(std::vector<int>());
+                                    for (int m = n; m < path_demo[i].size(); m++) {
+                                        path_demo1.back().push_back(path_demo[i][m]);
+                                    }
+                                    goto outside;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!mark_path_demo[i]) {
+                path_demo1.push_back(std::vector<int>());
+                for (int n = 0; n < path_demo[i].size(); n++) {
+                    path_demo1.back().push_back(path_demo[i][n]);
+                }
+            }
+        outside:
+            continue;
+        }
+
+        for (int i = 0; i < poly_vec.size(); i++) {
+            for (int j = 0; j < poly_vec[i].points.size(); j++) {
+                Eigen::Vector2d   point(poly_vec[i].points[j][0], poly_vec[i].points[j][1]);
+                double            angle = (double) rot_angle;
+                Eigen::Rotation2D rotation(angle);
+                Eigen::Vector2d   rotated_point = rotation * point;
+                poly_vec[i].points[j]           = (Point((double) rotated_point[0], (double) rotated_point[1]));
+            }
+        }
+
+        // for (int i = 0; i < ys.size(); i++)
+        //{
+        //     //poly_vec[ys[i]].points.clear();
+        //     for (int j = 0,k=poly_vec[ys[i]].points.size()-1; j < k; j++,k--)
+        //     {
+        //         Point tmp = poly_vec[ys[i]].points[j];
+        //         poly_vec[ys[i]].points[j] = poly_vec[ys[i]].points[k];
+        //         poly_vec[ys[i]].points[k] = tmp;
+        //     }
+        // }
+
+        std::vector<int> path_demo_total;
+        for (int i = 0; i < path_demo1.size(); i++)
+            for (int j = 0; j < path_demo1[i].size(); j++) {
+                bool insert = true;
+                for (int n = 0; n < path_demo_total.size(); n++) {
+                    if (path_demo1[i][j] == path_demo_total[n]) {
+                        insert = false;
+                    }
+                }
+                if (insert)
+                    path_demo_total.push_back(path_demo1[i][j]);
+            }
+
+        polylines.clear();
+        for (int i = 0; i < path_demo_total.size(); i++) {
+            polylines.push_back(poly_vec[path_demo_total[i]]);
+        }
+        /*for (int i = 0; i < path_demo1.size(); i++)
+        {
+            for (int j = 0; j < path_demo1[i].size(); j++)
+            {
+                polylines.push_back(poly_vec[path_demo1[i][j]]);
+            }
+        }*/
+        poly_vec.clear();
+
+        // polylines.clear();
+        // std::vector<bool> pcp(polyline_copy.size(), false);
+        // for (int i = 0; i < path.size(); i++)
+        //{
+        //    polylines.push_back(polyline_copy[path[i]]);
+        //   // pcp[path[i]] = true;
+        //   /* for (int j = 0; j < polylines[i].size(); j++)
+        //    {
+        //        outfile << "(" << polylines[i].points[j][0]<< "," << polylines[i].points[j][1] << ")" << std::endl;
+        //    }
+        //    outfile << " "<< std::endl;*/
+        //}
+        /* outfile.close();
+         for (int i = 0; i < pcp.size(); i++)
+         {
+             if (!pcp[i])
+                 polylines.push_back(polyline_copy[i]);
+         }*/
+
+        /*std::vector<bool> mark_path(path_container.size(), false);
+        int path_index = 0;
+        mark_path[0] = true;
+        std::vector<int> path = path_container[0];
+        while (true)
+        {
+            int before_index = path_index;
+            for (int i = 0; i < path_container.size(); i++)
+            {
+                if (!mark_path[i])
+                {
+                    if (path_container[path_index][1] == path_container[i][0])
+                    {
+                        path.push_back(path_container[i][1]);
+                        mark_path[i] = true;
+                        path_index = i;
+                        break;
+                    }
+                }
+            }
+
+            bool is_brk = true;
+            for (int i = 0; i < mark_path.size(); i++)
+            {
+                if (!mark_path[i])
+                    is_brk = false;
+            }
+            if (is_brk)
+                break;
+
+            if (before_index == path_index)
+            {
+                for (int i = 0; i < mark_path.size(); i++)
+                    if (!mark_path[i])
+                    {
+                        path_index = i;
+                        mark_path[i] = true;
+                        path.push_back(path_container[i][0]);
+                        path.push_back(path_container[i][1]);
+                        break;
+                    }
+            }
+        }
+
+
+        for (int i = 0; i < map_distance.size(); i++)
+        {
+            bool is_lost = true;
+            for (int j = 0; j < path.size(); j++)
+            {
+                if (i == path[j])
+                {
+                    is_lost = false;
+                }
+            }
+
+            if (is_lost)
+                path.push_back(i);
+        }*/
+
+#endif
+
+        /*std::sort(areas_container.begin(), areas_container.end(), [](std::pair<double, int>& a, std::pair<double, int>& b) {
+            if (a.first > b.first)
+                return true;
+            else
+                return false;
+            });*/
+        /* Polylines polylines_copy;
+         for (int i = 0; i < sort_distance.size(); i++)
+             polylines_copy.push_back(polylines[sort_distance[i]]);
+
+         polylines.clear();
+         polylines = polylines_copy;*/
+
+        //---------swap----------
+        // mark_polylines
+        /*Polylines polyline_temp=polylines;
+        for (int i = 0; i < polylines.size(); i++)
+        {
+            polyline_temp[i].points.clear();
+            for (int j = 0; j < polylines[i].points.size(); j++)
+            {
+                if (mark_polylines[i][j])
+                    continue;
+                else
+                {
+                    polyline_temp[i].points.push_back(polylines[i].points[j]);
+                }
+            }
+        }
+
+        polylines.clear();
+        polylines = polyline_temp;*/
+
+        // merge-->separate
+
+        // std::sort(poly_tatal.points.begin(), poly_tatal.points.end(), [](Point& a, Point& b) {
+        //     return a.y() < b.y();
+        //     });
+
+        //
+        // Polylines poly_container;
+        // std::vector<bool> poly_mark(poly_tatal.points.size(),false);
+        // while (1)
+        //{
+        //    bool is_break=true;
+        //    Polyline poly_path;
+        //    int current_index = 0;
+        //    for (size_t i = 0; i < poly_tatal.size(); i++)//maybe lose but it is impossible
+        //    {
+        //        if (!poly_mark[i] && std::abs(poly_tatal[i].y()-poly_tatal[i+1].y())<60)
+        //        {
+        //            poly_path.points.push_back(poly_tatal[i]);
+        //            poly_path.points.push_back(poly_tatal[i+1]);
+        //            poly_mark[i] = true;
+        //            poly_mark[i + 1] = true;
+        //            current_index = i;
+        //            is_break = false;
+        //            break;
+        //        }
+        //    }
+        //    if (is_break)
+        //        break;
+        //
+        //    int index_ptr = current_index;
+        //    for (size_t i = current_index; i < poly_tatal.size(); i++)
+        //    {
+        //        if (poly_mark[i])
+        //            continue;
+        //        if (std::abs(poly_tatal[i].y() - poly_tatal[i + 1].y()) > 1000 && std::abs(poly_tatal[i].y() - poly_tatal[i + 1].y()) <
+        //        LINE_WIDTH*1000&&
+        //            std::abs(poly_tatal[i].y() - poly_tatal[index_ptr].y())<LINE_WIDTH*1000 &&
+        //            (std::abs(poly_tatal[i].x() - poly_tatal[index_ptr].x())<1200000.f||std::abs(poly_tatal[i].x() -
+        //            poly_tatal[index_ptr+1].x())<1200000.f))
+        //        {
+        //            poly_path.points.push_back(poly_tatal[i]);
+        //            poly_mark[i] = true;
+        //            continue;
+        //        }
+        //        // need to find overcover are,if cover then add it
+        //        if (std::abs(poly_tatal[i].y() - poly_tatal[i + 1].y()) < 1000 &&std::abs(poly_tatal[i].y() - poly_tatal[index_ptr].y()) <
+        //        LINE_WIDTH*1000 &&
+        //            (std::abs(poly_tatal[i].x() - poly_tatal[index_ptr].x())<1200000.f||std::abs(poly_tatal[i+1].x() -
+        //            poly_tatal[index_ptr].x())<1200000.f||
+        //                std::abs(poly_tatal[i].x() - poly_tatal[index_ptr+1].x())<1200000.f||std::abs(poly_tatal[i+1].x() -
+        //                poly_tatal[index_ptr+1].x())<1200000.f))
+        //        {
+        //            // is cover
+        //            long long distance_two_line = std::abs(poly_tatal[i + 1].x() - poly_tatal[i].x()) + std::abs(poly_tatal[index_ptr].x()
+        //            - poly_tatal[index_ptr+1].x()); std::vector<long long> point_d =
+        //            {poly_tatal[i].x(),poly_tatal[i+1].x(),poly_tatal[index_ptr].x() , poly_tatal[index_ptr+1].x()};
+        //            std::sort(point_d.begin(),point_d.end());
+        //            long long distance_tatal = point_d.back() - point_d[0];
+        //            if (distance_tatal<distance_two_line)
+        //            {
+        //                poly_path.points.push_back(poly_tatal[i]);
+        //                poly_path.points.push_back(poly_tatal[i + 1]);
+        //                index_ptr = i;
+        //                poly_mark[i] = true;
+        //                poly_mark[i + 1] = true;
+        //            }
+        //        }
+        //    }
+        //
+
+        //    if (!poly_path.empty())
+        //    {
+        //        poly_container.push_back(poly_path);
+        //    }
+        //}
+
+        // for (int i = 0; i < poly_container.size(); i++)
+        //{
+        //     for (int j = 0; j < poly_container[i].points.size(); j++)
+        //     {
+        //         Eigen::Vector2d point(poly_container[i].points[j][0],poly_container[i].points[j][1]);
+        //         double angle = M_PI / 4.0f;
+        //         Eigen::Rotation2D rotation(angle);
+        //         Eigen::Vector2d rotated_point = rotation * point;
+        //         outfile << "(" << poly_container[i].points[j][0]<< "," << poly_container[i].points[j][1] << ")" << std::endl;
+        //         poly_container[i].points[j]=(Point((double)rotated_point[0],(double)rotated_point[1]));
+        //     }
+        //      outfile << " " << std::endl;
+        // }
+        // outfile.close();
+
+        // polylines.clear();
+        // polylines = poly_container;
+
+        // std::sort(polyline_baseline.begin(), polyline_baseline.end(), [&](Polyline &a,Polyline &b){
+        //     return a.points[0].y() < b.points[0].y();
+        //     });
+
+        // std::vector<bool> polyline_mark(polyline_baseline.size(),false);
+        // std::vector<int> path_a;
+        // int polyline_index=-1;
+        // while (1)
+        //{
+        //     if (polyline_index == -1)
+        //     {
+        //         for (int i = 0; i < polyline_mark.size(); i++)
+        //         {
+        //             if (!polyline_mark[i])
+        //             {
+        //                 polyline_index = i;
+        //                 break;
+        //             }
+        //         }
+        //     }
+        //     if (polyline_index == -1)
+        //         break;
+        //     path_a.push_back(polyline_index);
+        //     polyline_mark[polyline_index] = true;
+        //
+
+        //    float standard_y = polyline_baseline[polyline_index].points.back().y();
+        //    float standard_x = polyline_baseline[polyline_index].points.back().x();
+        //    std::vector<int> path_next;
+        //    for (int i = 0; i < polyline_baseline.size(); i++)
+        //    {
+        //        if (!polyline_mark[i] && polyline_baseline[i].points[0].y() - standard_y < LINE_WIDTH &&
+        //            (std::abs(polyline_baseline[i].points[0].x()-standard_x)<1200.f ||
+        //            std::abs(polyline_baseline[i].points[1].x()-standard_x)<1200.f))//this maybe lose
+        //        {
+        //            path_next.push_back(i);
+        //        }
+        //    }
+
+        //    int max_i = -1;
+        //    float max_dx = std::numeric_limits<float>::min();
+        //    for (int i = 0; i < path_next.size(); i++)
+        //    {
+        //        float dx = std::abs(polyline_baseline[path_next[i]].points[0].x() - polyline_baseline[path_next[i]].points[1].x());
+        //        if (dx > max_dx)
+        //        {
+        //            max_i = path_next[i];
+        //            max_dx = dx;
+        //        }
+        //    }
+        //    polyline_index = max_i;
+        //}
+
+        // for (int i = 0; i < polyline_baseline.size(); i++)
+        //{
+        //     for (int j = 0; j < polyline_baseline[i].points.size(); j++)
+        //     {
+        //         Eigen::Vector2d point(polyline_baseline[i].points[j][0] * 1000.f, polyline_baseline[i].points[j][1] * 1000.f);
+        //         double angle = M_PI / 4.0f;
+        //         Eigen::Rotation2D rotation(angle);
+        //         Eigen::Vector2d rotated_point = rotation * point;
+        //         polyline_baseline[i].points[j]=(Point(rotated_point[0],rotated_point[1]));
+        //     }
+        // }
+
+        // polylines.clear();
+        // for (int i = 0; i < path_a.size(); i++)
+        //{
+        //     polylines.push_back(polyline_baseline[path_a[i]]);
+        // }
+
+        break;
+    }
+
+outdoor:
     if (!polylines.empty() || !thick_polylines.empty()) {
         // calculate actual flow from spacing (which might have been adjusted by the infill
         // pattern generator)
         double flow_mm3_per_mm = params.flow.mm3_per_mm();
-        double flow_width = params.flow.width();
+        double flow_width      = params.flow.width();
         if (params.using_internal_flow) {
             // if we used the internal flow we're not doing a solid infill
             // so we can safely ignore the slight variation that might have
             // been applied to f->spacing
-        }
-        else {
-            Flow new_flow = params.flow.with_spacing(this->spacing);
+        } else {
+            Flow new_flow   = params.flow.with_spacing(this->spacing);
             flow_mm3_per_mm = new_flow.mm3_per_mm();
-            flow_width = new_flow.width();
+            flow_width      = new_flow.width();
         }
         // Save into layer.
         ExtrusionEntityCollection* eec = nullptr;
@@ -164,18 +2013,15 @@ void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& para
             Flow new_flow = params.flow.with_spacing(float(this->spacing));
             variable_width(thick_polylines, params.extrusion_role, new_flow, eec->entities);
             thick_polylines.clear();
-        }
-        else {
-            extrusion_entities_append_paths(
-                eec->entities, std::move(polylines),
-                params.extrusion_role,
-                flow_mm3_per_mm, float(flow_width), params.flow.height());
+        } else {
+            extrusion_entities_append_paths(eec->entities, std::move(polylines), params.extrusion_role, flow_mm3_per_mm, float(flow_width),
+                                            params.flow.height());
         }
         if (!params.can_reverse) {
             for (size_t i = idx; i < eec->entities.size(); i++)
                 eec->entities[i]->set_reverse();
         }
-        
+
         // Orca: run gap fill
         this->_create_gap_fill(surface, params, eec);
     }

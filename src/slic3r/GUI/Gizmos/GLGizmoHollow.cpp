@@ -14,6 +14,8 @@
 #include "libslic3r/PresetBundle.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #define MAX_SIZE std::string_view { "9999.99" }
 #define MAX(a,b)	((a)>(b)?(a):(b))

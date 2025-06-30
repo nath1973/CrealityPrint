@@ -7,6 +7,7 @@
 #include "Geometry/VoronoiUtils.hpp"
 #include "MutablePolygon.hpp"
 #include "format.hpp"
+#include "libslic3r/ModelVolume.hpp"
 
 #include <utility>
 #include <unordered_set>

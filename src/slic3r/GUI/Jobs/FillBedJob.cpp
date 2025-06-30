@@ -1,11 +1,13 @@
 #include "FillBedJob.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/ModelArrange.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "libnest2d/common.hpp"
 
 #include <numeric>
@@ -41,11 +43,19 @@ void FillBedJob::prepare()
     BoundingBox plate_bb = plate->get_bounding_box_crd();
     int plate_cols = plate_list.get_plate_cols();
     int cur_plate_index = plate->get_index();
+    bool is_seq_print = plate->get_real_print_seq() == PrintSequence::ByObject;
+    PrintSequence global_print_seq = wxGetApp().global_print_sequence();
+    PrintSequence curr_plate_seq = plate->get_print_seq();
+    if(curr_plate_seq == PrintSequence::ByObject && global_print_seq != PrintSequence::ByObject) {
+        params.is_seq_print = true;
+    }
 
     ModelObject *model_object = m_plater->model().objects[m_object_idx];
     if (model_object->instances.empty()) return;
 
     const Slic3r::DynamicPrintConfig& global_config = wxGetApp().preset_bundle->full_config();
+    auto extruder_clearance_radius = global_config.option<ConfigOptionFloat>("extruder_clearance_radius");
+
     m_selected.reserve(model_object->instances.size());
     for (size_t oidx = 0; oidx < model.objects.size(); ++oidx)
     {
@@ -55,8 +65,24 @@ void FillBedJob::prepare()
             bool selected = (oidx == m_object_idx);
 
             ArrangePolygon ap = get_instance_arrange_poly(mo->instances[inst_idx], global_config);
+            
+            // need to consider current plate print sequence
+            if(global_print_seq == PrintSequence::ByLayer) {
+                if(curr_plate_seq == PrintSequence::ByObject) {
+                    ap.brim_width += extruder_clearance_radius->getFloat();
+                }
+            } else { // global print sequence is ByObject
+                if(curr_plate_seq == PrintSequence::ByDefault || curr_plate_seq == PrintSequence::ByObject) {
+                    ap.brim_width += extruder_clearance_radius->getFloat();
+                }
+            }
+
             BoundingBox ap_bb = ap.transformed_poly().contour.bounding_box();
-            ap.height = 1;
+
+            if(!is_seq_print) {
+                ap.height = 1;
+            }
+            
             ap.name = mo->name;
 
             if (selected)
@@ -146,7 +172,12 @@ void FillBedJob::prepare()
 
     double sc = scaled<double>(1.) * scaled(1.);
 
-    auto polys = offset_ex(m_selected.front().poly, params.min_obj_distance / 2);
+    float delta = params.min_obj_distance / 2;
+    if(is_seq_print) {
+        delta = scaled(m_selected.front().brim_width / 2);
+    }
+
+    auto polys = offset_ex(m_selected.front().poly, delta);
     ExPolygon poly = polys.empty() ? m_selected.front().poly : polys.front();
     double poly_area = poly.area() / sc;
     double unsel_area = std::accumulate(m_unselected.begin(),
@@ -173,7 +204,11 @@ void FillBedJob::prepare()
         ArrangePolygon ap = template_ap;
         ap.poly = m_selected.front().poly;
         ap.bed_idx = PartPlateList::MAX_PLATES_COUNT;
-        ap.height = 1;
+
+        if(!is_seq_print) {
+            ap.height = 1;
+        }
+        
         ap.itemid = -1;
         ap.setter = [this, mi](const ArrangePolygon &p) {
             ModelObject *mo = m_plater->model().objects[m_object_idx];

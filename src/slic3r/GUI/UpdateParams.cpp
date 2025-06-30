@@ -47,33 +47,47 @@ int nsUpdateParams::CXCloud::getNeedUpdatePrintes(std::vector<std::string>& vtNe
 
     http.header("Content-Type", "application/json")
         .header("__CXY_REQUESTID_", to_string(uuid))
+        .timeout_connect(2)
+        .timeout_max(10)
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
-            json j = json::parse(body);
-            if (j["code"] != 0) {
-                nRet = 1; // «Î«Û ß∞‹
-
-                BOOST_LOG_TRIVIAL(error) << "CXCloud getNeedUpdatePrintes fail.code=" << j["code"];
+            if(status != 200)
+            {
+                BOOST_LOG_TRIVIAL(error) << "CXCloud getNeedUpdatePrintes fail.status=" << status;
+                nRet = 1; // error code
                 return;
             }
-            if (j.contains("result") && j["result"].contains("printerList") && j["result"]["printerList"].is_array()) {
-                for (auto& printer : j["result"]["printerList"]) {
-                    std::string printerName = "";
-                    if (printer.contains("nozzleDiameter") && printer["nozzleDiameter"].is_array()) {
-                        for (auto& nozzle : printer["nozzleDiameter"]) {
-                            printerName = "Creality " + printer["name"].get<std::string>() + " " + nozzle.get<std::string>() + " nozzle";
-                            std::string version = printer["showVersion"].get<std::string>();
-                            m_mapRemotePrinterVersion[printerName] = version;
-                            auto iter = m_mapLocalPrinterVersion.find(printerName);
-                            if (iter != m_mapLocalPrinterVersion.end()) {
-                                if (version > iter->second) {
-                                    vtNeedUpdatePrinter.push_back(printerName);
-                                }
-                            }
+            try{
+                json j = json::parse(body);
+                if (j["code"] != 0) {
+                    nRet = 1; // error code
 
+                    BOOST_LOG_TRIVIAL(error) << "CXCloud getNeedUpdatePrintes fail.code=" << j["code"];
+                    return;
+                }
+                if (j.contains("result") && j["result"].contains("printerList") && j["result"]["printerList"].is_array()) {
+                    for (auto& printer : j["result"]["printerList"]) {
+                        std::string printerName = "";
+                        if (printer.contains("nozzleDiameter") && printer["nozzleDiameter"].is_array()) {
+                            for (auto& nozzle : printer["nozzleDiameter"]) {
+                                printerName = "Creality " + printer["name"].get<std::string>() + " " + nozzle.get<std::string>() + " nozzle";
+                                std::string version = printer["showVersion"].get<std::string>();
+                                m_mapRemotePrinterVersion[printerName] = version;
+                                auto iter = m_mapLocalPrinterVersion.find(printerName);
+                                if (iter != m_mapLocalPrinterVersion.end()) {
+                                    if (version > iter->second) {
+                                        vtNeedUpdatePrinter.push_back(printerName);
+                                    }
+                                }
+
+                            }
                         }
                     }
                 }
+            } catch (std::exception& e) {
+                BOOST_LOG_TRIVIAL(error) << "CXCloud getNeedUpdatePrintes parse error: " << e.what();
+                nRet = 1; // error code
+                return;
             }
             m_bHasRequestedCXCloud = true;
             nRet = 0;
@@ -104,6 +118,7 @@ int nsUpdateParams::CXCloud::loadLocalPrinter() {
     //}
     auto cache_file = fs::path(data_dir()).append("system").append("Creality").append("profile_version.json");
     json cache_json;
+    try{
     if (fs::exists(cache_file)) {
         boost::nowide::ifstream ifs(cache_file.string());
         ifs >> cache_json;
@@ -113,6 +128,10 @@ int nsUpdateParams::CXCloud::loadLocalPrinter() {
             m_mapLocalPrinterVersion[item["name"].get<std::string>() + " " + item["nozzleDiameter"][0].get<std::string>() + " nozzle"] 
                 = item["showVersion"].get<std::string>();
         }
+    }
+    }catch(std::exception& e) {
+        fs::remove(cache_file);
+        BOOST_LOG_TRIVIAL(error) << "CXCloud loadLocalPrinter parse error: " << e.what();
     }
 
     return 0;

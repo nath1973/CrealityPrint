@@ -12,6 +12,11 @@
 #include "slic3r/GUI/print_manage/RemotePrinterManager.hpp"
 #include "slic3r/GUI/print_manage/Utils.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
+#include "libslic3r/Preset.hpp"
+#include "libslic3r/Thread.hpp"
+#include "slic3r/GUI/AnalyticsDataUploadManager.hpp"
+using namespace Slic3r;
 namespace DM {
     DeviceMgrRoutes::DeviceMgrRoutes()
     {
@@ -36,10 +41,18 @@ namespace DM {
             });
 
         // form device, real time update of the data
-        this->Handler({ "update_devices" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+        this->Handler({ "update_devices" }, [this](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
             DM::DataCenter::Ins().update_data(json_data);
             if (DM::DataCenter::Ins().is_current_device_changed()) {
                 wxPostEvent(wxGetApp().plater(), wxCommandEvent(EVT_CURRENT_DEVICE_CHANGED));
+            }
+            if (wxGetApp().obj_list()) {
+                wxPostEvent(wxGetApp().obj_list(), wxCommandEvent(EVT_UPDATE_DEVICES));
+            }
+            if(wxGetApp().mainframe->get_printer_mgr_view()->should_upload_device_info()) {
+                // upload analytics data here
+                AnalyticsDataUploadManager::getInstance().triggerUploadTasks(AnalyticsUploadTiming::ON_SOFTWARE_LAUNCH,
+                                                                        {AnalyticsDataEventType::ANALYTICS_DEVICE_INFO});
             }
 
             return true;
@@ -97,91 +110,74 @@ namespace DM {
 
             std::string url = json_data["url"].get<std::string>();
             std::string  sdp = json_data["sdp"].get<std::string>();
-            Slic3r::Http http = Slic3r::Http::post(url);
-
-            std::string localip = "";
-            try {
-                // 提取域名部分
-                std::string domain = DM::AppUtils::extractDomain(url);
-                // 创建一个 Boost.Asio 的 io_context 对象
-                boost::asio::io_context io_context;
-                // 创建一个 UDP 套接字
-                boost::asio::ip::udp::socket socket(io_context);
-                // 连接到一个公共的 UDP 地址和端口（Google 的公共 DNS 服务器）
-                socket.connect(boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(domain), 80));
-                // 获取本地端点信息
-                boost::asio::ip::udp::endpoint local_endpoint = socket.local_endpoint();
-                // 关闭套接字
-                socket.close();
-                // 返回本地 IP 地址的字符串表示
-                localip = local_endpoint.address().to_string();
-            }
-            catch (const std::exception& e) {
-                // 若出现异常，输出错误信息并返回空字符串
-                std::cerr << "Error: " << e.what() << std::endl;
-            }
-            if (!localip.empty())
-            {
-                std::string mdns_addr = "";
-                std::vector<std::string> tokens;
-                boost::split(tokens, sdp, boost::is_any_of("\n"));
-                for (const auto& token : tokens) {
-                    if (token.find("a=candidate") != std::string::npos) {
-                        std::vector<std::string> sub_tokens;
-                        boost::split(sub_tokens, token, boost::is_any_of(" "));
-                        mdns_addr = sub_tokens[4];
-                        break;
-                        //sdp = sdp.replace("a=candidate", "a=candidate" + " " + "raddr=" + localip);
-                    }
+            
+                std::string localip = "";
+                try {
+                    // 提取域名部分
+                    std::string domain = DM::AppUtils::extractDomain(url);
+                    // 创建一个 Boost.Asio 的 io_context 对象
+                    boost::asio::io_context io_context;
+                    // 创建一个 UDP 套接字
+                    boost::asio::ip::udp::socket socket(io_context);
+                    //socket.non_blocking(true); 
+                    // 连接到一个公共的 UDP 地址和端口（Google 的公共 DNS 服务器）
+                    //boost::system::error_code ec;
+                    socket.connect(boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(domain), 80));
+                   
+                    // 获取本地端点信息
+                    boost::asio::ip::udp::endpoint local_endpoint = socket.local_endpoint();
+                    // 关闭套接字
+                    socket.close();
+                    // 返回本地 IP 地址的字符串表示
+                    localip = local_endpoint.address().to_string();
                 }
-                if (!mdns_addr.empty())
+                catch (const std::exception& e) {
+                    // 若出现异常，输出错误信息并返回空字符串
+                    std::cerr << "Error: " << e.what() << std::endl;
+                }
+                if (!localip.empty())
                 {
-                    boost::algorithm::replace_first(sdp, mdns_addr, localip);
+                    std::string mdns_addr = "";
+                    std::vector<std::string> tokens;
+                    boost::split(tokens, sdp, boost::is_any_of("\n"));
+                    for (const auto& token : tokens) {
+                        if (token.find("a=candidate") != std::string::npos) {
+                            std::vector<std::string> sub_tokens;
+                            boost::split(sub_tokens, token, boost::is_any_of(" "));
+                            mdns_addr = sub_tokens[4];
+                            break;
+                            //sdp = sdp.replace("a=candidate", "a=candidate" + " " + "raddr=" + localip);
+                        }
+                    }
+                    if (!mdns_addr.empty())
+                    {
+                        boost::algorithm::replace_first(sdp, mdns_addr, localip);
+                    }
+
+                    //sdp = sdp.replace("
                 }
 
-                //sdp = sdp.replace("
-            }
 
+                nlohmann::json j;
+                j["type"] = "offer";
+                j["sdp"] = sdp;
 
-            nlohmann::json j;
-            j["type"] = "offer";
-            j["sdp"] = sdp;
+                std::string d = j.dump();
+                std::string e = cereal::base64::encode((unsigned char const*)d.c_str(), d.length());
 
-            std::string d = j.dump();
-            std::string e = cereal::base64::encode((unsigned char const*)d.c_str(), d.length());
-
-            http.header("Content-Type", "application/json")
-                .set_post_body(e)
-                .on_complete([&](std::string body, unsigned status) {
-                if (status != 200) {
-                    return;
-                }
-
-                nlohmann::json data;
-                data["body"] = body;
-                data["ret"] = true;
+                nlohmann::json out_data;
+                out_data["sdp"] = e;
+                out_data["url"] = url;
 
                 nlohmann::json commandJson;
                 commandJson["command"] = "get_webrtc_local_param";
-                commandJson["data"] = data;
-
-                AppUtils::PostMsg(browse, wxString::Format("window.handleStudioCmd('%s');", commandJson.dump(-1, ' ', true)).ToStdString());
-
-                    })
-                .on_error([&](std::string body, std::string error, unsigned status) {
-                        nlohmann::json data;
-                        data["body"] = body;
-                        data["ret"] = false;
-
-                        nlohmann::json commandJson;
-                        commandJson["command"] = "get_webrtc_local_param";
-                        commandJson["data"] = data;
-                        AppUtils::PostMsg(browse,
-                            wxString::Format("window.handleStudioCmd('%s');", commandJson.dump(-1, ' ', true)).ToStdString());
-                    })
-                        .perform_sync();
-
-                    return true;
+                commandJson["data"] = out_data;
+                auto strJS = commandJson.dump(-1, ' ', true);
+                wxGetApp().CallAfter([browse,strJS]{
+                        AppUtils::PostMsg(browse, wxString::Format("window.handleStudioCmd('%s');",strJS).ToStdString());
+                            });
+                
+                return true;
             });
 
         // set active device
@@ -189,7 +185,7 @@ namespace DM {
             std::string mac = json_data.contains("device_id") ? json_data["device_id"] : "";
             DM::DeviceMgr::Ins().SetCurrentDevice(mac);
             return true;
-            });
+            }); 
 
         this->Handler({ "get_current_device" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
 
@@ -248,7 +244,7 @@ namespace DM {
             device.model = json_data["model"];
             device.connectType = json_data["type"];
 
-            DM::DeviceMgr::Ins().UpdateDevice(device.address, device);
+            DM::DeviceMgr::Ins().UpdateDevice(device.mac, device);
             return true;
             });
         this->Handler({ "add_device" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
@@ -267,7 +263,24 @@ namespace DM {
             DM::DeviceMgr::Ins().AddDevice(group, device);
             return true;
             });
+        this->Handler({ "add_device_klipper" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
 
+            wxString strJS = wxString::Format("handleStudioCmd(%s)", json_data.dump(-1, ' ', true));
+
+            DM::DeviceMgr::Data device;
+            device.address = json_data["address"];
+            device.mac = json_data["mac"];
+            device.model = json_data["model"];
+            device.connectType = json_data["type"];
+            device.oldPrinter = json_data["oldPrinter"];
+            device.moonrakerPort = json_data["moonrakerPort"];
+            device.fluiddPort = json_data["fluiddPort"];
+            device.mainsailPort = json_data["mainsailPort"];
+
+            std::string group = json_data["group"];
+            DM::DeviceMgr::Ins().AddDevice(group, device);
+            return true;
+            });
         this->Handler({"remove_to_first"}, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
             DM::DeviceMgr::Data device;
             std::string         name = json_data["name"];
@@ -307,6 +320,61 @@ namespace DM {
             e.SetId(MainFrame::TabPosition::tpDeviceMgr); // printer details page
             wxPostEvent(wxGetApp().mainframe->topbar(), e);
 
+            return true;
+            });
+
+        this->Handler({"switch_to_tab"},[](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) { 
+            std::string tabName = json_data["tabName"];
+            std::string pageName = json_data["pageName"];
+            wxGetApp().switch_to_tab(tabName);
+            if (!pageName.empty()) {
+                wxGetApp().swith_community_sub_page(pageName);
+            }
+
+            return true;
+            });
+         this->Handler({ "get_model_match" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
+            std::string printmodelA = json_data["modelA"];
+            std::string printmodelB = json_data["modelB"];
+            int match_result = 0;
+            if(printmodelA != printmodelB)
+            {
+                Preset*     preset = Slic3r::GUI::wxGetApp().preset_bundle->printers.find_preset(printmodelA);
+                Preset*     preset2 = Slic3r::GUI::wxGetApp().preset_bundle->printers.find_preset(printmodelB);
+                if(preset &&preset2 )
+                {
+                    if(preset->config.has("printer_model") && preset2->config.has("printer_model"))
+                    {
+                        if(preset->config.opt_string("printer_model", true)== preset2->config.opt_string("printer_model", true))
+                        {
+                            match_result = 0;
+                        }else if(preset->config.has("gcode_flavor") && preset2->config.has("gcode_flavor"))
+                        {
+                            auto        flavor1 = preset->config.option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
+                            auto        flavor2 = preset2->config.option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
+                            if(flavor1 != flavor2)
+                            {
+                                match_result = 2;
+
+                            }else{
+                                
+                                match_result = 1;
+                            }
+                        }else{
+                                match_result = 1;
+                            }
+                        }
+                    
+                }else{
+                    match_result = 1;
+                }
+                
+                
+            }
+            nlohmann::json commandJson;
+                commandJson["command"] = "get_model_match";
+                commandJson["result"] = match_result;
+                AppUtils::PostMsg(browse, commandJson);
             return true;
             });
 

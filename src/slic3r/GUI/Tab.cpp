@@ -7,6 +7,7 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "WipeTowerDialog.hpp"
 
 #include "Search.hpp"
@@ -66,6 +67,8 @@
 #include "../Config/OptionConfig.h"
 
 #include "slic3r/GUI/ParamsDialog.hpp"
+#include "CommunicateWithCXCloud.hpp"
+#include "libslic3r/ModelVolume.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -245,7 +248,7 @@ void Tab::create_preset_tab()
     bool is_dark = wxGetApp().dark_mode();
     //add_scaled_button(panel, &m_btn_compare_preset, "compare");
     add_border_hover_icon(m_top_panel, &m_btn_save_preset, is_dark ? "save_dark_default" : "save_light_default", wxSize(FromDIP(24), FromDIP(24)));
-    add_border_hover_icon(m_top_panel, &m_btn_delete_preset, "cross", wxSize(FromDIP(24), FromDIP(24)));
+    add_border_hover_icon(m_top_panel, &m_btn_delete_preset, is_dark ? "cross" : "cross_light", wxSize(FromDIP(24), FromDIP(24)));
     //if (m_type == Preset::Type::TYPE_PRINTER)
     //    add_scaled_button(panel, &m_btn_edit_ph_printer, "cog");
 
@@ -1324,6 +1327,7 @@ void Tab::sys_color_changed()
 
     bool is_dark = wxGetApp().dark_mode();
     m_btn_save_preset->SetBitmap_(is_dark ?  "save_dark_default" : "save_light_default");  
+    m_btn_delete_preset->SetBitmap_(is_dark ? "cross" : "cross_light");  
     m_btn_search->SetBitmap_(is_dark ? "search" : "search_light");  
 
     if (m_detach_preset_btn)
@@ -2283,12 +2287,16 @@ void TabPrint::build()
         line.append_option(optgroup->get_option("overhang_2_4_speed"));
         line.append_option(optgroup->get_option("overhang_3_4_speed"));
         line.append_option(optgroup->get_option("overhang_4_4_speed"));
+        //line.append_option(optgroup->get_option("overhang_totally_speed"));
         optgroup->append_line(line);
         optgroup->append_separator();
+        optgroup->append_single_option_line("overhang_totally_speed");
         line = { L("Bridge"), L("Set speed for external and internal bridges") };
         line.append_option(optgroup->get_option("bridge_speed"));
         line.append_option(optgroup->get_option("internal_bridge_speed"));
         optgroup->append_line(line);
+        optgroup->append_single_option_line("smooth_speed_discontinuity_area");
+        optgroup->append_single_option_line("smooth_coefficient");
 
         optgroup = page->new_optgroup(L("Travel speed"), L"param_travel_speed", 15);
         optgroup->append_single_option_line("travel_speed");
@@ -3177,7 +3185,7 @@ void TabPrintPlate::on_value_change(const std::string& opt_key, const boost::any
                         for (int i = 0; i < wxGetApp().filaments_cnt(); i++) {
                             initial_sequence.push_back(i + 1);
                         }
-                        std::vector<LayerPrintSequence> initial_layer_sequence{ std::make_pair(std::make_pair(2, INT_MAX), initial_sequence) };
+                        std::vector<LayerPrintSequence> initial_layer_sequence{ std::make_pair(std::make_pair(2, INT_MAX-1), initial_sequence) };
                         plate->set_other_layers_print_sequence(initial_layer_sequence);
                     }
                     wxCommandEvent evt(EVT_OPEN_PLATESETTINGSDIALOG);
@@ -5929,6 +5937,11 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
 bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr*/, const std::string& new_printer_name /*= ""*/, bool no_transfer)
 {
     if (presets == nullptr) presets = m_presets;
+    if (wxGetApp().plater()->get_project_name() == _L("Untitled")) {
+        if (CXCloudDataCenter::getInstance().getFirstSelectProcessPreset() && wxGetApp().get_user().bLogin) {
+            return false;
+        }
+    }
 
     UnsavedChangesDialog dlg(m_type, presets, new_printer_name, no_transfer);
     if (dlg.ShowModal() == wxID_CANCEL)
@@ -6403,6 +6416,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach, bool save_to_proje
 
     // update preset comboboxes in DiffPresetDlg
     wxGetApp().mainframe->diff_dialog.update_presets(m_type);
+    CXCloudDataCenter::getInstance().setTokenInvalid(true);
 }
 
 // Called for a currently selected preset.
@@ -6537,7 +6551,7 @@ void Tab::delete_preset()
     } catch (...) {
         BOOST_LOG_TRIVIAL(error) << "delete preset failed";
     }
-    
+    CXCloudDataCenter::getInstance().setTokenInvalid(true);
 
     BOOST_LOG_TRIVIAL(info) << boost::format("delete preset finished");
 }
@@ -6847,7 +6861,7 @@ void TabPrinter::create_preset_tab()
     //m_btn_compare_preset->SetToolTip(_L("Compare presets"));
     // TRN "Save current Settings"
     m_btn_save_preset->SetToolTip(wxString::Format(_L("Save current %s"), m_title));
-    m_btn_delete_preset->SetToolTip(_(L("Delete this preset")));
+    m_btn_delete_preset->SetToolTip(_(L("Delete this preset1")));
     m_btn_delete_preset->Hide();
 
     /*add_scaled_button(panel, &m_question_btn, "question");
@@ -7374,6 +7388,17 @@ void Page::activate(ConfigOptionMode mode, std::function<void()> throw_if_cancel
     wxPanel* panel = new wxPanel(this->parent());
     panel->SetMinSize(wxSize(800, 0));
     m_vsizer->Add(panel);
+    try {
+        if (m_optgroups.size() > 0 && m_optgroups.front() != nullptr && !m_optgroups.front()->opt_map().empty()) {
+            const auto& first_opt = *m_optgroups.front()->opt_map().begin();
+            BOOST_LOG_TRIVIAL(warning) << "Activating page with first option: " << first_opt.first;
+        } else {
+            BOOST_LOG_TRIVIAL(warning) << "Page has no options in first group";
+        }
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << "Failed to get first option: " << e.what();
+    }
+    boost::log::core::get()->flush();
 
     for (auto group : m_optgroups) {
         if (!group->activate(throw_if_canceled))

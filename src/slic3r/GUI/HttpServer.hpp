@@ -39,40 +39,11 @@ class http_headers
 public:
     std::string get_url() { return url; }
 
-    int content_length()
-    {
-        auto request = headers.find("content-length");
-        if (request != headers.end()) {
-            std::stringstream ssLength(request->second);
-            int               content_length;
-            ssLength >> content_length;
-            return content_length;
-        }
-        return 0;
-    }
+    int content_length();
 
-    void on_read_header(std::string line)
-    {
-        // std::cout << "header: " << line << std::endl;
+    void on_read_header(std::string line);
 
-        std::stringstream ssHeader(line);
-        std::string       headerName;
-        std::getline(ssHeader, headerName, ':');
-
-        std::string value;
-        std::getline(ssHeader, value);
-        headers[headerName] = value;
-    }
-
-    void on_read_request_line(std::string line)
-    {
-        std::stringstream ssRequestLine(line);
-        ssRequestLine >> method;
-        ssRequestLine >> url;
-        ssRequestLine >> version;
-
-        std::cout << "request for resource: " << url << std::endl;
-    }
+    void on_read_request_line(std::string line);
 };
 
 class HttpServer

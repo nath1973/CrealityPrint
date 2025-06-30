@@ -5,6 +5,7 @@
 #include "libslic3r/MTUtils.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/ModelArrange.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include "slic3r/GUI/PartPlate.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -120,6 +121,7 @@ void ArrangeJob::prepare_selected(bool consider_lock) {
     //double stride = bed_stride_x(m_plater);
 
     PartPlate* cur_plate = plate_list.get_curr_plate();
+    current_plate_index = plate_list.get_curr_plate_index();
 
     std::vector<const Selection::InstanceIdxsList*>
         obj_sel(model.objects.size(), nullptr);
@@ -754,7 +756,6 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
             if (first_plate && mi) {
                 BoundingBoxf3 plate_bbox   = first_plate->get_build_volume();
                  Vec3d   instance_bbox_size = mi->get_object()->instance_bounding_box(0).size();
-                 instance_bbox_size = mi->get_matrix().matrix().block(0,0,3,3).inverse() * instance_bbox_size;
                  auto          offset             = mi->get_offset();
                  Vec3d top_left = {plate_bbox.min.x() + instance_bbox_size.x(), plate_bbox.max.y() + instance_bbox_size.y(), offset(2)};
                  mi->set_offset(top_left);
@@ -797,7 +798,6 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         if (first_plate && mi) {
             BoundingBoxf3 plate_bbox   = first_plate->get_build_volume();
                 Vec3d   instance_bbox_size = mi->get_object()->instance_bounding_box(0).size();
-                instance_bbox_size = mi->get_matrix().matrix().block(0,0,3,3).inverse() * instance_bbox_size;
                 auto          offset             = mi->get_offset();
                 Vec3d top_left = {plate_bbox.min.x() + instance_bbox_size.x(), plate_bbox.max.y() + instance_bbox_size.y(), offset(2)};
                 mi->set_offset(top_left);

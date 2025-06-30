@@ -26,6 +26,7 @@ bool isGCodeFile(const boost::filesystem::path& filePath) {
 }
 std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serverIp, int port, const std::string& uploadFileName, const std::string& localFilePath, std::function<void(float,double)> progressCallback, std::function<void(int)> uploadStatusCallback, std::function<void(std::string)> onCompleteCallback) {
     return std::async(std::launch::async, [=]() {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
     bool res = false;
 
     std::string urlUpload = "http://" + serverIp + ":" + std::to_string(80) + "/upload/" + Slic3r::Http::url_encode(uploadFileName);
@@ -33,8 +34,8 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% to %3%") % uploadFileName % localFilePath % urlUpload;
 
     auto http = Slic3r::Http::post(urlUpload);
-    m_pHttp   = &http;
-
+    //m_pHttp   = &http;
+    mapHttp.emplace(serverIp, &http);
     std::string temp_upload_name = uploadFileName;
     
     http.clear_header();
@@ -71,11 +72,17 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
             BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error uploading file: %2%, HTTP %3%, body: `%4%`") % uploadFileName % error % status %
                                             body;
             if (uploadStatusCallback) {
-                uploadStatusCallback(CURLE_HTTP_RETURNED_ERROR);
+                uploadStatusCallback(status);
             }
             res = false;
         })
         .on_progress([&](Slic3r::Http::Progress progress, bool& cancel) {
+             if (cancel) {
+                // Upload was canceled
+                BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Upload canceled") % uploadFileName;
+                res = false;
+                return;
+            }
             if (progressCallback) {
                 
                 time_t now = time(NULL);
@@ -91,33 +98,37 @@ std::future<void> Klipper4408Interface::sendFileToDevice(const std::string& serv
                         return ;
                     }
                     percent = round(tpercent);
-                    progressCallback(percent<1.0f?1.0f:percent, speed);
+                    progressCallback(percent<1.0f?1.0f:percent, progress.upload_spd/1024);
                 }
             }
-            if (cancel) {
-                // Upload was canceled
-                BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Upload canceled") % uploadFileName;
-                res = false;
-            }
+           
         })
         .perform_sync();
-
+        mapHttp.erase(serverIp);
         if (!res && uploadStatusCallback) {
-            if (m_bCancelSend) {
+            if (http.is_cancelled()) {
                 uploadStatusCallback(601); // 601 表示取消成功
             } else {
-                uploadStatusCallback(CURLE_HTTP_RETURNED_ERROR);
+                //uploadStatusCallback(CURLE_HTTP_RETURNED_ERROR);
             }
         }
     });
+
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end!!!";
 }
 
-void Klipper4408Interface::cancelSendFileToDevice()
+void Klipper4408Interface::cancelSendFileToDevice(std::string ipAddress)
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
     m_bCancelSend = true;
-    if (m_pHttp != nullptr) {
-        m_pHttp->cancel();
+    if(mapHttp.count(ipAddress) == 0) {
+        return;
     }
+    Slic3r::Http*     http = mapHttp.at(ipAddress);
+    if (http != nullptr) {
+        http->cancel();
+    }
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
 }
 
 }

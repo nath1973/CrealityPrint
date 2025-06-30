@@ -28,9 +28,9 @@ target_include_directories(webrtc_video
     set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
-    #find_package(OpenSSL REQUIRED)
+    find_package(OpenSSL REQUIRED)
     find_library(LIBMETARTC metartc6)
     find_library(LIBMETARTCCORE metartccore6)
     find_package(FFmpeg)
-    target_link_libraries(webrtc_video INTERFACE ${OPENSSL_LIBRARIES} boost_libs ${LIBMETARTC} ${LIBMETARTCCORE} usrsctp srtp2 asound FFmpeg::avcodec FFmpeg::avutil FFmpeg::avformat FFmpeg::swresample opus speexdsp lzma x264)
+    target_link_libraries(webrtc_video INTERFACE boost_libs ${LIBMETARTC} ${LIBMETARTCCORE} ${OPENSSL_LIBRARIES} usrsctp srtp2 asound FFmpeg::avcodec FFmpeg::avutil FFmpeg::avformat FFmpeg::swresample opus speexdsp lzma x264)
 endif()

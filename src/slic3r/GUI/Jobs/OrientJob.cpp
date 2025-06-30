@@ -1,12 +1,14 @@
 #include "OrientJob.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelObject.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "libslic3r/PresetBundle.hpp"
-
 
 namespace Slic3r { namespace GUI {
 

@@ -8,6 +8,7 @@
 #include "../Print.hpp"
 #include "../PrintConfig.hpp"
 #include "../Surface.hpp"
+#include "../AABBTreeLines.hpp"
 
 #include "ExtrusionEntity.hpp"
 #include "FillBase.hpp"

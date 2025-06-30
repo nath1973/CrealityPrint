@@ -24,6 +24,8 @@
 
 #include "libslic3r/Utils.hpp"
 
+#include "libslic3r/ModelVolume.hpp"
+
 //#define DEBUG_FILES
 
 #ifdef DEBUG_FILES

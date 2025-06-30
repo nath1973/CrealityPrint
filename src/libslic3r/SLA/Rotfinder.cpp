@@ -10,6 +10,7 @@
 
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/ModelInstance.hpp"
 
 #include <libslic3r/Geometry.hpp>
 

@@ -135,6 +135,8 @@ public:
 
     // BBS
     void            set_num_filaments(unsigned int n, std::string new_col = "");
+    void         update_num_filaments(unsigned int to_del_flament_id);
+
     unsigned int sync_ams_list(unsigned int & unknowns);
     //BBS: check whether this is the only edited filament
     bool is_the_only_edited_filament(unsigned int filament_index);
@@ -194,10 +196,12 @@ public:
 
     bool                        has_defauls_only() const
         { return prints.has_defaults_only() && filaments.has_defaults_only() && printers.has_defaults_only(); }
+    int  get_printer_extruder_count() const;
 
     DynamicPrintConfig          full_config() const;
     // full_config() with the some "useless" config removed.
     DynamicPrintConfig          full_config_secure() const;
+
 
     // Load user configuration and store it into the user profiles.
     // This method is called by the configuration wizard.
@@ -257,7 +261,7 @@ public:
 
     // Read out the number of extruders from an active printer preset,
     // update size and content of filament_presets.
-    void                        update_multi_material_filament_presets();
+    void update_multi_material_filament_presets(size_t to_delete_filament_id = size_t(-1));
 
     // Update the is_compatible flag of all print and filament presets depending on whether they are marked
     // as compatible with the currently selected printer (and print in case of filament presets).
@@ -339,6 +343,8 @@ private:
     bool validation_mode = false;
     std::string vendor_to_validate = ""; 
     int m_errors = 0;
+    bool m_isCrealityPrinter = false;
+    bool m_isCrealityFilament = false;
 };
 
 ENABLE_ENUM_BITMASK_OPERATORS(PresetBundle::LoadConfigBundleAttribute)

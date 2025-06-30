@@ -931,14 +931,16 @@ std::function<double(const Item &, const ItemGroup&)> AutoArranger<ExPolygon>::g
     };
 }
 
-template<class Bin> void remove_large_items(std::vector<Item> &items, Bin &&bin)
+template<class Bin> void remove_large_items(std::vector<Item>& items, Bin&& bin, std::vector<Item>& largeitems)
 {
     auto it = items.begin();
     while (it != items.end())
     {
         //BBS: skip virtual object
-        if (!it->is_virt_object && !sl::isInside(it->transformedShape(), bin))
+        if (!it->is_virt_object && !sl::isInside(it->transformedShape(), bin)) {
+            largeitems.emplace_back(*it);
             it = items.erase(it);
+        }
         else
             it++;
     }
@@ -983,9 +985,8 @@ void _arrange(
 
     AutoArranger<BinT> arranger{corrected_bin, mod_params, progressfn, stopfn};
 
-    //remove_large_items(shapes, corrected_bin);
     // If there is something on the plate
-    //if (!excludes.empty()) arranger.preload(excludes);
+    if (!excludes.empty()) arranger.preload(excludes);
 
     std::vector<std::reference_wrapper<Item>> inp;
     inp.reserve(shapes.size() + excludes.size());
@@ -1007,7 +1008,7 @@ void _arrange(
             }
         }
     }
-
+   
     arranger(inp.begin(), inp.end());
     for (Item &itm : inp) itm.inflation(0);
 }
@@ -1085,26 +1086,56 @@ static void process_arrangeable(const ArrangePolygon& arrpoly, std::vector<Item>
     item.filament_temp_type = arrpoly.filament_temp_type;
 }
 
-template<class BedT> bool isSmallBox(const Item& item, const BedT& bed)
-{
-    const auto& ibox    = sl::boundingBox(item.transformedShape());
-    const auto& icenter = ibox.center();
-    const auto& bbin    = to_nestbin(bed);
-    auto        bbox    = sl::boundingBox(bbin);
-    const auto& bcenter = bbox.center();
-
-    const auto& imin    = ibox.minCorner() - icenter + bcenter;
-    const auto& imax    = ibox.maxCorner() - icenter + bcenter;
-
-    const auto& bmin    = bbox.minCorner();
-    const auto& bmax    = bbox.maxCorner();
-
-    if (imax.x() <= bmax.x() && imax.y() && bmax.y() && imin.x() >= bmin.x() && imin.y() >= bmin.y()) {
-        return true;//is in the box
-    }
-    
-    return false;
-}
+//template<class BedT> bool is_Small_Box(const Item& item, const BedT& bed, bool allow_rotations = false)
+//{
+//    
+//    const auto& bbin    = to_nestbin(bed);
+//    auto        bbox    = sl::boundingBox(bbin);
+//    const auto& bcenter = bbox.center();
+//    const auto& bmin    = bbox.minCorner();
+//    const auto& bmax    = bbox.maxCorner();
+//
+//    const auto& ibox    = sl::boundingBox(item.transformedShape());
+//    const auto& icenter = ibox.center();
+//
+//    if (!allow_rotations) {
+//
+//        //move to bin center
+//        const auto& imin = ibox.minCorner() - icenter + bcenter;
+//        const auto& imax = ibox.maxCorner() - icenter + bcenter;
+//
+//        if (imax.x() <= bmax.x() && imax.y() <= bmax.y() && imin.x() >= bmin.x() && imin.y() >= bmin.y()) {
+//            return true; // is in the box
+//        }
+//
+//    }else {
+//
+//        //still first judge no rotation
+//        const auto& imin = ibox.minCorner() - icenter + bcenter;
+//        const auto& imax = ibox.maxCorner() - icenter + bcenter;
+//
+//        if (imax.x() <= bmax.x() && imax.y() <= bmax.y() && imin.x() >= bmin.x() && imin.y() >= bmin.y()) {
+//            return true; // is in the box
+//        }
+//
+//        //move to (0,0)
+//        const auto& imin_ = ibox.minCorner() - icenter;
+//        const auto& imax_ = ibox.maxCorner() - icenter;
+//
+//        //rotate 45 degree and move to bin center
+//        const auto& xmin_ = imin.x() * 0.707107 - imin.y() * 0.707107 + bcenter.x();
+//        const auto& ymin_ = imin.x() * 0.707107 + imin.y() * 0.707107 + bcenter.y();
+//
+//        const auto& xmax_ = imax.x() * 0.707107 - imax.y() * 0.707107 + bcenter.x();
+//        const auto& ymax_ = imax.x() * 0.707107 + imax.y() * 0.707107 + bcenter.y();
+//
+//        if (xmax_ <= bmax.x() && ymax_ <= bmax.y() && xmin_ >= bmin.x() && ymin_ >= bmin.y()) {
+//            return true; // is in the box
+//        }
+//    }
+//
+//    return false;
+//}
 
 template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
 {
@@ -1145,73 +1176,62 @@ void arrange(ArrangePolygons &      arrangables,
 {
     namespace clppr = Slic3r::ClipperLib;
 
-    std::vector<Item> items, fixeditems, bigArrangables;
+    std::vector<Item> items, fixeditems;
     items.reserve(arrangables.size());
     fixeditems.reserve(excludes.size());
 
-    for (ArrangePolygon& arrangeable : arrangables) {
+    for (ArrangePolygon& arrangeable : arrangables)
+    {
         process_arrangeable(arrangeable, items);
-        Item& item_ = items.back();
-        if (!isSmallBox(item_, bed))
-        {
-            bigArrangables.emplace_back(items.back());
-            items.pop_back();
-        }
     }
 
-    //盘外的并不会被选中
     for (const ArrangePolygon& fixed : excludes) 
     {
         process_arrangeable(fixed, fixeditems);
         fixeditems.back().markAsFixedInBin(fixed.bed_idx);
-  
-        /*Item& item_ = fixeditems.back();
-        item_.translate(bb.center());
-        if (sl::isInside(item_.transformedShape(), bbin)) 
-        {
-            bigitems.emplace_back(fixeditems.back());
-            fixeditems.pop_back();
-        }*/
     }
 
     for (Item &itm : fixeditems) itm.inflate(scaled(-2. * EPSILON));
 
     _arrange(items, fixeditems, to_nestbin(bed), params, params.progressind, params.stopcondition);
 
-    if (bigArrangables.size() < 1) {
-        for (size_t i = 0; i < items.size(); ++i) {
-            Point tr                   = items[i].translation();
-            arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
-            arrangables[i].rotation    = items[i].rotation();
-            arrangables[i].bed_idx     = items[i].binId();
-            arrangables[i].itemid      = items[i].itemId(); // arrange order is useful for sequential printing
-        }
-    } else {
-        for (size_t i = 0; i < arrangables.size(); ++i) {
-            for (size_t j = 0; j < items.size(); ++j)
-                if (arrangables[i].itemid == items[j].itemId()) {
-                Point tr                   = items[j].translation();
-                arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
-                arrangables[i].rotation    = items[j].rotation();
-                arrangables[i].bed_idx     = items[j].binId();
-            }
-            for (size_t j = 0; j < bigArrangables.size(); ++j) 
-                if (arrangables[i].itemid == bigArrangables[j].itemId()) {
-                Point tr                   = bigArrangables[j].translation();
-                arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
-                arrangables[i].rotation    = bigArrangables[j].rotation();
-                arrangables[i].bed_idx     = -1;
-            }
-        }
-        
+    for (size_t i = 0; i < items.size(); ++i) {
+        Point tr                   = items[i].translation();
+        arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+        arrangables[i].rotation    = items[i].rotation();
+        arrangables[i].bed_idx     = items[i].binId();
+        arrangables[i].itemid      = items[i].itemId(); // arrange order is useful for sequential printing
     }
-    //for (size_t i = 0; i < bigitems.size(); ++i) {
-    //    //Point tr                   = bigitems[i].translation();
-    //    //arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
-    //    //arrangables[i].rotation    = bigitems[i].rotation();
-    //    arrangables[i].bed_idx     = -1;
-    //    arrangables[i].itemid      = bigitems[i].itemId(); // arrange order is useful for sequential printing
+
+
+    //if (bigArrangables.size() < 1) {
+    //    for (size_t i = 0; i < items.size(); ++i) {
+    //        Point tr                   = items[i].translation();
+    //        arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+    //        arrangables[i].rotation    = items[i].rotation();
+    //        arrangables[i].bed_idx     = items[i].binId();
+    //        arrangables[i].itemid      = items[i].itemId(); // arrange order is useful for sequential printing
+    //    }
+    //} else {
+    //    for (size_t i = 0; i < arrangables.size(); ++i) {
+    //        for (size_t j = 0; j < items.size(); ++j)
+    //            if (arrangables[i].itemid == items[j].itemId()) {
+    //            Point tr                   = items[j].translation();
+    //            arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+    //            arrangables[i].rotation    = items[j].rotation();
+    //            arrangables[i].bed_idx     = items[j].binId();
+    //        }
+    //        for (size_t j = 0; j < bigArrangables.size(); ++j) 
+    //            if (arrangables[i].itemid == bigArrangables[j].itemId()) {
+    //            Point tr                   = bigArrangables[j].translation();
+    //            arrangables[i].translation = {coord_t(tr.x()), coord_t(tr.y())};
+    //            arrangables[i].rotation    = bigArrangables[j].rotation();
+    //            arrangables[i].bed_idx     = -1;
+    //        }
+    //    }
+    //    
     //}
+
 }
 
 template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const BoundingBox &bed, const ArrangeParams &params);

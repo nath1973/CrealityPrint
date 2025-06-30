@@ -14,7 +14,11 @@ namespace DM {
             std::string mac;
             std::string address;
             std::string name;
-            bool oldPrinter;    //¾É»úÐÍ ÈçD3Pro
+            
+            bool oldPrinter = false; //ï¿½É»ï¿½ï¿½ï¿½ ï¿½ï¿½D3Pro
+            int moonrakerPort = 0;   //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ê¶Ë¿ï¿½
+            int fluiddPort = 0;
+            int mainsailPort = 0;
         };
     public:
         DeviceMgr();
@@ -24,7 +28,7 @@ namespace DM {
         void AddDevice(std::string group, Data& data);
         void RemoveDevice(std::string name);
         void EditDeiveName(std::string name, std::string nameNew);
-        void UpdateDevice(std::string address, Data& data);
+        void UpdateDevice(std::string mac, Data& data);
         void AddGroup(std::string name, bool is_save=true);
         void RemoveGroup(std::string name);
         void EditGroupName(std::string name, std::string nameNew);

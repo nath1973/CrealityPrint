@@ -1,6 +1,7 @@
 #include "Preferences.hpp"
 #include "OptionsGroup.hpp"
 #include "GUI_App.hpp"
+#include "slic3r/GUI/WebViewDialog.hpp"
 #include "MainFrame.hpp"
 #include "Plater.hpp"
 #include "MsgDialog.hpp"
@@ -24,6 +25,8 @@
 #include <wx/listimpl.cpp>
 #include <map>
 #include <wx/string.h>
+#include "slic3r/GUI//Widgets/AMSControl.hpp"
+#include "AnalyticsDataUploadManager.hpp"
 
 #ifdef __WINDOWS__
 #ifdef _MSW_DARK_MODE
@@ -344,11 +347,11 @@ wxBoxSizer *PreferencesDialog::create_item_region_combobox(wxString title, wxWin
 
         wxGetApp().update_publish_status();
         
-        //#ifdef __APPLE__
-        //    this->notify_preferences_changed();
-        //#else
+        #ifdef __APPLE__
+            this->notify_preferences_changed();
+        #else
             wxGetApp().reload_homepage();
-        //#endif
+        #endif
         CallAfter([this,region] {
             wxGetApp().send_app_message("region|" + region.ToStdString(),true);
          });
@@ -808,15 +811,18 @@ wxBoxSizer *PreferencesDialog::create_item_checkbox(wxString title, wxWindow *pa
         boost::nowide::ifstream t(device_file.string());
         std::stringstream       buffer;
         buffer << t.rdbuf();
-
-       json privacyData = json::parse(buffer);
-        if (privacyData.contains("list")) {
-            for (auto& v : privacyData["list"]) {
-                if (v["version"] == version) {
-                    checkbox->SetValue(v["check"]);
-                    break;
+       try{
+        json privacyData = json::parse(buffer);
+            if (privacyData.contains("list")) {
+                for (auto& v : privacyData["list"]) {
+                    if (v["version"] == version) {
+                        checkbox->SetValue(v["check"]);
+                        break;
+                    }
                 }
             }
+        }catch(std::exception& e){
+            
         }
     
     }
@@ -831,6 +837,19 @@ wxBoxSizer *PreferencesDialog::create_item_checkbox(wxString title, wxWindow *pa
         //     bool pbool = app_config->get("staff_pick_switch") == "true";
         //     wxGetApp().switch_staff_pick(pbool);
         // }
+
+        if(param == "user_exp") {
+            json& privacy_data = wxGetApp().get_privacy_data();
+            if (privacy_data.contains("list")) {
+                for (auto& v : privacy_data["list"]) {
+                    v["check"] = checkbox->GetValue();
+                }
+            }
+
+            wxGetApp().save_privacy_version();
+
+            wxGetApp().reload_homepage();
+        }
 
          // backup
         if (param == "backup_switch") {
@@ -1192,18 +1211,21 @@ PreferencesDialog::PreferencesDialog(wxWindow *parent, wxWindowID id, const wxSt
     create();
     wxGetApp().UpdateDlgDarkUI(this); 
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& event) {
-        try {
-            NetworkAgent* agent = GUI::wxGetApp().getAgent();
-            if (agent) {
-                json j;
-                std::string value;
-                value = wxGetApp().app_config->get("auto_calculate");
-                j["auto_flushing"] = value;
-                value = wxGetApp().app_config->get("auto_calculate_when_filament_change");
-                j["auto_calculate_when_filament_change"] = value;
-                agent->track_event("preferences_changed", j.dump());
-            }
-        } catch(...) {}
+        //try {
+        //    NetworkAgent* agent = GUI::wxGetApp().getAgent();
+        //    if (agent) {
+        //        json j;
+        //        std::string value;
+        //        value = wxGetApp().app_config->get("auto_calculate");
+        //        j["auto_flushing"] = value;
+        //        value = wxGetApp().app_config->get("auto_calculate_when_filament_change");
+        //        j["auto_calculate_when_filament_change"] = value;
+        //        agent->track_event("preferences_changed", j.dump());
+        //    }
+        //} catch(...) {}
+
+        AnalyticsDataUploadManager::getInstance().triggerUploadTasks(AnalyticsUploadTiming::ON_PREFERENCES_CHANGED,{ AnalyticsDataEventType::ANALYTICS_PREFERENCES_CHANGED });
+
         event.Skip();
         });
 }
@@ -1220,7 +1242,7 @@ void PreferencesDialog::create()
 
     auto main_sizer = new wxBoxSizer(wxVERTICAL);
 
-    m_scrolledWindow = new MyscrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
+    m_scrolledWindow = new MyscrolledWindow(this, wxID_ANY, wxDefaultPosition, {FromDIP(560), FromDIP(500)}, wxVSCROLL);
     m_scrolledWindow->SetScrollRate(5, 5);
 
     m_sizer_body = new wxBoxSizer(wxVERTICAL);
@@ -1242,7 +1264,8 @@ void PreferencesDialog::create()
     m_sizer_body->Add(debug_page, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(38));
 #endif
     m_sizer_body->Add(0, 0, 0, wxBOTTOM, FromDIP(28));
-    m_scrolledWindow->SetSizerAndFit(m_sizer_body);
+    m_scrolledWindow->SetSizer(m_sizer_body);
+    m_scrolledWindow->SetVirtualSize(m_sizer_body->GetMinSize());
 
     main_sizer->Add(m_scrolledWindow, 1, wxEXPAND);
 
@@ -1295,7 +1318,7 @@ void PreferencesDialog::Split(const std::string &src, const std::string &separat
 
 wxWindow* PreferencesDialog::create_general_page()
 {
-    auto page = new wxWindow(m_scrolledWindow, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(560, 500)));
+    auto page = new wxWindow(m_scrolledWindow, wxID_ANY, wxDefaultPosition, wxDefaultSize);
     page->SetBackgroundColour(*wxWHITE);
     wxBoxSizer *sizer_page = new wxBoxSizer(wxVERTICAL);
 
@@ -1371,6 +1394,7 @@ wxWindow* PreferencesDialog::create_general_page()
     auto item_user_exp    = create_item_checkbox(_L("User Experience Program"), page, _L("User Experience Program"), 50,
                                                   "user_exp");
 #endif 
+    
     //item_user_exp->
     auto item_save_presets = create_item_button(_L("Clear my choice on the unsaved presets."), _L("Clear"), page, L"", _L("Clear my choice on the unsaved presets."), []() {
         wxGetApp().app_config->set("save_preset_choise", "");
@@ -1422,13 +1446,14 @@ wxWindow* PreferencesDialog::create_general_page()
     sizer_page->Add(item_user_exp, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(5));
 #endif
+
     sizer_page->Add(item_save_presets, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(5));
     sizer_page->Add(item_save_choise, 0, wxTOP, FromDIP(3));
 
     page->SetSizer(sizer_page);
+    page->Fit();
     page->Layout();
-    sizer_page->Fit(page);
     return page;
 }
 

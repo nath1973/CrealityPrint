@@ -341,9 +341,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         // ORCA: To enable dont slow down external perimeters feature per filament (extruder)
         adj.dont_slow_down_outer_wall   = m_config.dont_slow_down_outer_wall.get_at(extruder_id);
         adj.smart_cooling_zones  = m_config.smart_cooling_zones.get_at(extruder_id);
-        // CP: This setting only applies to PLA materials. 24.12.17
+        //CP: This setting only applies to PLA materials. 24.12.17
         std::string filament_type       = m_config.filament_type.get_at(extruder_id);
-        if (!boost::algorithm::contains(filament_type, "PLA")) {
+        if (filament_type != "PLA" && filament_type != "PETG" && filament_type != "ABS") {
             adj.smart_cooling_zones = false;
         }
         map_extruder_to_per_extruder_adjustment[extruder_id] = i;

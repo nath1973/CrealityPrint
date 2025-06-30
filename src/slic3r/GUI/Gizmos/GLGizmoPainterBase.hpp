@@ -367,10 +367,10 @@ private:
     mutable bool        m_is_set_height_start_z_by_imgui{false};
     mutable Vec2i32     m_height_start_pos{0, 0};
     mutable float       m_x_for_height_input{-1};
-    mutable bool        m_lock_x_for_height_bottom{false};  //ÆğµãÊäÈë¿òÖÃÓÚÊó±ê¸½½ü
+    mutable bool        m_lock_x_for_height_bottom{false};  //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê¸½ï¿½ï¿½
     mutable Vec2f       m_height_range_input_all_size;
     mutable bool        m_is_cursor_in_imgui{false};
-    mutable bool        m_show_height_range_by_imgui{true};  //ÊÇ·ñÏÔÊ¾¾àµ×±ß¸ß¶È
+    mutable bool        m_show_height_range_by_imgui{true};  //ï¿½Ç·ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½×±ß¸ß¶ï¿½
     BoundingBoxf3 bounding_box() const;
     void update_contours(int i, const TriangleMesh& vol_mesh, float cursor_z, float max_z, float min_z, bool update_height_start_pos) const;
     Vec2i                            _3d_to_mouse(Vec3d pos_in_3d, const Camera& camera) const;

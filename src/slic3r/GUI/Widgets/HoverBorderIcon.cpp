@@ -8,7 +8,11 @@
 BEGIN_EVENT_TABLE(HoverBorderIcon, wxPanel)
     EVT_PAINT(HoverBorderIcon::paintEvent)
     EVT_MOTION(HoverBorderIcon::OnMouseMove)
-END_EVENT_TABLE()
+#ifdef  __APPLE__
+    EVT_ENTER_WINDOW(HoverBorderIcon::OnMouseEnter)
+    EVT_LEAVE_WINDOW(HoverBorderIcon::OnMouseLeave)
+#endif //  __APPLE__
+    END_EVENT_TABLE()
 
 HoverBorderIcon::HoverBorderIcon()
     :m_force_paint(true)
@@ -35,7 +39,6 @@ void HoverBorderIcon::Create(wxWindow* parent, const wxString& text, const wxStr
                                          std::make_pair(is_dark ?  0x4B4B4D : 0xFFFFFF, (int) StateColor::Normal)));
     StaticBox::SetBackgroundColor(
         StateColor(std::make_pair(0xF0F0F1, (int) StateColor::Disabled),
-                   std::make_pair(wxColour("#787565"), (int) StateColor::Focused), // ORCA updated background color for focused item
                    std::make_pair(*wxWHITE, (int) StateColor::Normal)));
 
     state_handler.update_binds();
@@ -103,6 +106,22 @@ void HoverBorderIcon::OnMouseMove(wxMouseEvent& event)
     Refresh();
     event.Skip();
 }
+
+#ifdef __APPLE__
+void HoverBorderIcon::OnMouseEnter(wxMouseEvent& event)
+{
+    state_handler.set_state(9, 9);
+    Refresh();
+    event.Skip();
+}
+
+void HoverBorderIcon::OnMouseLeave(wxMouseEvent& event)
+{
+    state_handler.set_state(0, 9);
+    Refresh();
+    event.Skip();
+}
+#endif //__APPLE__
 
 void HoverBorderIcon::paintEvent(wxPaintEvent& evt)
 {

@@ -5,11 +5,14 @@
 #include "../GUI/Jobs/ProgressIndicator.hpp"
 #include "../GUI/PartPlate.hpp"
 #include "libslic3r/CutUtils.hpp"
+#include "libslic3r/BuildVolume.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "libslic3r/FDM/Filament.hpp"
 #include "slic3r/GUI/Jobs/BoostThreadWorker.hpp"
 #include "slic3r/GUI/Jobs/PlaterWorker.hpp"
+#include "slic3r/GUI/Plater.hpp"
 #include "../GUI/MsgDialog.hpp"
 
 

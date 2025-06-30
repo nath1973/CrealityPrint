@@ -11,6 +11,7 @@
 #include "Widgets/RoundedRectangle.hpp"
 #include "Widgets/StaticBox.hpp"
 #include "libslic3r/common_header/common_header.h"
+#include "slic3r/GUI//Widgets/AMSControl.hpp"
 static wxColour FG_COLOR = wxColour(0x32, 0x3A, 0x3D);
 static wxColour BG_COLOR = wxColour(0xF8, 0xF8, 0xF8);
 

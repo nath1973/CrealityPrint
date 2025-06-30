@@ -126,6 +126,22 @@ bool CXCloudDataCenter::isUpdateConfigFileTimeout() {
 }
 void CXCloudDataCenter::resetUpdateConfigFileTime() { m_llUpdateConfigFileTimestamp = Slic3r::Utils::get_current_time_utc(); }
 
+bool CXCloudDataCenter::isNetworkErrorRetryTimeout()
+{
+    long long now      = Slic3r::Utils::get_current_time_utc();
+    long long timediff = now - m_llNetworkErrorRetryTimestamp;
+    if (timediff >= 5 * 60 * 60) {
+        return true;
+    }
+    return false;
+}
+
+void CXCloudDataCenter::resetNetworkErrorRetryTime() { m_llNetworkErrorRetryTimestamp = Slic3r::Utils::get_current_time_utc(); }
+
+bool CXCloudDataCenter::isNetworkError() { return m_bNetworkError; }
+
+void CXCloudDataCenter::setNetworkError(bool bError) { m_bNetworkError = bError; }
+
 void CXCloudDataCenter::setConfigFileRetInfo(const PreUpdateProfileRetInfo& retInfo) { m_configFileRetInfo = retInfo; }
 const PreUpdateProfileRetInfo& CXCloudDataCenter::getConfigFileRetInfo() { return m_configFileRetInfo; }
 
@@ -138,11 +154,14 @@ void CXCloudDataCenter::updateCXCloutLoginInfo(const std::string& userId, const 
     m_cxCloudLoginInfo.tokenValid = true;
     m_cxCloudLoginInfoMutex.unlock();
 }
-void CXCloudDataCenter::setTokenInvalid()
+void CXCloudDataCenter::setTokenInvalid(bool bTokenValid/* = false*/)
 {
-    BOOST_LOG_TRIVIAL(warning) << "CXCloudDataCenter setTokenInvalid";
+    BOOST_LOG_TRIVIAL(warning) << "CXCloudDataCenter setTokenInvalid " << bTokenValid;
     m_cxCloudLoginInfoMutex.lock();
-    m_cxCloudLoginInfo.tokenValid = false;
+    m_cxCloudLoginInfo.tokenValid = bTokenValid;
+    if (bTokenValid) {
+        m_bNetworkError = false;
+    }
     m_cxCloudLoginInfoMutex.unlock();
 }
 
@@ -225,6 +244,8 @@ int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>&
 
     http.header("Content-Type", "application/json")
         .header("__CXY_REQUESTID_", to_string(uuid))
+        .timeout_connect(5)
+        .timeout_max(15)
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
             if (Slic3r::GUI::wxGetApp().app_config->get("showDebugLog") == "1") {
@@ -234,12 +255,15 @@ int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>&
             if (j["code"] != 0) {
                 if (j["code"].get<int>() == 4) {
                     CXCloudDataCenter::getInstance().setTokenInvalid();
+                } else {
+                    CXCloudDataCenter::getInstance().setTokenInvalid(true);
                 }
-                nRet = 1;       // ÇëÇóÊ§°Ü
+                nRet = 1;       // ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
                 setLastError(std::to_string(j["code"].get<int>()), "");
                 BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud getUserProfileList fail.code=" << j["code"];
                 return;
             }
+            CXCloudDataCenter::getInstance().setTokenInvalid(true);
             int total_count = 0;
             for (auto& file : j["result"]["list"]) {
                 UserProfileListItem userProfileListItem;
@@ -294,7 +318,7 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
         fs::create_directory(dest_path);
 
     auto http = Http::get(url);
-    http.on_header_callback([&](std::string header) {
+    http.timeout_max(15).on_header_callback([&](std::string header) {
             std::string filename;
 
             std::regex  r("filename=\"([^\"]*)\"");
@@ -378,6 +402,7 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
 
                 std::string outJsonFile;
                 std::string outInfoFile;
+                PresetCollection* collection = nullptr;
                 if (userInfo.bLogin) {
                     if (file_type == "printer") {
                         fs::path pathMachine = fs::path(data_dir()).append("user").append(userInfo.userId).append("machine");
@@ -391,6 +416,29 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
                             outJsonFile = fs::path(pathMachine).append(outputName + ".json").string();
                             outInfoFile = fs::path(pathMachine).append(outputName + ".info").string();
                         }
+                        collection = &GUI::wxGetApp().preset_bundle->printers;
+                        if (collection->get_selected_preset_name() == j["name"].get<std::string>()) {
+                            Preset* p         = collection->find_preset(j["name"].get<std::string>());
+                            Preset* pInherits = collection->find_preset(j["inherits"].get<std::string>());
+                            if (p != nullptr && pInherits != nullptr) {
+                                collection->lock();
+                                DynamicPrintConfig dcRemote = pInherits->config;
+                                ForwardCompatibilitySubstitutionRule rule = ForwardCompatibilitySubstitutionRule::Enable;
+                                dcRemote.load_string_map(inner_map, rule);
+                                DynamicPrintConfig       dcLocal       = p->config;
+                                std::vector<std::string> dirty_options = p->config.diff(dcRemote);
+                                for (auto item : dirty_options) {
+                                    collection->get_selected_preset().config.optptr(item)->set(dcRemote.option(item));
+                                }
+                                for (auto item : dirty_options) {
+                                    p->config.optptr(item)->set(dcLocal.option(item));
+                                }
+                                if (dirty_options.size() > 0) {
+                                    collection->get_selected_preset().set_dirty();
+                                }
+                                collection->unlock();
+                            }
+                        }
                     } else if (file_type == "materia") {
                         fs::path pathFilament = fs::path(data_dir()).append("user").append(userInfo.userId).append("filament");
                         if (j.contains("inherits") && j["inherits"].get<std::string>().empty()) {
@@ -403,43 +451,91 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
                             outJsonFile = fs::path(pathFilament).append(outputName + ".json").string();
                             outInfoFile = fs::path(pathFilament).append(outputName + ".info").string();
                         }
+                        collection = &GUI::wxGetApp().preset_bundle->filaments;
+                        if (collection->get_selected_preset_name() == j["name"].get<std::string>()) {
+                            Preset* p         = collection->find_preset(j["name"].get<std::string>());
+                            Preset* pInherits = collection->find_preset(j["inherits"].get<std::string>());
+                            if (p != nullptr && pInherits != nullptr) {
+                                collection->lock();
+                                DynamicPrintConfig dcRemote = pInherits->config;
+                                ForwardCompatibilitySubstitutionRule rule = ForwardCompatibilitySubstitutionRule::Enable;
+                                dcRemote.load_string_map(inner_map, rule);
+                                DynamicPrintConfig       dcLocal       = p->config;
+                                std::vector<std::string> dirty_options = p->config.diff(dcRemote);
+                                for (auto item : dirty_options) {
+                                    collection->get_selected_preset().config.optptr(item)->set(dcRemote.option(item));
+                                }
+                                for (auto item : dirty_options) {
+                                    p->config.optptr(item)->set(dcLocal.option(item));
+                                }
+                                if (dirty_options.size() > 0) {
+                                    collection->get_selected_preset().set_dirty();
+                                    CXCloudDataCenter::getInstance().setFilamentPresetDirty(true);
+                                }
+                                collection->unlock();
+                            }
+                        }
                     } else if (file_type == "process") {
                         fs::path pathProcess = fs::path(data_dir()).append("user").append(userInfo.userId).append("process");
                         outJsonFile          = fs::path(pathProcess).append(outputName + ".json").string();
                         outInfoFile          = fs::path(pathProcess).append(outputName + ".info").string();
+                        collection           = &GUI::wxGetApp().preset_bundle->prints;
+                        if (collection->get_selected_preset_name() == j["name"].get<std::string>()) {
+                            Preset* p         = collection->find_preset(j["name"].get<std::string>());
+                            Preset* pInherits = collection->find_preset(j["inherits"].get<std::string>());
+                            if (p != nullptr && pInherits != nullptr) {
+                                collection->lock();
+                                DynamicPrintConfig dcRemote = pInherits->config;
+                                ForwardCompatibilitySubstitutionRule rule = ForwardCompatibilitySubstitutionRule::Enable;
+                                dcRemote.load_string_map(inner_map, rule);
+                                DynamicPrintConfig       dcLocal       = p->config;
+                                std::vector<std::string> dirty_options = p->config.diff(dcRemote);
+                                for (auto item : dirty_options) {
+                                    collection->get_selected_preset().config.optptr(item)->set(dcRemote.option(item));
+                                }
+                                for (auto item : dirty_options) {
+                                    p->config.optptr(item)->set(dcLocal.option(item));
+                                }
+                                if (dirty_options.size() > 0) {
+                                    collection->get_selected_preset().set_dirty();
+                                    CXCloudDataCenter::getInstance().setProcessPresetDirty(true);
+                                }
+                                collection->unlock();
+                            }
+                        }
                     }
                 } else {
                     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset end not login";
                     return;
                 }
 
-                if (fs::exists(outJsonFile)) {
-                    fs::remove(outJsonFile);
-                }
-                boost::nowide::ofstream c;
-                c.open(outJsonFile, std::ios::out | std::ios::trunc);
-                c << std::setw(4) << jsonOut << std::endl;
-                c.close();
-                saveJsonFile = outJsonFile;
+                //if (fs::exists(outJsonFile)) {
+                //    fs::remove(outJsonFile);
+                //}
+                //boost::nowide::ofstream c;
+                //c.open(outJsonFile, std::ios::out | std::ios::trunc);
+                //c << std::setw(4) << jsonOut << std::endl;
+                //c.close();
+                //saveJsonFile = outJsonFile;
 
-                //  ±£´æinfoÎÄ¼þ
-                if (userInfo.bLogin) {
+                ////  ï¿½ï¿½ï¿½ï¿½infoï¿½Ä¼ï¿½
+                //if (userInfo.bLogin) {
 
-                    if (fs::exists(outInfoFile)) {
-                        fs::remove(outInfoFile);
-                    }
-                    boost::nowide::ofstream c2;
-                    c2.open(outInfoFile, std::ios::out | std::ios::trunc);
-                    c2 << "sync_info =" << std::endl;
-                    c2 << "user_id = " << user << std::endl;
-                    c2 << "setting_id =" << setting_id << std::endl;
-                    if (jsonOut.contains("base_id"))
-                        c2 << "base_id = " << jsonOut["base_id"].get<std::string>() << std::endl;
-                    else
-                        c2 << "base_id = " << std::endl;
-                    c2 << "updated_time =" << update_time << std::endl;
-                    c2.close();
-                }
+                //    if (fs::exists(outInfoFile)) {
+                //        fs::remove(outInfoFile);
+                //    }
+                //    boost::nowide::ofstream c2;
+                //    c2.open(outInfoFile, std::ios::out | std::ios::trunc);
+                //    c2 << "sync_info =" << std::endl;
+                //    c2 << "user_id = " << user << std::endl;
+                //    c2 << "setting_id =" << setting_id << std::endl;
+                //    if (jsonOut.contains("base_id"))
+                //        c2 << "base_id = " << jsonOut["base_id"].get<std::string>() << std::endl;
+                //    else
+                //        c2 << "base_id = " << std::endl;
+                //    c2 << "updated_time =" << update_time << std::endl;
+                //    c2.close();
+                //}
 
                 nRet = 0;
             } catch (const std::exception& e) {
@@ -469,12 +565,15 @@ int CommunicateWithCXCloud::preUpdateProfile_create(const UploadFileInfo& fileIn
         .header("__CXY_REQUESTID_", to_string(uuid))
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
+            CXCloudDataCenter::getInstance().setNetworkError(false);
             json j = json::parse(body);
             if (j["code"] != 0) {
                 if (j["code"].get<int>() == 4) {
                     CXCloudDataCenter::getInstance().setTokenInvalid();
                     BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_create fail.code=" << j["code"];
                 }
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_create fail.code=" << j["code"]
+                                           << ";body=" << body;
                 return;
             }
             new_setting_id             = j["result"]["id"];
@@ -507,6 +606,8 @@ int CommunicateWithCXCloud::preUpdateProfile_create(const UploadFileInfo& fileIn
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             BOOST_LOG_TRIVIAL(error) << "CommunicateWithCXCloud preUpdateProfile_create fail.err=" << error << ",status=" << status;
+            CXCloudDataCenter::getInstance().setNetworkError(true);
+            CXCloudDataCenter::getInstance().resetNetworkErrorRetryTime();
         })
         .on_progress([&](Http::Progress progress, bool& cancel) {
 
@@ -540,12 +641,15 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
         .header("__CXY_REQUESTID_", to_string(uuid))
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
+            CXCloudDataCenter::getInstance().setNetworkError(false);
             json j = json::parse(body);
             if (j["code"] != 0) {
                 if (j["code"].get<int>() == 4) {
                     CXCloudDataCenter::getInstance().setTokenInvalid();
                     BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_update fail.code=" << j["code"];
                 }
+                BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_update fail.code=" << j["code"]
+                                         << ";body=" << body;
                 return;
             }
             std::string setting_id     = j["result"]["id"];
@@ -581,6 +685,8 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
             nRet       = 1;
             retInfo.updatedInfo = "hold";
             BOOST_LOG_TRIVIAL(error) << "CommunicateWithCXCloud preUpdateProfile_update fail.err=" << error << ",status=" << status;
+            CXCloudDataCenter::getInstance().setNetworkError(true);
+            CXCloudDataCenter::getInstance().resetNetworkErrorRetryTime();
         })
         .on_progress([&](Http::Progress progress, bool& cancel) {
 
@@ -589,7 +695,7 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
     return nRet;
 }
 
-//  É¾³ýÓÃ»§Ô¤Éè
+//  É¾ï¿½ï¿½ï¿½Ã»ï¿½Ô¤ï¿½ï¿½
 int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
 {
     int nRet = -1;
@@ -608,6 +714,7 @@ int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
         .header("__CXY_REQUESTID_", to_string(uuid))
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
+            CXCloudDataCenter::getInstance().setNetworkError(false);
             json j = json::parse(body);
             if (j["code"] == 0) {
                 nRet = 0;
@@ -623,6 +730,8 @@ int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             BOOST_LOG_TRIVIAL(error) << "CommunicateWithCXCloud deleteProfile fail.err=" << error << ",status=" << status;
+            CXCloudDataCenter::getInstance().setNetworkError(true);
+            CXCloudDataCenter::getInstance().resetNetworkErrorRetryTime();
         })
         .on_progress([&](Http::Progress progress, bool& cancel) {
 
@@ -672,7 +781,7 @@ int CommunicateWithCXCloud::saveSyncDataToLocal(const UserInfo&            userI
         }
         saveJsonFile = outJsonFile;
 
-        //  ±£´æinfoÎÄ¼þ
+        //  ï¿½ï¿½ï¿½ï¿½infoï¿½Ä¼ï¿½
         {
             if (fs::exists(outInfoFile)) {
                 fs::remove(outInfoFile);
@@ -777,7 +886,8 @@ CommunicateWithFrontPage::CommunicateWithFrontPage() {
                         "layer_change_gcode",
                         "user_id",
                         "version",
-                        "setting_id"};
+                        "setting_id",
+                        "printer_select_mac"};
 }
 CommunicateWithFrontPage::~CommunicateWithFrontPage() {}
 

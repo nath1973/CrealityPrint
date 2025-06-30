@@ -2,6 +2,7 @@
 
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
+#include "slic3r/GUI/Auxiliary.hpp"
 
 namespace Slic3r { namespace GUI {
 

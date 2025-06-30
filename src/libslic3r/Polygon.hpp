@@ -153,126 +153,32 @@ inline void polygons_append(Polygons &dst, Polygons &&src)
 
 Polygons polygons_simplify(const Polygons &polys, double tolerance, bool strictly_simple = true);
 
-inline void polygons_rotate(Polygons &polys, double angle)
-{
-    const double cos_angle = cos(angle);
-    const double sin_angle = sin(angle);
-    for (Polygon &p : polys)
-        p.rotate(cos_angle, sin_angle);
-}
+void polygons_rotate(Polygons& polys, double angle);
 
-inline void polygons_reverse(Polygons &polys)
-{
-    for (Polygon &p : polys)
-        p.reverse();
-}
+void polygons_reverse(Polygons& polys);
 
-inline Points to_points(const Polygon &poly)
-{
-    return poly.points;
-}
+Points to_points(const Polygon& poly);
 
-inline size_t count_points(const Polygons &polys) {
-    size_t n_points = 0;
-    for (const auto &poly: polys) n_points += poly.points.size();
-    return n_points;
-}
+size_t count_points(const Polygons &polys);
 
-inline Points to_points(const Polygons &polys) 
-{
-    Points points;
-    points.reserve(count_points(polys));
-    for (const Polygon &poly : polys)
-        append(points, poly.points);
-    return points;
-}
+Points to_points(const Polygons& polys);
 
-inline Lines to_lines(const Polygon &poly) 
-{
-    Lines lines;
-    lines.reserve(poly.points.size());
-    if (poly.points.size() > 2) {
-        for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
-            lines.push_back(Line(*it, *(it + 1)));
-        lines.push_back(Line(poly.points.back(), poly.points.front()));
-    }
-    return lines;
-}
+Lines to_lines(const Polygon& poly);
 
-inline Lines to_lines(const Polygons &polys) 
-{
-    Lines lines;
-    lines.reserve(count_points(polys));
-    for (size_t i = 0; i < polys.size(); ++ i) {
-        const Polygon &poly = polys[i];
-        for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
-            lines.push_back(Line(*it, *(it + 1)));
-        lines.push_back(Line(poly.points.back(), poly.points.front()));
-    }
-    return lines;
-}
+Lines to_lines(const Polygons& polys);
 
-inline Polyline to_polyline(const Polygon &polygon)
-{
-    Polyline out;
-    out.points.reserve(polygon.size() + 1);
-    out.points.assign(polygon.points.begin(), polygon.points.end());
-    out.points.push_back(polygon.points.front());
-    return out;
-}
+Polyline to_polyline(const Polygon& polygon);
 
-inline Polylines to_polylines(const Polygons &polygons)
-{
-    Polylines out;
-    out.reserve(polygons.size());
-    for (const Polygon &polygon : polygons)
-        out.emplace_back(to_polyline(polygon));
-    return out;
-}
+Polylines to_polylines(const Polygons& polygons);
 
-inline Polylines to_polylines(Polygons &&polys)
-{
-    Polylines polylines;
-    polylines.assign(polys.size(), Polyline());
-    size_t idx = 0;
-    for (auto it = polys.begin(); it != polys.end(); ++ it) {
-        Polyline &pl = polylines[idx ++];
-        pl.points = std::move(it->points);
-        pl.points.push_back(pl.points.front());
-    }
-    assert(idx == polylines.size());
-    return polylines;
-}
+Polylines to_polylines(Polygons&& polys);
 
 // close polyline to polygon (connect first and last point in polyline)
-inline Polygons to_polygons(const Polylines &polylines)
-{
-    Polygons out;
-    out.reserve(polylines.size());
-    for (const Polyline &polyline : polylines) {
-        if (polyline.size())
-        out.emplace_back(polyline.points);
-    }
-    return out;
-}
+Polygons to_polygons(const Polylines& polylines);
 
-inline Polygons to_polygons(const VecOfPoints &paths)
-{
-    Polygons out;
-    out.reserve(paths.size());
-    for (const Points &path : paths)
-        out.emplace_back(path);
-    return out;
-}
+Polygons to_polygons(const VecOfPoints& paths);
 
-inline Polygons to_polygons(VecOfPoints &&paths)
-{
-    Polygons out;
-    out.reserve(paths.size());
-    for (Points &path : paths)
-        out.emplace_back(std::move(path));
-    return out;
-}
+Polygons to_polygons(VecOfPoints&& paths);
 
 // Do polygons match? If they match, they must have the same topology,
 // however their contours may be rotated.

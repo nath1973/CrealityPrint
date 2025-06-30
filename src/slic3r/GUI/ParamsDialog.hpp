@@ -112,6 +112,8 @@ private:
     wxPoint m_dragStartPos;
 };
 
+
+
 } // namespace GUI
 } // namespace Slic3r
 

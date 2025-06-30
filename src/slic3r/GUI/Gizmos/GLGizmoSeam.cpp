@@ -1,6 +1,9 @@
 #include "GLGizmoSeam.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelObject.hpp"
 
 //#include "slic3r/GUI/3DScene.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"

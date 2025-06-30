@@ -6,6 +6,8 @@
 #include <boost/log/trivial.hpp>
 
 #include "I18N.hpp"
+#include "ModelObject.hpp"
+#include "ModelInstance.hpp"
 
 //! macro used to mark string used at localization,
 //! return same string

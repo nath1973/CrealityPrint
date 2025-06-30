@@ -1,6 +1,9 @@
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
+#include "../ModelObject.hpp"
+#include "../ModelVolume.hpp"
+#include "../ModelInstance.hpp"
 #include "../Preset.hpp"
 #include "../Utils.hpp"
 #include "../LocalesUtils.hpp"
@@ -1051,6 +1054,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         bool load_gcode_3mf_from_stream(std::istream & data, Model& model, PlateDataPtrs& plate_data_list, DynamicPrintConfig& config, Semver& file_version);
         unsigned int version() const { return m_version; }
         bool check_3mf_model_config(const std::string& filename);
+        IdToModelObjectMap& objects() { return m_objects; }
 
     private:
         void _destroy_xml_parser();
@@ -1989,6 +1993,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                     else
                         model_object->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
                 }
+
+                model_object->from_loaded_id = object.first.second;
 
                 // select object's detected volumes
                 volumes_ptr = &obj_metadata->second.volumes;

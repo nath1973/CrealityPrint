@@ -1,6 +1,7 @@
 #include "DispConfig.h"
 #include "../GUI/GLTexture.hpp"
 #include "../GUI/GUI_App.hpp"
+#include "../GUI/ImGuiWrapper.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
@@ -274,7 +275,7 @@ ImVec2 DispConfig::getWindowSize(WindowType tp, float scale) {
         winsize = { 215, 55 };
         break;
     case DispConfig::e_wt_print_list:
-        winsize = { 202, 150 };
+        winsize = { 202, 184 };
         break;
     case DispConfig::e_wt_slider:
         winsize = { 50,400 };

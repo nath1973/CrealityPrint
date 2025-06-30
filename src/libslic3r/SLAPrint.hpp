@@ -6,10 +6,12 @@
 #include "PrintBase.hpp"
 #include "SLA/RasterBase.hpp"
 #include "SLA/SupportTree.hpp"
+#include "SLA/Hollowing.hpp"
 #include "Execution/ExecutionTBB.hpp"
 #include "Point.hpp"
 #include "MTUtils.hpp"
 #include "Zipper.hpp"
+#include "libslic3r/ModelObject.hpp"
 
 namespace Slic3r {
 

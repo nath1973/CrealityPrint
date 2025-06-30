@@ -4,9 +4,11 @@
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
 ///////////////////////////////////////////////////////////////////////////
+#include "ParamsPanel.hpp"
 #include "Widgets/StateColor.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Preset.hpp"
+#include "libslic3r/ModelVolume.hpp"
 
 #include "Tab.hpp"
 #include "format.hpp"
@@ -14,6 +16,7 @@
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 
+#include "libslic3r/ModelObject.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "Widgets/Label.hpp"
 #include "Widgets/SwitchButton.hpp"
@@ -22,16 +25,17 @@
 #include "Widgets/HoverBorderIcon.hpp"
 #include "GUI_Factories.hpp"
 #include "Widgets/TabCtrl.hpp"
-#include "ParamsPanel.hpp"
+#include "ParamsDialog.hpp"
 #include <map>
 #include <wx/colour.h>
 #include <wx/event.h>
 #include <wx/gdicmn.h>
 #include <wx/brush.h>
-#include <wx/colour.h>
+//#include <wx/colour.h>
 #include <wx/string.h>
 #include <wx/wx.h>
 #include <wx/dataview.h>
+#include <wx/dcgraph.h>
 #include "libslic3r/common_header/common_header.h"
 
 namespace Slic3r {

@@ -1,3 +1,4 @@
+#include "Monitor.hpp"
 #include "Tab.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
@@ -26,7 +27,6 @@
 #include "format.hpp"
 #include "MediaPlayCtrl.h"
 #include "MediaFilePanel.h"
-#include "Plater.hpp"
 #include "BindDialog.hpp"
 
 namespace Slic3r {

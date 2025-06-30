@@ -296,6 +296,9 @@ public:
 
 	const std::map<std::string, ProfilePrinter*>& get_profile_printers();
 
+	std::string make_model2cover_path_key(std::string vendor, std::string printer_model);
+	const std::map<std::string, std::string>& get_model2cover_path();
+
 	void set_mouse_device(const std::string& name, double translation_speed, double translation_deadzone, float rotation_speed, float rotation_deadzone, double zoom_speed, bool swap_yz, bool invert_x, bool invert_y, bool invert_z, bool invert_yaw, bool invert_pitch, bool invert_roll);
 	std::vector<std::string> get_mouse_device_names() const;
 	bool get_mouse_device_translation_speed(const std::string& name, double& speed) const
@@ -341,6 +344,7 @@ private:
         out = T(string_to_double_decimal_point(it_val->second));
 	    return true;
 	}
+    void fill_model_name2cover_path();
 
 	// Type of application: Editor or GCodeViewer
 	EAppMode													m_mode { EAppMode::Editor };
@@ -370,7 +374,33 @@ private:
 	std::map<std::string, ProfilePrinter*>						m_profile_printers;
 
     //
-    std::vector<std::string>                                    m_vec_user_presets;   
+    std::vector<std::string>                                    m_vec_user_presets;  
+
+	// printer model to cover path. key is {vendor}_{modelname}, value is {coverpath}
+	std::map<std::string, std::string>							m_model_name2cover_path;
+};
+
+
+// a simple cache file which can cache anything in local
+// Read during construction and write during destruction
+class EasyCache
+{
+public:
+    static EasyCache& get_instance()
+    {
+        static EasyCache instance;
+        return instance;
+    }
+    ~EasyCache();
+	
+public:
+    nlohmann::json&    data() { return m_data; }
+    void               flush();
+    inline std::string get_file_path();
+
+private:
+    EasyCache();
+    nlohmann::json m_data;
 };
 
 } // namespace Slic3r

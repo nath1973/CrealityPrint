@@ -4,6 +4,8 @@
 
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/ModelInstance.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/Plater.hpp"
@@ -205,11 +207,18 @@ void InstancesHider::render_cut() const
         else
             clipper->set_limiting_plane(ClippingPlane::ClipsNothing());
 
+#if ENABLE_RENDERDOC_CAPTURE
+#else
         glsafe(::glPushAttrib(GL_DEPTH_TEST));
+#endif
+        
         glsafe(::glEnable(GL_DEPTH_TEST));
         clipper->render_cut(mv->is_model_part() ? ColorRGBA(0.8f, 0.3f, 0.0f, 1.0f) : color_from_model_volume(*mv));
+        
+#if ENABLE_RENDERDOC_CAPTURE
+#else
         glsafe(::glPopAttrib());
-
+#endif
         ++clipper_id;
     }
 }

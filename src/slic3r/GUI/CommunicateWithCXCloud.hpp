@@ -87,13 +87,24 @@ namespace GUI {
         // 是否到了上传配置文件到创想云的时间
         bool isUpdateConfigFileTimeout();
         void resetUpdateConfigFileTime();
+        // 是否到了网络错误，重试的时间
+        bool isNetworkErrorRetryTimeout();
+        void resetNetworkErrorRetryTime();
+        bool isNetworkError();
+        void setNetworkError(bool bError);
         void setConfigFileRetInfo(const PreUpdateProfileRetInfo& retInfo);
         const PreUpdateProfileRetInfo& getConfigFileRetInfo();
         void                           setSyncData(const json& j) { m_jsonCXCloudSyncData = j; }
         const json&                    getSyncData() { return m_jsonCXCloudSyncData; };
         void                           updateCXCloutLoginInfo(const std::string& userId, const std::string& token);
-        void                           setTokenInvalid();
+        void                           setTokenInvalid(bool bTokenValid = false);
         bool                           isTokenValid();
+        bool getProcessPresetDirty(){ return m_bProcessPresetDirty; }
+        void setProcessPresetDirty(bool bDirty) { m_bProcessPresetDirty = bDirty; }
+        bool getFilamentPresetDirty() { return m_bFilamentPresetDirty; }
+        void setFilamentPresetDirty(bool bDirty) { m_bFilamentPresetDirty = bDirty; }
+        bool getFirstSelectProcessPreset() { return m_bFirstSelectProcessPreset; }
+        void setFirstSelectProcessPreset(bool bFirst) { m_bFirstSelectProcessPreset = bFirst; }
 
     private:
         CXCloudDataCenter() = default;
@@ -105,10 +116,15 @@ namespace GUI {
         std::mutex                                                 m_mutexUserCloudPresets;
         ENDownloadConfigState                                     m_enDownloadConfigToLocalState = ENDownloadConfigState::ENDCS_NOT_DOWNLOAD;
         long long m_llUpdateConfigFileTimestamp = 0;
+        long long m_llNetworkErrorRetryTimestamp = 0;
         PreUpdateProfileRetInfo                                   m_configFileRetInfo;
         json                                                      m_jsonCXCloudSyncData = json();
         CXCloudLoginInfo                                          m_cxCloudLoginInfo;
         std::mutex                                                m_cxCloudLoginInfoMutex;
+        bool m_bProcessPresetDirty = false;
+        bool m_bFilamentPresetDirty = false;
+        bool m_bFirstSelectProcessPreset = true;
+        bool m_bNetworkError = false;
     };
 
     class CLocalDataCenter

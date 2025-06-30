@@ -162,7 +162,7 @@ void GLGizmoMove3D::on_render()
 
                 GLModel::Geometry init_data;
                 init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
-                init_data.color = AXES_COLOR[id];
+                //init_data.color = AXES_COLOR[id];
                 init_data.reserve_vertices(2);
                 init_data.reserve_indices(2);
 
@@ -172,8 +172,9 @@ void GLGizmoMove3D::on_render()
 
                 // indices
                 init_data.add_line(0, 1);
-
+                
                 m_grabber_connections[id].model.init_from(std::move(init_data));
+                m_grabber_connections[id].model.set_color(AXES_COLOR[id]);
             //}
 
             glLineStipple(1, 0x0FFF);

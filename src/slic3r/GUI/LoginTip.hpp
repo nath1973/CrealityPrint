@@ -16,9 +16,11 @@ public:
     int isFilamentUserMaterialValid(const std::string& userMaterial);
     int showTokenInvalidTipDlg(const std::string& fromPage);
     void resetHasSkipToLogin();
+    bool tokenInvalidHasTip() { return m_bTokenInvalidHasTip; }
+
+    int syncShowTokenInvalidTipDlg(const std::string& fromPage);
 
 private:
-    int syncShowTokenInvalidTipDlg(const std::string& fromPage);
     int showAutoMappingNoLoginTipDlg(const std::string& fromPage);
     int showAutoMappingDiffAccountTipDlg(const std::string& fromPage);
     int showNoSelectedSyncUserPreset(const std::string& fromPage);
@@ -29,6 +31,7 @@ private:
 private:
     bool m_bShowTipDlg = true;
     bool m_bHasSkipToLogin = false;
+    bool m_bTokenInvalidHasTip = false;
 };
 
 }

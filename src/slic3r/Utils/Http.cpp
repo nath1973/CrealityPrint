@@ -414,6 +414,8 @@ std::string Http::priv::body_size_error()
 
 void Http::priv::http_perform()
 {
+	::curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+	::curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 15L);
 	::curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 	::curl_easy_setopt(curl, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
 	::curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writecb);
@@ -473,7 +475,7 @@ void Http::priv::http_perform()
 		else if (res == CURLE_WRITE_ERROR) {
 			if (errorfn) { errorfn(std::move(buffer), body_size_error(), 0); }
 		} else {
-			if (errorfn) { errorfn(std::move(buffer), curl_error(res), 0); }
+			if (errorfn) { errorfn(std::move(buffer), curl_error(res), (int)res); }
 		};
 	} else {
 		long http_status = 0;
@@ -744,7 +746,13 @@ void Http::cancel()
 {
 	if (p) { p->cancel = true; }
 }
-
+bool Http::is_cancelled() const
+{
+	if (p) {
+		return p->cancel;
+	}
+	return false;
+}
 Http Http::get(std::string url)
 {
     return Http{std::move(url)};

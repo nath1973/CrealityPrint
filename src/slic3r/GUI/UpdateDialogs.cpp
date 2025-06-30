@@ -12,6 +12,7 @@
 #include <wx/statbmp.h>
 #include <wx/checkbox.h>
 
+#include "slic3r/GUI/Auxiliary.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
 #include "GUI.hpp"

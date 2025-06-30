@@ -1,5 +1,6 @@
 #include "IMSlider.hpp"
 #include "libslic3r/GCode.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "GUI_App.hpp"
 #include "NotificationManager.hpp"
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
@@ -1895,8 +1896,8 @@ bool IMSlider::is_wipe_tower_layer(int tick) const
 {
     if (!m_is_wipe_tower || tick >= (int) m_values.size()) return false;
     if (tick == 0 || (tick == (int) m_values.size() - 1 && m_values[tick] > m_values[tick - 1])) return false;
-    if ((m_values[tick - 1] == m_values[tick + 1] && m_values[tick] < m_values[tick + 1]) ||
-        (tick > 0 && m_values[tick] < m_values[tick - 1])) // if there is just one wiping on the layer
+    if ((tick > 0 && m_values[tick] < m_values[tick - 1]) || 
+        (m_values[tick - 1] == m_values[tick + 1] && m_values[tick] < m_values[tick + 1])) // if there is just one wiping on the layer
         return true;
 
     return false;

@@ -89,7 +89,7 @@ public:
         HS_Deselect
     };
 
-    GLVolume(float r = 1.f, float g = 1.f, float b = 1.f, float a = 1.f);
+    GLVolume(float r = 1.f, float g = 1.f, float b = 1.f, float a = 1.f, bool create_index_data = true);
     GLVolume(const ColorRGBA& color) : GLVolume(color.r(), color.g(), color.b(), color.a()) {}
     virtual ~GLVolume() = default;
 
@@ -209,8 +209,9 @@ public:
     EHoverState         	hover;
 
     GUI::GLModel            model;
+    const TriangleMesh*     ori_mesh{nullptr};
     // raycaster used for picking
-    std::unique_ptr<GUI::MeshRaycaster> mesh_raycaster;
+    std::shared_ptr<GUI::MeshRaycaster> mesh_raycaster;
     // BBS
     mutable std::vector<GUI::GLModel> mmuseg_models;
     mutable ObjectBase::Timestamp       mmuseg_ts;
@@ -436,6 +437,7 @@ private:
 
 public:
     GLVolumePtrs volumes;
+    static std::map<const TriangleMesh*, std::set<GLVolume*>> g_mesh_volumes;//Shared between Preview and View3D page, to reuse vertex data objects in GLModel
 
     GLVolumeCollection() {
         set_default_slope_normal_z();
@@ -487,8 +489,9 @@ public:
                 std::function<bool(const GLVolume &)> filter_func  = std::function<bool(const GLVolume &)>(), bool with_outline = true) const;
 
     // Clear the geometry
-    void clear() { for (auto *v : volumes) delete v; volumes.clear(); }
+    void clear();
 
+    void release_volume(GLVolume* volume);
     bool empty() const { return volumes.empty(); }
     void set_range(double low, double high);
 

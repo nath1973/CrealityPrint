@@ -105,6 +105,7 @@ int LoginTip::showTokenInvalidTipDlg(const std::string& fromPage)
             //wxGetApp().swith_community_sub_page("param_set");
         }
     });
+    m_bTokenInvalidHasTip = true;
     return 0;
 }
 

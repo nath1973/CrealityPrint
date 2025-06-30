@@ -258,27 +258,47 @@ std::vector<WaveSeed> wave_seeds(
     int iseed = 0;
     for (const ClipperLib_Z::Path &path : segments) {
         assert(path.size() >= 2);
-        const ClipperLib_Z::IntPoint &front = path.front();
-        const ClipperLib_Z::IntPoint &back  = path.back();
+        ClipperLib_Z::IntPoint front = path.front();
+        ClipperLib_Z::IntPoint back  = path.back();
         // Both ends of a seed segment are supposed to be inside a single boundary expolygon.
         // Thus as long as the seed contour is not closed, it should be open at a boundary point.
         assert((front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end) || 
             //(front.z() < 0 && back.z() < 0));
             // Hope that at least one end of an open polyline is clipped by the boundary, thus an intersection point is created.
             (front.z() < 0 || back.z() < 0));
-        const Intersection *intersection = nullptr;
-        auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection &is) {
-            return is.first >= 1 && is.first < idx_boundary_end &&
-                   is.second >= idx_boundary_end && is.second < idx_src_end;
+
+        if (front != back && front.z() >= 0 && back.z() >= 0) {
+            // Very rare case when both endpoints intersect boundary ExPolygons in existing points.
+            // So the ZFillFunction callback hasn't been called.
+            continue;
+        }
+        else
+            if (front == back && (front.z() < idx_boundary_end)) {
+                // This should be a very rare exception.
+                // See https://github.com/prusa3d/PrusaSlicer/issues/12469.
+                // Segement is open, yet its first point seems to be part of boundary polygon.
+                // Take the first point with src polygon index.
+                for (const ClipperLib_Z::IntPoint& point : path) {
+                    if (point.z() >= idx_boundary_end) {
+                        front = point;
+                        back = point;
+                    }
+                }
+            }
+
+        const Intersection* intersection = nullptr;
+        auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection& is) {
+            return is.first >= 1 && is.first < idx_boundary_end&&
+                is.second >= idx_boundary_end && is.second < idx_src_end;
         };
         if (front.z() < 0) {
-            const Intersection &is = intersections[- front.z() - 1];
+            const Intersection &is = intersections[-front.z() - 1];
             assert(intersection_point_valid(is));
             if (intersection_point_valid(is))
                 intersection = &is;
         }
-        if (! intersection && back.z() < 0) {
-            const Intersection &is = intersections[- back.z() - 1];
+        if (!intersection && back.z() < 0) {
+            const Intersection &is = intersections[-back.z() - 1];
             assert(intersection_point_valid(is));
             if (intersection_point_valid(is))
                 intersection = &is;
@@ -286,7 +306,8 @@ std::vector<WaveSeed> wave_seeds(
         if (intersection) {
             // The path intersects the boundary contour at least at one side. 
             out.push_back({ uint32_t(intersection->second - idx_boundary_end), uint32_t(intersection->first - 1), ClipperZUtils::from_zpath(path) });
-        } else {
+        }
+        else {
             // This should be a closed contour.
             assert(front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end);
             // Find a source boundary expolygon of one sample of this closed path.
@@ -298,7 +319,7 @@ std::vector<WaveSeed> wave_seeds(
             if (boundary_id >= 0)
                 out.push_back({ uint32_t(front.z() - idx_boundary_end), uint32_t(boundary_id), ClipperZUtils::from_zpath(path) });
         }
-        ++ iseed;
+        ++iseed;
     }
 
     if (sorted)

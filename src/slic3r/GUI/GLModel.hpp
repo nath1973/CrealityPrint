@@ -62,7 +62,8 @@ namespace GUI {
             std::vector<float> vertices;
             std::vector<unsigned int> indices;
             EIndexType index_type{ EIndexType::UINT };
-            ColorRGBA color{ ColorRGBA::BLACK() };
+            BoundingBoxf3 m_bounding_box;//From the GLModel class, it belongs to geometric properties and can be shared together.
+            //ColorRGBA color{ ColorRGBA::BLACK() };//Move this object to the RenderData class.
 
             void reserve_vertices(size_t vertices_count) { vertices.reserve(vertices_count * vertex_stride_floats(format)); }
             void reserve_indices(size_t indices_count) { indices.reserve(indices_count); }
@@ -130,19 +131,26 @@ namespace GUI {
 
         struct RenderData
         {
+            bool share_state{false};//Do not release GPU objects during GModel decomposition, as it may be referenced by other GModel objects
             Geometry geometry;
             unsigned int vbo_id{ 0 };
             unsigned int ibo_id{ 0 };
             size_t vertices_count{ 0 };
             size_t indices_count{ 0 };
-
             //unsigned int vao_id{ 0 };
             unsigned int instance_vbo_id{ 0 };
             unsigned int instance_count{ 0 };
+            void release();
+            ~RenderData() { 
+                release();
+            }
+
+
         };
     private:
-        RenderData m_render_data;
-
+        //RenderData m_render_data;
+        std::shared_ptr<RenderData> m_render_data;
+        ColorRGBA color{ColorRGBA::BLACK()}; // Move this object out of the Geometry class.
         // By default the vertex and index buffers data are sent to gpu at the first call to render() method.
         // If you need to initialize a model from outside the main thread, so that a call to render() may happen
         // before the initialization is complete, use the methods:
@@ -151,27 +159,31 @@ namespace GUI {
         // enable_render()
         // to keep the data on cpu side until needed.
         bool m_render_disabled{ false };
-        BoundingBoxf3 m_bounding_box;
+        //BoundingBoxf3 m_bounding_box;
         std::string m_filename;
 
         //for render clone preview, if "glDrawElementsInstanced" not supported, use normal render 
         std::vector<Vec3f> m_model_offsets;
 
     public:
-        GLModel() = default;
+        GLModel(bool create_geometry_data = true);
         virtual ~GLModel() { reset(); }
 
-        size_t vertices_count() const { return m_render_data.vertices_count > 0 ?
-            m_render_data.vertices_count : m_render_data.geometry.vertices_count(); }
-        size_t indices_count() const { return m_render_data.indices_count > 0 ?
-            m_render_data.indices_count : m_render_data.geometry.indices_count(); }
+        size_t vertices_count() const { return m_render_data->vertices_count > 0 ?
+            m_render_data->vertices_count : m_render_data->geometry.vertices_count(); }
+        size_t indices_count() const { return m_render_data->indices_count > 0 ?
+            m_render_data->indices_count : m_render_data->geometry.indices_count(); }
 
-        size_t vertices_size_floats() const { return vertices_count() * Geometry::vertex_stride_floats(m_render_data.geometry.format); }
+        size_t vertices_size_floats() const { return vertices_count() * Geometry::vertex_stride_floats(m_render_data->geometry.format); }
         size_t vertices_size_bytes() const  { return vertices_size_floats() * sizeof(float); }
 
-        size_t indices_size_bytes() const { return indices_count() * Geometry::index_stride_bytes(m_render_data.geometry); }
+        size_t indices_size_bytes() const { return indices_count() * Geometry::index_stride_bytes(m_render_data->geometry); }
 
-        const Geometry& get_geometry() const { return m_render_data.geometry; }
+        const Geometry& get_geometry() const { return m_render_data->geometry; }
+        
+        void set_render_data(std::shared_ptr<RenderData> render_data) { m_render_data = render_data; }
+        std::shared_ptr<RenderData> get_render_data() { return m_render_data; }
+        void set_render_data_share_state(bool share_state) { m_render_data->share_state = share_state; }
 
         void init_from(Geometry&& data);
         void init_from(const TriangleMesh& mesh);
@@ -179,8 +191,8 @@ namespace GUI {
         void init_from(const Polygons& polygons, float z);
         bool init_from_file(const std::string& filename);
 
-        void set_color(const ColorRGBA& color) { m_render_data.geometry.color = color; }
-        const ColorRGBA& get_color() const { return m_render_data.geometry.color; }
+        void set_color(const ColorRGBA& color) { this->color = color; }
+        const ColorRGBA& get_color() const { return this->color; }
 
         void reset();
         void render();
@@ -193,9 +205,9 @@ namespace GUI {
         void release_instance_data_from_gpu();
 
         bool is_initialized() const { return vertices_count() > 0 && indices_count() > 0; }
-        bool is_empty() const { return m_render_data.geometry.is_empty(); }
+        bool is_empty() const { return m_render_data->geometry.is_empty(); }
 
-        const BoundingBoxf3& get_bounding_box() const { return m_bounding_box; }
+        const BoundingBoxf3& get_bounding_box() const { return m_render_data->geometry.m_bounding_box; }
         const std::string& get_filename() const { return m_filename; }
 
         bool is_render_disabled() const { return m_render_disabled; }
@@ -204,17 +216,17 @@ namespace GUI {
 
         size_t cpu_memory_used() const {
             size_t ret = 0;
-            if (!m_render_data.geometry.vertices.empty())
+            if (!m_render_data->geometry.vertices.empty())
                 ret += vertices_size_bytes();
-            if (!m_render_data.geometry.indices.empty())
+            if (!m_render_data->geometry.indices.empty())
                 ret += indices_size_bytes();
             return ret;
         }
         size_t gpu_memory_used() const {
             size_t ret = 0;
-            if (m_render_data.geometry.vertices.empty())
+            if (m_render_data->geometry.vertices.empty())
                 ret += vertices_size_bytes();
-            if (m_render_data.geometry.indices.empty())
+            if (m_render_data->geometry.indices.empty())
                 ret += indices_size_bytes();
             return ret;
         }

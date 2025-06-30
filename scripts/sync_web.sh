@@ -74,6 +74,8 @@ if [ "$SYNC_WEB" = false ]; then
     # run web build
     cd "$web_root/Community" || exit
     rm -rf "$sync_source_dir"
+    npm i
+    npm run po2json
     npm run release || exit 1
     echo "npm run release end"
 fi
@@ -91,3 +93,34 @@ echo "copy start"
 cp -R "$sync_source_dir/"* "$sync_target_dir/"
 echo "copy end"
 
+echo "start DMgr"
+sync_source_dir="$web_root/DMgr/dist"
+sync_target_dir="$cp_source/resources/web/deviceMgr"
+if [ "$SYNC_WEB" = false ]; then
+    # run web build
+    cd "$web_root/DMgr" || exit
+    rm -rf "$sync_source_dir"
+    npm i
+    npm run po2json
+    npm run build || exit 1
+    echo "npm run release end"
+fi
+rm -f "$sync_target_dir/assets/*.js"
+cp -R "$sync_source_dir/"* "$sync_target_dir/"
+
+echo "start sendpage"
+sync_source_dir="$web_root/SendToPrinterPage/dist"
+sync_target_dir="$cp_source/resources/web/sendToPrinterPage"
+if [ "$SYNC_WEB" = false ]; then
+    # run web build
+    cd "$web_root/SendToPrinterPage" || exit
+    rm -rf "$sync_source_dir"
+    npm i
+    npm run po2json
+    npm run build || exit 1
+    echo "npm run release end"
+fi
+rm -f "$sync_target_dir/assets/*.js"
+cp -R "$sync_source_dir/"* "$sync_target_dir/"
+
+echo "finish"

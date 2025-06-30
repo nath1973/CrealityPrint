@@ -8,6 +8,8 @@
 #include "libslic3r.h"
 #include "PrintConfig.hpp"
 #include "Model.hpp"
+#include "ModelVolume.hpp"
+#include "ModelInstance.hpp"
 #include <algorithm>
 #include <numeric>
 #include <unordered_set>

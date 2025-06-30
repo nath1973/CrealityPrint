@@ -153,7 +153,11 @@ std::vector<double> layer_height_profile_adaptive(
     const SlicingParameters& slicing_params,
     const ModelObject& object, float quality_factor);
 
-std::vector<double> layer_height_overhang(const SlicingParameters& slicing_params,const ModelObject& object,float height,std::vector<double> input_height);
+std::vector<double> layer_height_overhang(const SlicingParameters& slicing_params,
+                                          const ModelObject&       object,
+                                          float                    height,
+                                          std::vector<double>      input_height,
+                                          Transform3d              trafo = {});
 
 struct HeightProfileSmoothingParams
 {

@@ -743,13 +743,22 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
     
     bool has_overhang_speed = config->opt_bool("enable_overhang_speed");
     for (auto el :
-         {"overhang_speed_classic", "overhang_1_4_speed",
-        "overhang_2_4_speed", "overhang_3_4_speed", "overhang_4_4_speed"})
+         {"overhang_speed_classic", "overhang_1_4_speed", "overhang_2_4_speed", "overhang_3_4_speed", "overhang_4_4_speed"})
         toggle_line(el, has_overhang_speed);
     
     bool has_overhang_speed_classic = config->opt_bool("overhang_speed_classic");
     toggle_line("slowdown_for_curled_perimeters",!has_overhang_speed_classic && has_overhang_speed);
-    
+
+    for (auto el : {"smooth_speed_discontinuity_area", "smooth_coefficient", "overhang_totally_speed"})
+        toggle_line(el, has_overhang_speed_classic && has_overhang_speed);
+
+    toggle_line("smooth_coefficient",
+                config->opt_bool("smooth_speed_discontinuity_area") && has_overhang_speed_classic && has_overhang_speed);
+
+    //toggle_line("smooth_speed_discontinuity_area", has_overhang_speed_classic && has_overhang_speed);
+
+    //toggle_line("smooth_coefficient", has_overhang_speed_classic && has_overhang_speed);
+        
     toggle_line("flush_into_objects", !is_global_config);
 
     toggle_line("support_interface_not_for_body",config->opt_int("support_interface_filament")&&!config->opt_int("support_filament"));

@@ -12,7 +12,7 @@
 #include "PartPlate.hpp"
 
 #include <boost/log/trivial.hpp>
-#include <wx/graphics.h>
+#include <wx/dcgraph.h>
 #include "Notebook.hpp"
 #include "libslic3r/common_header/common_header.h"
 #define TOPBAR_ICON_SIZE  17
@@ -33,6 +33,7 @@ public:
     ~ButtonsCtrl() {}
 
     void SetSelection(int sel);
+    int GetSelection();
     bool InsertPage(size_t n, const wxString& text, bool bSelect = false, const std::string& bmp_name = "", const std::string& inactive_bmp_name = "");
     void RefreshColor();
     void reLayout();
@@ -88,7 +89,7 @@ ButtonsCtrl::ButtonsCtrl(wxWindow* parent, wxBoxSizer* side_tools)
     // this->Bind(wxEVT_PAINT, &ButtonsCtrl::OnPaint, this);
     Bind(wxEVT_SYS_COLOUR_CHANGED, [this](auto& e) {});
 }
-
+int  ButtonsCtrl::GetSelection() { return m_selection; }
 void ButtonsCtrl::SetSelection(int sel)
 {
     if (m_selection == sel)
@@ -533,7 +534,7 @@ void BBLTopbar::Init(wxFrame* parent)
     bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
     wxBitmap logo_bitmap = create_scaled_bitmap("logo", nullptr, (20));
     wxBitmap logo_bitmap_checked = create_scaled_bitmap("logo_checked", nullptr, (20));
-    wxAuiToolBarItem* logo_item   = this->AddTool(ID_LOGO, "", logo_bitmap);
+    logo_item   = this->AddTool(ID_LOGO, "", logo_bitmap);
     logo_item->SetHoverBitmap(logo_bitmap_checked);
 
     this->AddSpacer(FromDIP(10));
@@ -556,7 +557,7 @@ void BBLTopbar::Init(wxFrame* parent)
     this->AddSpacer(FromDIP(5));
 #endif
     wxBitmap open_bitmap = create_scaled_bitmap(is_dark ? "open_file" : "open_file_light" , this, (TOPBAR_ICON_SIZE));
-    wxAuiToolBarItem* tool_item   = this->AddTool(wxID_OPEN, "", open_bitmap, _L("Open Project"));
+    tool_item            = this->AddTool(wxID_OPEN, "", open_bitmap, _L("Open Project"));
 
     this->AddSpacer(FromDIP(10));
 
@@ -567,7 +568,7 @@ void BBLTopbar::Init(wxFrame* parent)
 
     this->AddSpacer(FromDIP(10));
 
-    this->AddTool(ID_PREFERENCES, "", create_scaled_bitmap(is_dark ? "preferences" : "preferences_light", this, (TOPBAR_ICON_SIZE)), _L("Preferences"));
+    m_preference_item = this->AddTool(ID_PREFERENCES, "", create_scaled_bitmap(is_dark ? "preferences" : "preferences_light", this, (TOPBAR_ICON_SIZE)), _L("Preferences"));
 
 #ifdef __APPLE__
     this->AddSpacer(FromDIP(10));
@@ -613,7 +614,7 @@ void BBLTopbar::Init(wxFrame* parent)
     wxAuiToolBarItem* item_ctrl = this->AddControl( m_tabCtrol);
     item_ctrl->SetAlignment(wxALIGN_CENTRE);
  
-    this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this, logo_item](wxCommandEvent& evt) {
+    this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& evt) {
         //         wxGetApp().mainframe->select_tab(evt.GetId());
         logo_item->SetUserData(HOME_BTN_CODE_UNCHECKED);
         logo_item->SetState(wxAUI_BUTTON_STATE_NORMAL);
@@ -708,8 +709,10 @@ void BBLTopbar::Init(wxFrame* parent)
     //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnFullScreen, this, wxID_MAXIMIZE_FRAME);
     //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCloseFrame, this, wxID_CLOSE_FRAME);
     this->Bind(wxEVT_LEFT_DCLICK, &BBLTopbar::OnMouseLeftDClock, this);
+    #ifdef WIN32
     this->Bind(wxEVT_LEFT_DOWN, &BBLTopbar::OnMouseLeftDown, this);
     this->Bind(wxEVT_LEFT_UP, &BBLTopbar::OnMouseLeftUp, this);
+    #endif
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnOpenProject, this, wxID_OPEN);
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnSaveProject, this, wxID_SAVE);
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnRedo, this, wxID_REDO);
@@ -808,6 +811,98 @@ void BBLTopbar::DisableUndoRedoItems()
     this->EnableTool(m_save_project_item->GetId(), false);
     if (nullptr != m_calib_item)
         this->EnableTool(m_calib_item->GetId(), false);
+    Refresh();
+}
+
+void BBLTopbar::DisableGuideModeItems()
+{
+    bool res = this->GetToolEnabled(logo_item->GetId());
+    if (!res) {
+        logo_item->SetUserData(0);   
+    }
+       
+    res = this->GetToolEnabled(m_file_menu_item->GetId());
+    if (!res) {
+        m_file_menu_item->SetUserData(0);
+    }
+    
+    res = this->GetToolEnabled(m_dropdown_menu_item->GetId());
+    if (!res) {
+        m_dropdown_menu_item->SetUserData(0);
+    }
+
+    res = this->GetToolEnabled(tool_item->GetId());
+    if (!res) {
+        tool_item->SetUserData(0);
+    }
+
+    res = this->GetToolEnabled(m_save_project_item->GetId());
+    if (!res) {
+        m_save_project_item->SetUserData(0);
+    }
+
+    res = this->GetToolEnabled(m_preference_item->GetId());
+    if (!res) {
+        m_preference_item->SetUserData(0);
+    }
+
+    res = this->GetToolEnabled(m_undo_item->GetId());
+    if (!res) {
+        m_undo_item->SetUserData(0);
+    }
+    
+    res = this->GetToolEnabled(m_redo_item->GetId());
+    if (!res) {
+        m_redo_item->SetUserData(0);
+    }
+
+    this->EnableTool(logo_item->GetId(), false);
+    this->EnableTool(m_file_menu_item->GetId(), false);
+    this->EnableTool(m_dropdown_menu_item->GetId(), false);
+    this->EnableTool(tool_item->GetId(), false);
+    this->EnableTool(m_save_project_item->GetId(), false);
+    this->EnableTool(m_preference_item->GetId(), false);
+    this->EnableTool(m_undo_item->GetId(), false);
+    this->EnableTool(m_redo_item->GetId(), false);
+    m_tabCtrol->Enable(false);
+    m_title_LabelItem->Enable(false);
+    this->EnableTool(m_upload_btn->GetId(), false);
+
+    Refresh();
+}
+
+void BBLTopbar::EnableGuideModeItems()
+{
+    if (logo_item->GetUserData() != 0)
+        logo_item->SetUserData(-1);
+    if (m_file_menu_item->GetUserData() != 0)
+        m_file_menu_item->SetUserData(-1);
+    if (m_dropdown_menu_item->GetUserData() != 0)
+        m_dropdown_menu_item->SetUserData(-1);
+    if (tool_item->GetUserData() != 0)
+        tool_item->SetUserData(-1);
+    if (m_save_project_item->GetUserData() != 0)
+        m_save_project_item->SetUserData(-1);
+    if (m_preference_item->GetUserData() != 0)
+        m_preference_item->SetUserData(-1);
+    if (m_undo_item->GetUserData() != 0)
+        m_undo_item->SetUserData(-1);
+    if (m_redo_item->GetUserData() != 0)
+        m_redo_item->SetUserData(-1);
+
+    this->EnableTool(logo_item->GetId(), true);
+    this->EnableTool(m_file_menu_item->GetId(), true);
+    this->EnableTool(m_dropdown_menu_item->GetId(), true);
+    this->EnableTool(tool_item->GetId(), true);
+    this->EnableTool(m_save_project_item->GetId(), true);
+    this->EnableTool(m_preference_item->GetId(), true);
+    this->EnableTool(m_undo_item->GetId(), true);
+    this->EnableTool(m_redo_item->GetId(), true);
+
+    m_tabCtrol->Enable(true);
+    m_title_LabelItem->Enable(true);
+    this->EnableTool(m_upload_btn->GetId(), true);
+
     Refresh();
 }
 
@@ -931,6 +1026,10 @@ void BBLTopbar::SetFileMenu(wxMenu* file_menu)
 
 void BBLTopbar::AddDropDownSubMenu(wxMenu* sub_menu, const wxString& title)
 {
+    if (title == _L("Help"))
+    {
+        m_helpItem = sub_menu;
+    }
     m_top_menu.AppendSubMenu(sub_menu, title);
 }
 
@@ -1146,6 +1245,15 @@ void BBLTopbar::OnDropdownToolItem(wxAuiToolBarEvent& evt)
     wxAuiToolBar* tb = static_cast<wxAuiToolBar*>(evt.GetEventObject());
 
     tb->SetToolSticky(evt.GetId(), true);
+
+    if (m_helpItem)
+    {
+        auto         guideItem = m_helpItem->FindItem(wxID_FIND);
+        ButtonsCtrl* pCtr      = dynamic_cast<ButtonsCtrl*>(m_tabCtrol);
+        int          index     = pCtr->GetSelection();
+        if (guideItem)
+            guideItem->Enable(index == 1);
+    }
 
     if (!m_skip_popup_dropdown_menu) {
         GetParent()->PopupMenu(&m_top_menu, wxPoint(FromDIP(1), this->GetSize().GetHeight() - 2));

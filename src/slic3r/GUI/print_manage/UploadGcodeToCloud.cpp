@@ -12,6 +12,7 @@
 #include "slic3r/GUI/Widgets/Label.hpp"
 #include "slic3r/GUI/Widgets/StateColor.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/Widgets/ProgressDialog.hpp"
 #include "slic3r/GUI/Widgets/RoundedRectangle.hpp"
 #include "slic3r/GUI/Widgets/StaticBox.hpp"
@@ -20,6 +21,7 @@
 #include "slic3r/GUI/wxExtensions.hpp"
 #include "slic3r/GUI/Jobs/BoostThreadWorker.hpp"
 #include "slic3r/GUI/Jobs/PlaterWorker.hpp"
+#include "slic3r/GUI/Auxiliary.hpp"
 
 #include <string>
 #include <vector>
@@ -37,6 +39,7 @@
 #include "slic3r/GUI/print_manage/MaterialMapPanel.hpp"
 #include "slic3r/GUI/Notebook.hpp"
 #include "data/DataCenter.hpp"
+#include "slic3r/GUI/LoginTip.hpp"
 #include "libslic3r/common_header/common_header.h"
 namespace Slic3r { namespace GUI {
 
@@ -196,7 +199,7 @@ void UploadGcodeToCloudDialog::on_rename_enter()
     m_current_project_name = new_file_name;
     m_rename_switch_panel->SetSelection(0);
     m_rename_text->SetLabel(m_current_project_name);
-    plater->set_project_filename(m_current_project_name);
+    //plater->set_project_filename(m_current_project_name);
     m_rename_normal_panel->Layout();
 }
 
@@ -1002,13 +1005,36 @@ void UploadGcodeToCloudDialog::on_upload_3mf(wxCommandEvent& event)
     // send_gcode(false);
     int nRet = -1;
     try {
+        if (!wxGetApp().is_login()) {
+            //EndDialog(wxID_OK);
+            //wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+            //wxGetApp().swith_community_sub_page("login");
+            //return;
+            throw ErrorCodeException("isLogin", 1, "no login");
+        }
         do {
             nRet = m_upload_file.getAliyunInfo();
-            if (nRet != 0)
+            if (nRet != 0) {
+                if (nRet == 4) {
+                    //LoginTip::getInstance().syncShowTokenInvalidTipDlg("");
+                    EndDialog(wxID_OK);
+                    wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+                    wxGetApp().swith_community_sub_page("token_expired");
+                    return;
+                }
                 break;
+            }
             nRet = m_upload_file.getOssInfo();
-            if (nRet != 0)
+            if (nRet != 0) {
+                if (nRet == 4) {
+                    //LoginTip::getInstance().syncShowTokenInvalidTipDlg("");
+                    EndDialog(wxID_OK);
+                    wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+                    wxGetApp().swith_community_sub_page("token_expired");
+                    return;
+                }
                 break;
+            }
 
             std::string target_name = std::string(m_rename_text->GetLabelText().utf8_str().data());
             std::string target_path = "model/slice/" + get_file_md5(m_ssGCodeFilePath) + ".gcode.gz";
@@ -1016,8 +1042,16 @@ void UploadGcodeToCloudDialog::on_upload_3mf(wxCommandEvent& event)
             if (nRet != 0)
                 break;
             nRet = m_upload_file.uploadGcodeToCXCloud(target_name, target_path);
-            if (nRet != 0)
+            if (nRet != 0) {
+                if (nRet == 4) {
+                    //LoginTip::getInstance().syncShowTokenInvalidTipDlg("");
+                    EndDialog(wxID_OK);
+                    wxGetApp().mainframe->select_tab(MainFrame::tpHome);
+                    wxGetApp().swith_community_sub_page("token_expired");
+                    return;
+                }
                 break;
+            }
         } while (0);
         BOOST_LOG_TRIVIAL(info) << "upload status:" << nRet;
         if (nRet != 0) {

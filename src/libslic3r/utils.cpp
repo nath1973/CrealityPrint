@@ -111,18 +111,29 @@ static boost::log::trivial::severity_level level_to_boost(unsigned level)
     default: return boost::log::trivial::trace;
     }
 }
+boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_log_sink;
+
+boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_test_log_sink = nullptr;
+std::function<void(const std::string& model, const std::string& function, const std::string& message)> ADD_TEST_POINT{
+    [](const std::string&, const std::string&, const std::string&) {}
+};
 
 void set_logging_level(unsigned int level)
 {
 #ifndef _DEBUG
-
     logSeverity = level_to_boost(level);
+    boost::log::core::get()->set_filter(boost::log::trivial::severity >= logSeverity);
 
-    boost::log::core::get()->set_filter
-    (
-        boost::log::trivial::severity >= logSeverity
-    );
+    if (g_test_log_sink != nullptr) {
+        boost::log::core::get()->reset_filter();
 
+		g_test_log_sink->set_filter([](const boost::log::attribute_value_set rec) { 
+			return rec.find("TLOG") != rec.end(); 
+		});
+
+		g_log_sink->set_filter(boost::log::trivial::severity >= logSeverity);
+	}
+    
 #endif
 }
 
@@ -164,8 +175,6 @@ unsigned get_logging_level()
     default: return 1;
     }
 }
-
-boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_log_sink;
 
 // Force set_logging_level(<=error) after loading of the DLL.
 // This is currently only needed if libslic3r is loaded as a shared library into Perl interpreter
@@ -352,7 +361,7 @@ namespace src = boost::log::sources;
 namespace expr = boost::log::expressions;
 namespace keywords = boost::log::keywords;
 namespace attrs = boost::log::attributes;
-void set_log_path_and_level(const std::string& file, unsigned int level)
+void set_log_path_and_level(const std::string& file, unsigned int level, bool enable_test)
 {
 #ifdef __APPLE__
 	//currently on old macos, the boost::log::add_file_log will crash
@@ -367,7 +376,7 @@ void set_log_path_and_level(const std::string& file, unsigned int level)
 	if (!boost::filesystem::exists(log_folder)) {
 		boost::filesystem::create_directory(log_folder);
 	}
-	auto full_path = (log_folder / file).make_preferred();
+    auto full_path = (log_folder / file).make_preferred();
 #ifndef _DEBUG
 
 	g_log_sink = boost::log::add_file_log(
@@ -382,6 +391,24 @@ void set_log_path_and_level(const std::string& file, unsigned int level)
 			<< ":" << expr::smessage
 			)
 	);
+
+    if (enable_test) {
+        ADD_TEST_POINT = [](const std::string& model, const std::string& function, const std::string& mesg) {
+            boost::log::sources::severity_logger_mt<boost::log::trivial::severity_level> lg;
+            lg.add_attribute("TLOG", boost::log::attributes::constant<std::string>("TLOG"));
+            BOOST_LOG_SEV(lg, boost::log::trivial::trace) << "[head]:" << model << " " << function
+                                                          << "[body]:" << mesg;
+            g_test_log_sink->flush();
+        };
+
+		std::string filename   = "creality.tlog";
+        auto        full_path2 = (log_folder / filename).make_preferred();
+        g_test_log_sink        = boost::log::add_file_log(
+            keywords::file_name = full_path2.string(), keywords::rotation_size = 100 * 1024 * 1024,
+            keywords::format = (expr::stream << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f")
+											 << expr::smessage)); 
+    }
+
 #endif // _DEBUG
 
 	logging::add_common_attributes();

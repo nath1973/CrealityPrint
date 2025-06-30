@@ -29,6 +29,10 @@ protected:
     void messureSize();
 
     void OnMouseMove(wxMouseEvent& event);
+#ifdef __APPLE__
+    void OnMouseEnter(wxMouseEvent& event);
+    void OnMouseLeave(wxMouseEvent& event);
+#endif //__APPLE__
 
     void Create(wxWindow* parent, const wxString& text, const wxString& icon, const wxPoint& pos, const wxSize& size, long style);
 

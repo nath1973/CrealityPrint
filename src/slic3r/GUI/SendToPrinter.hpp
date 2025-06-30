@@ -28,7 +28,6 @@
 #include "GUI_Utils.hpp"
 #include "wxExtensions.hpp"
 #include "DeviceManager.hpp"
-#include "Plater.hpp"
 #include "BBLStatusBar.hpp"
 #include "BBLStatusBarSend.hpp"
 #include "Widgets/Label.hpp"
@@ -42,6 +41,7 @@
 namespace Slic3r {
 namespace GUI {
 
+class Plater;
 class SendToPrinterDialog : public DPIDialog
 {
 private:

@@ -23,6 +23,10 @@
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelVolume.hpp"
+#include "libslic3r/Slicing.hpp"
 #include "../Config/DispConfig.h"
 #include "I18N.hpp"
 #include "GUI_App.hpp"
@@ -32,6 +36,7 @@
 #include "BackgroundSlicingProcess.hpp"
 #include "Widgets/Label.hpp"
 #include "3DBed.hpp"
+#include "Plater.hpp"
 #include "PartPlate.hpp"
 #include "Camera.hpp"
 #include "GUI_Colors.hpp"
@@ -864,12 +869,17 @@ void PartPlate::render_exclude_area() {
 	// draw exclude area
 	glsafe(::glDepthMask(GL_FALSE));
 
+#if ENABLE_RENDERDOC_CAPTURE
+#else
+
 	if (m_selected) {
 		glsafe(::glColor4fv(select_color.data()));
 	}
 	else {
 		glsafe(::glColor4fv(unselect_color.data()));
 	}
+
+#endif  //ENABLE_RENDERDOC_CAPTURE
 
 	m_exclude_triangles.set_color(m_selected ? select_color : unselect_color);
     m_exclude_triangles.render();
@@ -2771,6 +2781,15 @@ bool PartPlate::set_shape(const Pointfs& shape, const Pointfs& exclude_areas, Ve
 	return true;
 }
 
+BoundingBoxf3 PartPlate::get_build_volume()
+{
+    auto          eps       = Slic3r::BuildVolume::SceneEpsilon;
+    Vec3d         up_point  = m_bounding_box.max + Vec3d(eps, eps, m_origin.z() + m_height + eps);
+    Vec3d         low_point = m_bounding_box.min + Vec3d(-eps, -eps, m_origin.z() - eps);
+    BoundingBoxf3 plate_box(low_point, up_point);
+    return plate_box;
+}
+
 const BoundingBox PartPlate::get_bounding_box_crd()
 {
 	const auto plate_shape = Slic3r::Polygon::new_scale(m_shape);
@@ -3171,6 +3190,37 @@ void PartPlate::update_first_layer_print_sequence(size_t filament_nums)
     }
 }
 
+void PartPlate::update_first_layer_print_sequence_when_delete_filament(size_t filament_id)
+{
+	auto other_layers_seqs = get_other_layers_print_sequence();
+	if (!other_layers_seqs.empty()) {
+		bool need_update_data = false;
+		for (auto& other_layers_seq : other_layers_seqs) {
+			std::vector<int>& orders = other_layers_seq.second;
+			orders.erase(std::remove_if(orders.begin(), orders.end(), [filament_id](int n) { return n == filament_id + 1; }), orders.end());
+			for (auto& order : orders) {
+				order = order > filament_id ? order - 1 : order;
+			}
+			need_update_data = true;
+		}
+		if (need_update_data)
+			set_other_layers_print_sequence(other_layers_seqs);
+	}
+
+	ConfigOptionInts* op_print_sequence_1st = m_config.option<ConfigOptionInts>("first_layer_print_sequence");
+	if (!op_print_sequence_1st)
+		return;
+
+	std::vector<int>& print_sequence_1st = op_print_sequence_1st->values;
+	if (print_sequence_1st.size() == 0 || print_sequence_1st[0] == 0)
+		return;
+
+	print_sequence_1st.erase(std::remove_if(print_sequence_1st.begin(), print_sequence_1st.end(), [filament_id](int n) { return n == filament_id + 1; }), print_sequence_1st.end());
+	for (auto& order : print_sequence_1st) {
+		order = order > filament_id ? order - 1 : order;
+	}
+}
+
 void PartPlate::print() const
 {
 	unsigned int count=0;
@@ -3375,7 +3425,7 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
         if (_tyep->getInt() == (int) GCodeFlavorText::Left_Upper) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(3).x() + 15);
-                wt_y_opt = ConfigOptionFloat(points->get_at(3).y() - 30);
+                wt_y_opt = ConfigOptionFloat(points->get_at(3).y() - 35);
             }
 
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Left_Center) {
@@ -3386,12 +3436,12 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Left_Below) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(0).x() + 15);
-                wt_y_opt = ConfigOptionFloat(points->get_at(0).y() + 20);
+                wt_y_opt = ConfigOptionFloat(points->get_at(0).y() + 15);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Middle_Upper) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(2).x() / 2 - _tower_width->value / 2);
-                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - 30);
+                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - 35);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Middle_Center) {
             if (points->size() > 3) {
@@ -3401,12 +3451,12 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Middle_Below) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(1).x() / 2 - _tower_width->value / 2);
-                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 20);
+                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 15);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Upper) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(2).x() - _tower_width->value - 15);
-                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - 30);
+                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - 35);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Center) {
             if (points->size() > 3) {
@@ -3416,7 +3466,7 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Below) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(1).x() - _tower_width->value - 15);
-                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 20);
+                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 15);
             }
         }	
 	} 
@@ -3424,24 +3474,24 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
 	{
         if (_tyep->getInt() == (int) GCodeFlavorText::Left_Upper) {
             if (points->size() > 3) {
-                wt_x_opt = ConfigOptionFloat(points->get_at(3).x() + 25);
-                wt_y_opt = ConfigOptionFloat(points->get_at(3).y() - 65);
+                wt_x_opt = ConfigOptionFloat(points->get_at(3).x() + 35);
+                wt_y_opt = ConfigOptionFloat(points->get_at(3).y() -_tower_width->value - 15);
             }
 
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Left_Center) {
             if (points->size() > 3) {
-                wt_x_opt = ConfigOptionFloat(points->get_at(3).x() + 25);
+                wt_x_opt = ConfigOptionFloat(points->get_at(3).x() + 35);
                 wt_y_opt = ConfigOptionFloat(points->get_at(3).y() / 2);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Left_Below) {
             if (points->size() > 3) {
-                wt_x_opt = ConfigOptionFloat(points->get_at(0).x() + 25);
-                wt_y_opt = ConfigOptionFloat(points->get_at(0).y() + 20);
+                wt_x_opt = ConfigOptionFloat(points->get_at(0).x() + 35);
+                wt_y_opt = ConfigOptionFloat(points->get_at(0).y() + 15);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Middle_Upper) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(2).x() / 2);
-                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - 65);
+                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - _tower_width->value - 15);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Middle_Center) {
             if (points->size() > 3) {
@@ -3451,12 +3501,12 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Middle_Below) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(1).x() / 2);
-                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 20);
+                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 15);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Upper) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(2).x()  - 15);
-                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - 65);
+                wt_y_opt = ConfigOptionFloat(points->get_at(2).y() - _tower_width->value - 15);
             }
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Center) {
             if (points->size() > 3) {
@@ -3466,7 +3516,7 @@ void PartPlateList::set_default_wipe_tower_pos_for_plate(int plate_idx)
         } else if (_tyep->getInt() == (int) GCodeFlavorText::Right_Below) {
             if (points->size() > 3) {
                 wt_x_opt = ConfigOptionFloat(points->get_at(1).x() - 15);
-                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 20);
+                wt_y_opt = ConfigOptionFloat(points->get_at(1).y() + 15);
             }
         }	
 	}
@@ -5051,7 +5101,8 @@ bool PartPlateList::is_are_the_slice_results_ready_to_export() const
             if (m_plate_list[i]->is_all_instances_unprintable()) {
 				continue;
 			}
-            if (!m_plate_list[i]->is_slice_result_ready_for_print()) {
+            //if (!m_plate_list[i]->is_slice_result_ready_for_print()) {
+			if(!m_plate_list[i]->is_slice_result_ready_for_export()) {
 				continue;
 			}
         }

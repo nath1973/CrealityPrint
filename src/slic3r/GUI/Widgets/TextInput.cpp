@@ -190,6 +190,106 @@ void TextInput::paintEvent(wxPaintEvent &evt)
 {
     // depending on your system you may need to look at double-buffered dcs
     wxPaintDC dc(this);
+    auto      checkDCstate = [this](const wxDC& dc, const char* caller = nullptr) -> bool {
+        bool ok = true; // 整体状态：默认通过
+
+        // ===== 1. DC State Check =====
+        if (!dc.IsOk()) {
+            ok = false;
+            BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Invalid DC state";
+            boost::log::core::get()->flush();
+        }
+
+        // ===== 2. Font State Check =====
+        if (!dc.GetFont().IsOk()) {
+            ok = false;
+            BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Invalid font";
+            boost::log::core::get()->flush();
+        }
+
+        // ===== 3. Windows HDC Check =====
+#ifdef __WXMSW__
+        if (dc.GetHDC() == nullptr) {
+            ok             = false;
+            DWORD winError = ::GetLastError(); // 必须先取错误码
+            try {
+                // 核心错误码
+                BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - HDC_NULL | WinErr: " << winError;
+
+                // Self 窗口状态
+                if (HWND selfHwnd = (HWND) GetHandle(); selfHwnd != nullptr) {
+                    BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Self: hwnd=0x" << std::hex << selfHwnd << std::dec
+                                             << " | IsWindow=" << (::IsWindow(selfHwnd) ? 1 : 0)
+                                             << " | IsBeingDeleted=" << this->IsBeingDeleted() << " | IsShown=" << this->IsShown();
+                } else {
+                    BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Self: NULL_HANDLE";
+                }
+
+                // 资源状态
+                try {
+                    DWORD gdiCount  = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+                    DWORD userCount = GetGuiResources(GetCurrentProcess(), GR_USEROBJECTS);
+                    BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Resources: GDI=" << gdiCount << " | USER=" << userCount;
+                } catch (...) {
+                    BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - ResourceCheckFailed";
+                }
+
+                // 线程验证
+                BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Thread: current=" << GetCurrentThreadId()
+                                         << " | main=" << wxThread::GetMainId();
+
+                boost::log::core::get()->flush();
+
+                // 父窗口状态
+                if (wxWindow* parent = GetParent()) {
+                    if (HWND parentHwnd = (HWND) parent->GetHandle(); parentHwnd != nullptr) {
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Parent: hwnd=0x" << std::hex << parentHwnd << std::dec
+                                                 << " | IsWindow=" << (::IsWindow(parentHwnd) ? 1 : 0)
+                                                 << " | IsBeingDeleted=" << parent->IsBeingDeleted() << " | IsShown=" << parent->IsShown();
+                    } else {
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Parent: NULL_HANDLE";
+                    }
+                } else {
+                    BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - Parent: None";
+                }
+                boost::log::core::get()->flush();
+
+                // 错误描述
+                if (winError != 0) {
+                    char  errBuf[256] = {0};
+                    DWORD fmtRet = ::FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, winError, 0, errBuf,
+                                                    sizeof(errBuf) - 1, NULL);
+                    if (fmtRet > 0) {
+                        for (char* p = errBuf; *p; ++p)
+                            if (*p == '\r' || *p == '\n')
+                                *p = ' ';
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - ErrDesc: " << errBuf;
+                    } else {
+                        BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - ErrDesc: [FormatMessage failed]";
+                    }
+                }
+
+            } catch (const std::bad_alloc&) {
+                ::OutputDebugStringA("HDC_NULL_LOG: std::bad_alloc\n");
+            } catch (const std::exception& e) {
+                BOOST_LOG_TRIVIAL(error) << (caller ? caller : "") << " - LoggingException: " << e.what();
+            } catch (...) {
+                ::OutputDebugStringA("HDC_NULL_LOG: Unknown exception\n");
+            }
+        }
+#endif
+
+        boost::log::core::get()->flush();
+        return ok; // 全部流程完成后统一返回状态
+    };
+    bool res = checkDCstate(dc, __FUNCTION__);
+    if (!res) {
+        static thread_local std::mt19937_64                    eng{std::random_device{}()};
+        static thread_local std::uniform_int_distribution<int> dist(0, 3); // [0,3]
+        if (dist(eng) != 0) {
+            return;
+        }
+    }
     render(dc);
 }
 

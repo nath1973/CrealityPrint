@@ -3,9 +3,12 @@
 
 #include "CalibrationWizard.hpp"
 #include "Tabbook.hpp"
+#include "SelectMachine.hpp"
 //#include "Widgets/SideTools.hpp"
 
 namespace Slic3r { namespace GUI {
+
+ class SideTools;
 
 #define SELECT_MACHINE_GREY900 wxColour(38, 46, 48)
 #define SELECT_MACHINE_GREY600 wxColour(144,144,144)

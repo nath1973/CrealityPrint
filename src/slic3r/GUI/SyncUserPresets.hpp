@@ -37,6 +37,8 @@ public:
     void syncUserPresetsToCXCloud();
     void syncUserPresetsToFrontPage();
     void syncConfigToCXCloud();
+    void setAppHasStartuped();
+    void logout();
 
 private:
     SyncUserPresets();
@@ -71,6 +73,9 @@ protected:
     CommunicateWithFrontPage m_commWithFrontPage;
 
     ENSyncThreadState m_syncThreadState = ENSyncThreadState::ENTS_IDEL_CHECK;
+    std::atomic_bool  m_bAppHasStartuped = false;
+    bool m_bHasSyncToLocal  = false;
+    bool m_bTokenInvalidHasTip = false;
 };
 
 }

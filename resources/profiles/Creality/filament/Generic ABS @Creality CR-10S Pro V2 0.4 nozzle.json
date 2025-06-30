@@ -5,7 +5,7 @@
     "name": "Generic ABS @Creality CR-10S Pro V2 0.4 nozzle",
     "from": "system",
     "instantiation": "true",
-    "inherits": "fdm_filament_common",
+    "inherits": "fdm_filament_abs",
     "activate_air_filtration": "0",
     "activate_chamber_temp_control": "0",
     "additional_cooling_fan_speed": "0",
@@ -66,7 +66,7 @@
     "filament_shrink": "100%",
     "filament_soluble": "0",
     "filament_start_gcode": [
-        "; Filament gcode\n"
+        ";filament start gcode\n"
     ],
     "filament_toolchange_delay": "0",
     "filament_type": [

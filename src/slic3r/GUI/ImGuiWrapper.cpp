@@ -3347,9 +3347,14 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     GLint last_texture;          glsafe(::glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
     GLint last_polygon_mode[2];  glsafe(::glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode));
     GLint last_viewport[4];      glsafe(::glGetIntegerv(GL_VIEWPORT, last_viewport));
+
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     GLint last_scissor_box[4];   glsafe(::glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box));
     GLint last_texture_env_mode; glsafe(::glGetTexEnviv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, &last_texture_env_mode));
     glsafe(::glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT));
+#endif  //ENABLE_RENDERDOC_CAPTURE
+
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
     glsafe(::glDisable(GL_CULL_FACE));
@@ -3357,7 +3362,10 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glEnable(GL_SCISSOR_TEST));
     glsafe(::glEnable(GL_TEXTURE_2D));
     glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
+#endif  //ENABLE_RENDERDOC_CAPTURE
 
     // Setup viewport, orthographic projection matrix
     // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
@@ -3451,13 +3459,23 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     }
 
     // Restore modified state
+    
+#if ENABLE_RENDERDOC_CAPTURE
+#else
     glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, last_texture_env_mode));
-    glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
     glsafe(::glPopAttrib());
+ #endif  //ENABLE_RENDERDOC_CAPTURE
+
+    glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
     glsafe(::glPolygonMode(GL_FRONT, (GLenum)last_polygon_mode[0]);
     glsafe(::glPolygonMode(GL_BACK,  (GLenum)last_polygon_mode[1])));
     glsafe(::glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]));
-    glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]));
+    
+#if ENABLE_RENDERDOC_CAPTURE
+    glsafe(::glScissor(last_viewport[0], last_viewport[1], (GLsizei) last_viewport[2], (GLsizei) last_viewport[3]));
+#else
+    glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei) last_scissor_box[2], (GLsizei) last_scissor_box[3]));
+#endif //ENABLE_RENDERDOC_CAPTURE
 
     shader->stop_using();
 

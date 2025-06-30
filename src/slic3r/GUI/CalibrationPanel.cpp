@@ -4,6 +4,8 @@
 #include "MainFrame.hpp"
 #include "CalibrationPanel.hpp"
 #include "I18N.hpp"
+#include "slic3r/GUI//Widgets/AMSControl.hpp"
+#include "slic3r/GUI//Widgets/SideTools.hpp"
 
 namespace Slic3r { namespace GUI {
 

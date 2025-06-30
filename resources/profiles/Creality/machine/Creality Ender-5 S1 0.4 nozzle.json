@@ -5,7 +5,7 @@
     "inherits": "fdm_creality_common",
     "printer_model": "Creality Ender-5 S1",
     "printer_structure": "undefine",
-    "auxiliary_fan": "0",
+    "auxiliary_fan": "1",
     "bbl_use_printhost": "0",
     "bed_exclude_area": "0x0",
     "bed_mesh_max": "99999,99999",
@@ -13,7 +13,6 @@
     "bed_mesh_probe_distance": "50,50",
     "before_layer_change_gcode": ";BEFORE_LAYER_CHANGE\n;[layer_z]\nG92 E0\n",
     "best_object_pos": "0.5,0.5",
-    "change_filament_gcode": "M600",
     "cooling_tube_length": "5",
     "cooling_tube_retraction": "91.5",
     "creality_flush_time": "86.0",
@@ -31,7 +30,7 @@
     "gcode_flavor": "marlin",
     "high_current_on_filament_swap": "0",
     "host_type": "octoprint",
-    "machine_LED_light_exist": "1",
+    "machine_LED_light_exist": "0",
     "machine_end_gcode": "{if max_layer_z < printable_height}G1 Z{z_offset+min(max_layer_z+2, printable_height)} F600 ; Move print head up{endif}\nG1 X5 Y{print_bed_max[1]*0.8} F{travel_speed*60} ; present print\n{if max_layer_z < printable_height-10}G1 Z{z_offset+min(max_layer_z+70, printable_height-10)} F600 ; Move print head further up{endif}\n{if max_layer_z < max_print_height*0.6}G1 Z{printable_height*0.6} F600 ; Move print head further up{endif}\nM140 S0 ; turn off heatbed\nM104 S0 ; turn off temperature\nM107 ; turn off fan\nM84 X Y E ; disable motors",
     "machine_load_filament_time": "0",
     "machine_max_acceleration_e": "2000",
@@ -108,5 +107,5 @@
     "z_hop": "0.2",
     "z_hop_types": "Normal Lift",
     "name": "Creality Ender-5 S1 0.4 nozzle",
-    "setting_id": "23535"
+    "setting_id": "88178"
 }

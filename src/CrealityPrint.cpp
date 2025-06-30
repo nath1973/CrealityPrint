@@ -50,6 +50,8 @@ using namespace nlohmann;
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelInstance.hpp"
+#include "libslic3r/ModelVolume.hpp"
 #include "libslic3r/ModelArrange.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Print.hpp"
@@ -65,6 +67,7 @@ using namespace nlohmann;
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/BlacklistedLibraryCheck.hpp"
 #include "libslic3r/FlushVolCalc.hpp"
+#include "libslic3r/BuildVolume.hpp"
 
 #include "libslic3r/Orient.hpp"
 #include "libslic3r/PNGReadWrite.hpp"
@@ -5464,7 +5467,7 @@ int CLI::run(int argc, char **argv)
                         }
                     }
 
-                    ThumbnailsParams thumbnail_params;
+                    ThumbnailsParams thumbnail_params = {{}, false, true, true, true, 0};
                     GLShaderProgram* shader = opengl_mgr.get_shader("thumbnail");
                     if (!shader) {
                         BOOST_LOG_TRIVIAL(error) << boost::format("can not get shader for rendering thumbnail");
@@ -6467,7 +6470,7 @@ int main(int argc, char **argv)
                 return true;
             };
             #ifdef USE_BREAKPAD
-            google_breakpad::ExceptionHandler eh(tempPath.string(), NULL, dmpCallBack, NULL, true, NULL);
+            //google_breakpad::ExceptionHandler eh(tempPath.string(), NULL, dmpCallBack, NULL, true, NULL);
             #endif
         #endif
     }

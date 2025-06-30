@@ -6,6 +6,8 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/GUI/Notebook.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
+#include "libslic3r/Thread.hpp"
 #include "libslic3r_version.h"
 
 #include <regex>
@@ -25,6 +27,7 @@
 #include "../utils/cxmdns.h"
 #include "slic3r/GUI/print_manage/Utils.hpp"
 #include "slic3r/GUI/print_manage/AccountDeviceMgr.hpp"
+#include "slic3r/GUI/AnalyticsDataUploadManager.hpp"
 #include "wx/event.h"
 #include "../data/DataCenter.hpp"
 #include "../AppMgr.hpp"
@@ -36,6 +39,7 @@
 #if defined(__linux__) || defined(__LINUX__)
 #include "video/WebRTCDecoder.h"
 #endif
+#include <slic3r/GUI/print_manage/AppUtils.hpp>
 #include "buildinfo.h"
 
 namespace pt = boost::property_tree;
@@ -46,14 +50,17 @@ namespace GUI {
 PrinterMgrView::PrinterMgrView(wxWindow *parent)
         : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
  {
+    BOOST_LOG_TRIVIAL(warning) <<__FUNCTION__ << " Address: " << (void*) this;
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
 
       // Create the webview
     m_browser = WebView::CreateWebView(this, "");
     if (m_browser == nullptr) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " m_browser is null!!! ";
         wxLogError("Could not init m_browser");
         return;
     }
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) m_browser;
 
     m_browser->Bind(wxEVT_WEBVIEW_ERROR, &PrinterMgrView::OnError, this);
     m_browser->Bind(wxEVT_WEBVIEW_LOADED, &PrinterMgrView::OnLoaded, this);
@@ -83,7 +90,7 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
     #ifdef CUSTOMIZED
         customized = 1;
     #endif
-//#define _DEBUG1
+//#define _DEBUG1 
 #ifdef _DEBUG1
      wxString url = wxString::Format("http://localhost:5173/?version=%s&port=%d&os=%s&customized=%d", version, port, os, customized);
         this->load_url(url, wxString());
@@ -121,16 +128,19 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
 
 PrinterMgrView::~PrinterMgrView()
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) this;
+
 #ifdef __WXGTK__
     m_freshTimer->Stop();
     m_browser->Stop();
     m_browser->RemoveScriptMessageHandler("wx");
 #endif
     DM::AppMgr::Ins().UnRegister(m_browser);
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " Start";
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Start";
     SetEvtHandlerEnabled(false);
-
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " End";
+    m_scanExit = true;
+    m_scanPoolThread.join();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " End";
 }
 
 void PrinterMgrView::load_url(const wxString& url, wxString apikey)
@@ -139,7 +149,16 @@ void PrinterMgrView::load_url(const wxString& url, wxString apikey)
         return;
     m_apikey = apikey;
     m_apikey_sent = false;
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before
+                               << ", URL: " << url.ToStdString();
+
     m_browser->LoadURL(url);
+
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
     //m_browser->SetFocus();
     UpdateState();
 }
@@ -152,7 +171,13 @@ void PrinterMgrView::on_switch_to_device_page()
 
 void PrinterMgrView::reload()
 {
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before ;
     m_browser->Reload();
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
 }
 /**
  * Method that retrieves the current state from the web control and updates the
@@ -170,6 +195,7 @@ void PrinterMgrView::OnClose(wxCloseEvent& evt)
 
 void PrinterMgrView::SendAPIKey()
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
     if (m_apikey_sent || m_apikey.IsEmpty())
         return;
     m_apikey_sent   = true;
@@ -187,8 +213,16 @@ void PrinterMgrView::SendAPIKey()
                                        m_apikey);
     m_browser->RemoveAllUserScripts();
 
+    void* backend_before = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
+                               << ", Backend Ptr BEFORE: " << backend_before ;
     m_browser->AddUserScript(script);
     m_browser->Reload();
+
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] END (call returned). webView=" << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
 }
 
 void PrinterMgrView::OnError(wxWebViewEvent &evt)
@@ -220,7 +254,7 @@ void PrinterMgrView::OnError(wxWebViewEvent &evt)
         e = "wxWEBVIEW_NAV_ERR_OTHER";
         break;
       }
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": error loading page %1% %2% %3% %4%") %evt.GetURL() %evt.GetTarget() %e %evt.GetString();
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__<< boost::format(": error loading page %1% %2% %3% %4%") %evt.GetURL() %evt.GetTarget() %e %evt.GetString();
 }
 
 void PrinterMgrView::OnLoaded(wxWebViewEvent &evt)
@@ -231,8 +265,56 @@ void PrinterMgrView::OnLoaded(wxWebViewEvent &evt)
 
     DM::DeviceMgr::Ins().Load();
     AccountDeviceMgr::getInstance().load();
+    json groupData = DM::DeviceMgr::Ins().GetData();
+    for (auto it = groupData["groups"].begin(); it != groupData["groups"].end(); it++)
+        {
+            auto& group = it.value();
+            if (group.contains("list"))
+            {
+                for (auto jt = group["list"].begin(); jt != group["list"].end(); jt++)
+                {
+                    std::string address = jt.value()["address"].get<std::string>();
+                    std::string mac = jt.value()["mac"].get<std::string>();
+                    m_devicePool[mac] = address;
+                }
+            }
+        }
+    correct_device();
 }
+void PrinterMgrView::sendProgressWithRateLimit(std::string ip,float progress,double speed)
+{
+    std::lock_guard<std::mutex> lock(sendMutex);
+    auto now = std::chrono::steady_clock::now();
+    if (now - lastSendTime >= std::chrono::milliseconds(500)) {
+        lastSendTime = now;
+    }else{
+        return;
+    }
+    std::cout << "Progress: " << progress << "% for IP: " << ip << std::endl;
+                            nlohmann::json top_level_json;
+                            top_level_json["ip"] = ip;
+                            top_level_json["progress"]  = progress;
+                            top_level_json["speed"]  = round(speed);
 
+                            std::string json_str = top_level_json.dump();
+                            nlohmann::json commandJson;
+                            commandJson["command"] = "upload_progress";
+                            commandJson["data"]    = RemotePrint::Utils::url_encode(json_str);
+
+                            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+
+                            wxTheApp->CallAfter([this, strJS]() {
+                                try
+                                {
+                                    if (!m_browser->IsBusy()) {
+                                        run_script(strJS.ToStdString());
+                                    }
+                                }
+                                catch (...)
+                                {
+                                }
+                            });
+}
 void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
 {
     try
@@ -255,53 +337,115 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
             int plateIndex = j["plateIndex"];
             wxString ipAddress = j["ipAddress"];
             wxString uploadName = j["uploadName"];
+            bool oldPrinter = j["oldPrinter"];
+            int  moonrakerPort = j["moonrakerPort"];
+
+            if (oldPrinter)
+            {
+                std::string strIpAddr = ipAddress.ToStdString();
+                RemotePrint::RemotePrinterManager::getInstance().setOldPrinterMap(strIpAddr);
+            }
+            if (moonrakerPort > 0)
+            {
+                std::string strIpAddr = ipAddress.ToStdString();
+                if (strIpAddr.find('(') != std::string::npos)
+                {
+                    RemotePrint::RemotePrinterManager::getInstance().setKlipperPrinterMap(strIpAddr, moonrakerPort);
+                }
+            }
 
             PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(plateIndex);
             if (plate)
             {
+                // upload analytics data here
+                AnalyticsDataUploadManager::getInstance().triggerUploadTasks(AnalyticsUploadTiming::ON_CLICK_START_PRINT_CMD,
+                                                                             {AnalyticsDataEventType::ANALYTICS_GLOBAL_PRINT_PARAMS,
+                                                                              AnalyticsDataEventType::ANALYTICS_OBJECT_PRINT_PARAMS}, plateIndex);
+
                 std::string gcodeFilePath = plate->get_tmp_gcode_path();
                 if (wxGetApp().plater()->only_gcode_mode())
                 {
                     gcodeFilePath = wxGetApp().plater()->get_last_loaded_gcode().ToStdString();
                 }
 
-                RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(ipAddress.ToStdString(), uploadName.ToStdString(), gcodeFilePath,
+                RemotePrint::RemotePrinterManager::getInstance().pushUploadMultTasks(ipAddress.ToStdString(), uploadName.ToStdString(), gcodeFilePath,
                     [this](std::string ip, float progress, double speed) {
                         // BOOST_LOG_TRIVIAL(info) << "Progress: " << progress << "% for IP: " << ip;
-
-                        wxString jsCode = wxString::Format("window.updateProgress('%s', %f ,%f);", ip, progress, speed);
-
-                        wxTheApp->CallAfter([this, jsCode]() {
-                            if (m_browser->IsBusy())
-                            {
-                                BOOST_LOG_TRIVIAL(trace) << "Browser is busy, delaying script execution.";
-                                // Optionally, you can queue the script to run later
-                            }
-                            else
-                            {
-                                bool result = WebView::RunScript(m_browser, jsCode);
-                                BOOST_LOG_TRIVIAL(trace) << "RunScript result: " << result;
-                            }
-                            });
+                        //进度发送太快会导致浏览器卡死，所以这里限制一下
+                        
+                        if (progress >= 1.0f)
+                        {
+                            sendProgressWithRateLimit(ip, progress,speed);
+                        }
                     },
                     [this](std::string ip, int statusCode) {
+                        nlohmann::json top_level_json;
+                        top_level_json["ip"] = ip;
+                        top_level_json["statusCode"]  = statusCode;
+                        std::string json_str = top_level_json.dump();
 
-                        wxString statusJsCode = wxString::Format("window.uploadStatus('%s', %d);", ip, statusCode);
+                        nlohmann::json commandJson;
+                        commandJson["command"] = "upload_status";
+                        commandJson["data"] = RemotePrint::Utils::url_encode(json_str);
+                        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
 
-                        wxTheApp->CallAfter([this, statusJsCode]() {
-                            if (m_browser->IsBusy())
+                        wxTheApp->CallAfter([this, strJS]() {
+                            try
                             {
-                                BOOST_LOG_TRIVIAL(trace) << "Browser is busy, delaying script execution.";
-                                // Optionally, you can queue the script to run later
+                                if (!m_browser->IsBusy()) {
+                                    run_script(strJS.ToStdString());
+                                }
                             }
-                            else
+                            catch (...)
                             {
-                                bool result = WebView::RunScript(m_browser, statusJsCode);
-                                BOOST_LOG_TRIVIAL(trace) << "RunScript result: " << result;
                             }
-                            });
-                    }
-                    );
+                        });
+                    },
+                    [this](std::string ip, std::string body){
+                        int deviceType = 0;//local device
+                        int statusCode = 1;
+                        json jBody = json::parse(body);
+                        if (jBody.contains("code") && jBody["code"].is_number_integer()) {
+                            statusCode = jBody["code"];
+                        }
+
+                        nlohmann::json top_level_json;
+                        top_level_json["ip"] = ip;
+                        top_level_json["statusCode"] = statusCode;
+                        top_level_json["id"] = "";
+                        top_level_json["name"] = "";
+                        top_level_json["type"] = "";
+                        top_level_json["filekey"] = "";
+                        if(jBody.contains("result") && jBody["result"].contains("list") &&jBody["result"]["list"].size()>=0){
+                            deviceType = 1;//CX device
+                            if(jBody["result"]["list"][0].contains("id"))top_level_json["id"]=jBody["result"]["list"][0]["id"];
+                            if(jBody["result"]["list"][0].contains("name"))top_level_json["name"]=jBody["result"]["list"][0]["name"];
+                            if(jBody["result"]["list"][0].contains("type"))top_level_json["type"]=jBody["result"]["list"][0]["type"];
+                            if(jBody["result"]["list"][0].contains("filekey"))top_level_json["filekey"]=jBody["result"]["list"][0]["filekey"];
+                        }
+
+                        std::string json_str;
+                        json_str = top_level_json.dump(-1, ' ', true);
+
+                        nlohmann::json commandJson;
+                        commandJson["command"] = "upload_complete";
+                        commandJson["data"] = RemotePrint::Utils::url_encode(json_str);
+
+                        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+
+                        wxTheApp->CallAfter([this, strJS]() {
+                            try
+                            {
+                                if (!m_browser->IsBusy()) {
+                                    run_script(strJS.ToStdString());
+                                }
+                            }
+                            catch (...)
+                            {
+                            }
+                        });
+
+              });
             }
         }else if(strCmd == "down_files")
         {
@@ -321,7 +465,7 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
                 std::string url = iter->get<std::string>();
                 download_infos.push_back(url);
             }
-            this->down_files(download_infos, path.ToStdString(), path_type);
+            this->down_files(download_infos, path.ToUTF8().data(), path_type);
             
 
         }
@@ -440,8 +584,33 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
             wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump());
             run_script(strJS.ToStdString());
         }
-        else
+        else if (strCmd == "cancel_upload")
         {
+            wxString ipAddress  = j["ipAddress"];
+            RemotePrint::RemotePrinterManager::getInstance().cancelUpload(ipAddress.ToStdString());
+        }
+        else if (strCmd == "diagnosis_lan_connect")
+        {
+            std::string ip = j["ip"];
+            Slic3r::create_thread([this, ip] {
+                int result = DM::LANConnectCheck::checkLan(ip, _ctrl);
+                nlohmann::json commandJson;
+                nlohmann::json resultJson;
+                commandJson["command"] = "diagnosis_lan_connect_result";
+                resultJson["ip"] = ip;
+                resultJson["errorcode"] = result;
+                commandJson["data"] = resultJson;
+                wxString strJS = wxString::Format("window.handleStudioCmd('%s');", commandJson.dump());
+                wxGetApp().CallAfter([this, strJS] { run_script(strJS.ToStdString()); });
+            });
+        }
+        else if (strCmd == "diagnosis_close_cmd")
+        {
+            _ctrl.requestStop();
+            _ctrl.reset();
+        }
+        
+        else {
             BOOST_LOG_TRIVIAL(trace) << "PrinterMgrView::OnScriptMessage;Unknown Command:" << strCmd;
         }
     }
@@ -585,6 +754,10 @@ bool PrinterMgrView::Show(bool show)
 
 void PrinterMgrView::run_script(std::string content)
 {
+    void* backend_after = m_browser->GetNativeBackend();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " this Address: " << (void*) this << " wxWebView address: " << (void*) m_browser
+                               << ", Backend Ptr AFTER: " << backend_after;   
+    boost::log::core::get()->flush();
     WebView::RunScript(m_browser, content);
 }
 std::string getFileNameFromURL(const std::string& url) {
@@ -749,7 +922,90 @@ void PrinterMgrView::down_file(std::string download_info, std::string filename, 
         });
 
 }
+void PrinterMgrView::correct_device()
+{
+    
+    if (m_scanPoolThread.joinable() && !m_scanPoolThread.try_join_for(boost::chrono::seconds(0))) {
+        return;
+    }
+    m_scanPoolThread = Slic3r::create_thread(
+        [this] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            std::vector<std::string> prefix;
+            prefix.push_back("CXSWBox");
+            prefix.push_back("creality");
+            prefix.push_back("Creality");
+            std::vector<std::string> vtIp,vtBoxIp;
+            if(m_scanExit)
+            {
+                    return 0;
+                }
+            auto vtDevice = cxnet::syncDiscoveryService(prefix);
+            //cxnet::machine_info info;
+            //info.answer = "1";
+            //info.machineIp = "172.23.215.56";
+            //vtDevice.push_back(info);
+            for (auto& item : vtDevice) {
+                if(m_scanExit)
+                {
+                    return 0;
+                }
+                std::string answer = item.answer;
+                if (answer.substr(0, 8) == "_CXSWBox")
+                {
+                    continue; // Skip the box devices for correction
+                }
+                else
+                {
+                std::string url = (boost::format("http://%1%/info") % item.machineIp).str();
+                Slic3r::Http http_url = Slic3r::Http::get(url);    
+                http_url.timeout_connect(1)
+                .timeout_max(5)
+                .on_complete(
+                [this,item](std::string body, unsigned status) {
+                    try {
+                        json j = json::parse(body);
+                        std::string mac = j["mac"].get<std::string>();
+                        std::string vtIp = item.machineIp;
+                        if(m_devicePool.count(mac))
+                        {
+                            if(m_devicePool[mac] == vtIp)
+                            {
+                                return; // Device already exists with the same IP
+                            }
+                            else
+                            {
+                                
+                                nlohmann::json dataJson;
+                                dataJson["mac"] = mac;  
+                                dataJson["ip"] = vtIp;   
 
+                                nlohmann::json commandJson;
+                                commandJson["command"] = "correct_device";
+                                commandJson["data"]    = dataJson;
+
+                                wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump()));           
+                                wxGetApp().CallAfter([this, strJS] { run_script(strJS.ToStdString()); });            
+                            }
+                        }
+                        m_devicePool.emplace(
+                            std::make_pair(mac, vtIp)
+                        );
+                    }
+                    catch (std::exception& e) {
+                        BOOST_LOG_TRIVIAL(error) << "Error parsing JSON: " << e.what();
+                        return;
+                    }
+                }).on_error(
+                [this](std::string body, std::string error, unsigned int status) {
+                    
+                    }).perform_sync();
+                }
+            }
+
+            return 0;
+        });
+}
 void PrinterMgrView::scan_device() 
 {
     boost::thread _thread = Slic3r::create_thread(
@@ -759,7 +1015,7 @@ void PrinterMgrView::scan_device()
             prefix.push_back("CXSWBox");
             prefix.push_back("creality");
             prefix.push_back("Creality");
-            std::vector<std::string> vtIp,vtBoxIp;
+            std::vector<std::string> vtIp,vtBoxIp,vtKlipperIp;
             auto vtDevice = cxnet::syncDiscoveryService(prefix);
             for (auto& item : vtDevice) {
 
@@ -770,13 +1026,30 @@ void PrinterMgrView::scan_device()
                 }
                 else
                 {
-                    vtIp.push_back(item.machineIp);
+                    std::regex answerRegex("_creality(\\d{2})(\\d{4}).+");
+                    std::smatch matches;
+                    if (std::regex_match(answer, matches, answerRegex))
+                    {
+                        string strMachineType = matches[1];
+                        string strMoonrakerPort = matches[2];
+                        if (strMachineType == "00")
+                        {
+                            //音速屏
+                            vtKlipperIp.push_back(item.machineIp + ":"+strMoonrakerPort);
+                        }
+                    }
+                    else
+                    {
+                        //if (vtIp.size() < 50)
+                            vtIp.push_back(item.machineIp);
+                    }
                 }
             }
 
             nlohmann::json dataJson;
             dataJson["servers"] = vtIp;  
             dataJson["boxs"] = vtBoxIp;   
+            dataJson["klipper"] = vtKlipperIp;   
 
             nlohmann::json commandJson;
             commandJson["command"] = "scan_device";
@@ -1055,102 +1328,111 @@ int PrinterMgrView::getFileListFromLanDevice(const std::string strIp)
     {
         return -1;
     }
-
-    CURL* curl = curl_easy_init();
-    if (!curl)
-    {
-        return -1;
-    }
-
-    // RAII����CURL���
-    struct CurlGuard
-    {
-        CURL* handle;
-        ~CurlGuard()
+    Slic3r::create_thread([this,strIp]{
+        CURL* curl = curl_easy_init();
+        if (!curl)
         {
-            if (handle) curl_easy_cleanup(handle);
-        }
-    } guard{ curl };
-
-    std::string ftpUrl = "ftp://" + strIp + "/mmcblk0p1/creality/gztemp/";
-    curl_easy_setopt(curl, CURLOPT_URL, ftpUrl.c_str());
-    curl_easy_setopt(curl, CURLOPT_USERPWD, "anonymous:");
-    curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_NONE);
-
-    // ������ʱ�ļ��洢FTP��Ӧ
-    std::string tempFilePath = "/tmp/ftp_listing_temp"; // Linux/Mac��ʱ·��
-#if defined(_WIN32)
-    tempFilePath = std::tmpnam(nullptr); // Windows��ʱ�ļ�
-#endif
-
-    FILE* fd = nullptr;
-#if defined(_MSC_VER) || defined(__MINGW64__)
-    fd = boost::nowide::fopen(tempFilePath.c_str(), "wb+");
-#elif defined(__GNUC__) && defined(_LARGEFILE64_SOURCE)
-    fd = fopen64(tempFilePath.c_str(), "wb+");
-#else
-    fd = fopen(tempFilePath.c_str(), "wb+");
-#endif
-
-    if (fd == nullptr)
-    {
-        return -1;
-    }
-
-    // RAII�����ļ����
-    struct FileGuard
-    {
-        FILE* fd;
-        std::string filePath;
-        ~FileGuard()
-        {
-            if (fd) fclose(fd);
-            // ɾ����ʱ�ļ�
-            remove(filePath.c_str());
-        }
-    } fileGuard{ fd, tempFilePath };
-
-    //������д���ļ�
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fd);
-
-    // ͬ��ִ������
-    CURLcode res = curl_easy_perform(curl);
-
-    std::vector<std::string> FileInfoList;
-
-    if (res == CURLE_OK)
-    {
-        // �����ļ�ָ�뵽��ͷ
-        rewind(fd);
-
-        //��ȡ�ļ����ݲ�����
-        char buffer[1024];
-        while (fgets(buffer, sizeof(buffer), fd))
-        {
-            std::string line(buffer);
-
-            // �Ƴ����л��з��ͻس���
-            line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
-            line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-
-            FileInfoList.push_back(line);
+            return -1;
         }
 
-        nlohmann::json commandJson;
-        nlohmann::json dataJson;
+        // RAII����CURL���
+        struct CurlGuard
+        {
+            CURL* handle;
+            ~CurlGuard()
+            {
+                if (handle) curl_easy_cleanup(handle);
+            }
+        } guard{ curl };
 
-        dataJson["address"] = strIp;
-        if(FileInfoList.empty())
-            dataJson["fileList"] = nlohmann::json::array();
-        else
-            dataJson["fileList"] = FileInfoList;
-        commandJson["command"] = "get_file_List_from_lan_device";
-        commandJson["data"] = dataJson;
+        std::string ftpUrl = "ftp://" + strIp + "/mmcblk0p1/creality/gztemp/";
+        curl_easy_setopt(curl, CURLOPT_URL, ftpUrl.c_str());
+        curl_easy_setopt(curl, CURLOPT_USERPWD, "anonymous:");
+        curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_NONE);
 
-        wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
-        run_script(strJS.ToStdString());
-    }
+        // ������ʱ�ļ��洢FTP��Ӧ
+        std::string tempFilePath = "/tmp/ftp_listing_temp"; // Linux/Mac��ʱ·��
+    #if defined(_WIN32)
+        tempFilePath = std::tmpnam(nullptr); // Windows��ʱ�ļ�
+    #endif
+
+        FILE* fd = nullptr;
+    #if defined(_MSC_VER) || defined(__MINGW64__)
+        fd = boost::nowide::fopen(tempFilePath.c_str(), "wb+");
+    #elif defined(__GNUC__) && defined(_LARGEFILE64_SOURCE)
+        fd = fopen64(tempFilePath.c_str(), "wb+");
+    #else
+        fd = fopen(tempFilePath.c_str(), "wb+");
+    #endif
+
+        if (fd == nullptr)
+        {
+            return -1;
+        }
+
+        // RAII�����ļ����
+        struct FileGuard
+        {
+            FILE* fd;
+            std::string filePath;
+            ~FileGuard()
+            {
+                if (fd) fclose(fd);
+                // ɾ����ʱ�ļ�
+                remove(filePath.c_str());
+            }
+        } fileGuard{ fd, tempFilePath };
+
+        //������д���ļ�
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fd);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  // 连接超时5秒
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);       // 数据传输超时15秒
+
+        // ͬ��ִ������
+        CURLcode res = curl_easy_perform(curl);
+
+        std::vector<std::string> FileInfoList;
+
+        if (res == CURLE_OK)
+        {
+            // �����ļ�ָ�뵽��ͷ
+            rewind(fd);
+
+            //��ȡ�ļ����ݲ�����
+            char buffer[1024];
+            while (fgets(buffer, sizeof(buffer), fd))
+            {
+                std::string line(buffer);
+
+                // �Ƴ����л��з��ͻس���
+                line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+                line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+
+                FileInfoList.push_back(line);
+            }
+
+            nlohmann::json commandJson;
+            nlohmann::json dataJson;
+
+            dataJson["address"] = strIp;
+            if(FileInfoList.empty())
+                dataJson["fileList"] = nlohmann::json::array();
+            else
+                dataJson["fileList"] = FileInfoList;
+            commandJson["command"] = "get_file_List_from_lan_device";
+            commandJson["data"] = dataJson;
+
+            wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
+            wxGetApp().CallAfter([this, strJS] { 
+                    if (this == nullptr || this->IsBeingDeleted())
+                        return;
+                    run_script(strJS.ToStdString()); 
+                });
+            //run_script(strJS.ToStdString());
+        }
+        return 0;
+    });
     return 0;
 }
 
@@ -1184,6 +1466,8 @@ int PrinterMgrView::deleteFileListFromLanDevice(const std::string strIp, const s
     struct curl_slist *CMDlist = nullptr;
     CMDlist = curl_slist_append(CMDlist, deleteCmd.c_str()); 
     curl_easy_setopt(curl, CURLOPT_POSTQUOTE, CMDlist);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  // 连接超时5秒
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);       // 数据传输超时15秒
 
     // ͬ��ִ��FTPɾ������
     CURLcode res = curl_easy_perform(curl);
@@ -1247,6 +1531,20 @@ int PrinterMgrView::uploadeFileLanDevice(const std::string strIp)
     {
         return 0;
     }
+}
+
+std::vector<std::string> PrinterMgrView::get_all_device_macs() const 
+{
+    std::vector<std::string> macs;
+    for (const auto& pair : m_devicePool) {
+        macs.push_back(pair.first);
+    }
+    return macs;
+}
+
+bool PrinterMgrView::should_upload_device_info() const
+{
+    return !m_finish_upload_device_state && get_all_device_macs().size() > 0;
 }
 
 

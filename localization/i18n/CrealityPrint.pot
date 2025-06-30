@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-04-15 14:59+0800\n"
+"POT-Creation-Date: 2025-06-21 18:00+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1077,6 +1077,13 @@ msgstr ""
 msgid "mm/s or %"
 msgstr ""
 
+msgid "Over 100% wall (not brige)"
+msgstr ""
+
+#, possible-c-format, possible-boost-format
+msgid "Speed of 100% overhang wall which has 0 overlap with the lower layer."
+msgstr ""
+
 msgid "External"
 msgstr ""
 
@@ -1092,6 +1099,20 @@ msgstr ""
 msgid ""
 "Speed of internal bridge. If the value is expressed as a percentage, it will "
 "be calculated based on the bridge_speed. Default value is 150%."
+msgstr ""
+
+msgid "Smooth speed discontinuity area"
+msgstr ""
+
+msgid "Add the speed transition between discontinuity area."
+msgstr ""
+
+msgid "Smooth coefficient"
+msgstr ""
+
+msgid ""
+"The smaller the number, the longer the speed transition path. 0 means not "
+"apply."
 msgstr ""
 
 msgid "Brim width"
@@ -1230,7 +1251,7 @@ msgstr ""
 msgid "Activate air filtration"
 msgstr ""
 
-msgid "Activate for better air filtration. G-code command: M106 P3 S(0-255)"
+msgid "Activate for better air filtration. "
 msgstr ""
 
 msgid "Fan speed"
@@ -1664,8 +1685,6 @@ msgid ""
 "not slowed down to meet the minimum layer time. Makes the selection of "
 "slowed down areas more intelligent\n"
 "\n"
-"*Only for PLA temporarily\n"
-"\n"
 msgstr ""
 
 msgid "Layer time"
@@ -1748,6 +1767,12 @@ msgstr ""
 msgid ""
 "Filament diameter is used to calculate extrusion in gcode, so it's important "
 "and should be accurate"
+msgstr ""
+
+msgid "Adhesiveness category"
+msgstr ""
+
+msgid "filament_adhesiveness_category"
 msgstr ""
 
 msgid "Pellet flow coefficient"
@@ -2152,6 +2177,12 @@ msgid "Machine LED light exist"
 msgstr ""
 
 msgid "Machine platform motion enable"
+msgstr ""
+
+msgid "Chamber ptc heater"
+msgstr ""
+
+msgid "Chamber ptc heater exist"
 msgstr ""
 
 msgid "Enable accel_to_decel"
@@ -3684,6 +3715,9 @@ msgstr ""
 msgid "Smooth"
 msgstr ""
 
+msgid "Close "
+msgstr ""
+
 msgid "Temperature variation"
 msgstr ""
 
@@ -3960,6 +3994,12 @@ msgstr ""
 msgid "Spacing of interface lines. Zero means solid interface"
 msgstr ""
 
+msgid "Minimum Support Contact Area"
+msgstr ""
+
+msgid "Lower values generate more support contact surfaces."
+msgstr ""
+
 msgid "Bottom interface spacing"
 msgstr ""
 
@@ -3972,7 +4012,7 @@ msgstr ""
 msgid "Base pattern(Normal)"
 msgstr ""
 
-msgid "Line pattern of support"
+msgid "Setting for the main pattern of normal support"
 msgstr ""
 
 msgid "Rectilinear grid"
@@ -3981,10 +4021,12 @@ msgstr ""
 msgid "Hollow"
 msgstr ""
 
-msgid "Zig Zag"
+msgid "Base pattern(Tree)"
 msgstr ""
 
-msgid "Base pattern(Tree)"
+msgid ""
+"Setting for the main pattern of tree support; organic tree support style "
+"only supports the ‘hollow’ fill pattern."
 msgstr ""
 
 msgid "Interface pattern"
@@ -4168,10 +4210,17 @@ msgstr ""
 msgid "Support wall loops(Normal)"
 msgstr ""
 
-msgid "This setting specify the count of walls around support"
+msgid ""
+"Setting for the number of outer wall layers for normal support; 0 means an "
+"intelligent number of layers"
 msgstr ""
 
 msgid "Support wall loops(Tree)"
+msgstr ""
+
+msgid ""
+"Setting for the number of outer wall layers for tree support; 0 means an "
+"intelligent number of layers."
 msgstr ""
 
 msgid "Tree support with infill"
@@ -4319,6 +4368,31 @@ msgid "Wipe tower rotation angle"
 msgstr ""
 
 msgid "Wipe tower rotation angle with respect to x-axis."
+msgstr ""
+
+msgid ""
+"Brim width of prime tower, negative number means auto calculated width based "
+"on the height of prime tower."
+msgstr ""
+
+msgid "Skip points"
+msgstr ""
+
+msgid "The wall of prime tower will skip the start points of wipe path"
+msgstr ""
+
+msgid "Internal ribs"
+msgstr ""
+
+msgid "Enable internal ribs to increase the stability of the prime tower."
+msgstr ""
+
+msgid "Rib wall"
+msgstr ""
+
+msgid ""
+"The wall of prime tower will add four ribs and make its cross-section as "
+"close to a square as possible, so the width will be fixed."
 msgstr ""
 
 msgid "Prime tower enhance type"
@@ -4981,6 +5055,9 @@ msgid "floating cantilever"
 msgstr ""
 
 msgid "large overhangs"
+msgstr ""
+
+msgid "bridge overhangs"
 msgstr ""
 
 #, possible-c-format, possible-boost-format
@@ -6671,33 +6748,6 @@ msgstr ""
 msgid "Pass 2"
 msgstr ""
 
-msgid "-20"
-msgstr ""
-
-msgid "-15"
-msgstr ""
-
-msgid "-10"
-msgstr ""
-
-msgid "-5"
-msgstr ""
-
-msgid "0"
-msgstr ""
-
-msgid "5"
-msgstr ""
-
-msgid "10"
-msgstr ""
-
-msgid "15"
-msgstr ""
-
-msgid "20"
-msgstr ""
-
 msgid "Choose the one with the best coarse tuning"
 msgstr ""
 
@@ -6953,6 +7003,9 @@ msgid "Related Print"
 msgstr ""
 
 msgid "Add Related Process"
+msgstr ""
+
+msgid "Copy technologies from other printers to"
 msgstr ""
 
 msgid "Printer Preset Name"
@@ -8075,6 +8128,16 @@ msgstr ""
 msgid "Printer settings"
 msgstr ""
 
+msgid ""
+"In the slicing preview, Lite Mode displays only the essential toolpath data "
+"and hides internal infill structures, effectively preventing "
+"unresponsiveness caused by excessive rendering. You can disable this mode at "
+"any time in the preview interface."
+msgstr ""
+
+msgid "[Learn more]"
+msgstr ""
+
 msgid "Dynamic flow calibration"
 msgstr ""
 
@@ -8175,6 +8238,9 @@ msgstr ""
 msgid "Please choose the filament colour"
 msgstr ""
 
+msgid "Merge with"
+msgstr ""
+
 msgid "Archive preview"
 msgstr ""
 
@@ -8230,6 +8296,9 @@ msgid "Fan: "
 msgstr ""
 
 msgid "Temperature: "
+msgstr ""
+
+msgid "Loading display data"
 msgstr ""
 
 msgid "Loading G-codes"
@@ -8346,6 +8415,15 @@ msgstr ""
 msgid "Cost"
 msgstr ""
 
+msgid "Lite Mode"
+msgstr ""
+
+msgid ""
+"In lite mode, only the essential toolpath data is displayed.\n"
+"If you need to view internal parameters such as infill, please disable this "
+"mode and re-slice the model."
+msgstr ""
+
 msgid "Variable layer height"
 msgstr ""
 
@@ -8448,6 +8526,24 @@ msgstr ""
 msgid "Arrange"
 msgstr ""
 
+msgid "Arrange Selected"
+msgstr ""
+
+msgid "Object Clone Options"
+msgstr ""
+
+msgid "Number of copies:"
+msgstr ""
+
+msgid "Fill in bed options"
+msgstr ""
+
+msgid "Checkerboard Layout"
+msgstr ""
+
+msgid "angle reset"
+msgstr ""
+
 msgid "Add"
 msgstr ""
 
@@ -8479,6 +8575,9 @@ msgid "Slice all"
 msgstr ""
 
 msgid "Send print"
+msgstr ""
+
+msgid "Send to Multi-device"
 msgstr ""
 
 msgid "Export plate sliced file"
@@ -8589,6 +8688,9 @@ msgstr ""
 msgid "Version:"
 msgstr ""
 
+msgid "Loading configuration"
+msgstr ""
+
 msgid ""
 "Creality3DSlicer will terminate because of running out of memory.It may be a "
 "bug. It will be appreciated if you report the issue to our team."
@@ -8607,6 +8709,9 @@ msgstr ""
 
 #, possible-boost-format
 msgid "Creality3DSlicer got an unhandled exception: %1%"
+msgstr ""
+
+msgid "Untitled"
 msgstr ""
 
 msgid "Downloading Bambu Network Plug-in"
@@ -8631,6 +8736,33 @@ msgstr ""
 msgid "WebView2 Runtime"
 msgstr ""
 
+msgid "Here you can select and add your printer presets"
+msgstr ""
+
+msgid "Click 【"
+msgstr ""
+
+msgid "】 to select Creality printer maching the chosen preset"
+msgstr ""
+
+msgid "Here to import model files"
+msgstr ""
+
+msgid "Click the Mapping button【"
+msgstr ""
+
+msgid ""
+"】to map filament colors and types(If the selected device supports multi-"
+"color printing)"
+msgstr ""
+
+msgid "Click 【Slice plate】 to generate the G-code file for printing"
+msgstr ""
+
+msgid ""
+"Click 【Send print】,send the file to the selected device and start printing"
+msgstr ""
+
 msgid "Error Report"
 msgstr ""
 
@@ -8643,9 +8775,6 @@ msgstr ""
 msgid "Remember my choice"
 msgstr ""
 
-msgid "Loading configuration"
-msgstr ""
-
 #, possible-c-format, possible-boost-format
 msgid "Click to download new version in default browser: %s"
 msgstr ""
@@ -8654,6 +8783,12 @@ msgid "The Creality Print needs an upgrade"
 msgstr ""
 
 msgid "This is the newest version."
+msgstr ""
+
+msgid ""
+"Detected corruption in the Creality Print configuration file, attempted to "
+"rebuild, \n"
+"please manually restart the software."
 msgstr ""
 
 msgid ""
@@ -8698,9 +8833,6 @@ msgstr ""
 msgid "User logged out"
 msgstr ""
 
-msgid "Untitled"
-msgstr ""
-
 msgid "new or open project file is not allowed during the slicing process!"
 msgstr ""
 
@@ -8709,7 +8841,10 @@ msgid ""
 "latest version before it can be used normally"
 msgstr ""
 
-msgid "Privacy Policy Update"
+msgid "User Experience Improvement Program1"
+msgstr ""
+
+msgid "Slicing Preview"
 msgstr ""
 
 msgid ""
@@ -8742,6 +8877,12 @@ msgid "Stop them and continue anyway?"
 msgstr ""
 
 msgid "Ongoing uploads"
+msgstr ""
+
+msgid "The configuration package is changed in previous Config Guide"
+msgstr ""
+
+msgid "Configuration package changed"
 msgstr ""
 
 msgid "Selected model not a system model; no system consumables"
@@ -9095,6 +9236,9 @@ msgstr ""
 msgid "Split the selected object into mutiple parts"
 msgstr ""
 
+msgid "Delete this filament"
+msgstr ""
+
 msgid "select all objects on current plate"
 msgstr ""
 
@@ -9181,16 +9325,6 @@ msgid "Remove height range"
 msgstr ""
 
 msgid "Add height range"
-msgstr ""
-
-
-msgid "Display height range from bottom"
-msgstr ""
-
-msgid "Place input box near mouse"
-msgstr ""
-
-msgid "Bottom:"
 msgstr ""
 
 msgid "Fila."
@@ -9378,6 +9512,18 @@ msgid "Current device:"
 msgstr ""
 
 msgid "Can be set in the \"Worktop\" or \"Device\""
+msgstr ""
+
+msgid "Device Lists"
+msgstr ""
+
+msgid "There is no device of this type available at present."
+msgstr ""
+
+msgid "Please go to the device page to"
+msgstr ""
+
+msgid " add printer"
 msgstr ""
 
 msgid "Additional process preset"
@@ -9863,6 +10009,9 @@ msgid ""
 "user filament preset"
 msgstr ""
 
+msgid "no selected sync user presets, please select again?"
+msgstr ""
+
 msgid "New Window"
 msgstr ""
 
@@ -9905,9 +10054,6 @@ msgstr ""
 msgid "Send all"
 msgstr ""
 
-msgid "Send to Multi-device"
-msgstr ""
-
 msgid "Show the list of the keyboard shortcuts"
 msgstr ""
 
@@ -9924,6 +10070,9 @@ msgid "User Feedback"
 msgstr ""
 
 msgid "Log View"
+msgstr ""
+
+msgid "User Guide"
 msgstr ""
 
 msgid "Upload Models"
@@ -10803,6 +10952,9 @@ msgstr ""
 msgid "Tips:"
 msgstr ""
 
+msgid "Warning:"
+msgstr ""
+
 msgid "Error:"
 msgstr ""
 
@@ -10845,16 +10997,10 @@ msgstr ""
 msgid "Jump to"
 msgstr ""
 
-msgid "Warning:"
-msgstr ""
-
 msgid "Export successfully."
 msgstr ""
 
 msgid "Model file downloaded."
-msgstr ""
-
-msgid "Serious warning:"
 msgstr ""
 
 msgid "Immediate Update"
@@ -11163,6 +11309,12 @@ msgstr ""
 msgid "Pellets"
 msgstr ""
 
+#, possible-c-format, possible-boost-format
+msgid ""
+"After completing your operation, %s project will be closed and create a new "
+"project."
+msgstr ""
+
 msgid ""
 "No CFS filaments. Please select a printer in 'Device' page to load CFS info."
 msgstr ""
@@ -11363,6 +11515,9 @@ msgid ""
 "After that model consistency can't be guaranteed."
 msgstr ""
 
+msgid "Current tray is full; Unarranged models are placed above Tray 1."
+msgstr ""
+
 msgid "The selected object couldn't be split."
 msgstr ""
 
@@ -11531,9 +11686,6 @@ msgstr ""
 msgid "The current project has unsaved changes, save it before continue?"
 msgstr ""
 
-msgid "Number of copies:"
-msgstr ""
-
 msgid "Copies of the selected object"
 msgstr ""
 
@@ -11621,9 +11773,6 @@ msgid "Custom supports and color painting were removed before repairing."
 msgstr ""
 
 msgid "Optimize Rotation"
-msgstr ""
-
-msgid "Invalid number"
 msgstr ""
 
 #, possible-boost-format
@@ -11725,6 +11874,9 @@ msgstr ""
 msgid "Region selection"
 msgstr ""
 
+msgid "(Content of the collected data)"
+msgstr ""
+
 msgid "Downloads"
 msgstr ""
 
@@ -11785,6 +11937,9 @@ msgstr ""
 msgid "User Sync"
 msgstr ""
 
+msgid "User Experience Program"
+msgstr ""
+
 msgid "Clear my choice on the unsaved presets."
 msgstr ""
 
@@ -11794,7 +11949,7 @@ msgstr ""
 msgid "Clear my choice on the unsaved projects."
 msgstr ""
 
-msgid "Automatically layout when importing or copying"
+msgid "Automatically Layout on Model File Import"
 msgstr ""
 
 msgid "Enable Dark mode"
@@ -12036,7 +12191,22 @@ msgstr ""
 msgid "%.1f"
 msgstr ""
 
-msgid "Accept"
+msgid ""
+"We sincerely invite you to join Creality Print's \" User Experience "
+"Improvement Program\" to help us optimize printing efficiency, improve "
+"printing performance and software experience by anonymously collecting data "
+"such as slicing parameters, settings and usage logs. We will not collect any "
+"personally identifiable information, and all data will be protected in "
+"accordance with the"
+msgstr ""
+
+msgid " Privacy Policy "
+msgstr ""
+
+msgid ". You can turn off this feature in the settings at any time."
+msgstr ""
+
+msgid "Join in"
 msgstr ""
 
 msgid "Slice all plate to obtain time and filament estimation"
@@ -12222,6 +12392,9 @@ msgstr ""
 
 #, possible-boost-format
 msgid "Simply switch to \"%1%\""
+msgstr ""
+
+msgid "CheckerboardArrange"
 msgstr ""
 
 msgid "Task canceled"
@@ -12469,6 +12642,9 @@ msgid "View all Daily tips"
 msgstr ""
 
 msgid "Printing Progress"
+msgstr ""
+
+msgid "0"
 msgstr ""
 
 msgid "Layer: N/A"
@@ -13090,6 +13266,9 @@ msgstr ""
 msgid "Set"
 msgstr ""
 
+msgid "Delete this preset1"
+msgstr ""
+
 msgid "Click to reset current value and attach to the global value."
 msgstr ""
 
@@ -13106,6 +13285,9 @@ msgid "User Printer Preset"
 msgstr ""
 
 msgid "System Printer Preset"
+msgstr ""
+
+msgid "Previous"
 msgstr ""
 
 msgid "Undef"
@@ -13328,12 +13510,6 @@ msgid "Extension Board"
 msgstr ""
 
 msgid "Setup Wizard"
-msgstr ""
-
-msgid "The configuration package is changed in previous Config Guide"
-msgstr ""
-
-msgid "Configuration package changed"
 msgstr ""
 
 msgid "Bambu Network plug-in not detected."
@@ -13972,6 +14148,9 @@ msgstr ""
 msgid "Rename style"
 msgstr ""
 
+msgid "Rename current style."
+msgstr ""
+
 msgid "Can't rename temporary style."
 msgstr ""
 
@@ -14360,9 +14539,6 @@ msgstr ""
 msgid "Center of circle"
 msgstr ""
 
-msgid "ShiftLeft mouse button"
-msgstr ""
-
 msgid "Select feature"
 msgstr ""
 
@@ -14401,9 +14577,6 @@ msgid "Direct distance"
 msgstr ""
 
 msgid "Distance XYZ"
-msgstr ""
-
-msgid "Unable to perform boolean operation on selected parts"
 msgstr ""
 
 msgid "Mesh Boolean"
@@ -14484,6 +14657,12 @@ msgstr ""
 msgid "Toggle Wireframe"
 msgstr ""
 
+msgid "Display height range from bottom"
+msgstr ""
+
+msgid "Place input box near mouse"
+msgstr ""
+
 msgid "Vertical"
 msgstr ""
 
@@ -14501,6 +14680,9 @@ msgid "Move"
 msgstr ""
 
 msgid "Gizmo-Move"
+msgstr ""
+
+msgid "Bottom:"
 msgstr ""
 
 msgid "Gizmo-Rotate"
@@ -15257,6 +15439,9 @@ msgstr ""
 msgid "Upload failed(%s): %s"
 msgstr ""
 
+msgid "Please Select"
+msgstr ""
+
 msgid "Send to Lan Printer"
 msgstr ""
 
@@ -15771,32 +15956,4 @@ msgid ""
 "Compared with the default profile of a 0.8 mm nozzle, it has a smaller layer "
 "height, and results in less but still apparent layer lines and slightly "
 "higher printing quality, but longer printing time in some printing cases."
-msgstr ""
-
-msgid ""
-"We sincerely invite you to join Creality Print's \" User Experience Improvement Program\" "
-"to help us optimize printing efficiency, improve printing performance and software experience by "
-"anonymously collecting data such as slicing parameters, settings and usage logs. We will not collect any "
-"personally identifiable information, and all data will be protected in accordance with the"
-msgstr ""
-
-msgid " Privacy Policy "
-msgstr ""
-
-msgid ". You can turn off this feature in the settings at any time."
-msgstr ""
-
-msgid "Join in"
-msgstr ""
-
-msgid "User Experience Improvement Program"
-msgstr ""
-
-msgid "(Content of the collected data)"
-msgstr ""
-
-msgid "User Experience Program"
-msgstr ""
-
-msgid "Detected corruption in the Creality Print configuration file, attempted to rebuild, \nplease manually restart the software."
 msgstr ""

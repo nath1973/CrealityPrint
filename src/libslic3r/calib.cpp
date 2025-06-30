@@ -2,7 +2,10 @@
 #include "BoundingBox.hpp"
 #include "Config.hpp"
 #include "Model.hpp"
+#include "ModelObject.hpp"
+#include "ModelVolume.hpp"
 #include <cmath>
+#include "GCode.hpp"
 
 namespace Slic3r {
 

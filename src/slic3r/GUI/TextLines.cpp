@@ -3,6 +3,7 @@
 #include <GL/glew.h>
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelVolume.hpp"
 
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
@@ -11,6 +12,7 @@
 #include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/ExPolygonsIndex.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ModelVolume.hpp"
 
 #include "slic3r/GUI/Selection.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -198,8 +200,8 @@ GLModel::Geometry create_geometry(const TextLines &lines, float radius, bool is_
 
     GLModel::Geometry geometry;
     geometry.format = {GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3};
-    ColorRGBA color(.7f, .7f, .7f, .7f); // Transparent Gray
-    geometry.color = color;
+//     ColorRGBA color(.7f, .7f, .7f, .7f); // Transparent Gray
+//     geometry.color = color;
 
     geometry.reserve_vertices(its.vertices.size());
     for (Vec3f vertex : its.vertices)
@@ -303,6 +305,8 @@ void TextLinesModel::init(const Transform3d      &text_tr,
     if (geometry.vertices_count() == 0 || geometry.indices_count() == 0)
         return;
     m_model.init_from(std::move(geometry));
+    ColorRGBA color(.7f, .7f, .7f, .7f); // Transparent Gray
+    m_model.set_color(color);
     /*/
     // slower solution
     ColorRGBA color(.7f, .7f, .7f, .7f); // Transparent Gray

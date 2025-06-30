@@ -63,6 +63,7 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
             default_path = os.path.join(working_path, "mac-build", "build","resources", "sliceconfig", server_path_prefix, engine_type, "default")
         default_path = os.path.join(working_path, server_path_prefix, engine_type, "default")    
         try:
+            
             response = requests.post(
                 base_url + "api/cxy/v2/slice/profile/official/printerList", data=json.dumps({"engineVersion": engine_version}), 
                 headers=getCommonHeaders()).text
@@ -76,6 +77,8 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
                 with open(file_path, 'w+', encoding='utf8') as json_file:
                     json.dump(response["result"], json_file, ensure_ascii=False)
                 printer_list = response["result"]["printerList"]
+                session1 = requests.Session()
+                session2 = requests.Session()
                 for printer in printer_list:
                     zip_url = printer['zipUrl']
                     if zip_url == "":
@@ -84,7 +87,7 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
                     for nozzleDiameter in printer['nozzleDiameter']:
                         unique_printer_name = unique_printer_name + "-" + nozzleDiameter
                     print(unique_printer_name)
-                    r = requests.get(zip_url, allow_redirects=True)
+                    r = session1.get(zip_url, stream=True) 
                     tmpdirname = tempfile.mkdtemp()
                     tmpdirname = os.path.join(tmpdirname, unique_printer_name + '.zip')
                     print(tmpdirname)
@@ -95,7 +98,7 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
                     thumb_url = printer['thumbnail']
                     if thumb_url == "":
                         continue
-                    r = requests.get(thumb_url, allow_redirects=True)
+                    r = session2.get(thumb_url, stream=True)
                     imagedir = os.path.join(default_path, "machineImages")
                     if not os.path.exists(imagedir):
                         os.makedirs(imagedir)

@@ -30,7 +30,7 @@
         "Creality Hi 0.4 nozzle"
     ],
     "counterbore_hole_bridging": "none",
-    "default_acceleration": "12000",
+    "default_acceleration": "6000",
     "default_jerk": "10",
     "detect_narrow_internal_solid_infill": "1",
     "detect_overhang_wall": "1",
@@ -224,7 +224,7 @@
     "top_surface_line_width": "0.42",
     "top_surface_pattern": "monotonicline",
     "top_surface_speed": "200",
-    "travel_acceleration": "12000",
+    "travel_acceleration": "6000",
     "travel_jerk": "10",
     "travel_speed": "500",
     "travel_speed_z": "0",

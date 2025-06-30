@@ -252,8 +252,18 @@ set(lisbslic3r_sources
     LocalesUtils.hpp
     CutUtils.cpp
     CutUtils.hpp
+    ModelCommon.cpp
+    ModelCommon.hpp
     Model.cpp
     Model.hpp
+    ModelObject.cpp
+    ModelObject.hpp
+    ModelVolume.cpp
+    ModelVolume.hpp
+    ModelInstance.cpp
+    ModelInstance.hpp
+    ModelWipeTower.cpp
+    ModelWipeTower.hpp
     ModelArrange.hpp
     ModelArrange.cpp
     MultiMaterialSegmentation.cpp
@@ -473,7 +483,7 @@ set(lisbslic3r_sources
     Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
     Arachne/BeadingStrategy/WideningBeadingStrategy.cpp
     Arachne/utils/ExtrusionJunction.hpp
-    Arachne/utils/ExtrusionJunction.cpp
+    #Arachne/utils/ExtrusionJunction.cpp
     Arachne/utils/ExtrusionLine.hpp
     Arachne/utils/ExtrusionLine.cpp
     Arachne/utils/HalfEdge.hpp
@@ -683,7 +693,7 @@ if(NOT BUILD_CLOUD_SLICER)
     if(NOT WIN32)
         target_link_libraries(libslic3r freetype)
         if (NOT APPLE)
-            target_link_libraries(libslic3r fontconfig)
+            target_link_libraries(libslic3r fontconfig deflate Lerc)
         endif()
     endif()
 endif()

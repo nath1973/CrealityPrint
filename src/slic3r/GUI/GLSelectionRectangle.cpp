@@ -76,7 +76,11 @@ namespace GUI {
 
         glsafe(::glDisable(GL_DEPTH_TEST));
 
+#if ENABLE_RENDERDOC_CAPTURE
+#else
         glsafe(::glPushAttrib(GL_ENABLE_BIT));
+#endif
+        
 
         // Change dashed line to solid line
         /*glsafe(::glLineStipple(4, 0xAAAA));
@@ -119,7 +123,11 @@ namespace GUI {
             shader->stop_using();
         }
 
+        
+#if ENABLE_RENDERDOC_CAPTURE
+#else
         glsafe(::glPopAttrib());
+#endif
     }
 
 } // namespace GUI

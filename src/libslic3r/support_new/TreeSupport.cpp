@@ -814,6 +814,10 @@ void TreeSupport::detect_overhangs(bool check_support_necessity/* = false*/)
                 ExPolygons lower_layer_offseted = offset_ex(lower_polys, support_offset_scaled, SUPPORT_SURFACES_OFFSET_PARAMETERS);
                 overhangs_all_layers[layer_nr] = std::move(diff_ex(curr_polys, lower_layer_offseted));
 
+                if (!overhangs_all_layers[layer_nr].empty() && !has_bridge)
+                    if (!offset_ex(overhangs_all_layers[layer_nr], -max_bridge_length*2).empty())
+                        has_bridge = true;
+
                 double duration{ std::chrono::duration_cast<second_>(clock_::now() - t0).count() };
                 if (duration > 30 || overhangs_all_layers[layer_nr].size() > 100) {
                     BOOST_LOG_TRIVIAL(info) << "detect_overhangs takes more than 30 secs, skip cantilever and sharp tails detection: layer_nr=" << layer_nr << " duration=" << duration;
@@ -1022,7 +1026,7 @@ void TreeSupport::detect_overhangs(bool check_support_necessity/* = false*/)
                 }
             }
 
-            if (!cluster.is_sharp_tail && !cluster.is_cantilever) {
+            if (/*!cluster.is_sharp_tail &&*/ !cluster.is_cantilever) {
                 //// 2. check overhang cluster size is smaller than 3.0 * fw_scaled
                 //auto erode1 = offset_ex(cluster.merged_poly, -1 * extrusion_width_scaled);
                 //Point bbox_sz = get_extents(erode1).size();

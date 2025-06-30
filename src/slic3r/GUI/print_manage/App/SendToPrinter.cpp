@@ -25,6 +25,8 @@
 #include "slic3r/GUI/print_manage/Utils.hpp"
 #include "wx/event.h"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
+#include "slic3r/GUI/AnalyticsDataUploadManager.hpp"
 #include "libslic3r/Print.hpp"
 #include <wx/variant.h>
 #include <wx/datstrm.h>
@@ -33,6 +35,7 @@
 #include "../AppUtils.hpp"
 #include "slic3r/GUI/Notebook.hpp"
 #include "cereal/external/base64.hpp"
+#include "libslic3r/Time.hpp"
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -45,13 +48,14 @@ namespace Slic3r {
 namespace GUI {
 namespace pt = boost::property_tree;
 
-CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater)
+CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater,
+                                             SendType sendtype,std::string mapString)
     : DPIDialog(wxGetApp().mainframe,
                 wxID_ANY,
                 _L("Send to Lan Printer"),
                 wxDefaultPosition,
                 wxDefaultSize,
-                wxCAPTION | wxCLOSE_BOX | wxRESIZE_BORDER)
+                wxCAPTION | wxCLOSE_BOX | wxRESIZE_BORDER), m_sendtype(sendtype),m_mapString(mapString)
     , m_plater(plater)
 {
     #ifdef __WINDOWS__
@@ -105,14 +109,14 @@ CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater)
     int port = wxGetApp().get_server_port();
 //#define _DEBUG1
 #ifdef _DEBUG1
-    wxString url = wxString::Format("http://localhost:5174/?version=%s&port=%d", version, port);
+    wxString url = wxString::Format("http://localhost:5174/?version=%s&port=%d&sendtype=%d&map=%s", version, port,(int)m_sendtype,m_mapString);
     this->load_url(url, wxString());
     m_browser->EnableAccessToDevTools();
 #else
 
     // wxString url = wxString::Format("file://%s/web/sendToPrinterPage/index.html", from_u8(resources_dir()));
     // this->load_url(wxString(url), wxString());
-    wxString url = wxString::Format("%s/web/sendToPrinterPage/index.html?version=%s&port=%d", from_u8(resources_dir()),version, port);
+    wxString url = wxString::Format("%s/web/sendToPrinterPage/index.html?version=%s&port=%d&sendtype=%d", from_u8(resources_dir()),version, port,(int)m_sendtype);
     url.Replace(wxT("\\"), wxT("/"));
     url.Replace(wxT("#"), wxT("%23"));
     wxURI uri(url);
@@ -691,7 +695,13 @@ void CxSentToPrinterDialog::handle_send_3mf(const nlohmann::json& json_data)
 
     if (tmp_3mf_path.empty())
         return;
-     
+
+    {
+        // upload analytics data here
+        auto device = DM::DataCenter::Ins().get_printer_data(ipAddress.ToStdString());
+        check_upload_analytics_data(device.mac);
+    }
+    
 
     m_uploadingIp = ipAddress;
     RemotePrint::RemotePrinterManager::getInstance().pushUploadTasks(
@@ -748,17 +758,48 @@ void CxSentToPrinterDialog::handle_send_3mf(const nlohmann::json& json_data)
                 }
             });
             m_uploadingIp = wxEmptyString;
-        }, [this](std::string ip, std::string body) {
+        }, [this,tmp_3mf_path](std::string ip, std::string body) {
+
+            int statusCode = 1;
+            std::string status_msg = "";
+            json jBody = json::parse(body);
+            if (jBody.contains("code") && jBody["code"].is_number_integer()) {
+                statusCode = jBody["code"];
+            }
+            if(jBody.contains("message") && jBody["message"].is_string()) {
+                status_msg = jBody["message"];
+            }
 
             nlohmann::json commandJson;
             commandJson["command"] = "notify_send_complete";
             wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
 
-            wxTheApp->CallAfter([this, strJS]() {
+            wxTheApp->CallAfter([this, strJS,tmp_3mf_path, statusCode, status_msg]() {
                 try
                     {
                         if (!m_browser->IsBusy()) {
                             run_script(strJS.ToStdString());
+                        }
+
+                        if(wxGetApp().is_privacy_checked()) {
+                            json js;
+                            js["type_code"] = "slice813";
+                            js["client_id"] = wxGetApp().get_client_id();
+                            js["file_format"] = "3mf";
+
+                            std::uintmax_t size_bytes = 0;
+                            size_bytes = boost::filesystem::file_size(tmp_3mf_path);
+                            double size_mb = size_bytes / (1024.0 * 1024.0);  // MB
+                            std::ostringstream oss;
+                            oss << std::fixed << std::setprecision(2) << size_mb;
+                            js["file_size"] = oss.str();
+
+                            js["status_code"] = statusCode;
+                            js["message"] = status_msg;
+                            js["operation_date"] = Slic3r::Utils::utc_timestamp(Slic3r::Utils::get_current_time_utc());
+                            js["app_version"] = GUI_App::format_display_version().c_str();
+
+                            wxGetApp().track_event("send_file_complete", js.dump());
                         }
                     }
                     catch (...)
@@ -804,6 +845,7 @@ void CxSentToPrinterDialog::handle_send_gcode(const nlohmann::json& json_data)
     wxString ipAddress  = json_data["ipAddress"];
     std::string uploadName = json_data["uploadName"];  // convert from wxString to std::string would cause exception
     bool oldPrinter = json_data["oldPrinter"];
+    int  moonrakerPort = json_data["moonrakerPort"];
 
     if (oldPrinter)
     {
@@ -811,8 +853,26 @@ void CxSentToPrinterDialog::handle_send_gcode(const nlohmann::json& json_data)
         RemotePrint::RemotePrinterManager::getInstance().setOldPrinterMap(strIpAddr);
     }
 
+    if (moonrakerPort > 0)
+    {
+        std::string strIpAddr = ipAddress.ToStdString();
+        if (strIpAddr.find('(') != std::string::npos)
+        {
+           RemotePrint::RemotePrinterManager::getInstance().setKlipperPrinterMap(strIpAddr, moonrakerPort);
+        }
+    }
+
     PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(plateIndex);
     if (plate) {
+
+        {
+            // upload analytics data here
+            auto device = DM::DataCenter::Ins().get_printer_data(ipAddress.ToStdString());
+            AnalyticsDataUploadManager::getInstance().triggerUploadTasks(AnalyticsUploadTiming::ON_CLICK_START_PRINT_CMD,
+                                                                            {AnalyticsDataEventType::ANALYTICS_GLOBAL_PRINT_PARAMS,
+                                                                             AnalyticsDataEventType::ANALYTICS_OBJECT_PRINT_PARAMS}, plateIndex,device.mac);
+        }
+
         std::string gcodeFilePath;
         if (m_plater->only_gcode_mode()) {
 
@@ -884,12 +944,16 @@ void CxSentToPrinterDialog::handle_send_gcode(const nlohmann::json& json_data)
                 });
                 m_uploadingIp = wxEmptyString;
             },
-            [this](std::string ip, std::string body){
+            [this, gcodeFilePath](std::string ip, std::string body){
                 int deviceType = 0;//local device
                 int statusCode = 1;
+                std::string status_msg = "";
                 json jBody = json::parse(body);
                 if (jBody.contains("code") && jBody["code"].is_number_integer()) {
                     statusCode = jBody["code"];
+                }
+                if(jBody.contains("message") && jBody["message"].is_string()) {
+                    status_msg = jBody["message"];
                 }
 
                 nlohmann::json top_level_json;
@@ -917,11 +981,32 @@ void CxSentToPrinterDialog::handle_send_gcode(const nlohmann::json& json_data)
 
                 wxString strJS = wxString::Format("window.handleStudioCmd('%s');", RemotePrint::Utils::url_encode(commandJson.dump(-1, ' ', true)));
 
-                wxTheApp->CallAfter([this, strJS]() {
+                wxTheApp->CallAfter([this, strJS, statusCode, status_msg, gcodeFilePath]() {
                     try
                     {
                         if (!m_browser->IsBusy()) {
                             run_script(strJS.ToStdString());
+                        }
+
+                        if(wxGetApp().is_privacy_checked()) {
+                            json js;
+                            js["type_code"] = "slice813";
+                            js["client_id"] = wxGetApp().get_client_id();
+                            js["file_format"] = "gcode";
+
+                            std::uintmax_t size_bytes = 0;
+                            size_bytes = boost::filesystem::file_size(gcodeFilePath);
+                            double size_mb = size_bytes / (1024.0 * 1024.0);  // MB
+                            std::ostringstream oss;
+                            oss << std::fixed << std::setprecision(2) << size_mb;
+                            js["file_size"] = oss.str();
+
+                            js["status_code"] = statusCode;
+                            js["message"] = status_msg;
+                            js["operation_date"] = Slic3r::Utils::utc_timestamp(Slic3r::Utils::get_current_time_utc());
+                            js["app_version"] = GUI_App::format_display_version().c_str();
+
+                            wxGetApp().track_event("send_file_complete", js.dump());
                         }
                     }
                     catch (...)
@@ -1194,6 +1279,24 @@ void CxSentToPrinterDialog::replaceIllegalChars(std::string& str)
     }
 }
 
+void CxSentToPrinterDialog::check_upload_analytics_data(const std::string& device_ip)
+{
+    for (int i = 0; i < wxGetApp().plater()->get_partplate_list().get_plate_count(); i++) {
+        PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(i);
+        if (!plate) {
+            continue;
+        }
+
+        if ((plate->is_slice_result_ready_for_print() || m_plater->only_gcode_mode()) && plate->thumbnail_data.is_valid())
+        {
+            // upload analytics data here
+            AnalyticsDataUploadManager::getInstance().triggerUploadTasks(AnalyticsUploadTiming::ON_CLICK_START_PRINT_CMD,
+                                                                        {AnalyticsDataEventType::ANALYTICS_GLOBAL_PRINT_PARAMS,
+                                                                         AnalyticsDataEventType::ANALYTICS_OBJECT_PRINT_PARAMS}, plate->get_index(), device_ip);
+        }
+    }
+}
+
 std::string CxSentToPrinterDialog::get_plate_data_on_show()
 {
     m_backup_extruder_colors.clear();
@@ -1210,6 +1313,12 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
 
     std::vector<std::string> filament_types;
     nlohmann::json filament_types_json = nlohmann::json::array();
+    nlohmann::json filament_maps_json = nlohmann::json::array();
+    std::vector<std::string> filament_maps;
+    boost::split(filament_maps, m_mapString, boost::is_any_of(";"));
+    for (const auto& substr : filament_maps) {
+        filament_maps_json.emplace_back(substr);
+    }
 
     for (const auto& preset_name : filament_presets) {
         std::string     filament_type;
@@ -1325,7 +1434,9 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
     nlohmann::json top_level_json;
     top_level_json["extruder_colors"] = std::move(colors_json);
     top_level_json["filament_types"]    = std::move(filament_types_json);
+    top_level_json["filament_maps"]    = std::move(filament_maps_json);
     top_level_json["plates"]          = std::move(json_array);
+
 
     bool is_all_plates = wxGetApp().plater()->get_preview_canvas3D()->is_all_plates_selected();
     int cur_plate_index = m_plater->get_partplate_list().get_curr_plate_index();
@@ -1461,8 +1572,9 @@ double CxSentToPrinterDialog::get_gcode_total_weight()
         auto&  ps         = current_result->print_statistics;
         for (auto volume : ps.total_volumes_per_extruder) {
             size_t extruder_id = volume.first;
-            double density     = current_result->filament_densities.at(extruder_id);
-            // double cost        = current_result->filament_costs.at(extruder_id);
+            double density = 1.24;
+            if(extruder_id<current_result->filament_densities.size())
+                density     = current_result->filament_densities.at(extruder_id);
             double weight      = volume.second * density * 0.001;
             total_weight += weight;
         }

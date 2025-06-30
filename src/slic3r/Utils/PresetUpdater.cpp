@@ -39,6 +39,11 @@
 #include "slic3r/GUI/MarkdownTip.hpp"
 #include "libslic3r/miniz_extension.hpp"
 #include "slic3r/GUI/GUI_Utils.hpp"
+#include "slic3r/GUI/UpdateParams.hpp"
+#include "slic3r/GUI/CommunicateWithCXCloud.hpp"
+#include "slic3r/GUI/MainFrame.hpp"
+#include "libslic3r/common_header/common_header.h"
+#include "libslic3r_version.h"
 
 namespace fs = boost::filesystem;
 using Slic3r::GUI::Config::Index;
@@ -377,6 +382,7 @@ void PresetUpdater::priv::prune_tmps() const
 void PresetUpdater::priv::sync_version() const
 {
 	if (! enabled_version_check) { return; }
+    GUI::wxGetApp().check_new_version_cx();
 
 #if 0
 	Http::get(version_check_url)
@@ -1346,16 +1352,38 @@ void PresetUpdater::sync(std::string http_url, std::string language, std::string
 		this->p->prune_tmps();
 		if (p->cancel)
 			return;
+        std::string res = GUI::wxGetApp().app_config->get("is_first_install");
+        if(res!="1")
+            return;
 		this->p->sync_version();
 		if (p->cancel)
 			return;
         if (!vendors.empty()) {
-		    this->p->sync_config();
-		    if (p->cancel)
-			    return;
+            Slic3r::GUI::UpdateParams::getInstance().checkParamsNeedUpdate();
+		    //this->p->sync_config();
+		    //if (p->cancel)
+			//    return;
             GUI::wxGetApp().CallAfter([] {
                 GUI::wxGetApp().check_config_updates_from_updater();
             });
+            if (GUI::wxGetApp().is_login()) {
+                Slic3r::GUI::CommunicateWithCXCloud           commWithCXCloud;
+                std::vector<Slic3r::GUI::UserProfileListItem> vtUserProfileListItem;
+                commWithCXCloud.getUserProfileList(vtUserProfileListItem);
+                
+                if (!Slic3r::GUI::CXCloudDataCenter::getInstance().isTokenValid()) {
+                    GUI::wxGetApp().CallAfter([] {
+                        GUI::wxGetApp().mainframe->select_tab(Slic3r::GUI::MainFrame::tpHome);
+                        GUI::wxGetApp().swith_community_sub_page("token_expired");
+                    });
+                }
+ 
+            }
+                #if CUSTOM_CXCLOUD
+                #if UPDATE_ONLINE_MACHINES
+                    GUI::wxGetApp().check_machine_list();
+                #endif
+                #endif
         }
 		if (p->cancel)
 			return;

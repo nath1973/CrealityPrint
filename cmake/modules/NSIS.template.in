@@ -11,6 +11,7 @@ RequestExecutionLevel admin
   !define WebView2Installer "@CPACK_WEBVIEW2_NAME@"
   !define VCREDIST_X64Installer "@CPACK_VCREDIST_X64_NAME@"
   !define STLTHUMB_X64Installer "@CPACK_STLTHUMB_NAME@"
+  !define MD5_HASH   "6A9957F8C25088C0" 
 ;--------------------------------
 ;Variables
 
@@ -24,6 +25,18 @@ RequestExecutionLevel admin
   Var INSTALL_DESKTOP
   Var IS_DEFAULT_INSTALLDIR
   Var APPDATA_PATH
+  Var INSTALL_MODE
+  Var FIRST_INSTALL
+  Var INSTALL_STATUS
+
+  ; ======================
+; 基础配置
+; ======================
+  !define DLL_NAME "STLThumbWinShellExtension.dll"
+  !define BASE_CLSID "{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}"      
+  Var NEW_DLL_NAME  ; 重命名后的DLL文件名
+  Var Thumbnail_DIR ; suo目录
+  Var IS_REGISTERED ; 注册状态标志
 ;--------------------------------
 ;Include Modern UI
 
@@ -807,15 +820,63 @@ WriteRegStr HKCR "stl_cxsw\shell\open\command" "" '"$INSTDIR\${PROCESS_NAME}" "%
 WriteRegStr HKCR "gcode_cxsw\shell\open\command" "" '"$INSTDIR\${PROCESS_NAME}" "%1"'
 WriteRegStr HKCR "3mf_cxsw\shell\open\command" "" '"$INSTDIR\${PROCESS_NAME}" "%1"'
 WriteRegStr HKCR "cxprj_cxsw\shell\open\command" "" '"$INSTDIR\${PROCESS_NAME}" "%1"'
-System::Call "Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)"
+;System::Call "Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)"
 
   ;add stl thumb
-  ExecWait '"regsvr32" /s "$INSTDIR\STLThumbWinShellExtension.dll"'
+  StrCmp $IS_REGISTERED "0" 0 already_registered  ; 已注册则跳过
+  CopyFiles /SILENT "$INSTDIR\${DLL_NAME}" "$Thumbnail_DIR\$NEW_DLL_NAME"
+  CopyFiles /SILENT "$INSTDIR\stl-thumb.exe" "$Thumbnail_DIR\stl-thumb.exe"
+  ExecWait '"regsvr32" /s "$Thumbnail_DIR\$NEW_DLL_NAME"'
   WriteRegStr HKCR ".stl\shellex\{e357fccd-a995-4576-b01f-234630154e96}" "" "{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}"
   WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}" "" "STLThumbWinShellExtension.STLThumbnailProvider Class"
   WriteRegDWORD HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}" "DisableProcessIsolation" 1
-  WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}\InprocServer32" "" "$INSTDIR\STLThumbWinShellExtension.dll"
+  WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}\InprocServer32" "" "$Thumbnail_DIR\$NEW_DLL_NAME"
   WriteRegStr HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}\InprocServer32" "ThreadingModel" "Apartment"
+  
+already_registered:
+  System::Call "Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)"
+  ;-----------------------------------------------------------------------------
+  ; get computer operation system name and version
+  !include "WinVer.nsh"
+  ; init WinVer variable
+  ${WinVerGetMajor} $R0
+  ${WinVerGetMinor} $R1
+  ${WinVerGetBuild} $R2
+  ; $R0 = Major, $R1 = Minor, $R2 = Build, $R3 = PlatformID, $R4 = CSDVersion
+
+  StrCpy $0 "$R0.$R1.$R2"
+  ;StrCpy $1 "$R4"
+
+  nsExec::ExecToStack 'powershell -WindowStyle Hidden -Command "Get-Date -Format yyyy-MM-dd_HH:mm:ss"'
+  Pop $8 ; 状态码
+  Pop $8 ; 日期字符串
+
+  StrCpy $8 $8 "" 0 ; 保证从头开始
+  StrCpy $8 $8 -2   ; 去掉最后的 \r\n
+
+  ;MessageBox MB_OK "日期字符串: '$8'"
+
+  ; pack JSON data for reporting
+  StrCpy $2 '{\"slice803\":{\"app_version\":\"${VERSION}\",\"operating_system\":\"Windows $0\", \"install_mode\":\"$INSTALL_MODE\", \"first_install\":\"$FIRST_INSTALL\", \"install_status\":\"$INSTALL_STATUS\", \"install_date\":\"$8\"}}'
+
+  ;MessageBox MB_OK "content: '$2'"
+
+  ; report data for analytics（use system curl first，other wise use curl in installation direction）
+  IfFileExists "$WINDIR\System32\curl.exe" 0 useBundledCurl
+    nsExec::Exec 'curl -X POST "http://172.23.88.185:8080/api/v1/software_usage_event/telemetry" -H "Content-Type:application/json" -d "$2"'
+    ;Pop $0 ; exit code
+    ;Pop $1 ; output
+    ;MessageBox MB_OK "curl exit code: $0$\noutput: $1"
+    Goto curlDone
+  useBundledCurl:
+    nsExec::Exec '"$INSTDIR\curl.exe" -X POST "http://172.23.88.185:8080/api/v1/software_usage_event/telemetry" -H "Content-Type:application/json" -d "$2"'
+  curlDone:
+
+  ; 写入 JSON 到安装目录
+  ;FileOpen $9 "$INSTDIR\install_report.json" w
+  ;FileWrite $9 $2
+  ;FileClose $9
+
 SectionEnd
 
 Section "-Add to path"
@@ -937,12 +998,16 @@ Section "Un.${APP_NAME}"
 !endif
 
   ; Remove stl thumb
-   ExecWait '"regsvr32" /s /u "$INSTDIR\STLThumbWinShellExtension.dll"'
-   Delete "$INSTDIR\stl-thumb.exe"
-   Delete "$INSTDIR\STLThumbWinShellExtension.dll"
-   DeleteRegKey HKCR ".stl\shellex\{e357fccd-a995-4576-b01f-234630154e96}"
-   DeleteRegKey HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}"
-
+  ;=== 新增STL缩略图清理 ===
+  SetShellVarContext current
+StrCmp $IS_REGISTERED "1" 0 Jump_Del_Thumb  ; 已注册则跳过
+  IfFileExists "$Thumbnail_DIR\$NEW_DLL_NAME" 0 +1
+    ExecWait '"regsvr32" /s /u "$INSTDIR\STLThumbWinShellExtension.dll"'
+  Delete "$Thumbnail_DIR\stl-thumb.exe"
+  Delete "$Thumbnail_DIR\$NEW_DLL_NAME"
+  DeleteRegKey HKCR ".stl\shellex\{e357fccd-a995-4576-b01f-234630154e96}"
+  DeleteRegKey HKCR "CLSID\{AF07F051-9D08-44A7-8C63-9296ADFEDDD7}"
+Jump_Del_Thumb:
   ;Remove the uninstaller itself.
   Delete "$INSTDIR\@CPACK_NSIS_UNINSTALL_NAME@.exe"
   DeleteRegKey SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\@CPACK_PACKAGE_INSTALL_REGISTRY_KEY@"
@@ -1015,6 +1080,29 @@ SectionEnd
 ; "Program Files" for AllUsers, "My Documents" for JustMe...
 
 Function .onInit
+SetShellVarContext current
+; 重命名DLL文件
+StrCpy $NEW_DLL_NAME "${DLL_NAME}"
+StrCpy $Thumbnail_DIR "$APPDATA\Creality_STLThumbnail"
+
+ReadRegStr $0 HKCR "CLSID\${BASE_CLSID}" ""
+StrCmp $0 "" 0 HasReg  ; 已注册则跳过
+  StrCpy $IS_REGISTERED "0"
+HasReg:
+  IfFileExists "$Thumbnail_DIR\$NEW_DLL_NAME" 0 not_exist
+    StrCpy $IS_REGISTERED "1"
+    Goto initContinue
+  not_exist:
+    CreateDirectory "$Thumbnail_DIR"
+    StrCpy $IS_REGISTERED "0"
+    
+initContinue:
+StrCpy $INSTALL_STATUS "ok"
+; default is first install
+StrCpy $FIRST_INSTALL "1"
+; default is fresh install mode
+StrCpy $INSTALL_MODE "fresh-install"
+
 Push $0
   ${nsProcess::FindProcess} "${PROCESS_NAME}" $R0
   IntCmp $R0 0 0 checkUninstall checkUninstall
@@ -1031,17 +1119,22 @@ checkUninstall:
   StrCmp $0 "" inst instbefore
 
 instbefore:
+  ; IS NOT the first install
+  StrCpy $FIRST_INSTALL "0"
   Push $1 
   StrLen $1 "\Uninstall.exe"
   StrCpy $INSTDIR $0 -$1
   MessageBox MB_YESNOCANCEL|MB_ICONEXCLAMATION \
   "@CPACK_NSIS_PACKAGE_NAME@ $(DESC_installed)$\n$\n$(DESC_old_version)" \
   /SD IDYES IDYES uninst IDNO uninstall_end
+
   Pop $1 
   Abort
 
 ;Run the uninstaller
 uninst:
+; user choose to uninstall old version
+StrCpy $INSTALL_MODE "fresh-install"
 Push $2
 Push $3
   ClearErrors
@@ -1049,11 +1142,19 @@ Push $3
   StrCpy $3 $0 -$2 # remove "\Uninstall.exe" from UninstallString to get path
   
   ExecWait '"$0" /S _?=$3' ;Do not copy the uninstaller to a temp file
+  ;Remove the uninstaller itself.
+  Delete "$3\@CPACK_NSIS_UNINSTALL_NAME@.exe"
+  Pop $3
+  Pop $2
+  Pop $0
+  Goto inst
   ;IfErrors uninst_failed inst
 ;uninst_failed:
   ;MessageBox MB_OK|MB_ICONSTOP "Uninstall failed."
   ;Abort
 uninstall_end:
+  ; user choose to keep old install
+  StrCpy $INSTALL_MODE "keep-old"
   Pop $3
   Pop $2
   Pop $0

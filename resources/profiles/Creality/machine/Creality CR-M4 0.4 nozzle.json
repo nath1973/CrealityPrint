@@ -14,7 +14,7 @@
     "bed_mesh_probe_distance": "50,50",
     "before_layer_change_gcode": ";BEFORE_LAYER_CHANGE\n;[layer_z]\nG92 E0\n",
     "best_object_pos": "0.5,0.5",
-    "change_filament_gcode": "M600",
+    "change_filament_gcode": "1",
     "cooling_tube_length": "0",
     "cooling_tube_retraction": "0",
     "default_print_profile": "0.20mm Standard @Creality CR-M4 0.4 nozzle",
@@ -60,7 +60,7 @@
     "manual_filament_change": "0",
     "nozzle_height": "4",
     "nozzle_hrc": "0",
-    "nozzle_type": "undefine",
+    "nozzle_type": "brass",
     "nozzle_volume": "0",
     "parking_pos_retraction": "0",
     "pellet_modded_printer": "0",
@@ -115,5 +115,5 @@
     "z_hop": "0.4",
     "z_hop_types": "Normal Lift",
     "name": "Creality CR-M4 0.4 nozzle",
-    "setting_id": "86911"
+    "setting_id": "63011"
 }

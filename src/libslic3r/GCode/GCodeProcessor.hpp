@@ -39,6 +39,7 @@ class Print;
         Travel,
         Wipe,
         Extrude,
+        Extrude_Alter,  //Used to mean the toolpaths that be filtered for the gcode preview lite mode
         Count
     };
 
@@ -299,6 +300,54 @@ class Print;
 #endif
             return *this;
         }
+
+
+        void  take(const GCodeProcessorResult& other) {
+            filename                 = other.filename;
+            id                       = other.id;
+            
+            moves                    = std::move( other.moves );
+            lines_ends               = std::move( other.lines_ends );
+
+            printable_area           = other.printable_area;
+            bed_exclude_area         = other.bed_exclude_area;
+            toolpath_outside         = other.toolpath_outside;
+            label_object_enabled     = other.label_object_enabled;
+            long_retraction_when_cut = other.long_retraction_when_cut;
+            timelapse_warning_code   = other.timelapse_warning_code;
+            printable_height         = other.printable_height;
+            settings_ids             = other.settings_ids;
+            extruders_count          = other.extruders_count;
+            extruder_colors          = other.extruder_colors;
+            filament_diameters       = other.filament_diameters;
+            filament_densities       = other.filament_densities;
+            filament_costs           = other.filament_costs;
+            filament_flow_ratios     = other.filament_flow_ratios;
+            print_statistics         = other.print_statistics;
+            custom_gcode_per_print_z = other.custom_gcode_per_print_z;
+            spiral_vase_layers       = other.spiral_vase_layers;
+            warnings                 = other.warnings;
+            bed_type                 = other.bed_type;
+            bed_match_result         = other.bed_match_result;
+            // creality
+            creality_extruder_colors          = other.creality_extruder_colors;
+            creality_complete_extruder_colors = other.creality_complete_extruder_colors;
+            creality_default_extruder_colors  = other.creality_default_extruder_colors;
+            creality_extruder_types           = other.creality_extruder_types;
+            creality_flush_time               = other.creality_flush_time;
+            tool_change_path                  = other.tool_change_path;
+            tool_change_volumes_map           = other.tool_change_volumes_map;
+            flush_multiplier                  = other.flush_multiplier;
+            defaultAcc                        = other.defaultAcc;
+            printer_model                     = other.printer_model;
+            nozzle_diameter                   = other.nozzle_diameter;
+            image_data                        = other.image_data;
+            x_offset                          = other.x_offset;
+            y_offset                          = other.y_offset;
+#if ENABLE_GCODE_VIEWER_STATISTICS
+            time = other.time;
+#endif
+        }
         void  lock() const { result_mutex.lock(); }
         void  unlock() const { result_mutex.unlock(); }
     };
@@ -433,10 +482,29 @@ class Print;
             Flags flags;
             FeedrateProfile feedrate_profile;
             Trapezoid trapezoid;
+            float times;
+            float max_start_v2;
 
             // Calculates this block's trapezoid
             void calculate_trapezoid();
 
+            float delta_v2;
+            float smooth_delta_v2;
+            float max_smoothed_v2 =0;
+            float max_cruise_v2;
+
+            float move_d = 0.0f;    // 移动距离
+            float accel  = 1000.0f; // 加速度，单位 mm/s^2
+
+            float start_v  = 0.0f;
+            float cruise_v = 0.0f;
+            float end_v    = 0.0f;
+
+            float accel_t = 0.0f;
+            float cruise_t = 0.0f;            
+            float decel_t = 0.0f; 
+
+            void  set_junction(float start_v2, float cruise_v2, float end_v2);
             float time() const;
         };
 
@@ -457,6 +525,16 @@ class Print;
                 //For line move, there are same. For arc move, there are different.
                 Vec3f enter_direction;
                 Vec3f exit_direction;
+                float delta_v2=99999;
+                float max_start_v2 = 0;
+             
+                float junction_deviation;
+                float max_cruise_v2 = 9999;
+                float next_junction_v2 = 9999;
+
+                float max_smoothed_v2 = 0;
+                float smooth_delta_v2;
+                float acc=1000.0f; // 加速度，单位 mm/s^2;
 
                 void reset();
             };
@@ -478,6 +556,7 @@ class Print;
 
             bool enabled;
             float acceleration; // mm/s^2
+            float deceleration;
             // hard limit for the acceleration, to which the firmware will clamp.
             float max_acceleration; // mm/s^2
             float retract_acceleration; // mm/s^2
@@ -512,6 +591,8 @@ class Print;
             // Simulates firmware st_synchronize() call
             void simulate_st_synchronize(float additional_time = 0.0f);
             void calculate_time(size_t keep_last_n_blocks = 0, float additional_time = 0.0f);
+            void calculate_time_klipper(size_t keep_last_n_blocks = 0, float additional_time = 0.0f);
+            void flush_time(std::vector<TimeBlock>& queue, bool lazy);
         };
 
         struct TimeProcessor
@@ -781,6 +862,7 @@ class Print;
         bool m_single_extruder_multi_material;
         float m_preheat_time;
         int m_preheat_steps;
+        float             m_flush_time = 2.0;
 #if ENABLE_GCODE_VIEWER_STATISTICS
         std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
@@ -890,12 +972,13 @@ class Print;
         bool process_kissslicer_tags(const std::string_view comment);
 
         bool detect_producer(const std::string_view comment);
-
+        void flush_time(std::vector<TimeBlock>& queue, bool lazy = false);
         // Move
         void process_G0(const GCodeReader::GCodeLine& line);
         void process_G1(const GCodeReader::GCodeLine& line);
         void process_G2_G3(const GCodeReader::GCodeLine& line);
-
+        void process_G1_klipper(const GCodeReader::GCodeLine& line);
+        void process_G2_G3_klipper(const GCodeReader::GCodeLine& line);
         // BBS: handle delay command
         void process_G4(const GCodeReader::GCodeLine& line);
 
@@ -1031,7 +1114,9 @@ class Print;
         void  set_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
         float get_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
         void  set_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
-        float get_travel_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
+ void  set_deceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
+        float get_deceleration(PrintEstimatedStatistics::ETimeMode mode) const;       
+		 float get_travel_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
         void  set_travel_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
         float get_filament_load_time(size_t extruder_id);
         float get_filament_unload_time(size_t extruder_id);
