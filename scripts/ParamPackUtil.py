@@ -11,7 +11,10 @@ import platform
 import tempfile
 import zipfile
 import shutil
+import appdirs
 from typing import Dict
+from urllib3 import HTTPConnectionPool, HTTPSConnectionPool
+https_adapter = requests.adapters.HTTPAdapter(pool_connections=2, pool_maxsize=5)
 
 def _generateDUID() -> str:
     return str(uuid.uuid1())[-12:]
@@ -45,7 +48,7 @@ def processLocalParamPack(working_path, build_type, engine_type, engine_version)
         shutil.copytree(os.path.join(working_path, "resources", "sliceconfig", server_path_prefix), default_path)    
         print("use local parampack:"+os.path.join(working_path, "resources", "sliceconfig", server_path_prefix))     
 def downloadParamPack(working_path, build_type, engine_type, engine_version) -> None:
-    server_path_prefixes = ["server_0", "server_1"]
+    server_path_prefixes = ["server_0"]
     base_urls = ['https://api.crealitycloud.cn/', 'https://api.crealitycloud.com/']
     base_alpha_urls = ['https://admin-pre.crealitycloud.cn/', 'https://admin-pre.crealitycloud.cn/']
     idx = 0
@@ -77,8 +80,9 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
                 with open(file_path, 'w+', encoding='utf8') as json_file:
                     json.dump(response["result"], json_file, ensure_ascii=False)
                 printer_list = response["result"]["printerList"]
-                session1 = requests.Session()
-                session2 = requests.Session()
+                session = requests.Session()
+                session.mount('https://', https_adapter)
+                #session2 = requests.Session()
                 for printer in printer_list:
                     zip_url = printer['zipUrl']
                     if zip_url == "":
@@ -87,24 +91,33 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
                     for nozzleDiameter in printer['nozzleDiameter']:
                         unique_printer_name = unique_printer_name + "-" + nozzleDiameter
                     print(unique_printer_name)
-                    r = session1.get(zip_url, stream=True) 
-                    tmpdirname = tempfile.mkdtemp()
-                    tmpdirname = os.path.join(tmpdirname, unique_printer_name + '.zip')
+                    unique_file_name = zip_url.split('/')[-2]
+                    cache_dir = appdirs.user_cache_dir("CrealityPrint")
+                    tmpdirname = os.path.join(cache_dir, "temp")
+                    if not os.path.exists(tmpdirname):
+                        os.makedirs(tmpdirname)
+                    tmpdirname = os.path.join(tmpdirname, unique_file_name + '.zip')
                     print(tmpdirname)
-                    open(tmpdirname, 'wb+').write(r.content)
+                    if not os.path.exists(tmpdirname):
+                        r = session.get(zip_url, stream=True) 
+                        open(tmpdirname, 'wb+').write(r.content)
                     with zipfile.ZipFile(tmpdirname, 'r') as zObject: 
                         zObject.extractall(path=os.path.join(default_path, "parampack", unique_printer_name))
                     #download thumb
                     thumb_url = printer['thumbnail']
                     if thumb_url == "":
                         continue
-                    r = session2.get(thumb_url, stream=True)
+                    unique_file_name = thumb_url.split('/')[-1]
+                    tmpdirname = os.path.join(cache_dir,"temp", unique_file_name + '.png')
+                    if not os.path.exists(tmpdirname):
+                        r = session.get(thumb_url, stream=True)
+                        open(tmpdirname, 'wb+').write(r.content)
                     imagedir = os.path.join(default_path, "machineImages")
                     if not os.path.exists(imagedir):
                         os.makedirs(imagedir)
-                    imagedirname = os.path.join(imagedir, printer['printerIntName'] + '.png')
-                    print(imagedirname)
-                    open(imagedirname, 'wb+').write(r.content)
+                    imagedirname = os.path.join(imagedir, printer['printerIntName'] + '.png')                    
+                    shutil.copyfile(tmpdirname, imagedirname)
+                    print(tmpdirname)
 
             else:
                 print("get parampack cloud error")

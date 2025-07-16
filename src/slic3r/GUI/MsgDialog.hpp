@@ -178,6 +178,11 @@ public:
 						const wxString& message,
 						const wxString& caption = wxEmptyString,
 						long style = wxOK);
+    RichMessageDialog(  wxWindow* parent, 
+						const wxString& message, 
+						int useApplyStyle, 
+						const wxString& caption = wxEmptyString, 
+						long style = wxOK);
 	RichMessageDialog(RichMessageDialog&&) = delete;
 	RichMessageDialog(const RichMessageDialog&) = delete;
 	RichMessageDialog &operator=(RichMessageDialog&&) = delete;
@@ -303,6 +308,22 @@ private:
 		m_cancel,
 		m_help;
 };
+
+class ChangeBtnRichMsgDlg : public RichMessageDialog
+{
+public:
+    ChangeBtnRichMsgDlg(
+        wxWindow* parent, const wxString& message, bool useApplyStyle, const wxString& caption = wxEmptyString, long style = wxOK);
+    ChangeBtnRichMsgDlg(RichMessageDialog&&)        = delete;
+    ChangeBtnRichMsgDlg(const ChangeBtnRichMsgDlg&) = delete;
+    ChangeBtnRichMsgDlg& operator=(ChangeBtnRichMsgDlg&&) = delete;
+    ChangeBtnRichMsgDlg& operator=(const ChangeBtnRichMsgDlg&) = delete;
+    virtual ~ChangeBtnRichMsgDlg()                             = default;
+
+protected:
+    void apply_style(long style);
+};
+
 #else
 // just a wrapper for wxStaticLine to use the same code on all platforms
 class StaticLine : public wxStaticLine

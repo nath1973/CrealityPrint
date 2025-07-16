@@ -860,7 +860,7 @@ void OG_CustomCtrl::OnLeaveWin(wxMouseEvent& event)
 bool OG_CustomCtrl::update_visibility(ConfigOptionMode mode)
 {
     // BBS: new layout
-    wxCoord    h_pos = (ctrlWidth + get_title_width() - titleWidth) * m_em_unit;
+    wxCoord    h_pos = (ctrlWidth + get_title_width() - titleWidth + 6) * m_em_unit;
     wxCoord    h_pos2 = get_title_width() * m_em_unit;
     wxCoord    v_pos = 0;
 
@@ -977,7 +977,7 @@ void OG_CustomCtrl::msw_rescale()
 
     m_max_win_width = 0;
 
-    wxCoord    h_pos = (ctrlWidth + get_title_width() - titleWidth) * m_em_unit;
+    wxCoord    h_pos  = (ctrlWidth + get_title_width() - titleWidth + 6) * m_em_unit;
     wxCoord    h_pos2 = get_title_width() * m_em_unit;
     wxCoord    v_pos = 0;
     for (CtrlLine& line : ctrl_lines) {

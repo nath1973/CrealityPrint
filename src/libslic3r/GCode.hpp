@@ -252,6 +252,8 @@ public:
     // SoftFever
     std::string set_object_info(Print* print);
 
+    std::string get_gcode_uuid() { return m_gcode_uuid; }
+
     // append full config to the given string
     static void append_full_config(const Print& print, std::string& str);
 
@@ -608,6 +610,8 @@ private:
     double m_last_time = 0.0f;
     int m_currentExtruder = 0;
     int m_temperature = 0;
+
+    std::string m_gcode_uuid = "";
 
     std::set<unsigned int>                  m_initial_layer_extruders;
     // BBS

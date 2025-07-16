@@ -5,6 +5,7 @@ RequestExecutionLevel admin
   @CPACK_PACKAGE_UNICODE@
   !define VERSION "@CPACK_PACKAGE_VERSION@"
   !define PATCH  "@CPACK_PACKAGE_VERSION_PATCH@"
+  !define VERSION_EXTRA "@CPACK_PACKAGE_VERSION_EXTRA@"
   !define INST_DIR "@CPACK_TEMPORARY_DIRECTORY@"
   !define PROCESS_NAME "@CPACK_SOFEWARE_PROCESS_NAME@"
   !define APP_NAME  "@CPACK_NSIS_PACKAGE_NAME@"
@@ -856,6 +857,11 @@ already_registered:
 
   ;MessageBox MB_OK "日期字符串: '$8'"
 
+  ; 选择上报服务器地址（Release 用正式服，其它用测试服）
+  StrCpy $9 "http://172.23.88.185:8080"
+  StrCmp "${VERSION_EXTRA}" "Release" 0 +2
+    StrCpy $9 "https://devdata.cxswyjy.com"
+
   ; pack JSON data for reporting
   StrCpy $2 '{\"slice803\":{\"app_version\":\"${VERSION}\",\"operating_system\":\"Windows $0\", \"install_mode\":\"$INSTALL_MODE\", \"first_install\":\"$FIRST_INSTALL\", \"install_status\":\"$INSTALL_STATUS\", \"install_date\":\"$8\"}}'
 
@@ -863,13 +869,13 @@ already_registered:
 
   ; report data for analytics（use system curl first，other wise use curl in installation direction）
   IfFileExists "$WINDIR\System32\curl.exe" 0 useBundledCurl
-    nsExec::Exec 'curl -X POST "http://172.23.88.185:8080/api/v1/software_usage_event/telemetry" -H "Content-Type:application/json" -d "$2"'
+    nsExec::Exec 'curl -X POST "$9/api/v1/software_usage_event/telemetry" -H "Content-Type:application/json" -d "$2"'
     ;Pop $0 ; exit code
     ;Pop $1 ; output
     ;MessageBox MB_OK "curl exit code: $0$\noutput: $1"
     Goto curlDone
   useBundledCurl:
-    nsExec::Exec '"$INSTDIR\curl.exe" -X POST "http://172.23.88.185:8080/api/v1/software_usage_event/telemetry" -H "Content-Type:application/json" -d "$2"'
+    nsExec::Exec '"$INSTDIR\curl.exe" -X POST "$9/api/v1/software_usage_event/telemetry" -H "Content-Type:application/json" -d "$2"'
   curlDone:
 
   ; 写入 JSON 到安装目录

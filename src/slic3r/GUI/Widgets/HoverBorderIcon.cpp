@@ -37,9 +37,10 @@ void HoverBorderIcon::Create(wxWindow* parent, const wxString& text, const wxStr
     StaticBox::SetBorderColor(StateColor(std::make_pair(is_dark ? 0x4B4B4D : 0xFFFFFF, (int) StateColor::Disabled),
                                          std::make_pair(0x15BF59, (int) StateColor::Hovered),
                                          std::make_pair(is_dark ?  0x4B4B4D : 0xFFFFFF, (int) StateColor::Normal)));
+#ifndef __APPLE__
     StaticBox::SetBackgroundColor(
-        StateColor(std::make_pair(0xF0F0F1, (int) StateColor::Disabled),
-                   std::make_pair(*wxWHITE, (int) StateColor::Normal)));
+        StateColor(std::make_pair(0xF0F0F1, (int) StateColor::Disabled), std::make_pair(*wxWHITE, (int) StateColor::Normal)));
+#endif // !__APPLE__
 
     state_handler.update_binds();
     if (!icon.IsEmpty()) {

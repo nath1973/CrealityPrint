@@ -59,7 +59,7 @@ public:
                                     const std::string& name);
     void cancel_download_model_group(const std::string& modelId);
     void cancel_download_3mf_group(const std::string& fileId);
-    
+    std::string    filterInvalidFileNameChars(const std::string& input);
     nlohmann::json get_cache_json();
 
 private:

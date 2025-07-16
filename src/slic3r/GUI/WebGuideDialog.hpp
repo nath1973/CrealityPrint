@@ -74,11 +74,13 @@ public:
 
     //Model - Machine - Filaments
     int LoadProfile();
-    int LoadProfileFamily(std::string strVendor, std::string strFilePath);
-    int LoadMachineJson(std::string strVendor, std::string strFilePath);
+    // Replace it with ProfileFamilyLoader
+    /*int LoadProfileFamily(std::string strVendor, std::string strFilePath, json& outputJson);
+    int LoadMachineJson(std::string strVendor, std::string strFilePath);*/
+    // bool LoadFile(std::string jPath, std::string & sContent);
 
     int SaveProfile();
-    int GetFilamentInfo( std::string VendorDirectory,json & pFilaList, std::string filepath, std::string &sVendor, std::string &sType);
+    //int GetFilamentInfo( std::string VendorDirectory,json & pFilaList, std::string filepath, std::string &sVendor, std::string &sType);
 
 
     bool apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes);
@@ -87,7 +89,6 @@ public:
     void        StrReplace(std::string &strBase, std::string strSrc, std::string strDes);
     std::string w2s(wxString sSrc);
     void        GetStardardFilePath(std::string &FilePath);
-    bool LoadFile(std::string jPath, std::string & sContent);
 
     // install plugin
     int DownloadPlugin();

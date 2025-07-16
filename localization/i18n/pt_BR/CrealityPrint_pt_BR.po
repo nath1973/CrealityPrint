@@ -2305,7 +2305,7 @@ msgstr "Temperatura do bico da primeira camada"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Temperatura do bico para imprimir a primeira camada ao usar este filamento"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Velocidade total do ventilador na camada"
 
 msgid ""
@@ -2477,8 +2477,8 @@ msgstr "Melhor posição do objeto"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Melhor posição de arranjo automático na faixa [0,1] em relação ao formato da mesa."
 
-msgid "Auxiliary part cooling fan"
-msgstr "Ventilador auxiliar de resfriamento da peça"
+msgid "Side Fan"
+msgstr "Ventoinha lateral"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
 msgstr "Habilitar esta opção se a máquina tiver ventilador auxiliar de resfriamento da peça. Comando G-code: M106 P2 S(0-255)."
@@ -2536,8 +2536,8 @@ msgstr ""
 "Esta opção está habilitada se a máquina suportar o controle da temperatura da câmara.\n"
 "Comando G-code: M141 S(0-255)"
 
-msgid "Support air filtration"
-msgstr "Filtragem de ar de suporte"
+msgid "Back Fan"
+msgstr "Ventoinha traseira"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -13675,8 +13675,8 @@ msgstr "Resfriamento"
 msgid "Cooling for specific layer"
 msgstr "Resfriamento para camada específica"
 
-msgid "Part cooling fan"
-msgstr "Ventilador de resfriamento da peça"
+msgid "Model fan"
+msgstr "Ventoinha do modelo"
 
 msgid "Min fan speed threshold"
 msgstr "Limiar de velocidade mínima do ventilador"
@@ -13694,9 +13694,6 @@ msgstr "Limiar de velocidade máxima do ventilador"
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "A velocidade do ventilador de resfriamento da peça será máxima quando o tempo estimado da camada for menor que o valor ajustado"
-
-msgid "Exhaust fan"
-msgstr "Ventilador de exaustão"
 
 msgid "During print"
 msgstr "Durante a impressão"

@@ -2360,7 +2360,7 @@ msgstr "Température de la buse de couche initiale"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Température de la buse pour imprimer la couche initiale lors de l'utilisation de ce filament"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Ventilateur à pleine vitesse à la couche"
 
 msgid ""
@@ -2533,8 +2533,8 @@ msgstr "Meilleure position d’organisation automatique"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Meilleure position d’organisation automatique dans la plage [0,1] par rapport à forme du plateau."
 
-msgid "Auxiliary part cooling fan"
-msgstr "Ventilateur de refroidissement auxiliaire"
+msgid "Side Fan"
+msgstr "Ventilateur latéral"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
 msgstr ""
@@ -2595,8 +2595,8 @@ msgstr ""
 "Activez cette option si la machine prend en charge le contrôle de la température du caisson\n"
 "Commande de G-code : M141 S(0-255)"
 
-msgid "Support air filtration"
-msgstr "Filtration de l’air"
+msgid "Back Fan"
+msgstr "Ventilateur arrière"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -13803,8 +13803,8 @@ msgstr "Refroidissement"
 msgid "Cooling for specific layer"
 msgstr "Refroidissement pour une couche spécifique"
 
-msgid "Part cooling fan"
-msgstr "Ventilateur de refroidissement des pièces"
+msgid "Model fan"
+msgstr "Ventilateur du Modèle"
 
 msgid "Min fan speed threshold"
 msgstr "Seuil de vitesse mini du ventilateur"
@@ -13825,9 +13825,6 @@ msgid "Part cooling fan speed will be max when the estimated layer time is short
 msgstr ""
 "La vitesse du ventilateur de refroidissement des pièces sera maximale lorsque le temps de couche estimé est plus court que la valeur de "
 "réglage"
-
-msgid "Exhaust fan"
-msgstr "Ventilateur d’extraction"
 
 msgid "During print"
 msgstr "Pendant l’impression"

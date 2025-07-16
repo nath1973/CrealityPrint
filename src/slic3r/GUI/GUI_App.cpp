@@ -121,7 +121,7 @@
 #include "DesktopIntegrationDialog.hpp"
 #include "SendSystemInfoDialog.hpp"
 #include "ParamsDialog.hpp"
-#include "UITour.hpp"
+
 #include "KBShortcutsDialog.hpp"
 #include "DownloadProgressDialog.hpp"
 
@@ -1478,7 +1478,7 @@ IMPLEMENT_APP(GUI_App)
 
 //BBS: remove GCodeViewer as seperate APP logic
 //GUI_App::GUI_App(EAppMode mode)
-GUI_App::GUI_App()
+GUI_App::GUI_App(bool enable_test /*= false*/)
     : wxApp()
     //, m_app_mode(mode)
     , m_app_mode(EAppMode::Editor)
@@ -1487,6 +1487,7 @@ GUI_App::GUI_App()
 	, m_removable_drive_manager(std::make_unique<RemovableDriveManager>())
     , m_downloader(std::make_unique<Downloader>())
 	, m_other_instance_message_handler(std::make_unique<OtherInstanceMessageHandler>())
+    , m_enable_test(enable_test)
 {
 	//app config initializes early becasuse it is used in instance checking in CrealityPrint.cpp
     this->init_app_config();
@@ -2367,13 +2368,10 @@ void GUI_App::init_app_config()
     buf << get_current_pid() << ".log";
     std::string log_filename = buf.str();
 
-    // check test enable
-    bool enable_test = false/*this->argc >= 2 && this->argv[1] == "test"*/;
-
 #if !BBL_RELEASE_TO_PUBLIC
-    set_log_path_and_level(log_filename, 5, enable_test);
+    set_log_path_and_level(log_filename, 5, m_enable_test);
 #else
-    set_log_path_and_level(log_filename, 3, enable_test);
+    set_log_path_and_level(log_filename, 3, m_enable_test);
 #endif
 
     //BBS: remove GCodeViewer as seperate APP logic
@@ -2671,7 +2669,7 @@ std::string GUI_App::get_client_id()
 
 void GUI_App::startTour(int startIndex)
 {
-    m_UITour = new UITour(this->mainframe);
+    m_UITour = std::make_unique<UITour>(this->mainframe);
     wxRect size = this->mainframe->GetRect();
 
     if (startIndex == 0)
@@ -2683,7 +2681,7 @@ void GUI_App::startTour(int startIndex)
 
     //step1
     wxRect wifiBtn = sidebar().obj_list()->wifiBtn();
-    m_UITour->AddStep(1 - startIndex, wifiBtn, _L("Click 【"), _L("】 to select Creality printer maching the chosen preset"),
+    m_UITour->AddStep(1 - startIndex, wifiBtn, _L("Click 【"), _L("】 to select Creality printer matching the chosen preset"),
        "userGuide_step2", "wifi", wxRIGHT);
 
     //step2
@@ -2724,7 +2722,7 @@ void GUI_App::startTour(int startIndex)
 
     // step5
     wxRect setp5Rect = canvas->getSenderBtnRec();
-    m_UITour->AddStep(5 - startIndex, setp5Rect, _L("Click 【Send print】,send the file to the selected device and start printing"), "",
+    m_UITour->AddStep(5 - startIndex, setp5Rect, _L("Click 【Send print】, send the file to the selected device and start printing"), "",
                                "userGuide_step6", "", wxUP);
 
     m_UITour->Start();
@@ -2739,6 +2737,44 @@ void GUI_App::startTour_Apple()
     wxGetApp().app_config->set("is_first_install", "1");
     wxGetApp().check_creality_privacy_version();
 }
+
+void GUI_App::set_picking_effect(EPickingEffect effect)
+{
+    if (m_picking_effect != effect)
+    {
+        std::string str_picking_effect{};
+        switch (effect)
+        {
+        case EPickingEffect::Disabled:
+            str_picking_effect = "Disabled";
+            break;
+        case EPickingEffect::StencilOutline:
+            str_picking_effect = "StencilOutline";
+            break;
+        case EPickingEffect::Silhouette:
+            str_picking_effect = "Silhouette";
+            break;
+        }
+        BOOST_LOG_TRIVIAL(info) << "Switched picking effect to: " << str_picking_effect;
+        m_picking_effect = effect;
+    }
+}
+
+EPickingEffect GUI_App::get_picking_effect() const
+{
+    return m_picking_effect;
+}
+
+void GUI_App::set_picking_color(const ColorRGB& color)
+{
+    m_picking_color = color;
+}
+
+const ColorRGB& GUI_App::get_picking_color() const
+{
+    return m_picking_color;
+}
+
 //BBS
 void GUI_App::init_http_extra_header()
 {
@@ -4270,7 +4306,7 @@ void release_window_pools();
 
 void GUI_App::recreate_GUI(const wxString &msg_name)
 {
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "recreate_GUI enter";
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
     m_is_recreating_gui = true;
 
     update_http_extra_header();
@@ -4330,7 +4366,8 @@ void GUI_App::recreate_GUI(const wxString &msg_name)
 
     m_is_recreating_gui = false;
 
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "recreate_GUI exit";
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
+    boost::log::core::get()->flush();
 }
 
 void GUI_App::system_info()
@@ -4720,7 +4757,10 @@ bool GUI_App::check_machine_list()
     boost::filesystem::remove(printer_list_file);
     std::string base_url              = get_cloud_api_url();
                         auto        preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";
-                        Http::set_extra_headers(get_extra_header());
+                        std::map<std::string, std::string> extra_headers = get_extra_header();
+                        extra_headers["__CXY_OS_LANG_"] = "0";
+                        //extra_headers.insert(std::pair<std::string, std::string>("__CXY_OS_LANG_","0"));
+                        Http::set_extra_headers(extra_headers);
                         Http http = Http::post(base_url + preupload_profile_url);
                         json        j;
                         j["engineVersion"]  = "3.0.0";
@@ -4770,6 +4810,7 @@ bool GUI_App::check_machine_list()
                                     if(status!=200){
                                         return false;
                                     }
+                                    try{
                                      json j = json::parse(body);
                                         json printer_list = j["result"]["list"];
                                         if(printer_list.empty()){
@@ -4785,6 +4826,9 @@ bool GUI_App::check_machine_list()
                                         c.open(out_printer_list_file, std::ios::out | std::ios::trunc);
                                         c << std::setw(4) << list << std::endl;
                                         return true;
+                                    } catch (...) {
+                                        return false;
+                                    }
                                 }).perform_sync();
     //检测是否有需要自己更新参数包
     std::vector<json> printer_version_list;
@@ -5736,9 +5780,12 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     std::string fileId     = v.get_child("fileId").data();
                     std::string fileFormat = v.get_child("fileFormat").data();
                     std::string name = v.get_child("name").data();
+                    if (!name.empty() && name.back() == '\n') {
+                        name.pop_back();
+                    }
                     wxString    wxUrl      = wxString::FromUTF8(url.c_str());
                     
-                    wxGetApp().request_model_download(wxUrl);
+                    //wxGetApp().request_model_download(wxUrl);
                     AnalyticsDataUploadManager::getInstance().mark_analytics_project_info(url, modelId, fileId, fileFormat, name);
                     model_downloaders_[userId]->start_download_3mf_group(url, modelId, fileId, fileFormat, name);
                     
@@ -5760,6 +5807,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
 
                 auto cache_json = model_downloaders_[userId]->get_cache_json();
                 if (cache_json.is_object() && cache_json.contains("models")) {
+                    
                     j["models"] = cache_json["models"];
                 } else {
                     j["models"] = json::array();
@@ -5769,10 +5817,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 } else {
                     j["3mfs"] = json::array();
                 }
-
-                std::stringstream ss;
-                ss << j << std::endl;
-                return ss.str();
+                return j.dump(-1, ' ', true);
             }
             else if (command_str.compare("models_download_delete") == 0) {
                 std::string userId = root.get_child("userId").data();
@@ -5804,12 +5849,14 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     std::string modelGroupId = v.get_child("modelGroupId").data();
                     Plater*     plater       = wxGetApp().plater();
                     wxString    wxPath       = from_u8(path);
-                    if (!wxPath.IsEmpty()) {
+                    
+                    if (boost::filesystem::exists(path)) {
                         plater->load_project(wxPath);
                         plater->set_project_filename(wxPath);
                         wxGetApp().clear_cloud_model_download();
                         wxGetApp().set_cloud_model_download(modelGroupId);
                     }
+                    
                     /* plater->get_notification_manager()->push_import_finished_notification(target_path,
                        target_path.parent_path().string(), false);*/
                 }
@@ -6051,7 +6098,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     {
                         std::string zipUrl      = v.second.get_child("zipUrl").data();
                         int         start_pos = zipUrl.find_last_of("/");
-                        fs::path tmp_path = fs::path(fs::temp_directory_path()).append(zipUrl.substr(start_pos + 1));
+                        boost::filesystem::path tmp_path = boost::filesystem::path(boost::filesystem::temp_directory_path()).append(zipUrl.substr(start_pos + 1));
                         pool.addDownload(zipUrl, tmp_path.string());
                     }
                     

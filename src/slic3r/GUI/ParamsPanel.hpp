@@ -97,7 +97,7 @@ public:
 
 protected:
     void on_dpi_changed(const wxRect &suggested_rect) override;
-    void on_ok(wxMouseEvent &event);
+    void on_ok(wxCommandEvent &event);
     wxBoxSizer *create_item_checkbox(wxString title, wxWindow *parent, wxString tooltip, std::string param);
 };
 
@@ -350,8 +350,8 @@ class ParamsPanel : public wxPanel
         wxButton* m_btn_saveAs = nullptr;
         wxButton* m_btn_delete = nullptr;
         wxButton* m_btn_resets = nullptr;
-        wxButton* m_btn_system = nullptr;
-        wxButton* m_btn_user = nullptr;
+        Button*         m_btn_system      = nullptr;
+        Button*         m_btn_user        = nullptr;
         wxPanel* m_bottomBtnsPanel = nullptr;
         CustomTreeCtrl* m_preset_listBox  = nullptr;
         

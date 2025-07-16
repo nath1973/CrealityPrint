@@ -2186,7 +2186,7 @@ msgstr "Температура сопла першого шару"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Температура сопла для друку першого шару під час використання цього філаменту"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Повна швидкість вентилятора на шарі"
 
 msgid ""
@@ -2351,7 +2351,7 @@ msgstr "Найкраще положення об’єкта"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Найкраще автоматичне розташування об’єкта в діапазоні [0,1] відносно форми ліжка."
 
-msgid "Auxiliary part cooling fan"
+msgid "Side Fan"
 msgstr "Вентилятор охолодження допоміжних деталей"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
@@ -2407,7 +2407,7 @@ msgstr ""
 "Ця опція ввімкнена, якщо машина підтримує контроль температури в камері\n"
 "Команда G-коду: M141 S(0-255)"
 
-msgid "Support air filtration"
+msgid "Back Fan"
 msgstr "Підтримка повітряної фільтрації"
 
 msgid ""
@@ -13220,7 +13220,7 @@ msgstr "Охолодження"
 msgid "Cooling for specific layer"
 msgstr "Охолодження для конкретного шару"
 
-msgid "Part cooling fan"
+msgid "Model fan"
 msgstr "Вентилятор охолодження деталей"
 
 msgid "Min fan speed threshold"
@@ -13238,9 +13238,6 @@ msgstr "Поріг максимальної швидкості вентилят�
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "Швидкість вентилятора охолодження деталі буде максимальною, якщо розрахунковечас шару менший за задане значення"
-
-msgid "Exhaust fan"
-msgstr "Витяжний вентилятор"
 
 msgid "During print"
 msgstr "Під час друку"

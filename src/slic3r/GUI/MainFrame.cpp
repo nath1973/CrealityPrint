@@ -18,6 +18,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/filesystem/path.hpp>
 
 #include "GUI.hpp"
 #include "libslic3r/Print.hpp"
@@ -367,6 +368,17 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
 
     Bind(EVT_SYNC_CLOUD_PRESET, &MainFrame::on_select_default_preset, this);
 
+    static bool first_frame = false;
+    Bind(wxEVT_PAINT, [this](wxEvent& event) {
+        if (first_frame == false) {
+            first_frame = true;
+            if (wxGetApp().is_enable_test()) {
+                this->Maximize();
+            }
+            ADD_TEST_RESPONE("APP", "READY", 0, "");
+        }
+    });
+
 //    Bind(wxEVT_MENU,
 //        [this](wxCommandEvent&)
 //        {
@@ -450,11 +462,11 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
 
     // declare events
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& event) {
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< ": mainframe received close_widow event";
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__<< ": mainframe received close_widow event";
         if (event.CanVeto() && m_plater->get_view3D_canvas3D()->get_gizmos_manager().is_in_editing_mode(true)) {
             // prevents to open the save dirty project dialog
             event.Veto();
-            BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< "cancelled by gizmo in editing";
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "cancelled by gizmo in editing";
             return;
         }
 
@@ -866,7 +878,7 @@ void MainFrame::update_layout()
 // Called when closing the application and when switching the application language.
 void MainFrame::shutdown()
 {
-    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "MainFrame::shutdown enter";
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start";
     // BBS: backup
     Slic3r::set_backup_callback(nullptr);
 #ifdef _WIN32
@@ -935,7 +947,8 @@ void MainFrame::shutdown()
     // BBS: why clear ?
     //wxGetApp().plater_ = nullptr;
 
-    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << "MainFrame::shutdown exit";
+    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end";
+    boost::log::core::get()->flush();
 }
 
 void MainFrame::update_filament_tab_ui()
@@ -2426,19 +2439,7 @@ static wxMenu* generate_help_menu(MainFrame* mainframe)
     });
 #endif
     append_menu_item(helpMenu, wxID_ANY, _L("Log View"), _L("Log View"), [](wxCommandEvent&) {
-        std::string data_dir = wxStandardPaths::Get().GetUserDataDir().ToUTF8().data();
-        //A.0
-        std::string version_dir = CREALITYPRINT_VERSION_MAJOR + std::string(".0");
-        std::string version = std::string(PROJECT_VERSION_EXTRA);
-        bool        is_alpha = boost::algorithm::icontains(version, "alpha");
-        if (is_alpha) {
-            version_dir = version_dir + std::string(" Alpha");
-        }
-#ifdef _WIN32
-        std::string LogFilePath  = data_dir + "\\" + SLIC3R_APP_USE_FORDER + "\\" + version_dir + "\\" + "log";
-#else
-        std::string LogFilePath  = data_dir + "/" + SLIC3R_APP_USE_FORDER + "/" + version_dir + "/" + "log";
-#endif
+        auto LogFilePath = (boost::filesystem::path(Slic3r::data_dir()) / "log").make_preferred().string();
         desktop_open_any_folder(LogFilePath);
     });
 
@@ -2645,15 +2646,15 @@ void MainFrame::init_menubar_as_editor()
             [this,&report_file_menu_event](wxCommandEvent&) { loadOldPresetsFromFolder(); report_file_menu_event(8);}, "menu_import", nullptr, [this]() { return true; }, this);
 
         append_submenu(fileMenu, import_menu, wxID_ANY, _L("Import"), "");
-        append_menu_item(
-            import_menu, wxID_ANY, _L("Import Gcode") + dots /*+ "\tCtrl+I"*/, _L("Load a gcode"),
-            [this,&report_file_menu_event](wxCommandEvent&) {
-                if (m_plater) {
-                    m_plater->load_gcode();
-                    report_file_menu_event(9);
-                }
-            },
-            "menu_import", nullptr, [this]() { return true; }, this);
+        //append_menu_item(
+        //    import_menu, wxID_ANY, _L("Import Gcode") + dots /*+ "\tCtrl+I"*/, _L("Load a gcode"),
+        //    [this,&report_file_menu_event](wxCommandEvent&) {
+        //        if (m_plater) {
+        //            m_plater->load_gcode();
+        //            report_file_menu_event(9);
+        //        }
+        //    },
+        //    "menu_import", nullptr, [this]() { return true; }, this);
 
 
         wxMenu* export_menu = new wxMenu();
@@ -4620,6 +4621,7 @@ void MainFrame::update_side_preset_ui()
                     tab->select_preset(presetName);
                 }
                 CXCloudDataCenter::getInstance().setFirstSelectProcessPreset(false);
+                BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets MainFrame::update_side_preset_ui() FirstSelectProcessPreset=false";
             }
         };
     }

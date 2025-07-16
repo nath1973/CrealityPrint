@@ -673,6 +673,7 @@ public:
     void               set_bed_type_list(std::map<int, int>& bed_type_list);
     int                get_bed_type_list(int index);
     int                get_bed_type_list_second(int index);
+    BoundingBoxf3      get_bed_extended_bounding_box();
 
     // Creality: get picture from gcode
     std::string get_gcode_picture_path();

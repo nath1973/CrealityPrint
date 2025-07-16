@@ -6111,7 +6111,7 @@ void ObjectList::render_plate_tree_by_ImGui()
     }
 
     // HelpMarker("See \"Columns flags\" section to configure how indentation is applied to individual columns.");
-    if (ImGui::BeginTable("##obj_table", num_var_column + 2, flags, ImVec2(ImGui::GetCurrentWindow()->Size.x - 15.0f, table_h))) {
+    if (ImGui::BeginTable("##obj_table", num_var_column + 2, flags, ImVec2(ImGui::GetCurrentWindow()->Size.x - 15.0f * view_scale, table_h))) {
         // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthStretch);
 
@@ -7562,7 +7562,7 @@ void ObjectList::render_printer_preset_by_ImGui()
         
         if (ImGui::ImageButton(wifi_id, {20.0f * scale, 20.0f * scale}))
         {
-            ADD_TEST_POINT("wifi_icon", "entry", "200");
+            ADD_TEST_RESPONE("WIFI", "ENTRY", 0, "");
             // update printer list
             ImGui::OpenPopup(deviceListID);
         }
@@ -8057,10 +8057,18 @@ void ObjectList::update_printer_device_list_data(std::string vendor, bool bForce
             DM::Device device = DM::Device::deserialize(const_cast<nlohmann::json&>(printer));
             // model img
             auto printer_model = vendor + " " + device.modelName;
-            if (printer_model != current_printer_model && 
+
+            if (printer_model != current_printer_model &&
                 device.modelName != current_printer_model)
             {
-                continue;
+                if ((device.oldPrinter) && (device.name == "Morandi") && (current_printer_model == "Creality Sermoon D3 Pro"))
+                {
+                    //device.modelName = Creality Sermoon D3 Pro;
+                }
+                else
+                {
+                    continue;
+                }
             }
             auto key  = wxGetApp().app_config->make_model2cover_path_key("", current_printer_model);
             auto iter = model2CoverMap.find(key);

@@ -720,9 +720,8 @@ void GLGizmoHollow::on_render_input_window(float x, float y, float bottom_limit)
         else {
             GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
             canvas->render_hollow_anime(value_state);
-            value_state += 1.0f;          
-           // reqeuestRender()
-            canvas->schedule_extra_frame(2);
+            value_state += 1.0f;                     
+            m_imgui->set_requires_extra_frame();
         }
     }
     /*if (remove_selected || remove_all) {

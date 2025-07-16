@@ -3708,7 +3708,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("close_fan_the_first_x_layers", "auto-cooling");
         optgroup->append_single_option_line("full_fan_speed_layer");
 
-        optgroup = page->new_optgroup(L("Part cooling fan"), L"param_cooling_part_fan");
+        optgroup        = page->new_optgroup(L("Model fan"), L"param_cooling_part_fan");
         line = { L("Min fan speed threshold"), L("Part cooling fan speed will start to run at min speed when the estimated layer time is no longer than the layer time in setting. When layer time is shorter than threshold, fan speed is interpolated between the minimum and maximum fan speed according to layer printing time") };
         line.label_path = "auto-cooling";
         line.append_option(optgroup->get_option("fan_min_speed"));
@@ -3730,13 +3730,13 @@ void TabFilament::build()
         optgroup->append_single_option_line("overhang_fan_speed", "auto-cooling");
         optgroup->append_single_option_line("support_material_interface_fan_speed");
 
-        optgroup = page->new_optgroup(L("Auxiliary part cooling fan"), L"param_cooling_aux_fan");
+        optgroup = page->new_optgroup(L("Side Fan"), L"param_cooling_aux_fan");
         optgroup->append_single_option_line("additional_cooling_fan_speed", "auxiliary-fan");
         optgroup->append_single_option_line("enable_special_area_additional_cooling_fan", "auxiliary-fan");
         optgroup->append_single_option_line("cool_special_cds_fan_speed", "enable_special_area_additional_cooling_fan");
         optgroup->append_single_option_line("cool_cds_fan_start_at_height");
 
-        optgroup = page->new_optgroup(L("Exhaust fan"),L"param_cooling_exhaust");
+        optgroup = page->new_optgroup(L("Back Fan"),L"param_cooling_exhaust");
 
         optgroup->append_single_option_line("activate_air_filtration", "air-filtration");
 
@@ -5938,7 +5938,13 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
 {
     if (presets == nullptr) presets = m_presets;
     if (wxGetApp().plater()->get_project_name() == _L("Untitled")) {
-        if (CXCloudDataCenter::getInstance().getFirstSelectProcessPreset() && wxGetApp().get_user().bLogin) {
+        if (CXCloudDataCenter::getInstance().getFirstSelectProcessPreset() && wxGetApp().get_user().bLogin &&
+            wxGetApp().app_config->get("sync_user_preset") == "true" && CXCloudDataCenter::getInstance().isDownloadPresetFinished()) {
+            BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets Tab::may_discard_current_dirty_preset FirstSelectProcessPreset="
+                                       << CXCloudDataCenter::getInstance().getFirstSelectProcessPreset()
+                                       << ",bLogin=" << wxGetApp().get_user().bLogin
+                                       << ",sync_user_preset=" << wxGetApp().app_config->get("sync_user_preset").c_str()
+                                       << ", downloadPresetState=" << (int)CXCloudDataCenter::getInstance().getDownloadPresetState();
             return false;
         }
     }
@@ -7385,9 +7391,6 @@ void Page::activate(ConfigOptionMode mode, std::function<void()> throw_if_cancel
     // BBS: no line spliter for first group
     bool first = true;
 #endif
-    wxPanel* panel = new wxPanel(this->parent());
-    panel->SetMinSize(wxSize(800, 0));
-    m_vsizer->Add(panel);
     try {
         if (m_optgroups.size() > 0 && m_optgroups.front() != nullptr && !m_optgroups.front()->opt_map().empty()) {
             const auto& first_opt = *m_optgroups.front()->opt_map().begin();

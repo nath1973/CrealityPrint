@@ -47,9 +47,11 @@
             "description": "Sets release build type",
             "inherits": "x64-release",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
                 "CMAKE_PREFIX_PATH": "${sourceDir}/deps/build/OrcaSlicer_dep/usr/local/",
-                "CX_DEBUG": "1"
+                "CX_DEBUG": "1",
+                "CMAKE_EXPORT_COMPILE_COMMANDS":"1",
+                "BOOST_HAS_THREADS": "1"
             }
         },
         {
@@ -104,8 +106,13 @@
             "description": "Sets release build type",
             "inherits": "linux-debug",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_PREFIX_PATH": "${sourceDir}/deps/build/destdir/usr/local/"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_PREFIX_PATH": "${sourceDir}/deps/build/destdir/usr/local/",
+                "CMAKE_EXPORT_COMPILE_COMMANDS":"1",
+                "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+                "CMAKE_C_COMPILER": "/usr/bin/clang",
+                "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
             }
         },
         {

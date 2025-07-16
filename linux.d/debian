@@ -30,6 +30,8 @@ REQUIRED_DEV_PACKAGES=(
     libasound2-dev
     libopus-dev
     libspeexdsp-dev
+    libdeflate-dev
+    liblzma-dev
 )
 
 if [[ -n "$UPDATE_LIB" ]]

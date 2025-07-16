@@ -2,6 +2,7 @@
 #include "slic3r/Utils/Http.hpp"
 #include <boost/log/trivial.hpp>
 #include <curl/curl.h>
+#include <exception>
 #include <string>
 #include "nlohmann/json_fwd.hpp"
 #include "slic3r/GUI/GUI.hpp"
@@ -38,9 +39,9 @@ std::future<void> KlipperCXInterface::sendFileToDevice(const std::string& server
                 target_name = uploadFileName.substr(0, uploadFileName.size() - 6);
             }
                 ;
-            std::string local_target_path = wxString(localFilePath).utf8_str().data();
-            std::string target_path = "model/slice/" + Slic3r::GUI::get_file_md5(local_target_path) + ".gcode.gz";
-            nRet                    = m_upload_file.uploadFileToAliyun(local_target_path, target_path, target_name);
+            //std::string local_target_path = wxString(localFilePath).utf8_str().data();
+            std::string target_path = "model/slice/" + Slic3r::GUI::get_file_md5(localFilePath) + ".gcode.gz";
+            nRet                    = m_upload_file.uploadFileToAliyun(localFilePath, target_path, target_name);
             if (nRet != 0)
             {
                 uploadStatusCallback(3);
@@ -52,6 +53,8 @@ std::future<void> KlipperCXInterface::sendFileToDevice(const std::string& server
             uploadStatusCallback(nRet);
         }catch(Slic3r::GUI::ErrorCodeException& e){
             uploadStatusCallback(e.code());
+        }catch(std::exception& e){
+            uploadStatusCallback(1000);
         }
     });
 }

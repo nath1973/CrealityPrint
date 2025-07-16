@@ -340,7 +340,12 @@ bool BaselineOrcaFileHelper::ReadBaselineFileLatest(nlohmann::json& root, const 
         BLReturnBoolen(false);
 
     std::ifstream in_file(file_path);
-    root = json::parse(in_file);
+    try {
+        root = json::parse(in_file);
+    } catch (nlohmann::detail::parse_error& err) {
+        BOOST_LOG_TRIVIAL(error) << "BaselineOrcaFileHelper::ReadBaselineFileLatest parse in_file fail";
+        BLReturnBoolen(false);
+    }
     BLReturnBoolen(true);
 }
 

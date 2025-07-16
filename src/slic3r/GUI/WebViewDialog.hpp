@@ -107,6 +107,7 @@ public:
 
     void update_mode();
     void sync_preferences(const std::vector<wxString>& prefs);
+    void sync_user_preset(const std::vector<wxString>& datas);
     void update_device_page(const std::string& device_info);
 	void update_all_device(const std::string& device);
     void Reload();

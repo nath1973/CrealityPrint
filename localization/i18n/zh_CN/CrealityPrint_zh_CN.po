@@ -2524,8 +2524,8 @@ msgstr "首层打印温度"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "打印首层时的喷嘴温度"
 
-msgid "Full fan speed at layer"
-msgstr "满速风扇在"
+msgid "Model fan speed at layer"
+msgstr "模型风扇满速在"
 
 msgid ""
 "Fan speed will be ramped up linearly from zero at layer "
@@ -2711,8 +2711,8 @@ msgstr "最佳对象位置"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "最佳自动排列位置在[0,1]范围内，相对于打印床形状。"
 
-msgid "Auxiliary part cooling fan"
-msgstr "辅助部件冷却风扇"
+msgid "Side Fan"
+msgstr "辅助风扇"
 
 msgid ""
 "Enable this option if machine has auxiliary part cooling fan. G-code "
@@ -2770,8 +2770,8 @@ msgid ""
 "G-code command: M141 S(0-255)"
 msgstr "如果机器支持控制室温度，则启用此选项。G-code命令：M141 S（0-255）"
 
-msgid "Support air filtration"
-msgstr "腔体风扇"
+msgid "Back Fan"
+msgstr "机箱风扇"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -9770,7 +9770,7 @@ msgstr "点击此处可选择和添加打印机预设"
 msgid "Click 【"
 msgstr "点击【"
 
-msgid "】 to select Creality printer maching the chosen preset"
+msgid "】 to select Creality printer matching the chosen preset"
 msgstr "】可选择符合所选预设的创想打印机设备"
 
 msgid "Here to import model files"
@@ -9788,7 +9788,7 @@ msgid "Click 【Slice plate】 to generate the G-code file for printing"
 msgstr "点击【切片单盘】，生成打印机打印模型所需的G-Code文件"
 
 msgid ""
-"Click 【Send print】,send the file to the selected device and start printing"
+"Click 【Send print】, send the file to the selected device and start printing"
 msgstr "点击【发送打印】，将文件发送到打印机并开始打印"
 
 msgid "Error Report"
@@ -14304,8 +14304,8 @@ msgstr "冷却"
 msgid "Cooling for specific layer"
 msgstr "特定层冷却"
 
-msgid "Part cooling fan"
-msgstr "部件冷却风扇"
+msgid "Model fan"
+msgstr "模型风扇"
 
 msgid "Min fan speed threshold"
 msgstr "最小风扇速度阈值"
@@ -14326,9 +14326,6 @@ msgid ""
 "Part cooling fan speed will be max when the estimated layer time is shorter "
 "than the setting value"
 msgstr "当预计的层打印时间比设置值要短时，部件冷却风扇转速将达到最大值"
-
-msgid "Exhaust fan"
-msgstr "排气风扇"
 
 msgid "During print"
 msgstr "打印中"
@@ -17367,6 +17364,18 @@ msgid ""
 msgstr ""
 "相比于此喷嘴的默认参数，层高较小，层纹较不明显，打印质量较高，部分模型的打印"
 "耗时较长。"
+
+msgid "Adjust Model"
+msgstr "调整对象"
+
+msgid "Continue Export (Not Recommended)"
+msgstr "继续导出（不推荐）"
+
+msgid "has floating regions. Please re-orient the object or enable support generation."
+msgstr "有浮空区域。请重新调整对象的方向或启用支撑。"
+
+msgid "appears to have floating areas, which may cause print failure.\nPlease reorient the model or enable supports.\n\n "
+msgstr "存在浮空区域，可能会导致打印失败。\n建议重新调整对象的方向，或启用支撑结构。\n\n "
 
 #~ msgid "User Experience Improvement Program"
 #~ msgstr "用户体验改进计划"

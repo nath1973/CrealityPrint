@@ -706,15 +706,15 @@ bool GLToolbar::on_mouse(wxMouseEvent& evt, GLCanvas3D& parent)
             if (item_id != -2 && !m_items[item_id]->is_separator() && !m_items[item_id]->is_disabled() &&
                 (m_pressed_toggable_id == -1 || m_items[item_id]->get_last_action_type() == GLToolbarItem::Left)) {
 
-                if (item_id != get_item_id("arrange")) {
-                    // try to close arrange menu first
-                    GLToolbarItem* arrange_item = get_item("arrange");
-                    arrange_item->set_visible(false);
-                    force_right_action(get_item_id("arrange"), parent);
-                }
+                //if (item_id != get_item_id("arrange")) {
+                //    // try to close arrange menu first
+                //    GLToolbarItem* arrange_item = get_item("arrange");
+                //    arrange_item->set_visible(false);
+                //    force_right_action(get_item_id("arrange"), parent);
+                //}
 
                 // mouse is inside an icon
-                do_action(GLToolbarItem::Left, item_id, parent, true);
+                do_action(GLToolbarItem::Left, item_id, parent, false);
                 parent.set_as_dirty();
             }
         }

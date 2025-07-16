@@ -70,6 +70,13 @@ namespace GUI {
         ENDCS_CXCLOUD_NO_CONFIG     //  创想云没有配置文件
     };
 
+    enum class ENDownloadPresetState {
+        ENDPS_NOT_DOWNLOAD,         //  未开始下载
+        ENDPS_DOWNLOADING,           //  下载中
+        ENDPS_DOWNLOAD_SUCCESS,     //  下载成功
+        ENDPS_DOWNLOAD_FAILED,        //  下载失败
+    };
+
     class CXCloudDataCenter
     {
     public:
@@ -105,6 +112,9 @@ namespace GUI {
         void setFilamentPresetDirty(bool bDirty) { m_bFilamentPresetDirty = bDirty; }
         bool getFirstSelectProcessPreset() { return m_bFirstSelectProcessPreset; }
         void setFirstSelectProcessPreset(bool bFirst) { m_bFirstSelectProcessPreset = bFirst; }
+        void setDownloadPresetState(ENDownloadPresetState state) { m_enDownloadPresetState.store(state); } 
+        ENDownloadPresetState getDownloadPresetState() { return m_enDownloadPresetState.load(); }
+        bool isDownloadPresetFinished();
 
     private:
         CXCloudDataCenter() = default;
@@ -125,6 +135,7 @@ namespace GUI {
         bool m_bFilamentPresetDirty = false;
         bool m_bFirstSelectProcessPreset = true;
         bool m_bNetworkError = false;
+        std::atomic<ENDownloadPresetState> m_enDownloadPresetState = ENDownloadPresetState::ENDPS_NOT_DOWNLOAD;
     };
 
     class CLocalDataCenter
@@ -200,6 +211,7 @@ namespace GUI {
         size_t                                m_filamentId = 0;
         size_t                                m_processId = 0;
         std::unordered_map<std::string, json> m_mapPrinterData;
+        std::map<std::pair<std::string, std::string>, std::pair<std::string, std::string>> m_mapPrinterName2PrinterModel;
     };
 }
 }

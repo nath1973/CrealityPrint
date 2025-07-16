@@ -159,7 +159,7 @@ fi
 if [[ -n "${BUILD_DEPS}" ]]
 then
     echo "Configuring dependencies..."
-    BUILD_ARGS="-DDEP_WX_GTK3=ON"
+    BUILD_ARGS="-DDEP_WX_GTK3=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
     if [[ -n "${CLEAN_BUILD}" ]]
     then
         rm -fr deps/build
@@ -193,7 +193,7 @@ then
     BUILD_ARGS=""
     if [[ -n "${FOUND_GTK3_DEV}" ]]
     then
-        BUILD_ARGS="-DSLIC3R_GTK=3"
+        BUILD_ARGS="-DSLIC3R_GTK=3 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
     fi
     if [[ -n "${BUILD_DEBUG}" ]]
     then

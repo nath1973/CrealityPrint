@@ -277,7 +277,8 @@ TipsDialog::TipsDialog(wxWindow *parent, const wxString &title, const wxString &
     m_confirm->SetSize(TIPS_DIALOG_BUTTON_SIZE);
     m_confirm->SetMinSize(TIPS_DIALOG_BUTTON_SIZE);
     m_confirm->SetCornerRadius(FromDIP(12));
-    m_confirm->Bind(wxEVT_LEFT_DOWN, &TipsDialog::on_ok, this);
+    //m_confirm->Bind(wxEVT_LEFT_DOWN, &TipsDialog::on_ok, this);
+    m_confirm->Bind(wxEVT_BUTTON, &TipsDialog::on_ok, this);// fix bug [#10463], if use "wxEVT_LEFT_DOWN", would trigger evt.LeftUp() in [GLCanvas3D::on_mouse(wxMouseEvent& evt)]
     m_sizer_right->Add(m_confirm, 0, wxALL, FromDIP(5));
 
     m_sizer_bottom->Add(m_sizer_right, 0, wxEXPAND, FromDIP(5));
@@ -327,7 +328,7 @@ void TipsDialog::on_dpi_changed(const wxRect &suggested_rect)
     Refresh();
 }
 
-void TipsDialog::on_ok(wxMouseEvent &event)
+void TipsDialog::on_ok(wxCommandEvent &event)
 {
     if (m_show_again) {
         if (!m_app_key.empty())
@@ -554,7 +555,7 @@ ParamsPanel::ParamsPanel( wxWindow* parent, wxWindowID id, const wxPoint& pos, c
                 wxID_ANY,
                 wxDefaultPosition,
                 wxDefaultSize,
-                wxVSCROLL) // hide hori-bar will cause hidden field mis-position
+            	wxVSCROLL | wxHSCROLL) // hide hori-bar will cause hidden field mis-position
         {
             // ShowScrollBar(GetHandle(), SB_BOTH, FALSE);
             Bind(wxEVT_SCROLL_CHANGED, [this](auto& e) {
@@ -813,93 +814,64 @@ void ParamsPanel::create_layout_printerAndFilament()
         m_btnsPanel->SetSizer(buttons_sizer);
 
         bool is_dark = wxGetApp().dark_mode();
-
         int em = em_unit(this);
-        StateColor text_color = StateColor(std::pair{ is_dark ? wxColour(254, 254, 254) : wxColour(0,0,0), (int)StateColor::Normal });
-        StateColor bg_color = StateColor(std::pair{ wxColour(21, 191, 89), (int)StateColor::Hovered },
-            std::pair{ is_dark ? wxColour(1, 1, 1) : wxColour(142, 142, 159), (int)StateColor::Normal });
+        StateColor bg_color = StateColor(std::pair{wxColour(21, 191, 89), (int) StateColor::Hovered},
+                                         std::pair{is_dark ? wxColour(142, 142, 159) : wxColour(214, 214, 220), (int) StateColor::Normal});
 
+        StateColor bg_checkedColor = StateColor(std::pair{wxColour(21, 191, 89), (int) StateColor::Hovered},
+                                                std::pair{wxColour(21, 191, 89), (int) StateColor::Normal});
+
+        StateColor text_color = StateColor(std::pair{is_dark ? wxColour(254, 254, 254) : wxColour(255, 255, 255), (int) StateColor::Hovered},
+                                           std::pair{is_dark ? wxColour(254, 254, 254) : wxColour(0, 0, 0), (int) StateColor::Normal});
 
         wxFont font(12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("微软雅黑"));
 
-        m_btn_system = new wxButton(m_btnsPanel, wxID_ANY, _L("System"), wxDefaultPosition, wxDefaultSize,
-            wxLeft | wxBORDER_NONE);
-        m_btn_user = new wxButton(m_btnsPanel, wxID_ANY, _L("User"), wxDefaultPosition, wxDefaultSize,
-            wxLeft | wxBORDER_NONE);
-
-        buttons_sizer->Add(m_btn_system);
-        m_btn_system->SetMinSize({ FromDIP(100), FromDIP(30)});
-        m_btn_system->SetBackgroundColour(wxColour(21, 191, 89));
+        m_btn_system = new Button(m_btnsPanel, _L("System"), "", wxNO_BORDER, 0, 0);
+        //m_btn_system->SetValue(StateHandler::Hovered);
+        m_btn_system->SetMinSize({FromDIP(100), FromDIP(30)});
+        m_btn_system->SetCornerRadius(0);
+        m_btn_system->SetSize({FromDIP(100), FromDIP(30)});
+        m_btn_system->SetBackgroundColor(bg_checkedColor);
+        m_btn_system->SetTextColor(text_color);
         m_btn_system->SetClientData(new bool(true));
         m_btn_system->SetFont(font);
-        m_btn_system->Bind(wxEVT_ENTER_WINDOW, [this](auto& event) {
-#ifndef __APPLE_
-            bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
-            if (*sys_Value)
-                return;
-            m_btn_system->SetBackgroundColour(wxColour(21, 191, 89));
-#endif // !__APPLE_
-            });
-        m_btn_system->Bind(wxEVT_LEAVE_WINDOW, [this](auto& event) {
-            bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
-            if (*sys_Value)
-                return;
-            m_btn_system->SetBackgroundColour(wxColour(142, 142, 159));
-            });
 
-        m_btn_system->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
-
-            m_ps = ParamsPanel::PS_SYSTEM;
-            m_curVentor = _L("ALL");
-            m_printerType = _L("ALL");
-            filteredData(m_curVentor, m_printerType);
-            updateItemState();
-            });
         Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_system);
 
-        buttons_sizer->Add(m_btn_user);
-        m_btn_user->SetMinSize({ FromDIP(100), FromDIP(30)});
-        m_btn_user->SetBackgroundColour(wxColour(142, 142, 159));
-        m_btn_user->SetClientData(new bool(false));
+        m_btn_user = new Button(m_btnsPanel, _L("User"), "", wxNO_BORDER, 0, 0);
+        m_btn_user->SetMinSize({FromDIP(100), FromDIP(30)});
+        m_btn_user->SetCornerRadius(0);
+        m_btn_user->SetSize({FromDIP(100), FromDIP(30)});
+        m_btn_user->SetBackgroundColor(bg_color);
+        m_btn_user->SetTextColor(text_color);
+        m_btn_user->SetClientData(new bool(true));
         m_btn_user->SetFont(font);
-        m_btn_user->Bind(wxEVT_ENTER_WINDOW, [this](auto& event) {
-#ifndef __APPLE_
-            bool* sys_Value = static_cast<bool*>(m_btn_user->GetClientData());
-            if (*sys_Value)
-                return;
-            m_btn_user->SetBackgroundColour(wxColour(21, 191, 89));
-#endif // !1
-            });
-        m_btn_user->Bind(wxEVT_LEAVE_WINDOW, [this](auto& event) {
-            bool* sys_Value = static_cast<bool*>(m_btn_user->GetClientData());
-            if (*sys_Value)
-                return;
-            m_btn_user->SetBackgroundColour(wxColour(142, 142, 159));
-            });
-        m_btn_user->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
-            //bool* sys_Value = static_cast<bool*>(m_btn_system->GetClientData());
-            //bool* user_Value = static_cast<bool*>(m_btn_user->GetClientData());
-            //if (*user_Value)
-            //{
-            //    return;
-            //}
-            //else
-            //{
-            //    *user_Value = !*user_Value;
-            //    *sys_Value = !*sys_Value;
-            //    m_btn_user->SetBackgroundColour(wxColour(21, 191, 89));
-            //    m_btn_system->SetBackgroundColour(wxColour(214, 214, 220));
-            //}
-
-            m_ps = ParamsPanel::PS_USER;
-            m_curVentor = _L("ALL");
+        Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_user);
+        m_btn_user->Bind(wxEVT_BUTTON, [this, bg_color, bg_checkedColor](wxCommandEvent& event) {
+            m_ps          = ParamsPanel::PS_USER;
+            m_curVentor   = _L("ALL");
             m_printerType = _L("ALL");
             filteredData(m_curVentor, m_printerType);
+            m_btn_system->SetBackgroundColor(bg_color);
+            m_btn_user->SetBackgroundColor(bg_checkedColor);
             updateItemState();
-            Layout();
-            });
+        });
 
+       m_btn_system->Bind(wxEVT_BUTTON, [this, bg_color, bg_checkedColor](wxCommandEvent& event) {
+       m_ps          = ParamsPanel::PS_SYSTEM;
+       m_curVentor   = _L("ALL");
+       m_printerType = _L("ALL");
+       filteredData(m_curVentor, m_printerType);
+       m_btn_system->SetBackgroundColor(bg_checkedColor);
+       m_btn_user->SetBackgroundColor(bg_color);
+       updateItemState();
+        });
+
+        Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_system);
         Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_user);
+
+        buttons_sizer->Add(m_btn_system);
+        buttons_sizer->Add(m_btn_user);
 
         m_btnsPanel->Layout();
         m_btnsPanel->Fit();
@@ -2223,8 +2195,14 @@ void ParamsPanel::updateItemState()
             isSys = true;
     }
     
+    bool       is_dark  = wxGetApp().dark_mode();
+    StateColor bg_color = StateColor(std::pair{wxColour(142, 142, 159), (int) StateColor::Hovered},
+                                     std::pair{is_dark ? wxColour(142, 142, 159) : wxColour(214, 214, 220), (int) StateColor::Normal});
 
-    function setSystemType = [this]() {
+    StateColor bg_checkedColor = StateColor(std::pair{wxColour(21, 191, 89), (int) StateColor::Hovered},
+                                            std::pair{wxColour(21, 191, 89), (int) StateColor::Normal});
+
+    function setSystemType = [this, bg_color, bg_checkedColor]() {
         m_btn_save->Hide();
         m_btn_delete->Hide();
 
@@ -2232,11 +2210,12 @@ void ParamsPanel::updateItemState()
         *sys_Value = true;
         bool* user_Value = static_cast<bool*>(m_btn_user->GetClientData());
         *user_Value = false;
-        m_btn_user->SetBackgroundColour(wxColour(142, 142, 159));
-        m_btn_system->SetBackgroundColour(wxColour(21, 191, 89));
+        
+        m_btn_system->SetBackgroundColor(bg_checkedColor);
+        m_btn_user->SetBackgroundColor(bg_color);
     };
 
-    function setUserType = [this]() {
+    function setUserType = [this, bg_color, bg_checkedColor]() {
         m_btn_save->Show();
         m_btn_delete->Show();
 
@@ -2244,8 +2223,9 @@ void ParamsPanel::updateItemState()
         *sys_Value = false;
         bool* user_Value = static_cast<bool*>(m_btn_user->GetClientData());
         *user_Value = true;
-        m_btn_system->SetBackgroundColour(wxColour(142, 142, 159));
-        m_btn_user->SetBackgroundColour(wxColour(21, 191, 89));
+
+        m_btn_system->SetBackgroundColor(bg_color);
+        m_btn_user->SetBackgroundColor(bg_checkedColor);
     };
 
     if (m_ps == PS_SYSTEM || (m_ps == PS_BASE && isSys))

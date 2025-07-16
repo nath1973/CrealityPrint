@@ -46,34 +46,56 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
     SetSizer(v_sizer);
 	wxBoxSizer* choice_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    wxString m_rbExtruderTypeChoices[] = { _L("DDE"), _L("Bowden") };
-	int m_rbExtruderTypeNChoices = sizeof(m_rbExtruderTypeChoices) / sizeof(wxString);
-	m_rbExtruderType = new wxRadioBox(this, wxID_ANY, _L("Extruder type"), wxDefaultPosition, wxDefaultSize, m_rbExtruderTypeNChoices, m_rbExtruderTypeChoices, 2, wxRA_SPECIFY_COLS);
-	bool is_dark = wxGetApp().dark_mode();
-    m_rbExtruderType->SetSelection(0);
-    //m_rbExtruderType->SetForegroundColour(wxColour("#000000"));
-    m_rbExtruderType->SetBackgroundColour(wxColour(255, 255, 255)); // Background color
-    m_rbExtruderType->SetForegroundColour(wxColour(0, 0, 0)); // Border color
-    m_rbExtruderType->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
-    m_rbExtruderType->SetOwnBackgroundColour(wxColour(255, 255, 255)); // Background color
-    //m_rbExtruderType->SetOwnFont(wxFontInfo(10).Bold()); // Font
+    bool        is_dark      = wxGetApp().dark_mode();
 
+    // 定义颜色：白色文字 + 深灰色背景
+    wxColour textColor = is_dark ?  wxColour(0, 0, 0) : wxColour(51, 51, 51); // 白色
+    wxColour bgColor(75, 75, 77); // 深灰色（#404040）
+     // ---------------------- 左侧：挤出机类型 ----------------------
+    extruderBox                     = new wxStaticBox(this, wxID_ANY, _L("Extruder type"));
+    wxStaticBoxSizer* extruderSizer = new wxStaticBoxSizer(extruderBox, wxHORIZONTAL);
+    // 单选按钮：近程挤出机（设为组首，wxRB_GROUP）
+    m_radioNear = new wxRadioButton(extruderBox, wxID_ANY, _L("DDE"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
+    // 单选按钮：远程挤出机
+    m_radioFar = new wxRadioButton(extruderBox, wxID_ANY, _L("Bowden"));
+    // 添加到布局
+    extruderSizer->Add(m_radioNear, 0, wxALL, 5);
+    extruderSizer->Add(m_radioFar, 0, wxALL, 5);
+    // 设置颜色（静态框标题 + 单选按钮）
+    extruderBox->SetForegroundColour(textColor); // 标题文字颜色
+    extruderBox->SetBackgroundColour(bgColor);   // 静态框背景
+    m_radioNear->SetForegroundColour(textColor); // 按钮文字颜色
+    m_radioNear->SetBackgroundColour(bgColor);   // 按钮背景
+    m_radioFar->SetForegroundColour(textColor);
+    m_radioFar->SetBackgroundColour(bgColor);       
+    choice_sizer->Add(extruderSizer, 0, wxALL, 5);
 
-	choice_sizer->Add(m_rbExtruderType, 0, wxALL, 5);
-	choice_sizer->Add(FromDIP(5), 0, 0, wxEXPAND, 5);
-	wxString m_rbMethodChoices[] = { _L("PA Tower"), _L("PA Line"), _L("PA Pattern") };
-	int m_rbMethodNChoices = sizeof(m_rbMethodChoices) / sizeof(wxString);
-	m_rbMethod = new wxRadioBox(this, wxID_ANY, _L("Method"), wxDefaultPosition, wxDefaultSize, m_rbMethodNChoices, m_rbMethodChoices, 3, wxRA_SPECIFY_COLS);
-	m_rbMethod->SetSelection(0);
-    //m_rbMethod->SetForegroundColour(wxColour("#000000"));
-    m_rbMethod->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
-	choice_sizer->Add(m_rbMethod, 0, wxALL, 5);
-
-
-	v_sizer->Add(choice_sizer);
+    // ---------------------- 右侧：方法 ----------------------
+    methodBox                     = new wxStaticBox(this, wxID_ANY, _L("Method"));
+    wxStaticBoxSizer* methodSizer = new wxStaticBoxSizer(methodBox, wxHORIZONTAL);
+    // 单选按钮：PA塔（组首
+    m_radioPA = new wxRadioButton(methodBox, wxID_ANY, _L("PA Tower"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
+    // 单选按钮：划线模式
+    m_radioLine = new wxRadioButton(methodBox, wxID_ANY, _L("PA Line"));
+    // 单选按钮：V形模式
+    m_radioV = new wxRadioButton(methodBox, wxID_ANY, _L("PA Pattern"));
+    // 添加到布局
+    methodSizer->Add(m_radioPA, 0, wxALL, 5);
+    methodSizer->Add(m_radioLine, 0, wxALL, 5);
+    methodSizer->Add(m_radioV, 0, wxALL, 5);
+    // 设置颜色
+    methodBox->SetForegroundColour(textColor);
+    methodBox->SetBackgroundColour(bgColor);
+    m_radioPA->SetForegroundColour(textColor);
+    m_radioPA->SetBackgroundColour(bgColor);
+    m_radioLine->SetForegroundColour(textColor);
+    m_radioLine->SetBackgroundColour(bgColor);
+    m_radioV->SetForegroundColour(textColor);
+    m_radioV->SetBackgroundColour(bgColor);  
+    choice_sizer->Add(methodSizer, 0, wxALL, 5);
+    v_sizer->Add(choice_sizer);
 
     // Settings
-    //
     wxString start_pa_str = _L("Start PA: ");
     wxString end_pa_str = _L("End PA: ");
     wxString PA_step_str = _L("PA step: ");
@@ -90,7 +112,9 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
     // start PA
     auto start_PA_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto start_pa_text = new wxStaticText(this, wxID_ANY, start_pa_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
-    start_pa_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    //start_pa_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    start_pa_text->SetBackgroundColour(is_dark ? wxColour(75, 75, 77) : wxColour(255, 255, 255));
+    start_pa_text->SetForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
     m_tiStartPA = new TextInput(this, "", "", "", wxDefaultPosition, ti_size, wxTE_CENTRE | wxTE_PROCESS_ENTER|wxALIGN_RIGHT);
     m_tiStartPA->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
 
@@ -101,7 +125,9 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
     // end PA
     auto end_PA_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto end_pa_text = new wxStaticText(this, wxID_ANY, end_pa_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
-    end_pa_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    //end_pa_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    end_pa_text->SetBackgroundColour(is_dark ? wxColour(75, 75, 77) : wxColour(255, 255, 255));
+    end_pa_text->SetForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
     m_tiEndPA = new TextInput(this, "", "", "", wxDefaultPosition, ti_size, wxTE_CENTRE | wxTE_PROCESS_ENTER);
     m_tiStartPA->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
     end_PA_sizer->Add(end_pa_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
@@ -111,7 +137,9 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
     // PA step
     auto PA_step_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto PA_step_text = new wxStaticText(this, wxID_ANY, PA_step_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
-    PA_step_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    //PA_step_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    PA_step_text->SetBackgroundColour(is_dark ? wxColour(75, 75, 77) : wxColour(255, 255, 255));
+    PA_step_text->SetForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
     m_tiPAStep = new TextInput(this, "", "", "", wxDefaultPosition, ti_size, wxTE_CENTRE | wxTE_PROCESS_ENTER);
     m_tiStartPA->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
     PA_step_sizer->Add(PA_step_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
@@ -121,7 +149,9 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
     // creality add bed temp
     auto bed_temp_sizer = new wxBoxSizer(wxHORIZONTAL);
     auto bed_temp_text  = new wxStaticText(this, wxID_ANY, bed_temp_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
-    bed_temp_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    //bed_temp_text->SetOwnForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
+    bed_temp_text->SetBackgroundColour(is_dark ? wxColour(75, 75, 77) : wxColour(255, 255, 255));
+    bed_temp_text->SetForegroundColour(is_dark ? wxColour(0, 0, 0) : wxColour(51, 51, 51));
     m_tiBedTemp = new TextInput(this, wxString::FromDouble(50), _L("℃"), "", wxDefaultPosition, ti_size, wxTE_CENTRE);
     m_tiStartPA->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
     bed_temp_sizer->Add(bed_temp_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
@@ -154,8 +184,8 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
     PA_Calibration_Dlg::reset_params();
 
     // Connect Events
-    m_rbExtruderType->Connect(wxEVT_COMMAND_RADIOBOX_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_extruder_type_changed), NULL, this);
-    m_rbMethod->Connect(wxEVT_COMMAND_RADIOBOX_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_method_changed), NULL, this);
+    extruderBox->Connect(wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_extruder_type_changed), NULL, this);
+    methodBox->Connect(wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_method_changed), NULL, this);
     this->Connect(wxEVT_SHOW, wxShowEventHandler(PA_Calibration_Dlg::on_show));
     wxGetApp().UpdateDlgDarkUI(this);
 
@@ -165,17 +195,43 @@ PA_Calibration_Dlg::PA_Calibration_Dlg(wxWindow* parent, wxWindowID id, Plater* 
 
 PA_Calibration_Dlg::~PA_Calibration_Dlg() {
     // Disconnect Events
-    m_rbExtruderType->Disconnect(wxEVT_COMMAND_RADIOBOX_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_extruder_type_changed), NULL, this);
-    m_rbMethod->Disconnect(wxEVT_COMMAND_RADIOBOX_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_method_changed), NULL, this);
+    extruderBox->Disconnect(wxEVT_COMMAND_RADIOBOX_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_extruder_type_changed), NULL,
+                            this);
+    methodBox->Disconnect(wxEVT_COMMAND_RADIOBOX_SELECTED, wxCommandEventHandler(PA_Calibration_Dlg::on_method_changed), NULL, this);
     m_btnStart->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(PA_Calibration_Dlg::on_start), NULL, this);
 }
 
-void PA_Calibration_Dlg::reset_params() {
-    int currentType = m_rbExtruderType->GetSelection();
-    //bool isDDE = m_rbExtruderType->GetSelection() == 0 ? true : false;
-    int currentMethod = m_rbMethod->GetSelection();
+// 获取选中状态的函数
+int PA_Calibration_Dlg::GetSelectedMethod()
+{
+    if (m_radioPA->GetValue()) {
+        return m_selectedMethod = 0; // PA塔
+    } else if (m_radioLine->GetValue()) {
+        return m_selectedMethod = 1; // 划线模式
+    } else if (m_radioV->GetValue()) {
+        return m_selectedMethod = 2; // V形模式
+    }
+    return -1; // 无选中（理论上不会发生）
+}
 
-    //m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
+// 获取选中状态的函数
+int PA_Calibration_Dlg::GetSelectedExtruderType()
+{
+    if (m_radioNear->GetValue()) {
+        return m_selectedExtruderType=0; // 近程挤出机
+    } else if (m_radioFar->GetValue()) {
+        return m_selectedExtruderType = 1; // 远程挤出机
+    }
+    return -1; // 无选中（理论上不会发生）
+}
+
+
+void PA_Calibration_Dlg::reset_params()
+{
+    GetSelectedExtruderType();
+    GetSelectedMethod();
+
+    m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
     // creality add bed temp
     m_bedTempValue                = 50;
     auto          filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
@@ -211,11 +267,11 @@ void PA_Calibration_Dlg::reset_params() {
     }
     m_tiBedTemp->GetTextCtrl()->SetValue(wxString::FromDouble(m_bedTempValue));
     bool isempty = m_tiEndPA->GetTextCtrl()->GetValue().empty();
-    switch (currentMethod) {
+    switch (m_selectedMethod) {
         case 1:
             m_params.mode = CalibMode::Calib_PA_Line;
-            if (currentType != iExtruderTypeSeletion || currentMethod!=imethod || isempty) {
-                if (currentType == 0) {//近端
+            if (m_selectedExtruderType != iExtruderTypeSeletion || m_selectedMethod != imethod || isempty) {
+                if (m_selectedExtruderType == 0) { //近端
                     m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
                     m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.1));
                     m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.002));
@@ -231,8 +287,8 @@ void PA_Calibration_Dlg::reset_params() {
             break;
         case 2:
             m_params.mode = CalibMode::Calib_PA_Pattern;
-            if (currentType != iExtruderTypeSeletion || currentMethod != imethod || isempty) {
-                if (currentType == 0) { //近端
+            if (m_selectedExtruderType != iExtruderTypeSeletion || m_selectedMethod != imethod || isempty) {
+                if (m_selectedExtruderType == 0) { //近端
                     m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
                     m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.08));
                     m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.005));
@@ -247,8 +303,8 @@ void PA_Calibration_Dlg::reset_params() {
             break;
         default:
             m_params.mode = CalibMode::Calib_PA_Tower;
-            if (currentType != iExtruderTypeSeletion || currentMethod != imethod || isempty) {
-                if (currentType == 0) { //近端
+            if (m_selectedExtruderType != iExtruderTypeSeletion || m_selectedMethod != imethod || isempty) {
+                if (m_selectedExtruderType == 0) { //近端
                     m_tiStartPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.0));
                     m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(0.1));
                     m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.002));
@@ -263,18 +319,18 @@ void PA_Calibration_Dlg::reset_params() {
             break;
     }
 
-    //if (!isDDE) {
-    //    m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(1.0));
-    //    
-    //    if (m_params.mode == CalibMode::Calib_PA_Pattern) {
-    //        m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.05));
-    //    } else {
-    //        m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.02));
-    //    }
-    //}
+    if (m_selectedExtruderType == 1) {
+        m_tiEndPA->GetTextCtrl()->SetValue(wxString::FromDouble(1.0));
+        
+        if (m_params.mode == CalibMode::Calib_PA_Pattern) {
+            m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.05));
+        } else {
+            m_tiPAStep->GetTextCtrl()->SetValue(wxString::FromDouble(0.02));
+        }
+    }
 
-    iExtruderTypeSeletion = currentType;
-    imethod               = currentMethod;
+    iExtruderTypeSeletion = m_selectedExtruderType;
+    imethod               = m_selectedMethod;
 }
 
 void PA_Calibration_Dlg::on_start(wxCommandEvent& event) { 
@@ -290,7 +346,7 @@ void PA_Calibration_Dlg::on_start(wxCommandEvent& event) {
         return;
     }
 
-    switch (m_rbMethod->GetSelection()) {
+    switch (m_selectedMethod) {
         case 1:
             m_params.mode = CalibMode::Calib_PA_Line;
             break;
@@ -2671,15 +2727,15 @@ High_Flowrate_Dlg::High_Flowrate_Dlg(wxWindow* parent, wxWindowID id, Plater* pl
     v_sizer->Add(topSizer, 0, wxTOP | wxALIGN_CENTRE_HORIZONTAL, FromDIP(30));
 
     wxGridSizer* gridSizer = new wxGridSizer(3, 3, FromDIP(6), FromDIP(17));
+    gridSizer->Add(m_btn8, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn7, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn6, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn5, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn4, 0, wxALIGN_CENTER, FromDIP(5));
+    gridSizer->Add(m_btn3, 0, wxALIGN_CENTER, FromDIP(5));
     gridSizer->Add(m_btn0, 0, wxALIGN_CENTER, FromDIP(5));
     gridSizer->Add(m_btn1, 0, wxALIGN_CENTER, FromDIP(5));
     gridSizer->Add(m_btn2, 0, wxALIGN_CENTER, FromDIP(5));
-    gridSizer->Add(m_btn3, 0, wxALIGN_CENTER, FromDIP(5));
-    gridSizer->Add(m_btn4, 0, wxALIGN_CENTER, FromDIP(5));
-    gridSizer->Add(m_btn5, 0, wxALIGN_CENTER, FromDIP(5));
-    gridSizer->Add(m_btn6, 0, wxALIGN_CENTER, FromDIP(5));
-    gridSizer->Add(m_btn7, 0, wxALIGN_CENTER, FromDIP(5));
-    gridSizer->Add(m_btn8, 0, wxALIGN_CENTER, FromDIP(5));
 
     v_sizer->Add(gridSizer, 0, wxTOP | wxALIGN_CENTRE_HORIZONTAL, FromDIP(16));
 

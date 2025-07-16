@@ -2098,7 +2098,10 @@ void NotificationManager::push_slicing_serious_warning_notification(const std::s
 			}
 			if (!ovs.empty()) {
 				wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
-				wxGetApp().obj_list()->select_items(ovs);
+				wxGetApp().CallAfter([ovs]() {
+					wxGetApp().obj_list()->select_items(ovs);
+				});
+				
 			}
 			return false;
 		};

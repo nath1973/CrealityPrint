@@ -292,7 +292,7 @@ AboutDialog::AboutDialog()
     auto version_string = _L("Creality Print ") + " V" + std::string(CREALITYPRINT_VERSION);
     std::vector<wxString> text_list;
     wxString pre_empty_space = "    ";
-    text_list.push_back(pre_empty_space + version_string + _L("engine_copyright1"));
+    text_list.push_back(pre_empty_space + version_string + " " + _L("engine_copyright1"));
     text_list.push_back(pre_empty_space + _L("engine_copyright2"));
     text_list.push_back(pre_empty_space + _L("engine_copyright3"));
     text_list.push_back(pre_empty_space + _L("engine_copyright4"));

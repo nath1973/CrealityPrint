@@ -3654,7 +3654,13 @@ int CreatePrinterPresetDialog::load_profile_family(std::string strVendor, std::s
 
     std::string contents;
     load_file(strFilePath, contents);
-    json jLocal = json::parse(contents);
+    json jLocal = json();
+    try {
+        jLocal = json::parse(contents);
+    } catch (nlohmann::detail::parse_error& err) {
+        BOOST_LOG_TRIVIAL(error) << "CreatePrinterPresetDialog::load_profile_family parse body fail";
+        return -1;
+    }
     json pmodels = jLocal["machine_model_list"];
     int  nsize = pmodels.size();
 
@@ -3672,7 +3678,13 @@ int CreatePrinterPresetDialog::load_profile_family(std::string strVendor, std::s
         std::string             sub_file = sub_path.string();
 
         load_file(sub_file, contents);
-        json pm = json::parse(contents);
+        json pm = json();
+        try {
+            pm = json::parse(contents);
+        } catch (nlohmann::detail::parse_error& err) {
+            BOOST_LOG_TRIVIAL(error) << "CreatePrinterPresetDialog::load_profile_family parse body fail";
+            continue;
+        }
 
         OneModel["vendor"] = strVendor;
         std::string NozzleOpt = pm["nozzle_diameter"];

@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# 获取配置的clang-format风格
+STYLE=$(git config --get hooks.clangformat.style)
+
+GIT_ROOT=$(git rev-parse --show-toplevel)
+# 定义 clang-format.exe 的路径（假设在根目录下）
+CLANG_FORMAT="${GIT_ROOT}/clang-format.exe"
+# 检测操作系统类型
+case "$(uname -s)" in
+    Linux*)     OS=Linux;;
+    Darwin*)    OS=macOS;;
+    CYGWIN*|MINGW*) OS=Windows;;
+    *)          OS=Unknown
+esac
+
+# 调用对应平台的子脚本
+if [ "$OS" = "Windows" ]; then
+    CLANG_FORMAT="${GIT_ROOT}/clang-format.exe"
+else
+	# 检查clang-format是否安装
+	if ! command -v clang-format >/dev/null 2>&1; then
+		echo "错误：未安装 clang-format" >&2
+		echo "安装方法：" >&2
+		echo "  macOS: brew install clang-format" >&2
+		echo "  Linux: sudo apt-get install clang-format" >&2
+		exit 1
+	fi
+	CLANG_FORMAT="clang-format"
+fi
+
+# 检查文件是否存在
+if [ ! -f "${CLANG_FORMAT}" ]; then
+    echo "错误：未找到 ${CLANG_FORMAT}，请确保 clang-format.exe 在项目根目录下！" >&2
+    exit 1
+fi
+
+if [ -n "${STYLE}" ]; then
+  STYLEARG="-style=${STYLE}"
+else
+  # 尝试使用项目根目录的.clang-format文件
+  if [ -f "$(git rev-parse --show-toplevel)/.clang-format" ]; then
+    STYLEARG="-style=file"
+  else
+    STYLEARG=""
+  fi
+fi
+
+# 格式化单个文件函数
+format_file() {
+  file="${1}"
+  if [ -f "${file}" ]; then
+     "${CLANG_FORMAT}" -i ${STYLEARG} "${file}"
+    echo "clang-format ${STYLEARG} -i ${file}"
+    git add "${file}"
+  fi
+}
+
+# 检查是否需要格式化
+is_need_format() {
+  file="${1}"
+  need=1
+  
+  # 忽略/test/目录下的文件
+  if [[ "${file}" == */test/* ]]; then
+    need=0
+  fi
+  
+  if [[ $need -eq 1 ]]; then
+    # 只处理C/C++源文件
+    if [[ "${file}" != *.cpp && "${file}" != *.h && "${file}" != *.cc && "${file}" != *.c && "${file}" != *.hpp ]]; then
+      need=0
+    fi
+  fi
+  
+  return $need
+}
+
+case "${1}" in
+  --about )
+    echo "Runs clang-format on source files"
+    ;;
+  * )
+    for file in $(git diff-index --cached --name-only HEAD); do
+      is_need_format "${file}"
+      if [[ $? -eq 1 ]]; then
+        format_file "${file}"
+      fi
+    done
+    ;;
+esac

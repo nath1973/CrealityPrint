@@ -397,6 +397,13 @@ namespace Slic3r {
         to_svg(dir, polygons_0, polygons_1);
 	}
 
+	//-------------------------------------------------------------------------------
+	void to_svg(const char* file, const ClipperLib::Paths& paths)
+	{
+		 Polygons polygons = to_polygons(paths);
+		 to_svg(file, polygons);
+	}
+
 	////////////////////output 3D shapes to obj ////////////////////////////
 	void to_obj(const char* path, const indexed_triangle_set& its)
 	{
@@ -489,8 +496,14 @@ namespace Slic3r {
 		for (int layer_idx = 0; layer_idx < po->layer_count(); layer_idx++)
 		{
 			Layer* layer = po->get_layer(layer_idx);
-			size_t surface_size = layer->get_region(0)->fill_surfaces.size();
-			fs << layer_idx << "\t" << "\t" << surface_size << std::endl;
+			fs << layer_idx << "\t" << "\t";
+
+			for (int region_idx = 0; region_idx < layer->region_count(); region_idx++)
+			{
+				fs << "\t" << layer->get_region(region_idx)->fill_surfaces.size();
+			}
+
+			fs << std::endl;
 		}
 	}
 

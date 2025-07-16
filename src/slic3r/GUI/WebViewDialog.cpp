@@ -281,19 +281,26 @@ wxString WebViewPanel::GetURL()
         "http://localhost:%d/homepage/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&ai=true&time=%d&privacy=%d#/Community/Home Page", port,
         lang, version, type, region, use_inches,std::time(0),wxGetApp().is_privacy_checked());
    
+    #ifdef _DEBUG1
      //for dev: 使用局域网地址：可以找【刘明，或其他前端开发同事】，按要求启动一个 http 服务，用于调试
-     //port = 9090;
-     //type = std::string("Beta");
+     port = 9090;
+     type = std::string("Beta");
      
-     //wxString url = wxString::Format(
-     //    "http://localhost:%d/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&ai=true&time=%d&privacy=%d#/Community/Home Page", port, lang,
-     //    version, type, region, use_inches,std::time(0),wxGetApp().is_privacy_checked()
-     //);
+     url = wxString::Format(
+         "http://localhost:%d/index.html?lang=%s&version=%s&type=%s&region=%s&use_inches=%s&debug=false&ai=true&time=%d&privacy=%d#/Community/Home Page", port, lang,
+         version, type, region, use_inches,std::time(0),wxGetApp().is_privacy_checked()
+     );
+     #endif
      return url;
 }
 WebViewPanel::~WebViewPanel()
 {
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) this;
+
+    Unbind(wxEVT_WEBVIEW_NAVIGATED, &WebViewPanel::OnNavigationComplete, this);
+    Unbind(wxEVT_WEBVIEW_NAVIGATING, &WebViewPanel::OnNavigationRequest, this);
+    Unbind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, &WebViewPanel::OnScriptMessage, this);
+
 
 #ifdef __WXGTK__
     m_freshTimer->Stop();
@@ -558,6 +565,24 @@ void WebViewPanel::sync_preferences(const std::vector<wxString>& prefs)
     RunScript(wxString::Format("window.handleStudioCmd(%s)", oss.str()));
 }
 
+void WebViewPanel::sync_user_preset(const std::vector<wxString>& datas)
+{
+    if (datas.size() < 1)
+        return;
+
+    boost::property_tree::wptree req;
+    req.put(L"command", L"sync_user_preset");
+
+    boost::property_tree::wptree syncUserPreset;
+    syncUserPreset.put(L"syncPresetEnabled", datas[0].ToStdWstring());
+    req.add_child(L"syncUserPreset", syncUserPreset);
+
+    std::wostringstream oss;
+    pt::write_json(oss, req, false);
+
+    RunScript(wxString::Format("window.handleStudioCmd(%s)", oss.str()));
+}
+
 void WebViewPanel::update_device_page(const std::string& device_info)
 {
     RunScript(wxString::Format("window.handleStudioCmd('%s')", from_u8(device_info)));
@@ -797,6 +822,7 @@ void WebViewPanel::OnScriptMessage(wxWebViewEvent& evt)
 
     /* remove \n in response string */
     response.erase(std::remove(response.begin(), response.end(), '\n'), response.end());
+    boost::replace_all(response, "\\n", "");
     if (!response.empty()) {
         // m_response_js = wxString::Format("window.handleStudioCmd('%s')", response);
         wxString        wxResponse = from_u8(response.c_str());

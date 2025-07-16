@@ -111,6 +111,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/GLShader.hpp
     GUI/GLCanvas3D.hpp
     GUI/GLCanvas3D.cpp
+    GUI/GLEnums.hpp
     GUI/SceneRaycaster.hpp
     GUI/SceneRaycaster.cpp
     GUI/OpenGLManager.hpp
@@ -676,6 +677,8 @@ set(SLIC3R_GUI_SOURCES
     Config/OptionConfig.cpp
     GUI/AnalyticsDataUploadManager.hpp
     GUI/AnalyticsDataUploadManager.cpp
+    Utils/ProfileFamilyLoader.hpp
+    Utils/ProfileFamilyLoader.cpp
 )
 
 if (WIN32)
@@ -740,7 +743,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     FIND_LIBRARY(WAYLAND_EGL_LIBRARIES    NAMES wayland-egl)
     FIND_LIBRARY(WAYLAND_CLIENT_LIBRARIES NAMES wayland-client)
     find_package(CURL REQUIRED)
-    target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES} OSMesa)
+    target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES})
     target_link_libraries(libslic3r_gui
         OpenGL::EGL
         ${WAYLAND_SERVER_LIBRARIES}

@@ -39,6 +39,12 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
         use_mach_limits ? std::min(print_config.machine_max_jerk_x.values.front(), print_config.machine_max_jerk_y.values.front()) : 0);
     m_max_jerk_z = print_config.machine_max_jerk_z.values.front();
     m_max_jerk_e = print_config.machine_max_jerk_e.values.front();
+
+  
+    const ConfigOptionFloat* z_offset = print_config.option<ConfigOptionFloat>("z_offset");
+    if (z_offset != nullptr) {
+        m_z_offset = z_offset->value;
+    }
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)
@@ -595,7 +601,13 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &co
                 xy_z_move = w0.string();
             }
             else {
-                w0.emit_xy(Vec2d(target.x(), target.y()));
+                if (m_to_lift_type == LiftType::NormalLift) {
+                    w0.emit_xyz(Vec3d(target.x(), target.y(), target.z()));
+                    slop_move = "";
+                } else {
+                    w0.emit_xy(Vec2d(target.x(), target.y()));
+                }
+                
                 w0.emit_f(travel_speed * 60.0);
                 w0.emit_comment(GCodeWriter::full_gcode_comment, comment);
                 xy_z_move = w0.string() + _travel_to_z(target.z(), comment, limitSpeed);
@@ -883,6 +895,9 @@ std::string GCodeWriter::lift(LiftType lift_type, bool spiral_vase,const double 
     double target_lift = 0;
     {
         double above = this->config.retract_lift_above.get_at(m_extruder->id());
+        float                    c_z_offset = 0;
+        
+        above        = std::min(m_z_offset, above);
         double below = this->config.retract_lift_below.get_at(m_extruder->id());
         if (m_pos(2) >= above && (below == 0 || m_pos(2) <= below))
             target_lift = this->config.z_hop.get_at(m_extruder->id());

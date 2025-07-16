@@ -136,6 +136,13 @@ bool Button::Enable(bool enable)
 
 void Button::SetCanFocus(bool canFocus) { this->canFocus = canFocus; }
 
+void Button::SetValue(StateHandler::State state)
+{
+    state_handler.set_state(state, state);
+    Refresh();
+    Update();
+}
+
 void Button::SetValue(bool state)
 {
     /*if (GetValue() == state) return;*/

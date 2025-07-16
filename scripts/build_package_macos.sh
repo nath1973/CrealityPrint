@@ -130,6 +130,11 @@ function pack_slicer() {
     )
 }
 function build_slicer() {
+	echo "Verify localization with gettext..."
+	(
+		cd "$PROJECT_DIR"
+		./run_gettext.sh
+	)
     echo "Building slicer..."
     (
         echo " - SLICER_HEADER=$SLICER_HEADER"
@@ -155,12 +160,6 @@ function build_slicer() {
                 -DPROJECT_VERSION_EXTRA=$VERSION_EXTRA
         fi
         cmake --build . --config "$BUILD_CONFIG" --target "$SLICER_BUILD_TARGET" || exit -2
-    )
-
-    echo "Verify localization with gettext..."
-    (
-        cd "$PROJECT_DIR"
-        ./run_gettext.sh
     )
 
     # echo "Fix macOS app package..."

@@ -2619,7 +2619,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInts { 200 });
 
     def = this->add("full_fan_speed_layer", coInts);
-    def->label = L("Full fan speed at layer");
+    def->label = L("Model fan speed at layer");
     def->tooltip = L("Fan speed will be ramped up linearly from zero at layer \"close_fan_the_first_x_layers\" "
                   "to maximum at layer \"full_fan_speed_layer\". "
                   "\"full_fan_speed_layer\" will be ignored if lower than \"close_fan_the_first_x_layers\", in which case "
@@ -2804,7 +2804,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionPoint(Vec2d(0.5, 0.5)));
 
     def = this->add("auxiliary_fan", coBool);
-    def->label = L("Auxiliary part cooling fan");
+    def->label   = L("Side Fan");
     def->tooltip = L("Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255).");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
@@ -2858,7 +2858,7 @@ void PrintConfigDef::init_fff_params()
     def->readonly=false;
 
     def =this->add("support_air_filtration",coBool);
-    def->label=L("Support air filtration");
+    def->label=L("Back Fan");
     def->tooltip=L("Enable this if printer support air filtration\nG-code command: M106 P3 S(0-255)");
     def->mode    = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
@@ -5130,6 +5130,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip  = L("Setting for the number of outer wall layers for tree support; "
                     "0 means an intelligent number of layers.");
     def->min      = 0;
+    def->max      = 2;
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionInt(0));
 

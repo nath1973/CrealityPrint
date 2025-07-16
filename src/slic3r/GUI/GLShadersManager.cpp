@@ -88,6 +88,12 @@ std::pair<bool, std::string> GLShadersManager::init()
     else
         valid &= append_shader("mm_gouraud", { prefix + "mm_gouraud.vs", prefix + "mm_gouraud.fs" });
 
+    valid &= append_shader("silhouette", { prefix + "silhouette.vs", prefix + "silhouette.fs" });
+    valid &= append_shader("silhouette_composite", { prefix + "silhouette_composite.vs", prefix + "silhouette_composite.fs" });
+    valid &= append_shader("mainframe_composite", { prefix + "mainframe_composite.vs", prefix + "mainframe_composite.fs" });
+    valid &= append_shader("fxaa", { prefix + "fxaa.vs", prefix + "fxaa.fs" });
+    valid &= append_shader("gaussian_blur33", { prefix + "gaussian_blur33.vs", prefix + "gaussian_blur33.fs" });
+
     return { valid, error };
 }
 

@@ -106,17 +106,18 @@ CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater,
 
     topsizer->Add(m_browser, 1, wxEXPAND | wxALL, 0);
     std::string version = std::string(CREALITYPRINT_VERSION);
+    std::string os      = wxGetOsDescription().ToStdString();
     int port = wxGetApp().get_server_port();
 //#define _DEBUG1
 #ifdef _DEBUG1
-    wxString url = wxString::Format("http://localhost:5174/?version=%s&port=%d&sendtype=%d&map=%s", version, port,(int)m_sendtype,m_mapString);
+    wxString url = wxString::Format("http://localhost:5174/?version=%s&port=%d&sendtype=%d&map=%s&os=%s", version, port,(int)m_sendtype,m_mapString, os);
     this->load_url(url, wxString());
     m_browser->EnableAccessToDevTools();
 #else
 
     // wxString url = wxString::Format("file://%s/web/sendToPrinterPage/index.html", from_u8(resources_dir()));
     // this->load_url(wxString(url), wxString());
-    wxString url = wxString::Format("%s/web/sendToPrinterPage/index.html?version=%s&port=%d&sendtype=%d", from_u8(resources_dir()),version, port,(int)m_sendtype);
+    wxString url = wxString::Format("%s/web/sendToPrinterPage/index.html?version=%s&port=%d&sendtype=%d&os=%s", from_u8(resources_dir()),version, port,(int)m_sendtype, os);
     url.Replace(wxT("\\"), wxT("/"));
     url.Replace(wxT("#"), wxT("%23"));
     wxURI uri(url);
@@ -328,6 +329,9 @@ void CxSentToPrinterDialog::OnScriptMessage(wxWebViewEvent& evt)
             std::string video_url = (boost::format("http://%1%:8000/call/webrtc_local") % ip).str();
             WebRTCDecoder::GetInstance()->startPlay(video_url); 
 #endif
+        } else if (strCmd == "common_openurl") {
+            wxLaunchDefaultBrowser(j["url"]);
+            wxPostEvent(this, wxCloseEvent(wxEVT_CLOSE_WINDOW));
         }
         
         if (DM::AppMgr::Ins().Invoke(m_browser, evt.GetString().ToUTF8().data()))
@@ -1113,6 +1117,7 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
     nlohmann::json json_array = nlohmann::json::array();
     nlohmann::json json_data;
 
+    std::string printer_model = "";
     std::string printer_name = "";
     float       nozzle_diameter = 0.0f;
 
@@ -1127,9 +1132,11 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
         }
 
         GCodeProcessorResult* current_result = plate->get_slice_result();
+        
         if (!current_result->filename.empty() && current_result->image_data.size() > 0) 
         {
-            printer_name = current_result->printer_model;
+            printer_model = current_result->printer_model;
+            printer_name = current_result->printer_settings_id;
             nozzle_diameter = current_result->nozzle_diameter;
             int color_index = 0;
             for (auto color : current_result->creality_default_extruder_colors) {
@@ -1242,17 +1249,20 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
 
     int cur_plate_index                   = m_plater->get_partplate_list().get_curr_plate_index();
     top_level_json["current_plate_index"] = cur_plate_index;
-    
-    if (printer_name.empty())
+    if(printer_name.empty())
     {
-        printer_name = _L("Unknown model").ToUTF8().data();
-    }
-    else
-    {
-        printer_name = (boost::format("%s %.1f nozzle") % printer_name % nozzle_diameter).str();
+        if (printer_model.empty())
+        {
+            printer_name = _L("Unknown model").ToUTF8().data();
+        }
+        else
+        {
+            printer_name = (boost::format("%s %.1f nozzle") % printer_model % nozzle_diameter).str();
+        }
     }
     
     //std::string presetname = wxGetApp().preset_bundle->prints.get_selected_preset_name();
+    top_level_json["printer_model"] = printer_model;
     top_level_json["preset_name"] = printer_name;
 
     std::string json_str         = top_level_json.dump(-1, ' ', true);
@@ -1443,6 +1453,13 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
     top_level_json["current_plate_index"] = cur_plate_index;
     
     std::string printer_name = Slic3r::GUI::wxGetApp().preset_bundle->printers.get_selected_preset_name();
+    Preset&  presetSelect = Slic3r::GUI::wxGetApp().preset_bundle->printers.get_selected_preset();
+    ConfigOptionString* printer_model = presetSelect.config.option<ConfigOptionString>("printer_model");
+    if (printer_model) {
+        top_level_json["printer_model"] = printer_model->value;
+    }else{
+        top_level_json["printer_model"] = printer_name;
+    }
 
     top_level_json["preset_name"] = printer_name;
     top_level_json["slice_type"]  = m_plater->isSliceAll() ? 2 : 1; // 1 - 切单盘 2 - 切所有盘

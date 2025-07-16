@@ -60,7 +60,7 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
         wxLogError("Could not init m_browser");
         return;
     }
-    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) m_browser;
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " m_browser address: " << (void*) m_browser;
 
     m_browser->Bind(wxEVT_WEBVIEW_ERROR, &PrinterMgrView::OnError, this);
     m_browser->Bind(wxEVT_WEBVIEW_LOADED, &PrinterMgrView::OnLoaded, this);
@@ -365,7 +365,8 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
                 std::string gcodeFilePath = plate->get_tmp_gcode_path();
                 if (wxGetApp().plater()->only_gcode_mode())
                 {
-                    gcodeFilePath = wxGetApp().plater()->get_last_loaded_gcode().ToStdString();
+                    gcodeFilePath = wxGetApp().plater()->get_last_loaded_gcode().ToUTF8();
+
                 }
 
                 RemotePrint::RemotePrinterManager::getInstance().pushUploadMultTasks(ipAddress.ToStdString(), uploadName.ToStdString(), gcodeFilePath,

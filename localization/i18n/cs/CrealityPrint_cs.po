@@ -2310,7 +2310,7 @@ msgstr "Teplota trysky první vrstvy"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Teplota trysky pro tisk první vrstvy při použití tohoto filamentu"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Maximální otáčky ventilátoru ve vrstvě"
 
 msgid ""
@@ -2484,7 +2484,7 @@ msgstr "Nejlepší pozice objektu"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Nejlepší automatická uspořádávací pozice v rozsahu [0,1] vzhledem k tvaru podložky."
 
-msgid "Auxiliary part cooling fan"
+msgid "Side Fan"
 msgstr "Přídavný ventilátor chlazení"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
@@ -2542,7 +2542,7 @@ msgstr ""
 "Tato možnost je povolena, pokud stroj podporuje ovládání teploty komory\n"
 "G-kódový příkaz: M141 S(0-255)"
 
-msgid "Support air filtration"
+msgid "Back Fan"
 msgstr "Podpora filtrace vzduchu"
 
 msgid ""
@@ -13985,7 +13985,7 @@ msgstr "Chlazení"
 msgid "Cooling for specific layer"
 msgstr "Chlazení pro konkrétní vrstvu"
 
-msgid "Part cooling fan"
+msgid "Model fan"
 msgstr "Ventilátor chlazení části"
 
 msgid "Min fan speed threshold"
@@ -14004,9 +14004,6 @@ msgstr "Max rychlosti ventilátoru"
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "Rychlost ventilátoru chlazení části bude maximální, když bude odhadovaná doba vrstvy kratší než nastavená hodnota"
-
-msgid "Exhaust fan"
-msgstr "Odsávací ventilátor"
 
 msgid "During print"
 msgstr "Během tisku"

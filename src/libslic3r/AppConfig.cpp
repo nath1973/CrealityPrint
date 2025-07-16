@@ -26,6 +26,8 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <tbb/parallel_for_each.h>
+
 #ifdef WIN32
 //FIXME replace the two following includes with <boost/md5.hpp> after it becomes mainstream.
 #include <boost/uuid/detail/md5.hpp>
@@ -33,8 +35,6 @@
 #endif
 
 #define USE_JSON_CONFIG
-
-using namespace nlohmann;
 
 namespace Slic3r {
 
@@ -63,22 +63,32 @@ std::vector<ProfileMachine> ProfileLoader::LoadProfileMachine(const std::string&
 {
     std::vector<ProfileMachine> result;
 
-    for (auto const& dir_entry : boost::filesystem::directory_iterator{ profile_dir })
-    {
+    std::vector<boost::filesystem::path> paths;
+    for (auto const& dir_entry : boost::filesystem::directory_iterator{profile_dir}) {
         if (dir_entry.is_directory())
             continue;
 
-        const auto& path = dir_entry.path();
-        std::string vendor = path.has_stem() ? path.stem().string() : std::string();
+        const auto& path   = dir_entry.path();
         if (!path.has_extension() || path.extension().string() != ".json")
             continue;
 
+        paths.push_back(path);
+    }
+
+    std::mutex merger_mutex;
+    tbb::parallel_for_each(paths.begin(), paths.end(), 
+        [this, &result, &merger_mutex](const boost::filesystem::path& path) {
+        std::string vendor = path.has_stem() ? path.stem().string() : std::string();
+
         ProfileMachine profile_machine;
         if (!_LoadModel(profile_machine, vendor, path.string()))
-            continue;
+            return;
 
-        result.emplace_back(std::move(profile_machine));
-    }
+        {
+            std::lock_guard lk(merger_mutex);
+            result.emplace_back(std::move(profile_machine));
+        }
+    });
 
     return result;
 }
@@ -101,6 +111,34 @@ bool ProfileLoader::_LoadModel(ProfileMachine& profile, const std::string& vendo
 
     boost::filesystem::path root_path = boost::filesystem::path(profile_vendor_path).parent_path();
 
+    std::mutex profile_push_mutex;
+    std::vector<json> model_jsons;
+    for (auto it = data["machine_model_list"].begin(); it != data["machine_model_list"].end(); ++it) {
+        model_jsons.push_back(*it);
+    }
+    
+    tbb::parallel_for_each(model_jsons.begin(), model_jsons.end(),
+        [this, &profile, vendor, profile_vendor_path, &profile_push_mutex](const json itt) {
+            auto it = &itt;
+            if (!it->contains("name") || !it->at("name").is_string())
+                return;
+            if (!it->contains("sub_path") || !it->at("sub_path").is_string())
+                return;
+
+            std::string model    = it->at("name");
+            std::string sub_path = it->at("sub_path");
+
+            ProfileModel profile_model;
+            profile_model.vendor = profile.vendor;
+            if (!_LoadModelImpl(profile_model, vendor, model, profile_vendor_path, sub_path))
+                return;
+
+            {
+                std::lock_guard lk(profile_push_mutex);
+                profile.models.emplace_back(profile_model);
+            }
+        });
+    /*
     for (json::iterator it = data["machine_model_list"].begin(); it != data["machine_model_list"].end(); ++it)
     {
         if (!it->contains("name") || !it->at("name").is_string())
@@ -118,7 +156,7 @@ bool ProfileLoader::_LoadModel(ProfileMachine& profile, const std::string& vendo
 
         profile.models.emplace_back(profile_model);
     }
-
+    */
     _LoadPrinter(profile, (root_path / vendor / "machine").string());
 
     return true;
@@ -168,7 +206,46 @@ bool ProfileLoader::_LoadModelImpl(ProfileModel& profile, const std::string& ven
 
 bool ProfileLoader::_LoadPrinter(ProfileMachine& profile, const std::string& dir)
 {
-    for (auto const& dir_entry : boost::filesystem::recursive_directory_iterator{ dir })
+    
+    std::vector<boost::filesystem::path> paths;
+    for (auto const& dir_entry : boost::filesystem::recursive_directory_iterator{dir}) {
+        if (dir_entry.is_directory())
+            continue;
+        const auto& path = dir_entry.path();
+
+        if (!path.has_extension() || path.extension().string() != ".json")
+            continue;
+        paths.push_back(path);
+    }
+
+    std::mutex merger_mutex;
+    tbb::parallel_for_each(paths.begin(), paths.end(), 
+        [this, &profile, &merger_mutex](const boost::filesystem::path& path) {
+        ProfilePrinter profile_printer;
+        profile_printer.vendor = profile.vendor;
+        if (!_LoadPrinterImpl(profile_printer, path.string()))
+            return;
+
+        std::lock_guard lk(merger_mutex);
+        for (auto& profile_model : profile.models) {
+            if (profile_model.model != profile_printer.model)
+                return;
+
+            bool found = false;
+            for (int i = 0; i < profile_model.nozzles.size(); ++i) {
+                if (profile_model.nozzles[i] != profile_printer.nozzle)
+                    continue;
+
+                profile_model.printers[i] = std::move(profile_printer);
+                found                     = true;
+                break;
+            }
+            if (found)
+                break;
+        }
+    });
+    /*
+    for (auto const& dir_entry : boost::filesystem::recursive_directory_iterator{dir})
     {
         if(dir_entry.is_directory())
             continue;
@@ -202,7 +279,7 @@ bool ProfileLoader::_LoadPrinter(ProfileMachine& profile, const std::string& dir
                 break;
         }
     }
-
+    */
     return true;
 }
 
@@ -694,7 +771,12 @@ std::string AppConfig::load()
         if (md5_str != right_string)
             BOOST_LOG_TRIVIAL(info) << "The configuration file " << AppConfig::loading_path() <<
             " has a wrong MD5 checksum or the checksum is missing. This may indicate a file corruption or a harmless user edit.";
-        j = json::parse(left_string);
+        try {
+            j = json::parse(left_string);
+        } catch (nlohmann::detail::parse_error& err) {
+            BOOST_LOG_TRIVIAL(error) << format("Failed to parse configuration file \"%1%\": %2%", AppConfig::loading_path(), err.what());
+            return err.what();
+        }
 #else
         ifs >> j;
 #endif
@@ -729,7 +811,13 @@ std::string AppConfig::load()
             else {
                 BOOST_LOG_TRIVIAL(info) << format("Configuration file \"%1%\" was corrupted. It has been succesfully restored from the backup \"%2%\".", AppConfig::loading_path(), backup_path);
                 // Try parse configuration file after restore from backup.
-                j = json::parse(back_left_string);
+                try {
+                    j = json::parse(back_left_string);
+                } catch (nlohmann::detail::parse_error& err) {
+                    BOOST_LOG_TRIVIAL(error) << format("Failed to parse configuration file \"%1%\": %2%", AppConfig::loading_path(),
+                                                       err.what());
+                    return err.what();
+                }
                 recovered = true;
             }
         }

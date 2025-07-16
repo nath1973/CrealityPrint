@@ -2275,6 +2275,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     gcode.do_export(this, path.c_str(), result, thumbnail_cb);
 
     m_print_statistics.total_layer_count = gcode.layer_count();
+    m_print_uuid = gcode.get_gcode_uuid();
 
 #if AUTOMATION_TOOL
     if (AutomationMgr::enabled()) {

@@ -234,10 +234,7 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     getDirection(normal);
     if (normal.norm() <= epsilon())
         return true;
-    float             depth_scale_factor    = 100.f;
-    const Transform3d feature_matrix = Geometry::translation_transform(pos + normal * (depth_scale_factor)) *
-                                    Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), -normal) *
-                                    Geometry::scale_transform({(double) m_radius, (double) m_radius, (normal_on_model).norm() * (depth + depth_scale_factor)});
+
     // boolean mesh
     // get selection volume
     const ModelVolume* selected_volumes = m_src.mv;
@@ -249,14 +246,36 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
             break;
         }
     }
+
+    //fix bug:[#10503], if do mirror operation on model, the drill operation would cause exception
+    // (1) the "temp_src_mesh" and  "temp_tool_mesh"  should both use the local space when calling the  "sla::hollow_mesh_and_drill" interface;
+    // (2) the "temp_mesh_resuls" should apply the model world transform after "hollow_mesh_and_drill"
+    Transform3d inverse_matrix = selected_volumes_matrix.inverse();
+    Vec3d local_pos = inverse_matrix * pos;
+    Vec3d local_normal = inverse_matrix.linear().inverse().transpose() * normal;
+    local_normal.normalize();
+
+    float             depth_scale_factor    = 100.f;
+    //const Transform3d feature_matrix = Geometry::translation_transform(pos + normal * (depth_scale_factor)) *
+    //                                Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), -normal) *
+    //                                   Geometry::scale_transform(
+    //                                       {(double) m_radius, (double) m_radius, (normal_on_model).norm() * (depth + depth_scale_factor)});
+
+    const Transform3d feature_matrix_local = 
+    Geometry::translation_transform(local_pos + local_normal * depth_scale_factor) *
+    Eigen::Quaternion<double>::FromTwoVectors(Vec3d::UnitZ(), -local_normal) *
+    Geometry::scale_transform({(double)m_radius, (double)m_radius, 
+                              local_normal.norm() * (depth + depth_scale_factor)});
+
     auto m = indexed_triangle_set{};
     TriangleMesh        temp_src_mesh{selected_volumes->mesh().its};
 
     TriangleMesh              temp_tool_mesh(get_drill_mesh());
     std::vector<TriangleMesh> temp_mesh_resuls;
     const Transform3d         src_matrix = selected_volumes->get_transformation().get_matrix();
-    temp_src_mesh.transform(selected_volumes_matrix);
-    temp_tool_mesh.transform(feature_matrix);
+    //temp_src_mesh.transform(selected_volumes_matrix);
+    //temp_tool_mesh.transform(feature_matrix);
+    temp_tool_mesh.transform(feature_matrix_local);
 
     auto ret = sla::hollow_mesh_and_drill(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls);
 #ifdef HAS_WIN10SDK
@@ -288,8 +307,8 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
  
         TriangleMesh temp_src_mesh{selected_volumes->mesh().its};
         TriangleMesh              temp_tool_mesh(get_drill_mesh());
-        temp_src_mesh.transform(selected_volumes_matrix);
-        temp_tool_mesh.transform(feature_matrix);
+        //temp_src_mesh.transform(selected_volumes_matrix);
+        temp_tool_mesh.transform(feature_matrix_local);
         temp_mesh_resuls.clear();
         auto ret = sla::hollow_mesh_and_drill(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls);
         if (ret)
@@ -298,10 +317,19 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
 #endif
     if (temp_mesh_resuls.empty())
         return mouse_on_object;
+
+    //int active_inst = m_c->selection_info()->get_active_instance();
+    //const Transform3d instance_matrix = mo->instances[active_inst]->get_transformation().get_matrix_no_offset();
+    //temp_mesh_resuls.front().transform(instance_matrix.inverse());
+    //generate_new_volume(true, *temp_mesh_resuls.begin());
+
+    temp_mesh_resuls.front().transform(selected_volumes_matrix);
+    
     int active_inst = m_c->selection_info()->get_active_instance();
     const Transform3d instance_matrix = mo->instances[active_inst]->get_transformation().get_matrix_no_offset();
     temp_mesh_resuls.front().transform(instance_matrix.inverse());
-    generate_new_volume(true, *temp_mesh_resuls.begin());
+    
+    generate_new_volume(true, temp_mesh_resuls.front());
 
     // check after drill
     wxGetApp().plater()->check_object_need_repair(m_parent.get_selection().get_object_idx(), "drill");

@@ -5,6 +5,7 @@
 #include <memory>
 #include <chrono>
 #include <cstdint>
+#include <stack>
 
 #include "GLToolbar.hpp"
 #include "GLToolbarCollapse.h"
@@ -20,6 +21,7 @@
 #include "Camera.hpp"
 #include "SceneRaycaster.hpp"
 #include "IMToolbar.hpp"
+#include "GLEnums.hpp"
 
 #include "libslic3r/Slicing.hpp"
 //--overhangoptimization------
@@ -471,6 +473,25 @@ class GLCanvas3D
         virtual void Notify() override;
     };
 
+    class RenderPipelineStageModifier
+    {
+    public:
+        explicit RenderPipelineStageModifier(GLCanvas3D& canvas, ERenderPipelineStage stage);
+        ~RenderPipelineStageModifier();
+
+    private:
+        // no copy
+        RenderPipelineStageModifier(const RenderPipelineStageModifier&) = delete;
+        RenderPipelineStageModifier(RenderPipelineStageModifier&&) = delete;
+
+        // no assign
+        RenderPipelineStageModifier& operator=(const RenderPipelineStageModifier&) = delete;
+        RenderPipelineStageModifier& operator=(RenderPipelineStageModifier&&) = delete;
+    private:
+        GLCanvas3D& m_canvas;
+        ERenderPipelineStage m_stage;
+    };
+
 public:
     enum ECursorType : unsigned char { Standard, Cross };
 
@@ -638,6 +659,9 @@ private:
 
     CloneSettings m_clone_settings;
 
+    std::stack<ERenderPipelineStage> m_render_pipeline_stage_stack;
+    static GLModel s_full_screen_mesh;
+
 public:
     OrientSettings& get_orient_settings()
     {
@@ -764,6 +788,7 @@ public:
 
     void set_raycaster_gizmos_on_top(bool value) { m_scene_raycaster.set_gizmos_on_top(value); }
 
+    float get_explosion_ratio() { return m_explosion_ratio; }
     void       reset_explosion_ratio() { m_explosion_ratio = 1.0; }
     void       on_change_color_mode(bool is_dark, bool reinit = true);
     const bool get_dark_mode_status() { return m_is_dark; }
@@ -1310,6 +1335,13 @@ private:
 
     void _render_extra_popup();
 
+    void _push_render_stage(ERenderPipelineStage stage);
+    void _pop_render_stage();
+    ERenderPipelineStage _get_current_render_stage() const;
+
+    void _render_silhouette_effect();
+    void _composite_silhouette_effect();
+
     void _update_volumes_hover_state();
 
     // Convert the screen space coordinate to world coordinate on the bed.
@@ -1363,6 +1395,10 @@ private:
     // render some windows/widgets left leaning of layer_editing_profile window
     float _right_leaning_widget_margin() const;
     float _layer_editing_profile_right_margin() const;
+
+    static void _init_fullscreen_mesh();
+
+    static void _rebuild_postprocessing_pipeline(OpenGLManager& ogl_manager, const std::string& input_framebuffer_name, std::string& output_framebuffer_name, uint32_t width, uint32_t height);
 };
 
 const ModelVolume* get_model_volume(const GLVolume& v, const Model& model);

@@ -173,6 +173,12 @@ bool CXCloudDataCenter::isTokenValid() {
     return tokenValid; 
 }
 
+bool CXCloudDataCenter::isDownloadPresetFinished()
+{
+    return m_enDownloadPresetState.load() == ENDownloadPresetState::ENDPS_DOWNLOAD_SUCCESS ||
+            m_enDownloadPresetState.load() == ENDownloadPresetState::ENDPS_DOWNLOAD_FAILED;
+}
+
 CLocalDataCenter& CLocalDataCenter::getInstance()
 {
     static CLocalDataCenter instance;
@@ -251,14 +257,21 @@ int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>&
             if (Slic3r::GUI::wxGetApp().app_config->get("showDebugLog") == "1") {
                 BOOST_LOG_TRIVIAL(warning) << "getUserProfileList json=" << body;
             }
-            json j = json::parse(body);
+            json j = json();
+            try {
+                j = json::parse(body);
+            } catch (nlohmann::detail::parse_error& err) {
+                BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud getUserProfileList parse body fail";
+                nRet = -1;
+                return;
+            }
             if (j["code"] != 0) {
                 if (j["code"].get<int>() == 4) {
                     CXCloudDataCenter::getInstance().setTokenInvalid();
                 } else {
                     CXCloudDataCenter::getInstance().setTokenInvalid(true);
                 }
-                nRet = 1;       // ����ʧ��
+                nRet = 1;       // 请求失败
                 setLastError(std::to_string(j["code"].get<int>()), "");
                 BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud getUserProfileList fail.code=" << j["code"];
                 return;
@@ -353,7 +366,14 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
                     }
                     return;
                 }
-                json                               j = json::parse(body);
+                json j = json();
+                try {
+                    j = json::parse(body);
+                } catch (nlohmann::detail::parse_error& err) {
+                    BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud downloadUserPreset parse body fail";
+                    nRet = 0;
+                    return;
+                }
                 json                               jsonOut = json();
                 std::map<std::string, std::string> inner_map;
                 for (auto& element : j.items()) {
@@ -518,7 +538,7 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
                 //c.close();
                 //saveJsonFile = outJsonFile;
 
-                ////  ����info�ļ�
+                ////  保存info文件
                 //if (userInfo.bLogin) {
 
                 //    if (fs::exists(outInfoFile)) {
@@ -566,7 +586,13 @@ int CommunicateWithCXCloud::preUpdateProfile_create(const UploadFileInfo& fileIn
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
             CXCloudDataCenter::getInstance().setNetworkError(false);
-            json j = json::parse(body);
+            json j;
+            try {
+                j = json::parse(body);
+            } catch (nlohmann::detail::parse_error& err) {
+                BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_create parse body fail";
+                return;
+            }
             if (j["code"] != 0) {
                 if (j["code"].get<int>() == 4) {
                     CXCloudDataCenter::getInstance().setTokenInvalid();
@@ -642,11 +668,19 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
             CXCloudDataCenter::getInstance().setNetworkError(false);
-            json j = json::parse(body);
+            json j = json();
+            try {
+                j = json::parse(body);
+            } catch (nlohmann::detail::parse_error& err) {
+                BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_update parse body fail";
+                return;
+            }
             if (j["code"] != 0) {
                 if (j["code"].get<int>() == 4) {
                     CXCloudDataCenter::getInstance().setTokenInvalid();
                     BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_update fail.code=" << j["code"];
+                } else if (j["code"].get<int>() == 517) {   //  数据不存在
+                    nRet = 517;
                 }
                 BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud preUpdateProfile_update fail.code=" << j["code"]
                                          << ";body=" << body;
@@ -695,7 +729,7 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
     return nRet;
 }
 
-//  ɾ���û�Ԥ��
+//  删除用户预设
 int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
 {
     int nRet = -1;
@@ -715,7 +749,13 @@ int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
         .set_post_body(j.dump())
         .on_complete([&](std::string body, unsigned status) {
             CXCloudDataCenter::getInstance().setNetworkError(false);
-            json j = json::parse(body);
+            json j;
+            try {
+                j = json::parse(body);
+            } catch (nlohmann::detail::parse_error& err) {
+                BOOST_LOG_TRIVIAL(error) << "SyncUserPresets CommunicateWithCXCloud deleteProfile parse body fail";
+                return;
+            }
             if (j["code"] == 0) {
                 nRet = 0;
 
@@ -781,7 +821,7 @@ int CommunicateWithCXCloud::saveSyncDataToLocal(const UserInfo&            userI
         }
         saveJsonFile = outJsonFile;
 
-        //  ����info�ļ�
+        //  保存info文件
         {
             if (fs::exists(outInfoFile)) {
                 fs::remove(outInfoFile);
@@ -899,26 +939,32 @@ int CommunicateWithFrontPage::getUserPresetParams(const std::map<std::string, st
     m_printerId = 0;
     m_filamentId = 0;
     m_processId  = 0;
-    for (auto item : mapUserCloudPresets) {
-        std::vector<std::string> printer_names;
-        std::vector<std::string> printer_models;
-        std::vector<std::string> nozzles;
-        std::string              printer_model;
-        std::string              nozzle;
-        std::string              preset_type = item.second["type"];
-        std::string              preset_type_path;
-        if (preset_type == "printer") {
-            preset_type_path = "machine";
-            std::string ssJsonData;
-            getPrinterPresetParams(item.second, ssJsonData);
-        } else if (preset_type == "filament" || preset_type == "materia") {
-            preset_type_path = "filament";
-            std::string ssJsonData;
-            getFilamentPresetParams(item.second, ssJsonData);
-        } else if (preset_type == "print" || preset_type == "process") {
-            preset_type_path = "process";
-            std::string ssJsonData;
-            getProcessPresetParams(item.second, ssJsonData);
+    for (int i = 0; i < 2; ++i) {
+        for (auto item : mapUserCloudPresets) {
+            std::vector<std::string> printer_names;
+            std::vector<std::string> printer_models;
+            std::vector<std::string> nozzles;
+            std::string              printer_model;
+            std::string              nozzle;
+            std::string              preset_type = item.second["type"];
+            std::string              preset_type_path;
+            if (i == 0) {
+                if (preset_type == "printer") {
+                    preset_type_path = "machine";
+                    std::string ssJsonData;
+                    getPrinterPresetParams(item.second, ssJsonData);
+                }
+            } else if (i == 1) {
+                if (preset_type == "filament" || preset_type == "materia") {
+                    preset_type_path = "filament";
+                    std::string ssJsonData;
+                    getFilamentPresetParams(item.second, ssJsonData);
+                } else if (preset_type == "print" || preset_type == "process") {
+                    preset_type_path = "process";
+                    std::string ssJsonData;
+                    getProcessPresetParams(item.second, ssJsonData);
+                }
+            }
         }
     }
     json data_array = json::array();
@@ -953,6 +999,19 @@ int CommunicateWithFrontPage::getPrinterPresetParams(const std::map<std::string,
     if (printer_name.empty()) {
         printer_model = getMapValue(mapPrinterPreset, "printer_model");
         nozzle        = getMapValue(mapPrinterPreset, "nozzle_diameter");
+        {
+            int lastNoZero = nozzle.length();
+            if (!nozzle.empty() && nozzle.find(".") != std::string::npos) {
+                for (int i = lastNoZero - 1; i >= 0; --i) {
+                    if (nozzle.c_str()[i] != '0') {
+                        lastNoZero = i;
+                        break;
+                    }
+                }
+                nozzle = nozzle.substr(0, lastNoZero+1);
+            }
+        }
+        
         printer_name  = printer_model + " " + nozzle + " nozzle";
     } else {
         auto pos     = printer_name.find_last_of("@");
@@ -1000,6 +1059,7 @@ int CommunicateWithFrontPage::getPrinterPresetParams(const std::map<std::string,
         data_object["printer"].push_back(preset_data_object);
 
         m_mapPrinterData.emplace(printer_name, data_object);
+        m_mapPrinterName2PrinterModel.emplace(std::make_pair(preset_data_object["name"], nozzle), std::make_pair(printer_model, nozzle));
     } else {
         auto& data_object = m_mapPrinterData[printer_name];
         json  preset_data_object;
@@ -1025,6 +1085,7 @@ int CommunicateWithFrontPage::getPrinterPresetParams(const std::map<std::string,
         }
         preset_data_object["modifycations"] = modifycations_array;
         data_object["printer"].push_back(preset_data_object);
+        m_mapPrinterName2PrinterModel.emplace(std::make_pair(preset_data_object["name"], nozzle), std::make_pair(printer_model, nozzle));
     }
 
     return nRet;
@@ -1116,6 +1177,22 @@ int CommunicateWithFrontPage::getFilamentPresetParams(const std::map<std::string
 
         printer_model = printer_models[i];
         nozzle        = nozzles[i];
+
+        auto iter = m_mapPrinterName2PrinterModel.find(std::make_pair(printer_name, nozzle));
+        if (iter == m_mapPrinterName2PrinterModel.end() && nozzle.empty()) {
+            for (auto iter2 = m_mapPrinterName2PrinterModel.begin(); iter2 != m_mapPrinterName2PrinterModel.end(); iter2++) {
+                if (iter2->first.first == printer_name) {
+                    iter = iter2;
+                    break;
+                }
+            }
+        }
+        if (printer_name.find("Creality") == std::string::npos && iter != m_mapPrinterName2PrinterModel.end()) {
+            printer_model = iter->second.first;
+            printer_name  = iter->second.first + " " + iter->second.second + " nozzle";
+        } else {
+            
+        }
 
         if (m_mapPrinterData.find(printer_name) == m_mapPrinterData.cend()) {
             json data_object;
@@ -1258,6 +1335,21 @@ int CommunicateWithFrontPage::getProcessPresetParams(const std::map<std::string,
 
         printer_model = printer_models[i];
         nozzle        = nozzles[i];
+
+        auto iter = m_mapPrinterName2PrinterModel.find(std::make_pair(printer_name, nozzle));
+        if (iter == m_mapPrinterName2PrinterModel.end() && nozzle.empty()) {
+            for (auto iter2 = m_mapPrinterName2PrinterModel.begin(); iter2 != m_mapPrinterName2PrinterModel.end(); iter2++) {
+                if (iter2->first.first == printer_name) {
+                    iter = iter2;
+                    break;
+                }
+            }
+        }
+        if (printer_name.find("Creality") == std::string::npos && iter != m_mapPrinterName2PrinterModel.end()) {
+            printer_model = iter->second.first;
+            printer_name  = iter->second.first + " " + iter->second.second + " nozzle";
+        } else {
+        }
 
         if (m_mapPrinterData.find(printer_name) == m_mapPrinterData.cend()) {
             json data_object;

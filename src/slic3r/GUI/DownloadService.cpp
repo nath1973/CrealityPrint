@@ -94,22 +94,22 @@ void DownloadService::priv::get_perform()
     if (!extension.empty())
         dest_path = m_dest_folder / m_filename;
 
-    wxString temp_path_wstring(m_tmp_path.wstring());
+   // wxString temp_path_wstring(m_tmp_path.string());
 
     // std::cout << "dest_path: " << dest_path.string() << std::endl;
     // std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
 
     BOOST_LOG_TRIVIAL(info) << GUI::format("Starting download from %1% to %2%. Temp path is %3%", m_url, dest_path, m_tmp_path);
 
-    FILE* file;
+    boost::nowide::ofstream file;
     // open file for writting
     if (m_written == 0)
-        file = fopen(temp_path_wstring.c_str(), "wb");
+        file.open(m_tmp_path.string(), boost::nowide::ofstream::binary);
     else
-        file = fopen(temp_path_wstring.c_str(), "ab");
+        file.open(m_tmp_path.string(), boost::nowide::ofstream::binary | std::ios::app);
 
     // assert(file != NULL);
-    if (file == NULL) {
+    if (!file.is_open()) {
         return;
     }
 
@@ -138,7 +138,7 @@ void DownloadService::priv::get_perform()
             }
             if (m_cancel) {
                 m_stopped = true;
-                fclose(file);
+                file.close();
                 // remove canceled file
                 std::remove(m_tmp_path.string().c_str());
                 m_written           = 0;
@@ -148,7 +148,7 @@ void DownloadService::priv::get_perform()
             }
             if (m_pause) {
                 m_stopped = true;
-                fclose(file);
+                file.close();
                 cancel = true;
                 if (m_written == 0)
                     std::remove(m_tmp_path.string().c_str());
@@ -163,7 +163,7 @@ void DownloadService::priv::get_perform()
                 if (progress.dlnow - written_this_session > DOWNLOAD_MAX_CHUNK_SIZE || progress.dlnow == progress.dltotal) {
                     try {
                         std::string part_for_write = progress.buffer.substr(written_this_session, progress.dlnow);
-                        fwrite(part_for_write.c_str(), 1, part_for_write.size(), file);
+                        file.write(part_for_write.c_str(), part_for_write.size());  
                     } catch (const std::exception& e) {
                         // fclose(file); do it?
                         cancel = true;
@@ -179,8 +179,8 @@ void DownloadService::priv::get_perform()
             }
         })
         .on_error([&](std::string body, std::string error, unsigned http_status) {
-            if (file != NULL)
-                fclose(file);
+            if (file.is_open())
+                file.close();
         })
         .on_complete([&](std::string body, unsigned /* http_status */) {
             // TODO: perform a body size check
@@ -194,10 +194,9 @@ void DownloadService::priv::get_perform()
                 if (m_written < body.size()) {
                     // this code should never be entered. As there should be on_progress call after last bit downloaded.
                     std::string part_for_write = body.substr(m_written);
-                    fwrite(part_for_write.c_str(), 1, part_for_write.size(), file);
-
+                    file.write(part_for_write.c_str(), part_for_write.size());
                 }
-                fclose(file);
+                file.close();
                 boost::filesystem::rename(m_tmp_path, dest_path);
                 if (complete_callback_) {
                     complete_callback_(dest_path.string());

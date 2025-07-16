@@ -5,6 +5,7 @@
     ],
     "name": "0.30mm Standard @Kingroon KP3S 3.0",
     "inherits": "fdm_process_common",
+    "instantiation": "true",
     "print_settings_id": "0.30mm Standard @Kingroon KP3S 3.0",
     "bottom_surface_pattern": "monotonicline",
     "bridge_acceleration": "500",

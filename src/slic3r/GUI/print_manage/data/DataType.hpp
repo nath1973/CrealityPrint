@@ -70,6 +70,7 @@ namespace DM{
         bool webrtcSupport = false;
         int deviceState;
         int deviceType = 0;  //0==local, 1==cx cloud,        
+        bool oldPrinter = false;  //true = wifi盒子连接的机型
 
         std::vector<DeviceBoxColorInfo> boxColorInfos;
         std::vector<MaterialBox> materialBoxes;

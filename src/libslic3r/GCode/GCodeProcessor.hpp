@@ -239,6 +239,8 @@ class Print;
         float                           flush_multiplier;
         float                           defaultAcc;
         std::string                     printer_model;
+        std::string                     printer_settings_id;
+        std::string                     gcode_uuid;
         float                           nozzle_diameter;
         std::vector<std::pair<std::array<int, 2>, std::vector<unsigned char>>> image_data;
 
@@ -291,6 +293,8 @@ class Print;
             flush_multiplier                  = other.flush_multiplier;
             defaultAcc = other.defaultAcc;
             printer_model = other.printer_model;
+            printer_settings_id = other.printer_settings_id;
+            gcode_uuid = other.gcode_uuid;
             nozzle_diameter = other.nozzle_diameter;
             image_data = other.image_data;
             x_offset =other.x_offset;
@@ -340,6 +344,8 @@ class Print;
             flush_multiplier                  = other.flush_multiplier;
             defaultAcc                        = other.defaultAcc;
             printer_model                     = other.printer_model;
+            printer_settings_id                = other.printer_settings_id;
+            gcode_uuid                        = other.gcode_uuid;
             nozzle_diameter                   = other.nozzle_diameter;
             image_data                        = other.image_data;
             x_offset                          = other.x_offset;
@@ -493,8 +499,8 @@ class Print;
             float max_smoothed_v2 =0;
             float max_cruise_v2;
 
-            float move_d = 0.0f;    // ÒÆ¶¯¾àÀë
-            float accel  = 1000.0f; // ¼ÓËÙ¶È£¬µ¥Î» mm/s^2
+            float move_d = 0.0f;    // ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½
+            float accel  = 1000.0f; // ï¿½ï¿½ï¿½Ù¶È£ï¿½ï¿½ï¿½Î» mm/s^2
 
             float start_v  = 0.0f;
             float cruise_v = 0.0f;
@@ -534,7 +540,7 @@ class Print;
 
                 float max_smoothed_v2 = 0;
                 float smooth_delta_v2;
-                float acc=1000.0f; // ¼ÓËÙ¶È£¬µ¥Î» mm/s^2;
+                float acc=1000.0f; // ï¿½ï¿½ï¿½Ù¶È£ï¿½ï¿½ï¿½Î» mm/s^2;
 
                 void reset();
             };

@@ -156,6 +156,7 @@ void AnalyticsDataUploadManager::uploadGlobalPrintParams(int plate_idx, const st
         js["type_code"] = "slice801";
 
         js["printer_model"] = print_full_config.opt_serialize("printer_model");
+        js["print_uuid"] = plate_print.get_print_uuid();
 
         js["nozzle_type"] = print_full_config.opt_serialize("nozzle_type");
 
@@ -265,6 +266,7 @@ void AnalyticsDataUploadManager::uploadObjectPrintParams(int plate_idx,const std
         js["type_code"] = "slice802";
 
         js["printer_model"] = print_full_config.opt_serialize("printer_model");
+        js["print_uuid"] = plate_print.get_print_uuid();
 
         std::vector<int> obj_loaded_ids;
 

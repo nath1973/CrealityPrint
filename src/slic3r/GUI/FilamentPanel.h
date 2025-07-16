@@ -255,9 +255,10 @@ public:
 private:
     json m_FilamentProfileJson;
     int LoadFilamentProfile(bool isCxVedor=true);
-    bool LoadFile(std::string jPath, std::string& sContent);
-    int LoadProfileFamily(std::string strVendor, std::string strFilePath);
-    int GetFilamentInfo(std::string VendorDirectory, json& pFilaList, std::string filepath, std::string& sVendor, std::string& sType);
+    // Replace it with ProfileFamilyLoader
+    //bool LoadFile(std::string jPath, std::string& sContent);
+    //int LoadProfileFamily(std::string strVendor, std::string strFilePath);
+    //int GetFilamentInfo(std::string VendorDirectory, json& pFilaList, std::string filepath, std::string& sVendor, std::string& sType);
     void SetFilamentProfile(std::vector<std::pair<int, DM::Material>>& validMaterials);
 
 protected:
@@ -364,11 +365,27 @@ public:
         m_popups.push_back(popup);
 
         // 绑定事件
-        popup->Bind(wxEVT_ACTIVATE, &PopupWindowManager::OnActivate, this);
-        popup->Bind(wxEVT_KILL_FOCUS, &PopupWindowManager::OnFocusLoss, this);
         popup->Bind(wxEVT_DESTROY, &PopupWindowManager::OnPopupDestroyed, this);
     }
 
+    void CloseLast()
+    {
+        // 创建副本避免迭代器失效
+        std::vector<PopupWindow*> popupsCopy = m_popups;
+        //m_popups.clear();  // 立即清空原列表，防止重复处理
+        m_popups.erase(m_popups.end() - 1);
+        PopupWindow* popup = popupsCopy.back();
+        //for (PopupWindow* popup : popupsCopy) {
+            if (popup) {
+                // 确保先解除事件绑定
+                popup->Unbind(wxEVT_DESTROY, &PopupWindowManager::OnPopupDestroyed, this);
+
+                // 关闭并销毁弹窗
+                popup->Dismiss();
+                popup->Destroy();
+            }
+        //}
+    }
     void CloseAll()
     {
         // 创建副本避免迭代器失效
@@ -378,8 +395,6 @@ public:
         for (PopupWindow* popup : popupsCopy) {
             if (popup) {
                 // 确保先解除事件绑定
-                popup->Unbind(wxEVT_ACTIVATE, &PopupWindowManager::OnActivate, this);
-                popup->Unbind(wxEVT_KILL_FOCUS, &PopupWindowManager::OnFocusLoss, this);
                 popup->Unbind(wxEVT_DESTROY, &PopupWindowManager::OnPopupDestroyed, this);
 
                 // 关闭并销毁弹窗
@@ -388,7 +403,6 @@ public:
             }
         }
     }
-
 private:
     std::vector<PopupWindow*> m_popups;
     // 弹窗销毁事件处理
@@ -400,19 +414,6 @@ private:
         }
         event.Skip();  // 允许其他处理
     }
-    void OnActivate(wxActivateEvent& event)
-    {
-        if (!event.GetActive()) {
-            CloseAll();
-        }
-        event.Skip();
-    }
-
-    void OnFocusLoss(wxFocusEvent& event)
-    {
-        CloseAll();
-        event.Skip();
-    }
 };
 
 // 增强型弹出窗口基类
@@ -422,7 +423,6 @@ public:
     ManagedPopupWindow(wxWindow* parent) : PopupWindow(parent, wxBORDER_NONE) { 
         SetBackgroundStyle(wxBG_STYLE_PAINT); // 启用自定义绘制
         SetDoubleBuffered(true); // 启用双缓冲防止闪烁
-
         Bind(wxEVT_PAINT, &ManagedPopupWindow::OnPaint, this);
         init();
     }
@@ -454,13 +454,12 @@ public:
     }
 
 protected:
-    void OnDismiss() override
-    {
-        PopupWindowManager::Get().CloseAll();
-        //PopupWindow::OnDismiss();
-    }
+    //void Dismiss() override
+    //{
+    //    PopupWindowManager::Get().CloseAll();
+    //    PopupWindow::Dismiss();
+    //}
     void OnPaint(wxPaintEvent& event);
-    
 };
 
 
@@ -496,13 +495,13 @@ public:
         wxWindowID      id,
         const wxString& label,
         const wxPoint& pos = wxDefaultPosition,
-        const wxSize& size = wxDefaultSize);
+        const wxSize& size = wxDefaultSize,
+        const int& type = 0);
 
     void SetBaseColors(const wxColour& normal, const wxColour& pressed);
 
     void SetBitMap_Cus(wxBitmap bit1, wxBitmap bit2);
     void SetExpendStates(bool expend);
-
 private:
     wxColour m_baseColor;
     wxColour m_pressedColor;
@@ -522,6 +521,7 @@ private:
     
    
     void OnPaint(wxPaintEvent&);
+    int m_type = 0;    //0:del,1:merge
 };
 
 // 子菜单窗口
@@ -534,18 +534,28 @@ public:
 
 private:
     int m_index = 0;
+    ManagedPopupWindow* m_menuPop = nullptr;
+    void Dismiss() override {
+        wxPoint mousePos = ::wxGetMousePosition();
+        // 判断点击位置是否在弹窗外
+        if (m_menuPop && !m_menuPop->GetScreenRect().Contains(mousePos)) {
+            PopupWindowManager::Get().CloseAll();
+        }
+    }
 };
 // 自定义右键菜单窗口
 class MaterialContextMenu : public ManagedPopupWindow
 {
 public:
     MaterialContextMenu(wxWindow* parent,int index);
+
 private:
     HoverButton* m_mergeBtn;
     int       m_index = 0;
 	bool        m_is_clicked = false;
     void            OnShowSubmenu(wxCommandEvent&);
     void            OnDelete(wxCommandEvent&);
+    bool    m_isExpended = false;
 };
 
 #endif // 

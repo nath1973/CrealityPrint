@@ -2602,7 +2602,7 @@ msgstr "首層列印溫度"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "列印首層時的噴嘴溫度"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "滿速風扇在"
 
 msgid ""
@@ -2801,8 +2801,8 @@ msgstr "最佳物件位置"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "針對列印版的形狀，範圍 [0,1] 內的最佳自動擺放位置 。"
 
-msgid "Auxiliary part cooling fan"
-msgstr "輔助冷卻風扇"
+msgid "Side Fan"
+msgstr "輔助風扇"
 
 msgid ""
 "Enable this option if machine has auxiliary part cooling fan. G-code "
@@ -2864,8 +2864,8 @@ msgstr ""
 "如果支援列印設備內部溫度控制，則啟用此選項\n"
 "G-code 指令：M141 S（0-255）"
 
-msgid "Support air filtration"
-msgstr "支援空氣過濾"
+msgid "Back Fan"
+msgstr "機箱風扇"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -15017,8 +15017,8 @@ msgstr "冷卻"
 msgid "Cooling for specific layer"
 msgstr "特定層冷卻"
 
-msgid "Part cooling fan"
-msgstr "部件冷卻風扇"
+msgid "Model fan"
+msgstr "模型風扇"
 
 msgid "Min fan speed threshold"
 msgstr "最小風扇速度臨界值"
@@ -15040,9 +15040,6 @@ msgid ""
 "Part cooling fan speed will be max when the estimated layer time is shorter "
 "than the setting value"
 msgstr "當預計的層列印時間比設定值要小時，部件冷卻風扇轉速將達到最大值"
-
-msgid "Exhaust fan"
-msgstr "排風扇"
 
 msgid "During print"
 msgstr "列印期間"

@@ -7,17 +7,11 @@ if [%1]==[] (
     set web_branch=%1
 )
 if [%2]==[] (
-    set web_root=%cd%\..\Community\CrealityCommunity
+    set web_root=%cd%\Community
 ) else (
     set web_root=%2
 )
-@REM if [%3]==[] (
-@REM     set cp_branch=feature/syncweb
-@REM ) else (
-@REM     set cp_tmpval=%3
-@REM     set "cp_branch=%cp_tmpval:origin/=%"
-@REM )
-
+set web_root=%cd%\Community
 set cp_source=%cd%
 echo web_root=%web_root%
 echo cp_source=%cp_source%
@@ -38,22 +32,17 @@ if "%WEB_TAG_NUM%"=="" (
 
 :CP_RESET
 echo CP_RESET
-cd /d %cp_source%
-@REM reset hard
-echo reset hard cp
-git reset --hard
+
+
 
 :WEB_REPO
 @REM web repo start
 echo WEB_REPO start
 echo curwebdir=%web_root%
 cd /d %web_root%
-git fetch
-git checkout %web_branch%
-git reset --hard 
-git pull origin %web_branch%
+
 REM 获取 git rev-list 的输出
-for /f "tokens=*" %%i in ('git rev-list %web_branch% --count') do set GIT_COUNT=%%i
+for /f "tokens=*" %%i in ('git rev-list HEAD --count') do set GIT_COUNT=%%i
 @REM get web git count
 echo Git count: %GIT_COUNT%
 echo Web tag num: %WEB_TAG_NUM%
@@ -83,6 +72,8 @@ if not exist %sync_source_dir% (
     exit /b 1
 )
 echo copy start
+del "%sync_target_dir%\assets\*.js" /s /q
+del "%sync_target_dir%\assets\*.css" /s /q
 xcopy "%sync_source_dir%\*" "%sync_target_dir%\" /s /e /y
 echo  copy end
 

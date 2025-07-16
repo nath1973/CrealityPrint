@@ -423,7 +423,9 @@ public:
         return *this;
     }
 
-    void unbind() { event_storage.reset(nullptr); }
+    void unbind() { 
+        event_storage.reset(nullptr); 
+    }
     explicit operator bool() const { return !!event_storage; }
 };
 

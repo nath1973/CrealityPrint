@@ -70,6 +70,9 @@ namespace Slic3r {
 
 	//------------------------------------------------------------------------------
 	void to_svg(const char* dir, const ClipperLib_Z::Paths& paths0, const ClipperLib_Z::Paths& paths1);
+
+	//------------------------------------------------------------------------------
+	void to_svg(const char* file, const ClipperLib::Paths &paths);
 	
 
 	////////////////////output 3D shapes to obj ////////////////////////////

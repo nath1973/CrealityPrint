@@ -693,7 +693,16 @@ if(NOT BUILD_CLOUD_SLICER)
     if(NOT WIN32)
         target_link_libraries(libslic3r freetype)
         if (NOT APPLE)
-            target_link_libraries(libslic3r fontconfig deflate Lerc)
+            execute_process(
+                COMMAND bash -c "source /etc/os-release && echo $VERSION_ID"
+                OUTPUT_VARIABLE UBUNTU_VERSION
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(UBUNTU_VERSION STREQUAL "20.04")
+                target_link_libraries(libslic3r fontconfig deflate)
+            else()
+                target_link_libraries(libslic3r fontconfig deflate Lerc)
+            endif()
         endif()
     endif()
 endif()

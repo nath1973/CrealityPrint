@@ -254,7 +254,8 @@ wxBoxSizer *PreferencesDialog::create_item_language_combobox(
             m_current_language_selected = combobox->GetSelection();
             if (m_current_language_selected >= 0 && m_current_language_selected < vlist.size()) {
                 app_config->set(param, vlist[m_current_language_selected]->CanonicalName.ToUTF8().data());
-
+                BOOST_LOG_TRIVIAL(warning) << "m_current_language_selected=" << vlist[m_current_language_selected]->CanonicalName.ToUTF8().data();   
+                boost::log::core::get()->flush();
                 wxGetApp().load_language(vlist[m_current_language_selected]->CanonicalName, false);
                 Close();
                 // Reparent(nullptr);
@@ -867,7 +868,7 @@ wxBoxSizer *PreferencesDialog::create_item_checkbox(wxString title, wxWindow *pa
             } else {
                 wxGetApp().stop_sync_user_preset();
             }
-            notify_preferences_changed();
+            notify_sync_user_preset_changed();
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " sync_user_preset: " << (sync ? "true" : "false");
         }
 
@@ -1744,5 +1745,19 @@ void PreferencesDialog::notify_preferences_changed()
 
 }
 
+void PreferencesDialog::notify_sync_user_preset_changed()
+{
+    if (!app_config)
+        return;
+
+    std::vector<wxString> prefs;
+    std::string           syncPresetEnabled = app_config->get("sync_user_preset") == "true" ? "1" : "0";
+
+    prefs.push_back(wxString(syncPresetEnabled));
+
+    if (Slic3r::GUI::wxGetApp().mainframe->m_webview) {
+        Slic3r::GUI::wxGetApp().mainframe->m_webview->sync_user_preset(prefs);
+    }
+}
 
 }} // namespace Slic3r::GUI

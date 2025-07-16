@@ -2212,7 +2212,7 @@ msgstr "Düsentemperatur für die erste Schicht"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Düsentemperatur zum Drucken der ersten Schicht bei Verwendung dieses Filaments"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Volle Lüfterdrehzahl ab Schicht"
 
 msgid ""
@@ -2380,8 +2380,8 @@ msgstr "Beste Objektposition"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Beste automatische Positionierung im Bereich [0,1] bezogen auf das Bett."
 
-msgid "Auxiliary part cooling fan"
-msgstr "Hilfslüfter"
+msgid "Side Fan"
+msgstr "Seitlicher Ventilator"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
 msgstr "Aktivieren Sie diese Option, wenn der Drucker einen zusätzlichen Lüfter für die Kühlung von Teilen hat. G-Code-Befehl: M106 P2 S(0-255)."
@@ -2434,8 +2434,8 @@ msgstr ""
 "Diese Option ist aktiviert, wenn der Drucker die Temperatur der Druckkammer steuern kann\n"
 "G-Code-Befehl: M141 S(0-255)"
 
-msgid "Support air filtration"
-msgstr "Luftfilterung unterstützen"
+msgid "Back Fan"
+msgstr "Hinterer Ventilator"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -13359,8 +13359,8 @@ msgstr "Kühlung"
 msgid "Cooling for specific layer"
 msgstr "Kühlung für eine bestimmte Schicht"
 
-msgid "Part cooling fan"
-msgstr "Bauteillüfter"
+msgid "Model fan"
+msgstr "Modell Ventilator"
 
 msgid "Min fan speed threshold"
 msgstr "Minimale Lüftergeschwindigkeit"
@@ -13377,9 +13377,6 @@ msgstr "Schwellenwert für die maximale Lüftergeschwindigkeit"
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "Der Bauteillüfter wird auf maximaler Drehzahl laufen, wenn die geschätzte Schichtzeit kürzer ist als der eingestellte Wert."
-
-msgid "Exhaust fan"
-msgstr "Abluftventilator"
 
 msgid "During print"
 msgstr "Während des Drucks"

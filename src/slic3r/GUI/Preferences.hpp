@@ -151,6 +151,7 @@ protected:
     void OnSelectTabel(wxCommandEvent &event);
     void OnSelectRadio(wxMouseEvent &event);
     void notify_preferences_changed();
+    void notify_sync_user_preset_changed();
 };
 
 wxDECLARE_EVENT(EVT_PREFERENCES_SELECT_TAB, wxCommandEvent);

@@ -2166,7 +2166,7 @@ msgstr "İlk katman nozul sıcaklığı"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Bu filamenti kullanırken ilk katmanı yazdırmak için nozul sıcaklığı"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Maksimum fan hızı"
 
 msgid ""
@@ -2331,8 +2331,8 @@ msgstr "En iyi nesne konumu"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Yatak şekline göre [0,1] aralığında en iyi otomatik düzenleme konumu."
 
-msgid "Auxiliary part cooling fan"
-msgstr "Yardımcı parça soğutma fanı"
+msgid "Side Fan"
+msgstr "Yan Fan"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
 msgstr "Makinede yardımcı parça soğutma fanı varsa bu seçeneği etkinleştirin. G-code komut: M106 P2 S(0-255)."
@@ -2387,8 +2387,8 @@ msgstr ""
 "Bu seçenek, hazne sıcaklığını kontrol eden makine desteği varsa etkinleştirilir\n"
 "G-code komut: M141 S(0-255)"
 
-msgid "Support air filtration"
-msgstr "Hava filtrasyonu desteği"
+msgid "Back Fan"
+msgstr "Arka Fan"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -13160,8 +13160,8 @@ msgstr "Soğutma"
 msgid "Cooling for specific layer"
 msgstr "Belirli Katman İçin Soğutma"
 
-msgid "Part cooling fan"
-msgstr "Parça Soğutma Fanı"
+msgid "Model fan"
+msgstr "Model fanı"
 
 msgid "Min fan speed threshold"
 msgstr "Minimum fan hızı"
@@ -13178,9 +13178,6 @@ msgstr "Maksimum fan hızı"
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "Tahmini katman süresi ayar değerinden kısa olduğunda parça soğutma fanı hızı maksimum olacaktır"
-
-msgid "Exhaust fan"
-msgstr "Egzos Fanı"
 
 msgid "During print"
 msgstr "Baskı boyunca"

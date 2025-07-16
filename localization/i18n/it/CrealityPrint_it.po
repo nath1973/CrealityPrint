@@ -2273,7 +2273,7 @@ msgstr "Temperatura nozzle primo layer"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Temperatura del nozzle per la stampa del primo layer con questo filamento"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Massima velocità della ventola al layer"
 
 msgid ""
@@ -2446,8 +2446,8 @@ msgstr "Migliore posizione dell'oggetto"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Migliore posizione di disposizione automatica nell'intervallo [0,1] w.r.t. forma del letto."
 
-msgid "Auxiliary part cooling fan"
-msgstr "Ventola di raffreddamento della parte ausiliaria"
+msgid "Side Fan"
+msgstr "Ventola laterale"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
 msgstr "Abilitare questa opzione se la macchina è dotata di ventola di raffreddamento della parte ausiliaria. Comando G-code: M106 P2 S(0-255)."
@@ -2504,8 +2504,8 @@ msgstr ""
 "Questa opzione è abilitata se la macchina supporta il controllo della temperatura della camera\n"
 "Comando G-code: M141 S(0-255)"
 
-msgid "Support air filtration"
-msgstr "Supporta la filtrazione dell'aria"
+msgid "Back Fan"
+msgstr "Ventola posteriore"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -13621,8 +13621,8 @@ msgstr "Raffreddamento"
 msgid "Cooling for specific layer"
 msgstr "Raffreddamento per specifico layer"
 
-msgid "Part cooling fan"
-msgstr "Ventola di raffreddamento oggetto"
+msgid "Model fan"
+msgstr "Modello ventilatore"
 
 msgid "Min fan speed threshold"
 msgstr "Soglia minima velocità della ventola"
@@ -13640,9 +13640,6 @@ msgstr "Soglia massima velocità della ventola"
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "La ventola di raffreddamento funzionerà alla massima velocità quando il tempo layer stimato è inferiore al valore di soglia."
-
-msgid "Exhaust fan"
-msgstr "Aspiratore"
 
 msgid "During print"
 msgstr "Durante la stampa"

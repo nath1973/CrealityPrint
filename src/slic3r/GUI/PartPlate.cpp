@@ -5153,6 +5153,24 @@ int PartPlateList::rebuild_plates_after_deserialize(std::vector<bool>& previous_
 {
 	int ret = 0;
 
+	// use current bed info to update plate size, fix undo problem when  change different printer
+    BoundingBoxf3 bed_bbox = this->m_plater->get_bed_extended_bounding_box();
+    Vec3d  max = bed_bbox.max;
+    Vec3d  min = bed_bbox.min;
+    const DynamicPrintConfig* config       = this->m_plater->config();
+    float plate_height   = config->opt_float("printable_height");
+
+	int plate_width = max.x() - min.x() - Bed3D::Axes::DefaultTipRadius;
+	int plate_depth = max.y() - min.y() - Bed3D::Axes::DefaultTipRadius;
+
+	if ((m_plate_width != plate_width) || (m_plate_depth != plate_depth) || (m_plate_height != plate_height)) {
+		m_plate_width = plate_width;
+		m_plate_depth = plate_depth;
+		m_plate_height = plate_height;
+        m_height_to_lid = config->opt_float("extruder_clearance_height_to_lid");
+        m_height_to_rod = config->opt_float("extruder_clearance_height_to_rod");
+	}
+
 	BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": plates count %1%") % m_plate_list.size();
 	// SoftFever: assign plater info first
     for (auto partplate : m_plate_list) {

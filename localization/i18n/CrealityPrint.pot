@@ -2262,7 +2262,7 @@ msgstr ""
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr ""
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr ""
 
 msgid ""
@@ -2437,7 +2437,7 @@ msgstr ""
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr ""
 
-msgid "Auxiliary part cooling fan"
+msgid "Side Fan"
 msgstr ""
 
 msgid ""
@@ -2491,7 +2491,7 @@ msgid ""
 "G-code command: M141 S(0-255)"
 msgstr ""
 
-msgid "Support air filtration"
+msgid "Back Fan"
 msgstr ""
 
 msgid ""
@@ -13113,7 +13113,7 @@ msgstr ""
 msgid "Cooling for specific layer"
 msgstr ""
 
-msgid "Part cooling fan"
+msgid "Model fan"
 msgstr ""
 
 msgid "Min fan speed threshold"
@@ -13132,9 +13132,6 @@ msgstr ""
 msgid ""
 "Part cooling fan speed will be max when the estimated layer time is shorter "
 "than the setting value"
-msgstr ""
-
-msgid "Exhaust fan"
 msgstr ""
 
 msgid "During print"
@@ -15956,4 +15953,16 @@ msgid ""
 "Compared with the default profile of a 0.8 mm nozzle, it has a smaller layer "
 "height, and results in less but still apparent layer lines and slightly "
 "higher printing quality, but longer printing time in some printing cases."
+msgstr ""
+
+msgid "Adjust Model"
+msgstr ""
+
+msgid "Continue Export (Not Recommended)"
+msgstr ""
+
+msgid "has floating regions. Please re-orient the object or enable support generation."
+msgstr ""
+
+msgid "appears to have floating areas, which may cause print failure.\nPlease reorient the model or enable supports.\n\n "
 msgstr ""

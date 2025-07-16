@@ -573,13 +573,17 @@ std::string GLGizmoMeasure::on_get_name() const
 bool GLGizmoMeasure::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
-    bool res = (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA) ?
-        selection.is_single_full_instance() :
-        selection.is_single_full_instance() || selection.is_single_volume() || selection.is_single_modifier();
-    if (res)
-        res &= !selection.contains_sinking_volumes();
-
-    return res;
+    if (selection.is_wipe_tower()) {
+        return false; 
+    }
+    if (wxGetApp().plater()->canvas3D()->get_canvas_type() == GLCanvas3D::ECanvasType::CanvasAssembleView) {
+        if (abs(m_parent.get_explosion_ratio() - 1.0f) < 1e-2 && selection.volumes_count() > 0) {
+            return true;
+        }
+        return false;
+    } else {
+        return selection.volumes_count() > 0;
+    }
 }
 
 void GLGizmoMeasure::on_render()

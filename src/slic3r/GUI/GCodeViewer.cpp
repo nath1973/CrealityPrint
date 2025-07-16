@@ -2502,7 +2502,11 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     const bool is_lite_mode = m_is_lite_mode = (wxGetApp().app_config->get_bool("gcode_preview_lite_mode") && (!m_only_gcode_in_preview));
 
     unsigned int progress_count = 0;
-    unsigned int progress_threshold = m_moves_count/100;
+    unsigned int progress_threshold = 1;
+    if (m_moves_count >= 100) {
+        progress_threshold = m_moves_count / 100;
+    }
+        
     //BBS: add only gcode mode
     ProgressDialog *          progress_dialog    = m_only_gcode_in_preview ?
         new ProgressDialog(_L("Loading G-codes"), "...",
@@ -4405,7 +4409,7 @@ void GCodeViewer::render_shells(int canvas_width, int canvas_height)
         std::vector<std::string> filament_colors = (config->option<ConfigOptionStrings>("filament_colour"))->values;
         GLVolumeCollection::apply_custom_gcode(shader, info, filament_colors);
     }
-    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, false, camera.get_view_matrix(), camera.get_projection_matrix());
+    m_shells.volumes.render(GUI::ERenderPipelineStage::Normal,GLVolumeCollection::ERenderType::Transparent, false, camera.get_view_matrix(), camera.get_projection_matrix());
     shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
 
@@ -5262,8 +5266,8 @@ public:
                         ::sprintf(buf, imperial_units ? "%.2f in\n%.2f oz" : "%.2f m\n%.2f g", column_sum_m, column_sum_g / unit_conver);
                         columns_offsets.push_back({ buf, color_print_offsets[_u8L("Total")] });
                     }
-
-                    append_item(EItemType::Rect, m_tools.m_tool_colors[extruder_idx]
+						
+                    append_color_print_item(EItemType::Rect, m_tools.m_tool_colors[extruder_idx]
                         , columns_offsets, true, filament_visible, [&]() {
                             m_tools.m_tool_visibles[extruder_idx] = !m_tools.m_tool_visibles[extruder_idx];
                             featureFn();
@@ -5471,6 +5475,109 @@ private:
         float dummy_size = type == EItemType::None ? window_padding * 3 : ImGui::GetStyle().ItemSpacing.x + icon_size;
         ImGui::SameLine(dummy_size);
         imgui->text(columns_offsets[0].first);
+
+        for (auto i = 1; i < columns_offsets.size(); i++) {
+            ImGui::SameLine(columns_offsets[i].second);
+            imgui->text(columns_offsets[i].first);
+        }
+        ImGui::PopStyleVar(1);
+    };
+
+
+	void append_color_print_item(EItemType                             type,
+                     const ColorRGBA&                                  color,
+                     const std::vector<std::pair<std::string, float>>& columns_offsets,
+                     bool                                              checkbox = true,
+                     bool                                              visible  = true,
+                     std::function<void()>                             callback = nullptr)
+    {
+        auto draw_list = ImGui::GetWindowDrawList();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(20.0 * m_scale, 6.0 * m_scale));
+        float dummy_size = type == EItemType::None ? window_padding * 3 : ImGui::GetStyle().ItemSpacing.x + icon_size;
+        // render icon
+        ImVec2 pos = ImVec2(ImGui::GetCursorScreenPos().x + dummy_size, ImGui::GetCursorScreenPos().y);
+        switch (type) {
+        default:
+        case EItemType::Rect: {
+            /*draw_list->AddRectFilled({pos.x + 1.0f * m_scale, pos.y + 1.0f * m_scale},
+                                     {pos.x + icon_size - 1.0f * m_scale, pos.y + icon_size + 1.0f * m_scale},
+                                     ImGuiWrapper::to_ImU32(color));*/
+
+			bool is_dark = wxGetApp().dark_mode();			
+			
+			// frame background color
+			ColorRGB x = is_dark ? ColorRGB((unsigned char) 43, (unsigned char) 43, (unsigned char) 45) :
+                                   ColorRGB((unsigned char) 230, (unsigned char) 230, (unsigned char) 233);
+			
+			float k = abs(color.r() - x.r()) + abs(color.g() - x.g()) + abs(color.b() - x.b());
+            if (k < 0.3) {
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+			} else {
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+			}			
+
+			ImGui::RenderFrame({pos.x - 1.0f * m_scale, pos.y - 1.0f * m_scale},
+                               {pos.x + icon_size + 1.0f * m_scale, pos.y + icon_size + 1.0f * m_scale}, ImGuiWrapper::to_ImU32(color),
+                               true,
+                               3.0f);
+			ImGui::PopStyleVar();
+            break;
+        }
+        case EItemType::Circle: {
+            ImVec2 center(0.5f * (pos.x + pos.x + icon_size), 0.5f * (pos.y + pos.y + icon_size + 5.0f));
+            draw_list->AddCircleFilled(center, 0.5f * icon_size, ImGuiWrapper::to_ImU32(color), 16);
+            break;
+        }
+        case EItemType::Hexagon: {
+            ImVec2 center(0.5f * (pos.x + pos.x + icon_size), 0.5f * (pos.y + pos.y + icon_size + 5.0f));
+            draw_list->AddNgonFilled(center, 0.5f * icon_size, ImGuiWrapper::to_ImU32(color), 6);
+            break;
+        }
+        case EItemType::Line: {
+            draw_list->AddLine({pos.x + 1, pos.y + icon_size + 2}, {pos.x + icon_size - 1, pos.y + 4}, ImGuiWrapper::to_ImU32(color), 3.0f);
+            break;
+        case EItemType::None: break;
+        }
+        }
+
+        
+        //ImGui::Dummy({0.0, 0.0});
+        //ImGui::SameLine();
+        if (callback) {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0 * m_scale, 0.0));
+            float max_height = 0.f;
+            for (auto column_offset : columns_offsets) {
+                if (ImGui::CalcTextSize(column_offset.first.c_str()).y > max_height)
+                    max_height = ImGui::CalcTextSize(column_offset.first.c_str()).y;
+            }
+            bool b_menu_item = ImGui::BBLMenuItem(("##" + columns_offsets[0].first).c_str(), nullptr, false, true, max_height);
+            ImGui::PopStyleVar(1);
+            if (b_menu_item)
+                callback();
+            if (checkbox) {
+                float bias = ImGui::GetWindowWidth() - ImGui::GetFrameHeight() / 2 - 2.0 * window_padding;
+                ImGui::SameLine(bias);
+                visible = config.checkBox("##" + columns_offsets[0].first, visible);
+            }
+        }
+
+        const auto& t = columns_offsets[0].first;
+        ImVec2 text_size = ImGui::CalcTextSize(t.c_str());
+        ImGui::SameLine(dummy_size + (icon_size - text_size.x) / 2.0f);
+
+		float gray = color.r() * 0.299f + color.g() * 0.587f + color.b() * 0.114f;
+        if (gray > 0.5f) {
+            gray = 0.0f;
+        } else {
+            gray = 1.0f;
+        }
+        
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(gray, gray, gray, 1.0f));
+
+        imgui->text(t);
+
+		ImGui::PopStyleColor();
 
         for (auto i = 1; i < columns_offsets.size(); i++) {
             ImGui::SameLine(columns_offsets[i].second);

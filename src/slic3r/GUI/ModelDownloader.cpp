@@ -153,6 +153,26 @@ void ModelDownloader::start_download_model_group(const std::string& full_url,
     save_cache_to_storage();
 }
 
+std::string ModelDownloader::filterInvalidFileNameChars(const std::string& input)
+{
+    std::string result;
+    for (char c : input) {
+        // �滻�Ƿ��ַ��Լ��� ASCII �ַ�
+        if (c == '\\' || c == '/' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|' ||
+            static_cast<unsigned char>(c) < 32) {
+            result += '-';
+        } else {
+            result += c;
+        }
+    }
+
+    // ��ֹ���Ϊ��
+    if (result.empty()) {
+        result = "unnamed";
+    }
+
+    return result;
+}
 
 void ModelDownloader::start_download_3mf_group(const std::string& full_url,
                                                const std::string& modelId,
@@ -165,8 +185,9 @@ void ModelDownloader::start_download_3mf_group(const std::string& full_url,
     /* if (!fs::exists(target_path.append(modelId))) {
          fs::create_directories(target_path);
      }*/
+    auto safe_name   = filterInvalidFileNameChars(name);
     auto cache_path  = target_path;
-    auto file_path   = cache_path.append(name + fileFormat).string();
+    auto file_path   = cache_path.append(safe_name + fileFormat).string();
     auto progress_cb = [&, modelId, fileId, file_path = std::move(file_path)](int progress) {
         std::lock_guard<std::mutex> lock_guard(cache_json_mutex_);
         if (cache_json_.is_object() && cache_json_.contains("3mfs")) {
@@ -178,8 +199,9 @@ void ModelDownloader::start_download_3mf_group(const std::string& full_url,
                     cache_progress = progress;
                     if (progress == 100) {
                         file["path"]                        = file_path;
+                        save_cache_to_storage();
                     }
-                    save_cache_to_storage();
+                    
                     return;
                 }
             }
@@ -190,6 +212,7 @@ void ModelDownloader::start_download_3mf_group(const std::string& full_url,
         std::lock_guard<std::mutex> lock_guard(cache_json_mutex_);
         if (cache_json_.is_object() && cache_json_.contains("3mfs")) {
             boost::filesystem::path target_path = fs::path(path);
+            wxGetApp().request_model_download(wxString::FromUTF8(target_path.string()));
             /*Plater* plater                      = wxGetApp().plater();
             plater->load_project(target_path.wstring());
             plater->set_project_filename(target_path.wstring());
@@ -198,22 +221,31 @@ void ModelDownloader::start_download_3mf_group(const std::string& full_url,
         }
     };
 
-    download_tasks_.emplace_back(
-        std::make_unique<DownloadTask>(modelId, full_url, name + fileFormat, target_path, progress_cb, complete_cb));
-    download_tasks_.back()->start();
+    
     BOOST_LOG_TRIVIAL(debug) << "started download";
+    bool bNeedDownload = true;
+    boost::filesystem::path downloaded_path;
     std::lock_guard<std::mutex> lock_guard(cache_json_mutex_);
     if (cache_json_.is_object() && cache_json_.contains("3mfs")) {
         bool found = false;
         for (auto& file : cache_json_["3mfs"]) {
             std::string file_id = file["fileId"];
+            int progress = file["progress"];
+            std::string path = file["path"];
             if (file_id == fileId) {
-                file["fileId"]     = fileId;
-                file["progress"] = 0;
-                file["path"]       = "";
-                file["name"]       = name;
-                file["modelGroupId"] = modelId;
                 found = true;
+                if(progress==100 && boost::filesystem::exists(path))
+                {
+                    bNeedDownload = false;
+                    downloaded_path = path;
+                }else{
+                    file["fileId"]     = fileId;
+                    file["progress"] = 0;
+                    file["path"]       = "";
+                    file["name"]       = name;
+                    file["modelGroupId"] = modelId;
+                }
+                
                 break;
             }
         }
@@ -242,7 +274,15 @@ void ModelDownloader::start_download_3mf_group(const std::string& full_url,
         model_array.push_back(model_object);
         cache_json_["3mfs"] = model_array;
     }
-
+    if(bNeedDownload)
+    {
+        download_tasks_.emplace_back(
+            std::make_unique<DownloadTask>(modelId, full_url, safe_name + fileFormat, target_path, progress_cb, complete_cb));
+        download_tasks_.back()->start();
+    }else{
+        wxGetApp().request_model_download(wxString::FromUTF8(downloaded_path.string()));
+    }
+    
     save_cache_to_storage();
 }
 

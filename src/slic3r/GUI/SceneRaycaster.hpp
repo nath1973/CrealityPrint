@@ -110,9 +110,9 @@ public:
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
 
     static int decode_id(EType type, int id);
+    static int encode_id(EType type, int id);
 
 private:
-    static int encode_id(EType type, int id);
     static int base_id(EType type);
 };
 

@@ -987,12 +987,12 @@ void TriangleSelector::split_triangle(int facet_idx, const Vec3i32 &neighbors)
 
     // In case the object is non-uniformly scaled, transform the
     // points to world coords.
-    if (! m_cursor->uniform_scaling) {
+     if (! m_cursor->uniform_scaling) {
         for (size_t i=0; i<pts.size(); ++i) {
             pts_transformed[i] = m_cursor->trafo * (*pts[i]);
             pts[i] = &pts_transformed[i];
         }
-    }
+     }
 
     std::array<double, 3> sides = {(*pts[2] - *pts[1]).squaredNorm(),
                                    (*pts[0] - *pts[2]).squaredNorm(),
@@ -1093,6 +1093,17 @@ bool TriangleSelector::Circle::is_edge_inside_cursor(const Triangle &tr, const s
             return true;
     }
     return false;
+}
+
+TriangleSelector::HeightRange::HeightRange(float z_world_, const Vec3f &source_, float height_, const Transform3d &trafo_, const ClippingPlane &clipping_plane_)
+    : SinglePointCursor(Vec3f(0.f, 0.f, 0.f), source_, 1.f, trafo_, clipping_plane_), m_z_world(z_world_), m_height(height_)
+{
+    uniform_scaling = false;//HeightRange must use world cs
+    // overwrite base
+    source       = trafo * source;
+    radius       = height_;
+    radius_sqr   = Slic3r::sqr(height_);
+    trafo_normal = trafo.linear().inverse().transpose();
 }
 
 // BBS

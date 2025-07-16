@@ -288,7 +288,7 @@ void GLToolbar::calc_layout()
 //BBS: GUI refactor: GLToolbar
 float GLToolbar::get_width_horizontal() const
 {
-    auto tt = DispConfig().getTexture(DispConfig::e_tt_collapse_item);
+    auto  tt   = DispConfig().getTexture(DispConfig::e_tt_collapse);
 	float size = tt->get_width();
     return size * m_layout.scale;
 }
@@ -296,7 +296,7 @@ float GLToolbar::get_width_horizontal() const
 //BBS: GUI refactor: GLToolbar
 float GLToolbar::get_width_vertical() const
 {
-    auto tt = DispConfig().getTexture(DispConfig::e_tt_collapse_item);
+    auto  tt   = DispConfig().getTexture(DispConfig::e_tt_collapse);
 	float size = tt->get_width();
 	return size * m_layout.scale;
 }
@@ -489,7 +489,7 @@ bool GLToolbar::contains_mouse_vertical(const Vec2d& mouse_pos, const GLCanvas3D
 void GLToolbar::render_background(float left, float top, float right, float bottom, float border_w, float border_h) const
 {
     const std::uintptr_t tex_id = reinterpret_cast<std::uintptr_t>(DispConfig().getTextureId(DispConfig::e_tt_collapse));
-	const float left_uv = 0.0f;
+	const float left_uv = 0.03f;
 	const float right_uv = 1.0f;
 	const float top_uv = 1.0f;
 	const float bottom_uv = 0.0f;

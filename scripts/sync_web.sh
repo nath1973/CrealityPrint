@@ -10,7 +10,7 @@ else
 fi
 
 if [ -z "$2" ]; then
-    web_root="$(pwd)/../Community/"
+    web_root="$(pwd)/Community/"
 else
     web_root="$2"
 fi
@@ -44,21 +44,16 @@ fi
 
 echo "CP_RESET"
 cd "$cp_source" || exit
-# reset hard
-echo "reset hard cp"
-git reset --hard
+
 
 # web repo start
 echo "WEB_REPO start"
 echo "curwebdir=$web_root"
 cd "$web_root" || exit
-git fetch
-git checkout "$web_branch"
-git reset --hard
-git pull origin "$web_branch"
+
 
 # 获取 git rev-list 的输出
-GIT_COUNT=$(git rev-list "$web_branch" --count)
+GIT_COUNT=$(git rev-list HEAD --count)
 echo "Git count: $GIT_COUNT"
 echo "Web tag num: $WEB_TAG_NUM"
 
@@ -90,6 +85,8 @@ if [ ! -d "$sync_source_dir" ]; then
 fi
 
 echo "copy start"
+rm -f "$sync_target_dir/assets/*.js"
+rm -f "$sync_target_dir/assets/*.css"
 cp -R "$sync_source_dir/"* "$sync_target_dir/"
 echo "copy end"
 

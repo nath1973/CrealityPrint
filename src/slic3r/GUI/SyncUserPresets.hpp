@@ -52,6 +52,11 @@ protected:
     int  doCheckNeedSyncPrinterToCXCloud();
     int  doCheckNeedSyncFilamentToCXCloud();
     int  doCheckNeedSyncProcessToCXCloud();
+    int  preUpdateProfile_create(const UploadFileInfo&       fileInfo,
+                                 PresetBundle* preset_bundle,
+                                 Preset& preset,
+                                 PreUpdateProfileRetInfo& retInfo,
+                                 std::map<std::string, std::string>& values_map);
     int  doCheckNeedDeleteFromCXCloud();
     //  同步配置文件Creality.conf
     int  doCheckNeedSyncConfigToCXCloud();

@@ -913,6 +913,9 @@ public:
         return has_critical_warnings();
     }
 
+    void set_print_uuid(const std::string& print_uuid) { m_print_uuid = print_uuid;}
+    std::string get_print_uuid() const { return m_print_uuid; }
+
 protected:
     // Invalidates the step, and its depending steps in Print.
     bool                invalidate_step(PrintStep step);
@@ -972,6 +975,8 @@ private:
     
     //SoftFever: calibration
     Calib_Params m_calib_params;
+
+    std::string m_print_uuid;
 
     // To allow GCode to set the Print's GCodeExport step status.
     friend class GCode;

@@ -9,6 +9,7 @@
 #include "video/WebRTCDecoder.h"
 #include <boost/asio/steady_timer.hpp>
 #endif
+namespace pt = boost::property_tree;
 namespace Slic3r {
 namespace GUI {
 
@@ -405,6 +406,8 @@ std::string build_http_response(int status_code, const std::string& content_type
     response << "Content-Type: " << content_type << "\r\n";
     response << "Content-Length: " << content.length() << "\r\n";
     response << "Access-Control-Allow-Origin: " << "*" << "\r\n";
+    response << "Cache-Control: no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0\r\n";
+    response << "pragma:no-cache\r\n";
     response << "\r\n";
     response << content;
     return response.str();
@@ -609,24 +612,62 @@ std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const 
     if(path.find("/login") == 0) {
         std::string   result_url = url_get_param(url, "result_url");
         std::string   code       = url_get_param(url, "code");
-        std::string   url_scheme = (boost::format("crealityprintlink://open?code=%1%") % code).str();
-
-        // hack：必须在 ui 线程 post_openlink_cmd，否则 web 端无法接收到 msg
-        std::string olderToken = wxGetApp().get_user().token;
-        GUI::wxGetApp().CallAfter([url_scheme] { wxGetApp().post_openlink_cmd(url_scheme); });
-        int wait_time = 160; // 16s
-        while(olderToken== wxGetApp().get_user().token)
-        {
-            //std::cout <<"token" <<wxGetApp().get_user().token;
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
-            wait_time--;
-            if (wait_time <= 0) {
-                std::string location_str = (boost::format("%1%?result=fail") % result_url).str();
-                return std::make_shared<ResponseRedirect>(location_str);
-            }
+         std::string location_str = (boost::format("%1%?result=success") % result_url).str();
+        Http::set_extra_headers(wxGetApp().get_extra_header());
+        std::string base_url              = get_cloud_api_url();
+        Http http = Http::post(base_url + "/api/cxy/account/v2/oauthLogin");
+        json        j;
+        j["code"]  = code;
+        j["clientId"]  = "f9c302ecc29c59a0a6e921ff39a073ca";
+        j["redirecturi"]  = (boost::format("https://www.crealitycloud.com/oauth?back_url=http://localhost:%1%/login") % wxGetApp().get_server_port()).str();;
+        if(code==""){
+            location_str = (boost::format("%1%?result=fail?code=1000") % result_url).str();
+            return std::make_shared<ResponseRedirect>(location_str);
         }
-        wxGetApp().send_app_message("login",true);
-        std::string location_str = (boost::format("%1%?result=success") % result_url).str();
+        //boost::uuids::uuid uuid = boost::uuids::random_generator()();
+        http.header("Content-Type", "application/json")
+            //              .header("__CXY_REQUESTID_", to_string(uuid))
+                        .timeout_connect(5)
+                        .timeout_max(15)
+                        .set_post_body(j.dump())
+                        .on_complete([&](std::string body, unsigned status) {
+                            if(status!=200){
+                                location_str = (boost::format("%1%?result=fail") % result_url).str();
+                                return false;
+                            }
+                            std::stringstream oss;
+                            try{
+                                json j = json::parse(body);
+                                int code = j["code"];
+                                if(code==0)
+                                {
+                                    std::string region = wxGetApp().app_config->get("region");
+                                    auto user_file = fs::path(data_dir()).append("user_info.json");
+                                    json data_node = j["result"];
+                                    json r;
+                                    r["token"] = data_node["token"];
+                                    r["nickName"] = data_node["user_info"]["nickName"];
+                                    r["avatar"] = data_node["user_info"]["avatar"];
+                                    r["userId"] = data_node["userId"];
+                                    r["region"] = region;
+                                    boost::nowide::ofstream c;
+                                    c.open(user_file.string(), std::ios::out | std::ios::trunc);
+                                    c << std::setw(4) << r << std::endl;
+                                    c.close();
+                                        GUI::wxGetApp().CallAfter([=] { wxGetApp().reload_homepage(); });
+                                }else{
+                                    location_str = (boost::format("%1%?result=fail&code=%2%") % result_url % code).str();
+                                }
+                            }catch(std::exception& e)
+                            {
+                                location_str = (boost::format("%1%?result=fail") % result_url).str();
+                                return false;
+                            }
+                            
+                            return true;
+                            
+                        }).perform_sync();        
+        
         return std::make_shared<ResponseRedirect>(location_str);
     }
     

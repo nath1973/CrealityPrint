@@ -29,15 +29,16 @@ set DEL_ZIP_CACHE=ON
 SET ROOT_DEP=%ROOT%\deps
 SET DEP_BUILD_DIR=%ROOT_DEP%\build_%build_type%
 SET DEP_INSTALL_DIR=%ROOT%\dep_%build_type%
+SET ENV_DEPS=%DEPS_DLL_PATH_RELEASE%
 if(%build_type% == Debug) (
     echo "Debug build"
 ) else (
-    SET ENV_DEPS=%DEPS_DLL_PATH_RELEASE%
     echo ENV_DEPS=%ENV_DEPS%
     if [%ENV_DEPS%] == [] (
         echo "ENV_DEPS is empty"
     ) else (
         SET DEP_INSTALL_DIRATH=%ENV_DEPS%
+        SET DEP_INSTALL_DIR=%ENV_DEPS%
     )
 )
 

@@ -94,6 +94,11 @@ DISTRIBUTION=$(awk -F= '/^ID=/ {print $2}' /etc/os-release)
 if [ "${DISTRIBUTION}" == "ubuntu" ]
 then
     DISTRIBUTION="debian"
+    VERSION_ID=$(awk -F= '/^VERSION_ID=/ {print $2}' /etc/os-release)
+    if [ ${VERSION_ID} == "\"24.04\"" ]
+    then
+        DISTRIBUTION="debian2"
+    fi
 fi
 if [ ! -f ./linux.d/${DISTRIBUTION} ]
 then

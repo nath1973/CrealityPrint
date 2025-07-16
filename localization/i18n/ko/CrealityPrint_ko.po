@@ -2567,7 +2567,7 @@ msgstr "첫 번째 레이어 노즐 온도"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "이 필라멘트로 첫 번째 레이어를 출력하기 위한 노즐 온도"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "레이어에서 최대 팬 속도"
 
 msgid ""
@@ -2760,8 +2760,8 @@ msgstr "최적의 객체 위치"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "베드 모양에 따라 [0,1] 범위에서 가장 적합한 자동 정렬 위치."
 
-msgid "Auxiliary part cooling fan"
-msgstr "보조 냉각 팬"
+msgid "Side Fan"
+msgstr "측면 팬"
 
 msgid ""
 "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 "
@@ -2825,8 +2825,8 @@ msgstr ""
 "이 옵션은 기계가 챔버 온도 제어를 지원하는 경우 활성화됩니다\n"
 "Gcode 명령: M141 S(0-255)"
 
-msgid "Support air filtration"
-msgstr "공기 여과 지원"
+msgid "Back Fan"
+msgstr "배기 팬"
 
 msgid ""
 "Enable this if printer support air filtration\n"
@@ -14263,8 +14263,8 @@ msgstr "냉각"
 msgid "Cooling for specific layer"
 msgstr "특정 레이어에 대한 냉각"
 
-msgid "Part cooling fan"
-msgstr "부품 냉각 팬"
+msgid "Model fan"
+msgstr "메인 팬"
 
 msgid "Min fan speed threshold"
 msgstr "최소 팬 속도 임계값"
@@ -14286,9 +14286,6 @@ msgid ""
 "Part cooling fan speed will be max when the estimated layer time is shorter than the "
 "setting value"
 msgstr "예상 레이어 시간이 임계값보다 짧으면 파트 냉각 팬이 최대 속도로 작동합니다."
-
-msgid "Exhaust fan"
-msgstr "배기 팬"
 
 msgid "During print"
 msgstr "출력하는동안"

@@ -160,6 +160,8 @@ public:
     //BBS: x, y offset for gcode generated
     double          m_x_offset{ 0 };
     double          m_y_offset{ 0 };
+
+    double          m_z_offset{0};
     
     std::string m_gcode_label_objects_start;
     std::string m_gcode_label_objects_end;

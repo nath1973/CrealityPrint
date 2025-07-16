@@ -39,7 +39,10 @@ int GUI_Run(GUI_InitParams &params)
     //BBS: remove the try-catch and let exception goto above
     try {
         //GUI::GUI_App* gui = new GUI::GUI_App(params.start_as_gcodeviewer ? GUI::GUI_App::EAppMode::GCodeViewer : GUI::GUI_App::EAppMode::Editor);
-        GUI::GUI_App* gui = new GUI::GUI_App();
+        bool enable_test = false;
+        if (params.argc >= 2 && params.argv != nullptr && std::string(params.argv[1]) == std::string("test#157369"))
+            enable_test = true;
+        GUI::GUI_App* gui = new GUI::GUI_App(enable_test);
         //if (gui->get_app_mode() != GUI::GUI_App::EAppMode::GCodeViewer) {
             // G-code viewer is currently not performing instance check, a new G-code viewer is started every time.
             bool gui_single_instance_setting = gui->app_config->get("app", "single_instance") == "true";

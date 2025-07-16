@@ -92,6 +92,8 @@ static Slic3r::ColorRGBA DEFAULT_BG_LIGHT_COLOR_DARK = {0x36 / 255.0, 0x36 / 255
 static Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR        = {0.753f, 0.192f, 0.039f, 1.0f};
 static Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR_DARK   = {0.753f, 0.192f, 0.039f, 1.0f};
 
+GLModel GLCanvas3D::s_full_screen_mesh;
+
 void GLCanvas3D::update_render_colors()
 {
     DEFAULT_BG_LIGHT_COLOR = ImGuiWrapper::from_ImVec4(RenderColor::colors[RenderCol_3D_Background]);
@@ -1343,6 +1345,8 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D& bed)
     load_arrange_settings();
 
     m_selection.set_volumes(&m_volumes.volumes);
+
+    m_render_pipeline_stage_stack.push(ERenderPipelineStage::Normal);
 }
 
 GLCanvas3D::~GLCanvas3D()
@@ -1352,6 +1356,8 @@ GLCanvas3D::~GLCanvas3D()
 
     m_sel_plate_toolbar.del_all_item();
     m_sel_plate_toolbar.del_stats_item();
+
+    s_full_screen_mesh.reset();
 }
 
 void GLCanvas3D::post_event(wxEvent&& event)
@@ -1596,7 +1602,9 @@ void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObje
 void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject* mo, int instance_idx, const ModelVolume* mv)
 {
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters_for_picking(SceneRaycaster::EType::Volume);
-    for (GLVolume* vol : m_volumes.volumes) {
+    //for (GLVolume* vol : m_volumes.volumes) {
+    for (size_t i = 0; i < m_volumes.volumes.size(); ++i) {
+        GLVolume* vol = m_volumes.volumes[i];
         // BBS: add partplate logic
         if (vol->composite_id.object_id >= 1000 &&
             vol->composite_id.object_id < 1000 + wxGetApp().plater()->get_partplate_list().get_plate_count()) { // wipe tower
@@ -1627,8 +1635,8 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
             }
         }
 
-        auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol](std::shared_ptr<SceneRaycasterItem> item) {
-            return item->get_raycaster() == vol->mesh_raycaster.get();
+        auto it = std::find_if(raycasters->begin(), raycasters->end(), [vol,i](std::shared_ptr<SceneRaycasterItem> item) {
+            return item->get_raycaster() == vol->mesh_raycaster.get() && item->get_id() == SceneRaycaster::encode_id(SceneRaycaster::EType::Volume, i);
         });
         if (it != raycasters->end())
             (*it)->set_active(vol->is_active);
@@ -2008,6 +2016,20 @@ void GLCanvas3D::render(bool only_init)
         return;
     }
 
+    //wxGetApp().set_picking_effect(EPickingEffect::Silhouette);
+    ColorRGB picking_color;
+    if (m_canvas_type == ECanvasType::CanvasAssembleView) {
+        picking_color.set(0, 1.0f);
+        picking_color.set(1, 1.0f);
+        picking_color.set(2, 0.0f);
+    }
+    else {
+        picking_color.set(0, 1.0f);
+        picking_color.set(1, 1.0f);
+        picking_color.set(2, 1.0f);
+    }
+    wxGetApp().set_picking_color(picking_color);
+
     if (only_init)
         return;
 
@@ -2045,6 +2067,13 @@ void GLCanvas3D::render(bool only_init)
 
     camera.apply_projection(_max_bounding_box(true, true, true));
 
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    OpenGLManager& ogl_manager = wxGetApp().get_opengl_manager();
+
+    ogl_manager.set_viewport_size(viewport[2], viewport[3]);
+
+    ogl_manager.bind_vao();
+
     wxGetApp().imgui()->new_frame();
 
     if (m_picking_enabled) {
@@ -2064,6 +2093,30 @@ void GLCanvas3D::render(bool only_init)
             imgui.end();
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
         }
+    }
+
+    glsafe(::glViewport(viewport[0], viewport[1], viewport[2], viewport[3]));
+    EPickingEffect picking_effect = wxGetApp().get_picking_effect();
+    if (EPickingEffect::Disabled != picking_effect) {
+        if (!ogl_manager.are_framebuffers_supported()) {
+            picking_effect = EPickingEffect::StencilOutline; // use stencil outline as framebuffer not supported yet.
+        }
+    }
+
+    const bool off_screen_rendering_enabled = ogl_manager.is_fxaa_enabled();
+
+    if (m_picking_enabled && EPickingEffect::Silhouette == picking_effect) {
+        _render_silhouette_effect();
+    }
+
+    std::string write_to_framebuffer_name{};
+    if (off_screen_rendering_enabled) {
+        write_to_framebuffer_name = "mainframe";
+        OpenGLManager::FrameBufferModifier main_frame(ogl_manager, write_to_framebuffer_name, ogl_manager.get_msaa_type());
+    }
+    else {
+        write_to_framebuffer_name = OpenGLManager::s_back_frame;
+        OpenGLManager::FrameBufferModifier main_frame(ogl_manager, write_to_framebuffer_name);
     }
 
     // draw scene
@@ -2126,6 +2179,10 @@ void GLCanvas3D::render(bool only_init)
         _render_objects(GLVolumeCollection::ERenderType::Transparent, !m_gizmos.is_running());
     }
 
+     if (m_picking_enabled && EPickingEffect::Silhouette == picking_effect) {
+         _composite_silhouette_effect();
+     }
+
     _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER
     _render_selection_center();
@@ -2141,6 +2198,8 @@ void GLCanvas3D::render(bool only_init)
     // could be invalidated by the following gizmo render methods
     _render_selection_sidebar_hints();
     _render_current_gizmo();
+
+    _rebuild_postprocessing_pipeline(ogl_manager, write_to_framebuffer_name, OpenGLManager::s_back_frame, viewport[2], viewport[3]);
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
     if (m_picking_enabled && !m_mouse.dragging && !m_gizmos.is_dragging() && !m_rectangle_selection.is_dragging())
@@ -3174,8 +3233,18 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult&     gcode_result
         _set_warning_notification_if_needed(EWarning::ToolpathOutside);
         _set_warning_notification_if_needed(EWarning::GCodeConflict);
     }
-
-    m_gcode_viewer.refresh(gcode_result, str_tool_colors);
+    if(only_gcode && gcode_result.creality_complete_extruder_colors.size()> 0)
+    {
+        std::vector<std::string> creality_str_tool_colors;
+        for (int i = 0; i < gcode_result.creality_complete_extruder_colors.size(); i++)
+        {
+            creality_str_tool_colors.push_back(gcode_result.creality_complete_extruder_colors[i]);
+        }
+        m_gcode_viewer.refresh(gcode_result, creality_str_tool_colors);
+    }else{
+        m_gcode_viewer.refresh(gcode_result, str_tool_colors);
+    }
+    
     set_as_dirty();
     request_extra_frame();
 
@@ -7016,6 +7085,336 @@ bool GLCanvas3D::unregister_all_extra_render_event()
     return has_callback;
 }
 
+void GLCanvas3D::_push_render_stage(ERenderPipelineStage stage)
+{
+    m_render_pipeline_stage_stack.push(stage);
+}
+
+void GLCanvas3D::_pop_render_stage()
+{
+    if (m_render_pipeline_stage_stack.size() > 1)
+    {
+        m_render_pipeline_stage_stack.pop();
+    }
+}
+
+ERenderPipelineStage GLCanvas3D::_get_current_render_stage() const
+{
+    return m_render_pipeline_stage_stack.top();
+}
+
+void GLCanvas3D::_render_silhouette_effect()
+{
+    RenderPipelineStageModifier render_pipeline_stage_modifier(*this, ERenderPipelineStage::Silhouette);
+
+    OpenGLManager& ogl_manager = wxGetApp().get_opengl_manager();
+    float t_viewport_scale = 1.0f;
+    uint32_t viewport_width = 0;
+    uint32_t viewport_height = 0;
+    ogl_manager.get_viewport_size(viewport_width, viewport_height);
+    viewport_width = viewport_width * t_viewport_scale;
+    viewport_height = viewport_height * t_viewport_scale;
+    {
+        OpenGLManager::FrameBufferModifier frame_buffer_modifier(ogl_manager, "silhouette", EMSAAType::X4);
+        frame_buffer_modifier.set_width(viewport_width)
+            .set_height(viewport_height);
+    }
+    // BBS: render silhouette
+    glViewport(0, 0, viewport_width, viewport_height);
+    glsafe(::glClearColor(0.0f, 0.0f, 0.0f, 0.0f));
+    glsafe(::glClearDepth(1.0f));
+    glsafe(::glEnable(GL_DEPTH_TEST));
+    glsafe(::glDisable(GL_BLEND));
+    glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+    GLShaderProgram* p_silhouette_shader = wxGetApp().get_shader("silhouette");
+    if (!p_silhouette_shader)
+    {
+        BOOST_LOG_TRIVIAL(error) << "Invalid shader: silhouette. Failed to render highlight effect.";
+        return;
+    }
+
+    p_silhouette_shader->start_using();
+
+    const auto& picking_color = wxGetApp().get_picking_color();
+    p_silhouette_shader->set_uniform("u_base_color", picking_color);
+
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Transform3d& view_matrix = camera.get_view_matrix();
+    const Transform3d& projection_matrix = camera.get_projection_matrix();
+    const Matrix4d view_proj = projection_matrix.matrix() * view_matrix.matrix();
+    p_silhouette_shader->set_uniform("u_view_projection_matrix", view_proj);
+    _render_objects(GLVolumeCollection::ERenderType::Opaque, false);
+    _render_objects(GLVolumeCollection::ERenderType::Transparent, false);
+
+    p_silhouette_shader->stop_using();
+
+    // BBS: end render silhouette
+
+    std::string input_fb_name = "silhouette";
+    const auto& p_frame_buffer = ogl_manager.get_frame_buffer(input_fb_name);
+    if (!p_frame_buffer)
+    {
+        BOOST_LOG_TRIVIAL(error) << "Invalid framebuffer. Failed to render highlight effect.";
+        return;
+    }
+
+    int stage = 0;
+
+    const std::array<float, 2> viewport_size{ static_cast<float>(viewport_width), static_cast<float>(viewport_height) };
+
+    {
+        glViewport(0, 0, viewport_width, viewport_height);
+        glsafe(::glDisable(GL_DEPTH_TEST));
+        _init_fullscreen_mesh();
+        // BBS: gaussian blur
+        {
+            OpenGLManager::FrameBufferModifier frame_buffer_gaussian_blur33(ogl_manager, "silhouette_gaussian_blur33", EMSAAType::Disabled);
+            frame_buffer_gaussian_blur33.set_width(viewport_width)
+                .set_height(viewport_height);
+        }
+        GLShaderProgram* p_gaussian_blur33_shader = wxGetApp().get_shader("gaussian_blur33");
+        if (!p_gaussian_blur33_shader)
+        {
+            BOOST_LOG_TRIVIAL(error) << "Invalid gaussian_blur33 shader. Failed to render highlight effect.";
+            return;
+        }
+
+        p_gaussian_blur33_shader->start_using();
+
+        p_gaussian_blur33_shader->set_uniform("u_viewport_size", viewport_size);
+
+        Matrix3f gaussian_blur33_convolution_matrix;
+        // https://lodev.org/cgtutor/filtering.html#Gaussian_Blur_
+        gaussian_blur33_convolution_matrix.data()[3 * 0 + 0] = 0.077847;
+        gaussian_blur33_convolution_matrix.data()[3 * 0 + 1] = 0.123317;
+        gaussian_blur33_convolution_matrix.data()[3 * 0 + 2] = 0.077847;
+        gaussian_blur33_convolution_matrix.data()[3 * 1 + 0] = 0.123317;
+        gaussian_blur33_convolution_matrix.data()[3 * 1 + 1] = 0.195346;
+        gaussian_blur33_convolution_matrix.data()[3 * 1 + 2] = 0.123317;
+        gaussian_blur33_convolution_matrix.data()[3 * 2 + 0] = 0.077847;
+        gaussian_blur33_convolution_matrix.data()[3 * 2 + 1] = 0.123317;
+        gaussian_blur33_convolution_matrix.data()[3 * 2 + 2] = 0.077847;
+        p_gaussian_blur33_shader->set_uniform("u_convolution_matrix", gaussian_blur33_convolution_matrix);
+
+        const auto color_texture_id = p_frame_buffer->get_color_texture();
+        if (!p_frame_buffer->is_texture_valid(color_texture_id))
+        {
+            BOOST_LOG_TRIVIAL(error) << "Invalid silhouette texture. Failed to render highlight effect.";
+            return;
+        }
+        int stage = 0;
+        p_gaussian_blur33_shader->set_uniform("u_sampler", stage);
+        glsafe(::glActiveTexture(GL_TEXTURE0 + stage));
+        glsafe(::glBindTexture(GL_TEXTURE_2D, color_texture_id));
+
+        s_full_screen_mesh.render();
+
+        p_gaussian_blur33_shader->stop_using();
+
+        glsafe(::glEnable(GL_DEPTH_TEST));
+        // BBS: end gaussian blur
+    }
+    ogl_manager.get_viewport_size(viewport_width, viewport_height);
+    glViewport(0, 0, viewport_width, viewport_height);
+}
+
+void GLCanvas3D::_composite_silhouette_effect()
+{
+    // BBS: composite silhouette
+
+    OpenGLManager& ogl_manager = wxGetApp().get_opengl_manager();
+
+    const auto& p_frame_buffer = ogl_manager.get_frame_buffer("silhouette_gaussian_blur33");
+    if (!p_frame_buffer)
+    {
+        BOOST_LOG_TRIVIAL(error) << "Invalid framebuffer. Failed to render highlight effect.";
+        return;
+    }
+
+    const auto color_texture_id = p_frame_buffer->get_color_texture();
+    if (!p_frame_buffer->is_texture_valid(color_texture_id))
+    {
+        BOOST_LOG_TRIVIAL(error) << "Invalid silhouette texture. Failed to render highlight effect.";
+        return;
+    }
+
+    glsafe(::glDisable(GL_DEPTH_TEST));
+    glsafe(::glEnable(GL_BLEND));
+    glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+    GLShaderProgram* p_silhouette_composite_shader = wxGetApp().get_shader("silhouette_composite");
+    if (!p_silhouette_composite_shader)
+    {
+        BOOST_LOG_TRIVIAL(error) << "Invalid silhouette shader. Failed to render highlight effect.";
+        return;
+    }
+    p_silhouette_composite_shader->start_using();
+
+    uint32_t viewport_width = 0;
+    uint32_t viewport_height = 0;
+    ogl_manager.get_viewport_size(viewport_width, viewport_height);
+
+    const float alpha = 0.4f;
+    Matrix3f convolution_matrix;
+    convolution_matrix.data()[3 * 0 + 0] = -alpha;
+    convolution_matrix.data()[3 * 0 + 1] = -alpha;
+    convolution_matrix.data()[3 * 0 + 2] = -alpha;
+
+    convolution_matrix.data()[3 * 1 + 0] = -alpha;
+    convolution_matrix.data()[3 * 1 + 1] = alpha * 9.0f;
+    convolution_matrix.data()[3 * 1 + 2] = -alpha;
+
+    convolution_matrix.data()[3 * 2 + 0] = -alpha;
+    convolution_matrix.data()[3 * 2 + 1] = -alpha;
+    convolution_matrix.data()[3 * 2 + 2] = -alpha;
+    p_silhouette_composite_shader->set_uniform("u_convolution_matrix", convolution_matrix);
+
+    const std::array<float, 3> viewport_size_alpha{ static_cast<float>(viewport_width), static_cast<float>(viewport_height), alpha };
+    p_silhouette_composite_shader->set_uniform("u_viewport_size_alpha", viewport_size_alpha);
+
+    const auto& picking_color = wxGetApp().get_picking_color();
+    p_silhouette_composite_shader->set_uniform("u_picking_color", picking_color);
+
+    const int stage = 0;
+    p_silhouette_composite_shader->set_uniform("u_sampler", stage);
+    glsafe(::glActiveTexture(GL_TEXTURE0 + stage));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, color_texture_id));
+
+    _init_fullscreen_mesh();
+
+    s_full_screen_mesh.render();
+
+    p_silhouette_composite_shader->stop_using();
+
+    glsafe(::glDisable(GL_BLEND));
+    // BBS: end composite silhouette
+}
+
+void GLCanvas3D::_init_fullscreen_mesh()
+{
+    if (s_full_screen_mesh.is_initialized()) {
+        return;
+    }
+    GLModel::Geometry geo;
+    geo.format.type = GLModel::Geometry::EPrimitiveType::Triangles;
+    geo.format.vertex_layout = GLModel::Geometry::EVertexLayout::P3T2;
+
+    geo.add_vertex(Vec3f{ -1.0f, -1.0f, 0.0f }, Vec2f{ 0.0f, 0.0f });
+    geo.add_vertex(Vec3f{ 3.0f, -1.0f, 0.0f }, Vec2f{ 2.0f, 0.0f });
+    geo.add_vertex(Vec3f{ -1.0f, 3.0f, 0.0f }, Vec2f{ 0.0f, 2.0f });
+
+    geo.add_triangle(0, 1, 2);
+
+    s_full_screen_mesh.init_from(std::move(geo));
+}
+
+void GLCanvas3D::_rebuild_postprocessing_pipeline(OpenGLManager& ogl_manager, const std::string& input_framebuffer_name, std::string& output_framebuffer_name, uint32_t width, uint32_t height)
+{
+    const bool offscreen_rendering = input_framebuffer_name != OpenGLManager::s_back_frame;
+    if (!offscreen_rendering && !ogl_manager.is_fxaa_enabled()) {
+        return;
+    }
+
+    _init_fullscreen_mesh();
+
+    uint32_t output_texture_id = UINT32_MAX;
+    if (ogl_manager.is_fxaa_enabled()) {
+        if (!offscreen_rendering) {
+            {
+                OpenGLManager::FrameBufferModifier fxaa_frame(ogl_manager, "fxaaframe_temp", EMSAAType::Disabled);
+                fxaa_frame.set_width(width)
+                    .set_height(height);
+            }
+
+            ogl_manager.blit_framebuffer(OpenGLManager::s_back_frame, "fxaaframe_temp");
+        }
+
+        {
+            OpenGLManager::FrameBufferModifier fxaa_frame(ogl_manager, "fxaaframe", EMSAAType::Disabled);
+            fxaa_frame.set_width(width)
+                .set_height(height);
+        }
+
+        // BBS: composite main frame
+        glsafe(::glDisable(GL_DEPTH_TEST));
+        glsafe(::glDisable(GL_BLEND));
+
+        const auto& p_main_frame_buffer = ogl_manager.get_frame_buffer(offscreen_rendering ? input_framebuffer_name : "fxaaframe_temp");
+        if (p_main_frame_buffer) {
+            output_texture_id = p_main_frame_buffer->get_color_texture();
+            if (p_main_frame_buffer->is_texture_valid(output_texture_id)) {
+                GLShaderProgram* p_fxaa_shader = ogl_manager.get_shader("fxaa");
+                if (p_fxaa_shader) {
+                    p_fxaa_shader->start_using();
+
+                    const int stage = 0;
+                    p_fxaa_shader->set_uniform("u_sampler", stage);
+                    glsafe(::glActiveTexture(GL_TEXTURE0 + stage));
+                    glsafe(::glBindTexture(GL_TEXTURE_2D, output_texture_id));
+
+                    const std::array<float, 4> viewport_size{ static_cast<float>(width), static_cast<float>(height), 1.0f / width, 1.0f / height };
+                    p_fxaa_shader->set_uniform("u_viewport_size", viewport_size);
+
+                    s_full_screen_mesh.render();
+
+                    //ogl_manager.unbind_shader();
+                    p_fxaa_shader->stop_using();
+
+                    const auto& p_fxaa_frame_buffer = ogl_manager.get_frame_buffer("fxaaframe");
+                    if (p_fxaa_frame_buffer) {
+                        output_texture_id = p_fxaa_frame_buffer->get_color_texture();
+                        if (!p_fxaa_frame_buffer->is_texture_valid(output_texture_id)) {
+                            BOOST_LOG_TRIVIAL(error) << "Invalid fxaa texture.";
+                        }
+                    }
+                    else {
+                        BOOST_LOG_TRIVIAL(error) << "Invalid fxaa framebuffer.";
+                    }
+                }
+                else {
+                    BOOST_LOG_TRIVIAL(error) << "Invalid fxaa shader.";
+                }
+            }
+            else {
+                BOOST_LOG_TRIVIAL(error) << "Invalid main frame texture. Failed to composite main frame.";
+            }
+        }
+    }
+    else if (offscreen_rendering) {
+        const auto& p_main_frame_buffer = ogl_manager.get_frame_buffer(input_framebuffer_name);
+        if (p_main_frame_buffer) {
+            output_texture_id = p_main_frame_buffer->get_color_texture();
+        }
+    }
+
+    {
+        OpenGLManager::FrameBufferModifier output_frame(ogl_manager, output_framebuffer_name);
+        output_frame.set_width(width)
+            .set_height(height);
+    }
+
+    GLShaderProgram* p_mainframe_composite_shader = ogl_manager.get_shader("mainframe_composite");
+    if (!p_mainframe_composite_shader)
+    {
+        BOOST_LOG_TRIVIAL(error) << "Invalid mainframe composite shader. Failed to composite main frame.";
+        return;
+    }
+    //ogl_manager.bind_shader(p_mainframe_composite_shader);
+    p_mainframe_composite_shader->start_using();
+
+    const int stage = 0;
+    p_mainframe_composite_shader->set_uniform("u_sampler", stage);
+    glsafe(::glActiveTexture(GL_TEXTURE0 + stage));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, output_texture_id));
+
+    s_full_screen_mesh.render();
+
+    //ogl_manager.unbind_shader();
+    p_mainframe_composite_shader->stop_using();
+
+    // BBS: end composite mainframe
+}
+
 static float       identityMatrix[16]   = {1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
 static const float cameraProjection[16] = {1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
 
@@ -8936,6 +9335,8 @@ void GLCanvas3D::_render_background()
     // Draws a bottom to top gradient over the complete screen.
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+    _init_fullscreen_mesh();
+
     ColorRGBA       background_color       = m_is_dark ? DEFAULT_BG_LIGHT_COLOR_DARK : DEFAULT_BG_LIGHT_COLOR;
     ColorRGBA       error_background_color = m_is_dark ? ERROR_BG_LIGHT_COLOR_DARK : ERROR_BG_LIGHT_COLOR;
     const ColorRGBA bottom_color           = use_error_color ? error_background_color : background_color;
@@ -9212,8 +9613,11 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
 
     GLShaderProgram* shader      = wxGetApp().get_shader("gouraud");
     ECanvasType      canvas_type = this->m_canvas_type;
-    if (shader != nullptr) {
-        shader->start_using();
+    const GUI::ERenderPipelineStage render_pipeline_stage = _get_current_render_stage();
+    if ((GUI::ERenderPipelineStage::Silhouette == render_pipeline_stage) || shader != nullptr) {
+        if (GUI::ERenderPipelineStage::Silhouette != render_pipeline_stage) {
+            shader->start_using();
+        }
 
         switch (type) {
         default:
@@ -9221,10 +9625,10 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
             GLGizmosManager& gm = get_gizmos_manager();
             if (dynamic_cast<GLGizmoPainterBase*>(gm.get_current()) == nullptr) {
                 if (m_picking_enabled && m_layers_editing.is_enabled() && (m_layers_editing.last_object_id != -1) &&
-                    (m_layers_editing.object_max_z() > 0.0f)) {
+                    (m_layers_editing.object_max_z() > 0.0f) && GUI::ERenderPipelineStage::Silhouette != render_pipeline_stage) {
                     int           object_id = m_layers_editing.last_object_id;
                     const Camera& camera    = wxGetApp().plater()->get_camera();
-                    m_volumes.render(type, false, camera.get_view_matrix(), camera.get_projection_matrix(),
+                    m_volumes.render(render_pipeline_stage, type, false, camera.get_view_matrix(), camera.get_projection_matrix(),
                                      [object_id](const GLVolume& volume) {
                                          // Which volume to paint without the layer height profile shader?
                                          return volume.is_active && (volume.is_modifier || volume.composite_id.object_id != object_id);
@@ -9241,7 +9645,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                     //  do not cull backfaces to show broken geometry, if any
                     const Camera& camera = wxGetApp().plater()->get_camera();
                     m_volumes.render(
-                        type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(),
+                        render_pipeline_stage, type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(),
                         [this, canvas_type](const GLVolume& volume) {
                             if (canvas_type == ECanvasType::CanvasAssembleView) {
                                 return !volume.is_modifier && !volume.is_wipe_tower;
@@ -9251,7 +9655,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                         },
                         with_outline);
                 }
-            } else {
+            } else if (GUI::ERenderPipelineStage::Silhouette != render_pipeline_stage) {
                 // In case a painting gizmo is open, it should render the painted triangles
                 // before transparent objects are rendered. Otherwise they would not be
                 // visible when inside modifier meshes etc.
@@ -9275,7 +9679,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
             const Camera& camera = wxGetApp().plater()->get_camera();
             // BBS:add assemble view related logic
             m_volumes.render(
-                type, false, camera.get_view_matrix(), camera.get_projection_matrix(),
+                render_pipeline_stage, type, false, camera.get_view_matrix(), camera.get_projection_matrix(),
                 [this, canvas_type](const GLVolume& volume) {
                     if (canvas_type == ECanvasType::CanvasAssembleView) {
                         return !volume.is_modifier;
@@ -9298,7 +9702,9 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
             shader->set_uniform("show_wireframe", false);
         }*/
 
-        shader->stop_using();
+        if (GUI::ERenderPipelineStage::Silhouette != render_pipeline_stage) {
+            shader->stop_using();
+        }
     }
 
     m_camera_clipping_plane = ClippingPlane::ClipsNothing();
@@ -12019,6 +12425,17 @@ void GLCanvas3D::ToolbarHighlighterTimer::Notify()
 void GLCanvas3D::GizmoHighlighterTimer::Notify()
 {
     wxPostEvent((wxEvtHandler*) GetOwner(), GizmoHighlighterTimerEvent(EVT_GLCANVAS_GIZMO_HIGHLIGHTER_TIMER, *this));
+}
+
+GLCanvas3D::RenderPipelineStageModifier::RenderPipelineStageModifier(GLCanvas3D& canvas, ERenderPipelineStage stage)
+    : m_canvas(canvas)
+{
+    m_canvas._push_render_stage(stage);
+}
+
+GLCanvas3D::RenderPipelineStageModifier::~RenderPipelineStageModifier()
+{
+    m_canvas._pop_render_stage();
 }
 
 void GLCanvas3D::ToolbarHighlighter::set_timer_owner(wxEvtHandler* owner, int timerid /* = wxID_ANY*/) { m_timer.SetOwner(owner, timerid); }

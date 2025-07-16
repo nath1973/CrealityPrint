@@ -1013,7 +1013,7 @@ int GLVolumeCollection::get_selection_support_threshold_angle(bool &enable_suppo
 }
 
 //BBS: add outline drawing logic
-void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
+void GLVolumeCollection::render(GUI::ERenderPipelineStage render_pipeline_stage, GLVolumeCollection::ERenderType type, bool disable_cullface, const Transform3d& view_matrix, const Transform3d& projection_matrix,
     std::function<bool(const GLVolume&)> filter_func, bool with_outline) const
 {
     GLVolumeWithIdAndZList to_render = volumes_to_render(volumes, type, view_matrix, filter_func);
@@ -1052,90 +1052,100 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 #endif // ENABLE_MODIFIERS_ALWAYS_TRANSPARENT
 
         // render sinking contours of non-hovered volumes
-        shader->stop_using();
-        if (sink_shader != nullptr)
-        {
-            sink_shader->start_using();
-            if (m_show_sinking_contours) 
+        if (GUI::ERenderPipelineStage::Silhouette != render_pipeline_stage) {
+            shader->stop_using();
+            if (sink_shader != nullptr)
             {
-                if (volume.first->is_sinking() && !volume.first->is_below_printbed() &&
-                    volume.first->hover == GLVolume::HS_None && !volume.first->force_sinking_contours) 
+                sink_shader->start_using();
+                if (m_show_sinking_contours)
                 {
-                    volume.first->render_sinking_contours();
+                    if (volume.first->is_sinking() && !volume.first->is_below_printbed() &&
+                        volume.first->hover == GLVolume::HS_None && !volume.first->force_sinking_contours)
+                    {
+                        volume.first->render_sinking_contours();
+                    }
                 }
+                sink_shader->stop_using();
             }
-            sink_shader->stop_using();
-        }
-        shader->start_using();
-
-        if (!volume.first->model.is_initialized())
-            shader->set_uniform("uniform_color", volume.first->render_color);
-        if (volume.first->is_wipe_tower) {
-            // disable cliping effect for wipe tower
-            std::array<float, 2> max_range = {-FLT_MAX, FLT_MAX};
-            shader->set_uniform("z_range", max_range); 
-        } else {
-            shader->set_uniform("z_range", m_z_range); 
-        }
-        shader->set_uniform("clipping_plane", m_clipping_plane);
-        shader->set_uniform("use_color_clip_plane", m_use_color_clip_plane);
-        shader->set_uniform("color_clip_plane", m_color_clip_plane);
-        shader->set_uniform("uniform_color_clip_plane_1", m_color_clip_plane_colors[0]);
-        shader->set_uniform("uniform_color_clip_plane_2", m_color_clip_plane_colors[1]);
-
-        if (volume.first->partly_inside) {
-            //only partly inside volume need to be painted with boundary check
-            shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
-            shader->set_uniform("print_volume.xy_data", m_print_volume.data);
-            shader->set_uniform("print_volume.z_data", m_print_volume.zs);
-        } 
-        else {
-            //shader->set_uniform("color_bed_exclude_area.enable", 0);
-            //use -1 ad a invalid type
-            shader->set_uniform("print_volume.type", -1);
+            shader->start_using();
         }
 
-        GUI::PartPlate*      curr_plate = GUI::wxGetApp().plater()->get_partplate_list().get_selected_plate();
-        bool                 is_multi_color;
-        const BoundingBoxf3& exclude_area = curr_plate->get_color_bed_exclude_area_cache(&is_multi_color);
-        shader->set_uniform("color_bed_exclude_area.enable", static_cast<int>(is_multi_color));
-        if (is_multi_color) {
-            std::array<float, 4> xy_data{(float)exclude_area.min.x(), (float)exclude_area.min.y(), (float)exclude_area.max.x(), (float)exclude_area.max.y()};
-            shader->set_uniform("color_bed_exclude_area.xy_data", xy_data);
-            std::array<float, 2> zs{(float)exclude_area.min.z(), (float)exclude_area.max.z()};
-            shader->set_uniform("color_bed_exclude_area.z_data", zs);
-        }
+        if (GUI::ERenderPipelineStage::Silhouette != render_pipeline_stage) {
+            if (!volume.first->model.is_initialized())
+                shader->set_uniform("uniform_color", volume.first->render_color);
+            if (volume.first->is_wipe_tower) {
+                // disable cliping effect for wipe tower
+                std::array<float, 2> max_range = { -FLT_MAX, FLT_MAX };
+                shader->set_uniform("z_range", max_range);
+            }
+            else {
+                shader->set_uniform("z_range", m_z_range);
+            }
+            shader->set_uniform("clipping_plane", m_clipping_plane);
+            shader->set_uniform("use_color_clip_plane", m_use_color_clip_plane);
+            shader->set_uniform("color_clip_plane", m_color_clip_plane);
+            shader->set_uniform("uniform_color_clip_plane_1", m_color_clip_plane_colors[0]);
+            shader->set_uniform("uniform_color_clip_plane_2", m_color_clip_plane_colors[1]);
 
-        bool  enable_support;
-        int   support_threshold_angle = get_selection_support_threshold_angle(enable_support);
+            if (volume.first->partly_inside) {
+                //only partly inside volume need to be painted with boundary check
+                shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
+                shader->set_uniform("print_volume.xy_data", m_print_volume.data);
+                shader->set_uniform("print_volume.z_data", m_print_volume.zs);
+            }
+            else {
+                //shader->set_uniform("color_bed_exclude_area.enable", 0);
+                //use -1 ad a invalid type
+                shader->set_uniform("print_volume.type", -1);
+            }
+
+            GUI::PartPlate*      curr_plate = GUI::wxGetApp().plater()->get_partplate_list().get_selected_plate();
+            bool                 is_multi_color;
+            const BoundingBoxf3& exclude_area = curr_plate->get_color_bed_exclude_area_cache(&is_multi_color);
+            shader->set_uniform("color_bed_exclude_area.enable", static_cast<int>(is_multi_color));
+            if (is_multi_color) {
+                std::array<float, 4> xy_data{(float)exclude_area.min.x(), (float)exclude_area.min.y(), (float)exclude_area.max.x(), (float)exclude_area.max.y()};
+                shader->set_uniform("color_bed_exclude_area.xy_data", xy_data);
+                std::array<float, 2> zs{(float)exclude_area.min.z(), (float)exclude_area.max.z()};
+                shader->set_uniform("color_bed_exclude_area.z_data", zs);
+            }
+
+            bool  enable_support;
+            int   support_threshold_angle = get_selection_support_threshold_angle(enable_support);
     
-        float normal_z  = -::cos(Geometry::deg2rad((float) support_threshold_angle));
+            float normal_z  = -::cos(Geometry::deg2rad((float) support_threshold_angle));
   
-        shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
-        shader->set_uniform("slope.actived", m_slope.isGlobalActive && !volume.first->is_modifier && !volume.first->is_wipe_tower);
-        shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(volume.first->world_matrix().matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
-        shader->set_uniform("slope.normal_z", normal_z);
+            shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
+            shader->set_uniform("slope.actived", m_slope.isGlobalActive && !volume.first->is_modifier && !volume.first->is_wipe_tower);
+            shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(volume.first->world_matrix().matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
+            shader->set_uniform("slope.normal_z", normal_z);
 
-#if ENABLE_ENVIRONMENT_MAP
-        unsigned int environment_texture_id = GUI::wxGetApp().plater()->get_environment_texture_id();
-        bool use_environment_texture = environment_texture_id > 0 && GUI::wxGetApp().app_config->get("use_environment_map") == "1";
-        shader->set_uniform("use_environment_tex", use_environment_texture);
-        if (use_environment_texture)
-            glsafe(::glBindTexture(GL_TEXTURE_2D, environment_texture_id));
-#endif // ENABLE_ENVIRONMENT_MAP
-        glcheck();
+    #if ENABLE_ENVIRONMENT_MAP
+            unsigned int environment_texture_id = GUI::wxGetApp().plater()->get_environment_texture_id();
+            bool use_environment_texture = environment_texture_id > 0 && GUI::wxGetApp().app_config->get("use_environment_map") == "1";
+            shader->set_uniform("use_environment_tex", use_environment_texture);
+            if (use_environment_texture)
+                glsafe(::glBindTexture(GL_TEXTURE_2D, environment_texture_id));
+    #endif // ENABLE_ENVIRONMENT_MAP
+            glcheck();
 
-        volume.first->model.set_color(volume.first->render_color);
-        const Transform3d model_matrix = volume.first->world_matrix();
-        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
-        shader->set_uniform("projection_matrix", projection_matrix);
-        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-        shader->set_uniform("view_normal_matrix", view_normal_matrix);
-		//BBS: add outline related logic
-        //if (with_outline && volume.first->selected)
-        //    volume.first->render_with_outline(view_matrix * model_matrix);
-        //else
+            volume.first->model.set_color(volume.first->render_color);
+            const Transform3d model_matrix = volume.first->world_matrix();
+            shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
+            shader->set_uniform("projection_matrix", projection_matrix);
+            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
+		    //BBS: add outline related logic
+            //if (with_outline && volume.first->selected)
+            //    volume.first->render_with_outline(view_matrix * model_matrix);
+            //else
+                volume.first->render();
+        }
+        else if(volume.first->selected) {
+            shader->set_uniform("u_model_matrix", volume.first->world_matrix());
+            //volume.first->render(view_matrix, false, body_color);
             volume.first->render();
+        }
 
 #if ENABLE_ENVIRONMENT_MAP
         if (use_environment_texture)

@@ -1865,6 +1865,8 @@ src/slic3r/Utils/SimplyPrint.hpp
 src/slic3r/Utils/TCPConsole.hpp
 src/slic3r/Utils/UndoRedo.hpp
 src/slic3r/Utils/WxFontUtils.hpp
+src/slic3r/Utils/ProfileFamilyLoader.hpp
+src/slic3r/Utils/ProfileFamilyLoader.cpp
 src/video/WebRTCDecoder.cpp
 src/video/YangPlayerBase.cpp
 src/video/YangPlayerDecoder.cpp

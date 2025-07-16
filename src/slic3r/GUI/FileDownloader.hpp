@@ -29,16 +29,15 @@ private:
     struct DownloadItem {
         std::string url;
         std::string filename;
-        std::ofstream stream;
+        boost::nowide::ofstream stream;
         
         DownloadItem(const std::string& u, const std::string& f) 
-            : url(u), filename(f), stream(f, std::ios::binary) {}
+            : url(u), filename(f), stream(f,boost::nowide::ofstream::binary) {}
         
         // 移动构造函数
         DownloadItem(DownloadItem&& other) noexcept
             : url(std::move(other.url)),
-              filename(std::move(other.filename)),
-              stream(std::move(other.stream)) {}
+              filename(std::move(other.filename)){}
         
         // 禁止拷贝
         DownloadItem(const DownloadItem&) = delete;

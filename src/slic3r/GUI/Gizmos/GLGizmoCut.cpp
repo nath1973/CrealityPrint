@@ -1316,6 +1316,8 @@ void GLGizmoCut3D::on_set_state()
         m_start_dragging_m  = m_rotation_m;
         reset_cut_by_contours();
 
+        wxGetApp().set_picking_effect(EPickingEffect::Disabled);
+
         m_parent.request_extra_frame();
     }
     else {
@@ -1333,6 +1335,8 @@ void GLGizmoCut3D::on_set_state()
         // be deleted prematurely.
         if (m_part_selection.valid())
             wxGetApp().CallAfter([this]() { m_part_selection = PartSelection(); });
+
+        wxGetApp().set_picking_effect(EPickingEffect::Silhouette);
     }
 }
 
@@ -1691,6 +1695,8 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
         reset_cut_by_contours();
+
+    wxGetApp().set_picking_effect(EPickingEffect::Silhouette);
 }
 
 void GLGizmoCut3D::on_start_dragging()
@@ -1720,6 +1726,8 @@ void GLGizmoCut3D::on_stop_dragging()
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
         reset_cut_by_contours();
     //check_and_update_connectors_state();
+
+    wxGetApp().set_picking_effect(EPickingEffect::Disabled);
 }
 
 void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool update_tbb /*=false*/)
@@ -2013,6 +2021,8 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* object, int instan
     add_object(object);
 
     m_parts.clear();
+    m_parts.reserve(object->volumes.size());
+
 
     for (const ModelVolume* volume : object->volumes) {
         assert(volume != nullptr);

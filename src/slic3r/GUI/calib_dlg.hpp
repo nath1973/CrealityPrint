@@ -27,7 +27,9 @@ public:
 	void on_show(wxShowEvent& event);
 
 protected:
-    void reset_params();
+    void         reset_params();
+    int          GetSelectedMethod();
+    int          GetSelectedExtruderType();
 	virtual void on_start(wxCommandEvent& event);
 	virtual void on_extruder_type_changed(wxCommandEvent& event);
 	virtual void on_method_changed(wxCommandEvent& event);
@@ -37,8 +39,18 @@ protected:
 	Calib_Params m_params;
 
 
-	wxRadioBox* m_rbExtruderType;
-	wxRadioBox* m_rbMethod;
+	//wxRadioBox* m_rbExtruderType;
+	//wxRadioBox* m_rbMethod;
+    wxStaticBox* extruderBox; 
+    wxStaticBox* methodBox;
+    wxRadioButton* m_radioNear;
+    wxRadioButton* m_radioFar;
+    int            m_selectedExtruderType;
+    wxRadioButton* m_radioPA;
+    wxRadioButton* m_radioLine;
+    wxRadioButton* m_radioV;
+    int            m_selectedMethod;
+
 	TextInput* m_tiStartPA;
 	TextInput* m_tiEndPA;
 	TextInput* m_tiPAStep;

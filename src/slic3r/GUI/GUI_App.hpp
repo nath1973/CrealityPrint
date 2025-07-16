@@ -25,7 +25,8 @@
  #include "slic3r/GUI/Jobs/UpgradeNetworkJob.hpp"
 #include "slic3r/GUI/HttpServer.hpp"
 #include "../Utils/PrintHost.hpp"
-
+#include "slic3r/GUI/GLEnums.hpp"
+#include "UITour.hpp"
 #include <mutex>
 #include <stack>
 #include "ModelDownloader.h"
@@ -321,7 +322,7 @@ private:
     std::map<std::string, bool> test_url_state;
     void            reinit_downloader();
     //BBS: remove GCodeViewer as seperate APP logic
-    explicit GUI_App();
+    explicit GUI_App(bool enable_test = false);
     //explicit GUI_App(EAppMode mode = EAppMode::Editor);
     ~GUI_App() override;
 
@@ -630,7 +631,7 @@ private:
                                  PresetBundle*        preset_bundle,
                                  const PresetUpdater* updater,
                                  bool&                apply_keeped_changes);
-
+    bool            is_enable_test() { return m_enable_test; }
     // Parameters extracted from the command line to be passed to GUI after initialization.
     GUI_InitParams* init_params { nullptr };
 
@@ -727,8 +728,14 @@ private:
     void startTour(int startIndex = 0);
     void startTour_Apple();
 
+    void set_picking_effect(EPickingEffect effect);
+    EPickingEffect get_picking_effect() const;
+
+    void set_picking_color(const ColorRGB& color);
+    const ColorRGB& get_picking_color() const;
+
 private:
-    UITour*          m_UITour = nullptr;
+    std::unique_ptr<UITour> m_UITour = nullptr;
     int             updating_bambu_networking();
     bool            on_init_inner();
     void            parse_args();
@@ -774,6 +781,12 @@ private:
     int                                                                                repeat_presets_ = 0;
     std::atomic<int>                                                               m_user_query_type = 0;//0: nothing 1: query 2: query and sync
     std::atomic<bool>                                                               m_user_syncing = false;
+    bool                                                                            m_enable_test  = false;
+
+
+    EPickingEffect          m_picking_effect{ EPickingEffect::Silhouette };
+    ColorRGB                m_picking_color{ 1.0f, 1.0f, 1.0f };
+
 };
 
 DECLARE_APP(GUI_App)

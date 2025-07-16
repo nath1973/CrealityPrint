@@ -53,6 +53,7 @@ public:
     void SetCanFocus(bool canFocus) override;
 
     void SetValue(bool state);
+    void SetValue(StateHandler::State state);
 
     bool GetValue() const;
 

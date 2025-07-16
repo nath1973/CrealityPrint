@@ -1177,7 +1177,9 @@ void BBLTopbar::Rescale(bool isResize) {
 
 void BBLTopbar::OnIconize(wxAuiToolBarEvent& event)
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";   
     m_frame->Iconize();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
 }
 
 void BBLTopbar::OnUpload3mf(wxAuiToolBarEvent& event)
@@ -1192,9 +1194,11 @@ void BBLTopbar::OnUpload3mf(wxAuiToolBarEvent& event)
 void BBLTopbar::OnFullScreen(wxAuiToolBarEvent& event)
 {
     if (m_frame->IsMaximized()) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Restore";   
         m_frame->Restore();
     }
     else {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Maximize";   
         m_normalRect = m_frame->GetRect();
         m_frame->Maximize();
     }
@@ -1202,7 +1206,9 @@ void BBLTopbar::OnFullScreen(wxAuiToolBarEvent& event)
 
 void BBLTopbar::OnCloseFrame(wxAuiToolBarEvent& event)
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";   
     m_frame->Close();
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
 }
 
 void BBLTopbar::OnMouseLeftDClock(wxMouseEvent& mouse)
@@ -1317,12 +1323,24 @@ void BBLTopbar::OnMouseLeftUp(wxMouseEvent& event)
     wxAuiToolBarItem* close_item = this->FindTool(wxID_CLOSE_FRAME);
     if (item == max_item) {
         wxAuiToolBarEvent evt;
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " OnFullScreen "
+                                   << " mouse_pos.x=" << mouse_pos.x << " mouse_pos.y=" << mouse_pos.y;
+        boost::log::core::get()->flush();
+
         OnFullScreen(evt);
     } else if (item == min_item) {
         wxAuiToolBarEvent evt;
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " OnIconize"
+                                   << " mouse_pos.x=" << mouse_pos.x << " mouse_pos.y=" << mouse_pos.y;
+        boost::log::core::get()->flush();
+
         OnIconize(evt);
     } else if (item == close_item) {
         wxAuiToolBarEvent evt;
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " OnCloseFrame"
+                                   << " mouse_pos.x=" << mouse_pos.x << " mouse_pos.y=" << mouse_pos.y;   
+        boost::log::core::get()->flush();
+
         OnCloseFrame(evt);
     }
     event.Skip();

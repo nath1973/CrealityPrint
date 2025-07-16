@@ -2182,7 +2182,7 @@ msgstr "Temperatura dyszy dla pierwszej warstwy"
 msgid "Nozzle temperature to print initial layer when using this filament"
 msgstr "Temperatura dyszy do drukowania pierwszej warstwy przy użyciu tego filamentu"
 
-msgid "Full fan speed at layer"
+msgid "Model fan speed at layer"
 msgstr "Pełna prędkość wentylatora na warstwie"
 
 msgid ""
@@ -2347,7 +2347,7 @@ msgstr "Najlepsza pozycja obiektu"
 msgid "Best auto arranging position in range [0,1] w.r.t. bed shape."
 msgstr "Najlepsza automatyczna pozycja w zakresie [0,1] w stosunku do kształtu stołu."
 
-msgid "Auxiliary part cooling fan"
+msgid "Side Fan"
 msgstr "Pomocniczy wentylator chłodzący części"
 
 msgid "Enable this option if machine has auxiliary part cooling fan. G-code command: M106 P2 S(0-255)."
@@ -2407,7 +2407,7 @@ msgstr ""
 "Ta opcja jest włączona, jeśli drukarka obsługuje kontrolę temperatury komory\n"
 "Polecenie G-code: M141 S(0-255)"
 
-msgid "Support air filtration"
+msgid "Back Fan"
 msgstr "Wsparcie filtracji powietrza"
 
 msgid ""
@@ -13143,7 +13143,7 @@ msgstr "Chłodzenie"
 msgid "Cooling for specific layer"
 msgstr "Chłodzenie dla określonej warstwy"
 
-msgid "Part cooling fan"
+msgid "Model fan"
 msgstr "Wentylator chłodzący części"
 
 msgid "Min fan speed threshold"
@@ -13161,9 +13161,6 @@ msgstr "Maksymalny próg prędkości wentylatora"
 
 msgid "Part cooling fan speed will be max when the estimated layer time is shorter than the setting value"
 msgstr "Prędkość wentylatora chłodzącego części będzie maksymalna, gdy szacowany czas warstwy będzie krótszy niż wartość ustawiona"
-
-msgid "Exhaust fan"
-msgstr "Wentylator wyciągowy"
 
 msgid "During print"
 msgstr "Podczas druku"

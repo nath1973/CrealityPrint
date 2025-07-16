@@ -73,21 +73,3 @@ find "./localization/i18n/" -name "CrealityPrint*.po" | while read -r file; do
     processFile "$file" "CrealityPrint"
 done
 
-pot_file="./localization/i18n/Community.pot"
-echo "Run the script for each .po file"
-find "./localization/i18n/" -name "Community*.po" | while read -r file; do
-    processFile "$file" "Community" 1
-done
-
-pot_file="./localization/i18n/DeviceList.pot"
-echo "Run the script for each .po file"
-find "./localization/i18n/" -name "DeviceList*.po" | while read -r file; do
-    processFile "$file" "DeviceList" 1
-done
-
-pot_file="./localization/i18n/SendPage.pot"
-echo "Run the script for each .po file"
-find "./localization/i18n/" -name "SendPage*.po" | while read -r file; do
-    processFile "$file" "SendPage" 1
-    echo "end\n"
-done

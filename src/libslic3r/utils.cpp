@@ -114,8 +114,8 @@ static boost::log::trivial::severity_level level_to_boost(unsigned level)
 boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_log_sink;
 
 boost::shared_ptr<boost::log::sinks::synchronous_sink<boost::log::sinks::text_file_backend>> g_test_log_sink = nullptr;
-std::function<void(const std::string& model, const std::string& function, const std::string& message)> ADD_TEST_POINT{
-    [](const std::string&, const std::string&, const std::string&) {}
+std::function<void(const std::string& model, const std::string& function, int code, const std::string& message)> ADD_TEST_RESPONE{
+    [](const std::string&, const std::string&, int code, const std::string&) {}
 };
 
 void set_logging_level(unsigned int level)
@@ -393,10 +393,10 @@ void set_log_path_and_level(const std::string& file, unsigned int level, bool en
 	);
 
     if (enable_test) {
-        ADD_TEST_POINT = [](const std::string& model, const std::string& function, const std::string& mesg) {
+        ADD_TEST_RESPONE = [](const std::string& module, const std::string& function, int code, const std::string& mesg) {
             boost::log::sources::severity_logger_mt<boost::log::trivial::severity_level> lg;
             lg.add_attribute("TLOG", boost::log::attributes::constant<std::string>("TLOG"));
-            BOOST_LOG_SEV(lg, boost::log::trivial::trace) << "[head]:" << model << " " << function
+            BOOST_LOG_SEV(lg, boost::log::trivial::trace) << "[head]:" << module << "_" << function << "_" << code
                                                           << "[body]:" << mesg;
             g_test_log_sink->flush();
         };
@@ -1217,6 +1217,10 @@ std::string header_slic3r_generated2()
 {
 	return std::string("Creality_Print V" CREALITYPRINT_VERSION);
 }
+
+std::string header_slic3r_generated_cloud() { return std::string("Creality_Cloud_Slicer V" CREALITYPRINT_VERSION); }
+
+
 std::string header_slic3r_generated()
 {
 	return std::string(SLIC3R_APP_NAME " " CREALITYPRINT_VERSION);

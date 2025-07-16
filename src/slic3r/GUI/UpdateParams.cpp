@@ -168,11 +168,14 @@ void UpdateParams::checkParamsNeedUpdate()
         }
     }
     if (hasPrinterNeedUpdate) {
-        std::string ssTip = _u8L("Detected a new parameter package to update, would you like to update it?");
-
-        wxGetApp().plater()->get_notification_manager()->push_update_params_tip(ssTip);
+        wxGetApp().CallAfter([this]() {
+            std::string ssTip = _u8L("Detected a new parameter package to update, would you like to update it?");
+            wxGetApp().plater()->get_notification_manager()->push_update_params_tip(ssTip);
+        });
     } else {
-        closeParamsUpdateTip();
+        wxGetApp().CallAfter([this]() {
+            closeParamsUpdateTip();
+        });
     }
 }
 

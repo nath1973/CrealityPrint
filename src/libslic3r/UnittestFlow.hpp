@@ -1,5 +1,6 @@
 #ifndef _NULLSPACE_UNITTEST_1590155449305_H
 #define _NULLSPACE_UNITTEST_1590155449305_H
+#include <functional>
 #include <string>
 #include <vector>
 namespace Slic3r 

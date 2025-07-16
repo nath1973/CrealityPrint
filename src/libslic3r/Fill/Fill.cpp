@@ -134,11 +134,257 @@ struct SurfaceFill {
 // Detect narrow infill regions
 // Based on the anti-vibration algorithm from PrusaSlicer:
 // https://github.com/prusa3d/PrusaSlicer/blob/94290e09d75f23719c3d2ab2398737c8be4c3fd6/src/libslic3r/Fill/FillEnsuring.cpp#L100-L289
+
+static coord_t _MAX_LINE_LENGTH_TO_FILTER() // 4 mm.
+{
+    return scaled<coord_t>(4.);
+}
+const constexpr size_t  MAX_SKIPS_ALLOWED = 2; // Skip means propagation through long line.
+const constexpr size_t  MIN_DEPTH_FOR_LINE_REMOVING = 5;
+
+struct LineNode
+{
+    struct State
+    {
+        // The total number of long lines visited before this node was reached.
+        // We just need the minimum number of all possible paths to decide whether we can remove the line or not.
+        int min_skips_taken = 0;
+        // The total number of short lines visited before this node was reached.
+        int total_short_lines = 0;
+        // Some initial line is touching some long line. This information is propagated to neighbors.
+        bool initial_touches_long_lines = false;
+        bool initialized = false;
+
+        void reset() {
+            this->min_skips_taken = 0;
+            this->total_short_lines = 0;
+            this->initial_touches_long_lines = false;
+            this->initialized = false;
+        }
+    };
+
+    explicit LineNode(const Line& line) : line(line) {}
+
+    Line                   line;
+    // Pointers to line nodes in the previous and the next section that overlap with this line.
+    std::vector<LineNode*> next_section_overlapping_lines;
+    std::vector<LineNode*> prev_section_overlapping_lines;
+
+    bool                   is_removed = false;
+
+    State                  state;
+
+    // Return true if some initial line is touching some long line and this information was propagated into the current line.
+    bool is_initial_line_touching_long_lines() const {
+        if (prev_section_overlapping_lines.empty())
+            return false;
+
+        for (LineNode* line_node : prev_section_overlapping_lines) {
+            if (line_node->state.initial_touches_long_lines)
+                return true;
+        }
+
+        return false;
+    }
+
+    // Return true if the current line overlaps with some long line in the previous section.
+    bool is_touching_long_lines_in_previous_layer() const {
+        if (prev_section_overlapping_lines.empty())
+            return false;
+
+        const auto MAX_LINE_LENGTH_TO_FILTER = _MAX_LINE_LENGTH_TO_FILTER();
+        for (LineNode* line_node : prev_section_overlapping_lines) {
+            if (!line_node->is_removed && line_node->line.length() >= MAX_LINE_LENGTH_TO_FILTER)
+                return true;
+        }
+
+        return false;
+    }
+
+    // Return true if the current line overlaps with some line in the next section.
+    bool has_next_layer_neighbours() const {
+        if (next_section_overlapping_lines.empty())
+            return false;
+
+        for (LineNode* line_node : next_section_overlapping_lines) {
+            if (!line_node->is_removed)
+                return true;
+        }
+
+        return false;
+    }
+};
+
+using LineNodes = std::vector<LineNode>;
+
+inline bool are_lines_overlapping_in_y_axes(const Line& first_line, const Line& second_line) {
+    return (second_line.a.y() <= first_line.a.y() && first_line.a.y() <= second_line.b.y())
+        || (second_line.a.y() <= first_line.b.y() && first_line.b.y() <= second_line.b.y())
+        || (first_line.a.y() <= second_line.a.y() && second_line.a.y() <= first_line.b.y())
+        || (first_line.a.y() <= second_line.b.y() && second_line.b.y() <= first_line.b.y());
+}
+
+bool can_line_note_be_removed(const LineNode& line_node) {
+    const auto MAX_LINE_LENGTH_TO_FILTER = _MAX_LINE_LENGTH_TO_FILTER();
+    return (line_node.line.length() < MAX_LINE_LENGTH_TO_FILTER)
+        && (line_node.state.total_short_lines > int(MIN_DEPTH_FOR_LINE_REMOVING)
+            || (!line_node.is_initial_line_touching_long_lines() && !line_node.has_next_layer_neighbours()));
+}
+
+// Remove the node and propagate its removal to the previous sections.
+void propagate_line_node_remove(const LineNode& line_node) {
+    std::queue<LineNode*> line_node_queue;
+    for (LineNode* prev_line : line_node.prev_section_overlapping_lines) {
+        if (prev_line->is_removed)
+            continue;
+
+        line_node_queue.emplace(prev_line);
+    }
+
+    for (; !line_node_queue.empty(); line_node_queue.pop()) {
+        LineNode& line_to_check = *line_node_queue.front();
+
+        if (can_line_note_be_removed(line_to_check)) {
+            line_to_check.is_removed = true;
+
+            for (LineNode* prev_line : line_to_check.prev_section_overlapping_lines) {
+                if (prev_line->is_removed)
+                    continue;
+
+                line_node_queue.emplace(prev_line);
+            }
+        }
+    }
+}
+
+// Filter out short extrusions that could create vibrations.
+static std::vector<Lines> filter_vibrating_extrusions(const std::vector<Lines>& lines_sections) {
+    // Initialize all line nodes.
+    std::vector<LineNodes> line_nodes_sections(lines_sections.size());
+    for (const Lines& lines_section : lines_sections) {
+        const size_t section_idx = &lines_section - lines_sections.data();
+
+        line_nodes_sections[section_idx].reserve(lines_section.size());
+        for (const Line& line : lines_section) {
+            line_nodes_sections[section_idx].emplace_back(line);
+        }
+    }
+
+    // Precalculate for each line node which line nodes in the previous and next section this line node overlaps.
+    for (auto curr_lines_section_it = line_nodes_sections.begin(); curr_lines_section_it != line_nodes_sections.end(); ++curr_lines_section_it) {
+        if (curr_lines_section_it != line_nodes_sections.begin()) {
+            const auto prev_lines_section_it = std::prev(curr_lines_section_it);
+            for (LineNode& curr_line : *curr_lines_section_it) {
+                for (LineNode& prev_line : *prev_lines_section_it) {
+                    if (are_lines_overlapping_in_y_axes(curr_line.line, prev_line.line)) {
+                        curr_line.prev_section_overlapping_lines.emplace_back(&prev_line);
+                    }
+                }
+            }
+        }
+
+        if (std::next(curr_lines_section_it) != line_nodes_sections.end()) {
+            const auto next_lines_section_it = std::next(curr_lines_section_it);
+            for (LineNode& curr_line : *curr_lines_section_it) {
+                for (LineNode& next_line : *next_lines_section_it) {
+                    if (are_lines_overlapping_in_y_axes(curr_line.line, next_line.line)) {
+                        curr_line.next_section_overlapping_lines.emplace_back(&next_line);
+                    }
+                }
+            }
+        }
+    }
+
+    const auto MAX_LINE_LENGTH_TO_FILTER = _MAX_LINE_LENGTH_TO_FILTER();
+    // Select each section as the initial lines section and propagate line node states from this initial lines section to the last lines section.
+    // During this propagation, we remove those lines that meet the conditions for its removal.
+    // When some line is removed, we propagate this removal to previous layers.
+    for (size_t initial_line_section_idx = 0; initial_line_section_idx < line_nodes_sections.size(); ++initial_line_section_idx) {
+        // Stars from non-removed short lines.
+        for (LineNode& initial_line : line_nodes_sections[initial_line_section_idx]) {
+            if (initial_line.is_removed || initial_line.line.length() >= MAX_LINE_LENGTH_TO_FILTER)
+                continue;
+
+            initial_line.state.reset();
+            initial_line.state.total_short_lines = 1;
+            initial_line.state.initial_touches_long_lines = initial_line.is_touching_long_lines_in_previous_layer();
+            initial_line.state.initialized = true;
+        }
+
+        // Iterate from the initial lines section until the last lines section.
+        for (size_t propagation_line_section_idx = initial_line_section_idx; propagation_line_section_idx < line_nodes_sections.size(); ++propagation_line_section_idx) {
+            // Before we propagate node states into next lines sections, we reset the state of all line nodes in the next line section.
+            if (propagation_line_section_idx + 1 < line_nodes_sections.size()) {
+                for (LineNode& propagation_line : line_nodes_sections[propagation_line_section_idx + 1]) {
+                    propagation_line.state.reset();
+                }
+            }
+
+            for (LineNode& propagation_line : line_nodes_sections[propagation_line_section_idx]) {
+                if (propagation_line.is_removed || !propagation_line.state.initialized)
+                    continue;
+
+                for (LineNode* neighbour_line : propagation_line.next_section_overlapping_lines) {
+                    if (neighbour_line->is_removed)
+                        continue;
+
+                    const bool is_short_line = neighbour_line->line.length() < MAX_LINE_LENGTH_TO_FILTER;
+                    const bool is_skip_allowed = propagation_line.state.min_skips_taken < int(MAX_SKIPS_ALLOWED);
+
+                    if (!is_short_line && !is_skip_allowed)
+                        continue;
+
+                    const int neighbour_total_short_lines = propagation_line.state.total_short_lines + int(is_short_line);
+                    const int neighbour_min_skips_taken = propagation_line.state.min_skips_taken + int(!is_short_line);
+
+                    if (neighbour_line->state.initialized) {
+                        // When the state of the node was previously filled, then we need to update data in such a way
+                        // that will maximize the possibility of removing this node.
+                        neighbour_line->state.min_skips_taken = std::max(neighbour_line->state.min_skips_taken, neighbour_total_short_lines);
+                        neighbour_line->state.min_skips_taken = std::min(neighbour_line->state.min_skips_taken, neighbour_min_skips_taken);
+
+                        // We will keep updating neighbor initial_touches_long_lines until it is equal to false.
+                        if (neighbour_line->state.initial_touches_long_lines) {
+                            neighbour_line->state.initial_touches_long_lines = propagation_line.state.initial_touches_long_lines;
+                        }
+                    }
+                    else {
+                        neighbour_line->state.total_short_lines = neighbour_total_short_lines;
+                        neighbour_line->state.min_skips_taken = neighbour_min_skips_taken;
+                        neighbour_line->state.initial_touches_long_lines = propagation_line.state.initial_touches_long_lines;
+                        neighbour_line->state.initialized = true;
+                    }
+                }
+
+                if (can_line_note_be_removed(propagation_line)) {
+                    // Remove the current node and propagate its removal to the previous sections.
+                    propagation_line.is_removed = true;
+                    propagate_line_node_remove(propagation_line);
+                }
+            }
+        }
+    }
+
+    // Create lines sections without filtered-out lines.
+    std::vector<Lines> lines_sections_out(line_nodes_sections.size());
+    for (const std::vector<LineNode>& line_nodes_section : line_nodes_sections) {
+        const size_t section_idx = &line_nodes_section - line_nodes_sections.data();
+
+        for (const LineNode& line_node : line_nodes_section) {
+            if (!line_node.is_removed) {
+                lines_sections_out[section_idx].emplace_back(line_node.line);
+            }
+        }
+    }
+
+    return lines_sections_out;
+}
+
 void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &normal_infill, ExPolygons &narrow_infill)
 {
     assert(fill.surface.surface_type == stInternalSolid);
 
-	switch (fill.params.pattern) {
+    switch (fill.params.pattern) {
     case ipRectilinear:
     case ipMonotonic:
     case ipMonotonicLine:
@@ -155,16 +401,11 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
 
     constexpr double connect_extrusions = true;
 
-    auto segments_overlap = [](coord_t alow, coord_t ahigh, coord_t blow, coord_t bhigh) {
-        return (alow >= blow && alow <= bhigh) || (ahigh >= blow && ahigh <= bhigh) || (blow >= alow && blow <= ahigh) ||
-               (bhigh >= alow && bhigh <= ahigh);
-    };
-
-    const coord_t scaled_spacing                      = scaled<coord_t>(fill.params.spacing);
-    double        distance_limit_reconnection         = 2.0 * double(scaled_spacing);
+    const coord_t scaled_spacing = scaled<coord_t>(fill.params.spacing);
+    double        distance_limit_reconnection = 2.0 * double(scaled_spacing);
     double        squared_distance_limit_reconnection = distance_limit_reconnection * distance_limit_reconnection;
     // Calculate infill direction, see Fill::_infill_direction
-    double        base_angle                          = fill.params.angle + float(M_PI / 2.);
+    double        base_angle = fill.params.angle + float(M_PI / 2.);
     // For pattern other than ipAlignedRectilinear, the angle are alternated
     if (fill.params.pattern != ipAlignedRectilinear) {
         size_t idx = layer_id / fill.surface.thickness_layers;
@@ -172,7 +413,7 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
     }
     const double aligning_angle = -base_angle + PI;
 
-	for (const ExPolygon &expolygon : fill.expolygons) {
+    for (const ExPolygon& expolygon : fill.expolygons) {
         Polygons filled_area = to_polygons(expolygon);
         polygons_rotate(filled_area, aligning_angle);
         BoundingBox bb = get_extents(filled_area);
@@ -181,31 +422,32 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
 
         inner_area = shrink(inner_area, scaled_spacing * 0.5 - scaled<double>(fill.params.overlap));
 
-        AABBTreeLines::LinesDistancer<Line> area_walls{to_lines(inner_area)};
+        AABBTreeLines::LinesDistancer<Line> area_walls{ to_lines(inner_area) };
 
-        const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
-        std::vector<Line> vertical_lines(n_vlines);
-        coord_t           y_min = bb.min.y();
-        coord_t           y_max = bb.max.y();
+        const size_t  n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
+        const coord_t y_min = bb.min.y();
+        const coord_t y_max = bb.max.y();
+        Lines         vertical_lines(n_vlines);
         for (size_t i = 0; i < n_vlines; i++) {
-            coord_t x           = bb.min.x() + i * double(scaled_spacing);
-            vertical_lines[i].a = Point{x, y_min};
-            vertical_lines[i].b = Point{x, y_max};
-        }
-        if (vertical_lines.size() > 0) {
-            vertical_lines.push_back(vertical_lines.back());
-            vertical_lines.back().a = Point{coord_t(bb.min.x() + n_vlines * double(scaled_spacing) + scaled_spacing * 0.5), y_min};
-            vertical_lines.back().b = Point{vertical_lines.back().a.x(), y_max};
+            coord_t x = bb.min.x() + i * double(scaled_spacing);
+            vertical_lines[i].a = Point{ x, y_min };
+            vertical_lines[i].b = Point{ x, y_max };
         }
 
-        std::vector<std::vector<Line>> polygon_sections(n_vlines);
+        if (!vertical_lines.empty()) {
+            vertical_lines.push_back(vertical_lines.back());
+            vertical_lines.back().a = Point{ coord_t(bb.min.x() + n_vlines * double(scaled_spacing) + scaled_spacing * 0.5), y_min };
+            vertical_lines.back().b = Point{ vertical_lines.back().a.x(), y_max };
+        }
+
+        std::vector<Lines> polygon_sections(n_vlines);
 
         for (size_t i = 0; i < n_vlines; i++) {
             const auto intersections = area_walls.intersections_with_line<true>(vertical_lines[i]);
 
             for (int intersection_idx = 0; intersection_idx < int(intersections.size()) - 1; intersection_idx++) {
-                const auto &a = intersections[intersection_idx];
-                const auto &b = intersections[intersection_idx + 1];
+                const auto& a = intersections[intersection_idx];
+                const auto& b = intersections[intersection_idx + 1];
                 if (area_walls.outside((a.first + b.first) / 2) < 0) {
                     if (std::abs(a.first.y() - b.first.y()) > scaled_spacing) {
                         polygon_sections[i].emplace_back(a.first, b.first);
@@ -214,87 +456,7 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
             }
         }
 
-        struct Node
-        {
-            int                              section_idx;
-            int                              line_idx;
-            int                              skips_taken         = 0;
-            bool                             neighbours_explored = false;
-            std::vector<std::pair<int, int>> neighbours{};
-        };
-
-        coord_t length_filter     = scale_(4);
-        size_t  skips_allowed     = 2;
-        size_t  min_removal_conut = 5;
-        for (int section_idx = 0; section_idx < int(polygon_sections.size()); ++section_idx) {
-            for (int line_idx = 0; line_idx < int(polygon_sections[section_idx].size()); ++line_idx) {
-                if (const Line &line = polygon_sections[section_idx][line_idx]; line.a != line.b && line.length() < length_filter) {
-                    std::set<std::pair<int, int>> to_remove{{section_idx, line_idx}};
-                    std::vector<Node>             to_visit{{section_idx, line_idx}};
-
-                    bool initial_touches_long_lines = false;
-                    if (section_idx > 0) {
-                        for (int prev_line_idx = 0; prev_line_idx < int(polygon_sections[section_idx - 1].size()); ++prev_line_idx) {
-                            if (const Line &nl = polygon_sections[section_idx - 1][prev_line_idx];
-                                nl.a != nl.b && segments_overlap(line.a.y(), line.b.y(), nl.a.y(), nl.b.y())) {
-                                initial_touches_long_lines = true;
-                            }
-                        }
-                    }
-
-                    while (!to_visit.empty()) {
-                        Node        curr   = to_visit.back();
-                        const Line &curr_l = polygon_sections[curr.section_idx][curr.line_idx];
-                        if (curr.neighbours_explored) {
-                            bool is_valid_for_removal = (curr_l.length() < length_filter) &&
-                                                        ((int(to_remove.size()) - curr.skips_taken > int(min_removal_conut)) ||
-                                                         (curr.neighbours.empty() && !initial_touches_long_lines));
-                            if (!is_valid_for_removal) {
-                                for (const auto &n : curr.neighbours) {
-                                    if (to_remove.find(n) != to_remove.end()) {
-                                        is_valid_for_removal = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!is_valid_for_removal) {
-                                to_remove.erase({curr.section_idx, curr.line_idx});
-                            }
-                            to_visit.pop_back();
-                        } else {
-                            to_visit.back().neighbours_explored = true;
-                            int  curr_index                     = to_visit.size() - 1;
-                            bool can_use_skip                   = curr_l.length() <= length_filter && curr.skips_taken < int(skips_allowed);
-                            if (curr.section_idx + 1 < int(polygon_sections.size())) {
-                                for (int lidx = 0; lidx < int(polygon_sections[curr.section_idx + 1].size()); ++lidx) {
-                                    if (const Line &nl = polygon_sections[curr.section_idx + 1][lidx];
-                                        nl.a != nl.b && segments_overlap(curr_l.a.y(), curr_l.b.y(), nl.a.y(), nl.b.y()) &&
-                                        (nl.length() < length_filter || can_use_skip)) {
-                                        to_visit[curr_index].neighbours.push_back({curr.section_idx + 1, lidx});
-                                        to_remove.insert({curr.section_idx + 1, lidx});
-                                        Node next_node{curr.section_idx + 1, lidx, curr.skips_taken + (nl.length() >= length_filter)};
-                                        to_visit.push_back(next_node);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    for (const auto &pair : to_remove) {
-                        Line &l = polygon_sections[pair.first][pair.second];
-                        l.a     = l.b;
-                    }
-                }
-            }
-        }
-
-        for (size_t section_idx = 0; section_idx < polygon_sections.size(); section_idx++) {
-            polygon_sections[section_idx].erase(std::remove_if(polygon_sections[section_idx].begin(), polygon_sections[section_idx].end(),
-                                                               [](const Line &s) { return s.a == s.b; }),
-                                                polygon_sections[section_idx].end());
-            std::sort(polygon_sections[section_idx].begin(), polygon_sections[section_idx].end(),
-                      [](const Line &a, const Line &b) { return a.a.y() < b.b.y(); });
-        }
+        polygon_sections = filter_vibrating_extrusions(polygon_sections);
 
         Polygons reconstructed_area{};
         // reconstruct polygon from polygon sections
@@ -306,21 +468,21 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
             };
 
             std::vector<std::vector<Line>> polygon_sections_w_width = polygon_sections;
-            for (auto &slice : polygon_sections_w_width) {
-                for (Line &l : slice) {
-                    l.a -= Point{0.0, 0.5 * scaled_spacing};
-                    l.b += Point{0.0, 0.5 * scaled_spacing};
+            for (auto& slice : polygon_sections_w_width) {
+                for (Line& l : slice) {
+                    l.a -= Point{ 0.0, 0.5 * scaled_spacing };
+                    l.b += Point{ 0.0, 0.5 * scaled_spacing };
                 }
             }
 
             std::vector<TracedPoly> current_traced_polys;
-            for (const auto &polygon_slice : polygon_sections_w_width) {
-                std::unordered_set<const Line *> used_segments;
-                for (TracedPoly &traced_poly : current_traced_polys) {
+            for (const auto& polygon_slice : polygon_sections_w_width) {
+                std::unordered_set<const Line*> used_segments;
+                for (TracedPoly& traced_poly : current_traced_polys) {
                     auto candidates_begin = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
-                                                             [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
-                    auto candidates_end   = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.highs.back(),
-                                                             [](const Point &high, const Line &seg) { return seg.a.y() > high.y(); });
+                        [](const Point& low, const Line& seg) { return seg.b.y() > low.y(); });
+                    auto candidates_end = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.highs.back(),
+                        [](const Point& high, const Line& seg) { return seg.a.y() > high.y(); });
 
                     bool segment_added = false;
                     for (auto candidate = candidates_begin; candidate != candidates_end && !segment_added; candidate++) {
@@ -328,20 +490,22 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
                             continue;
                         }
                         if (connect_extrusions && (traced_poly.lows.back() - candidates_begin->a).cast<double>().squaredNorm() <
-                                                      squared_distance_limit_reconnection) {
+                            squared_distance_limit_reconnection) {
                             traced_poly.lows.push_back(candidates_begin->a);
-                        } else {
-                            traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, coord_t(0)});
-                            traced_poly.lows.push_back(candidates_begin->a - Point{scaled_spacing / 2, 0});
+                        }
+                        else {
+                            traced_poly.lows.push_back(traced_poly.lows.back() + Point{ scaled_spacing / 2, coord_t(0) });
+                            traced_poly.lows.push_back(candidates_begin->a - Point{ scaled_spacing / 2, 0 });
                             traced_poly.lows.push_back(candidates_begin->a);
                         }
 
                         if (connect_extrusions && (traced_poly.highs.back() - candidates_begin->b).cast<double>().squaredNorm() <
-                                                      squared_distance_limit_reconnection) {
+                            squared_distance_limit_reconnection) {
                             traced_poly.highs.push_back(candidates_begin->b);
-                        } else {
-                            traced_poly.highs.push_back(traced_poly.highs.back() + Point{scaled_spacing / 2, 0});
-                            traced_poly.highs.push_back(candidates_begin->b - Point{scaled_spacing / 2, 0});
+                        }
+                        else {
+                            traced_poly.highs.push_back(traced_poly.highs.back() + Point{ scaled_spacing / 2, 0 });
+                            traced_poly.highs.push_back(candidates_begin->b - Point{ scaled_spacing / 2, 0 });
                             traced_poly.highs.push_back(candidates_begin->b);
                         }
                         segment_added = true;
@@ -351,9 +515,9 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
                     if (!segment_added) {
                         // Zero or multiple overlapping segments. Resolving this is nontrivial,
                         // so we just close this polygon and maybe open several new. This will hopefully happen much less often
-                        traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, 0});
-                        traced_poly.highs.push_back(traced_poly.highs.back() + Point{scaled_spacing / 2, 0});
-                        Polygon &new_poly = reconstructed_area.emplace_back(std::move(traced_poly.lows));
+                        traced_poly.lows.push_back(traced_poly.lows.back() + Point{ scaled_spacing / 2, 0 });
+                        traced_poly.highs.push_back(traced_poly.highs.back() + Point{ scaled_spacing / 2, 0 });
+                        Polygon& new_poly = reconstructed_area.emplace_back(std::move(traced_poly.lows));
                         new_poly.points.insert(new_poly.points.end(), traced_poly.highs.rbegin(), traced_poly.highs.rend());
                         traced_poly.lows.clear();
                         traced_poly.highs.clear();
@@ -361,23 +525,23 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
                 }
 
                 current_traced_polys.erase(std::remove_if(current_traced_polys.begin(), current_traced_polys.end(),
-                                                          [](const TracedPoly &tp) { return tp.lows.empty(); }),
-                                           current_traced_polys.end());
+                    [](const TracedPoly& tp) { return tp.lows.empty(); }),
+                    current_traced_polys.end());
 
-                for (const auto &segment : polygon_slice) {
+                for (const auto& segment : polygon_slice) {
                     if (used_segments.find(&segment) == used_segments.end()) {
-                        TracedPoly &new_tp = current_traced_polys.emplace_back();
-                        new_tp.lows.push_back(segment.a - Point{scaled_spacing / 2, 0});
+                        TracedPoly& new_tp = current_traced_polys.emplace_back();
+                        new_tp.lows.push_back(segment.a - Point{ scaled_spacing / 2, 0 });
                         new_tp.lows.push_back(segment.a);
-                        new_tp.highs.push_back(segment.b - Point{scaled_spacing / 2, 0});
+                        new_tp.highs.push_back(segment.b - Point{ scaled_spacing / 2, 0 });
                         new_tp.highs.push_back(segment.b);
                     }
                 }
             }
 
             // add not closed polys
-            for (TracedPoly &traced_poly : current_traced_polys) {
-                Polygon &new_poly = reconstructed_area.emplace_back(std::move(traced_poly.lows));
+            for (TracedPoly& traced_poly : current_traced_polys) {
+                Polygon& new_poly = reconstructed_area.emplace_back(std::move(traced_poly.lows));
                 new_poly.points.insert(new_poly.points.end(), traced_poly.highs.rbegin(), traced_poly.highs.rend());
             }
         }
@@ -389,16 +553,16 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
 
     // Do the split
     ExPolygons normal_fill_areas_ex = union_safety_offset_ex(normal_fill_areas);
-    ExPolygons narrow_fill_areas    = diff_ex(fill.expolygons, normal_fill_areas_ex);
+    ExPolygons narrow_fill_areas = diff_ex(fill.expolygons, normal_fill_areas_ex);
 
     // Merge very small areas that is smaller than a single line width to the normal infill if they touches
     for (auto iter = narrow_fill_areas.begin(); iter != narrow_fill_areas.end();) {
         auto shrinked_expoly = offset_ex(*iter, -scaled_spacing * 0.5);
         if (shrinked_expoly.empty()) {
             // Too small! Check if it touches any normal infills
-            auto     expanede_exploy          = offset_ex(*iter, scaled_spacing * 0.3);
+            auto     expanede_exploy = offset_ex(*iter, scaled_spacing * 0.3);
             Polygons normal_fill_area_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(normal_fill_areas_ex, get_extents(expanede_exploy));
-            auto     touch_check              = intersection_ex(normal_fill_area_clipped, expanede_exploy);
+            auto     touch_check = intersection_ex(normal_fill_area_clipped, expanede_exploy);
             if (!touch_check.empty()) {
                 normal_fill_areas_ex.emplace_back(*iter);
                 iter = narrow_fill_areas.erase(iter);
@@ -419,7 +583,7 @@ void split_solid_surface(size_t layer_id, const SurfaceFill &fill, ExPolygons &n
 
 #ifdef DEBUG_SURFACE_SPLIT
     {
-        BoundingBox bbox   = get_extents(fill.expolygons);
+        BoundingBox bbox = get_extents(fill.expolygons);
         bbox.offset(scale_(1.));
         ::Slic3r::SVG svg(debug_out_path("surface_split_%d.svg", layer_id), bbox);
         svg.draw(to_lines(fill.expolygons), "red", scale_(0.1));

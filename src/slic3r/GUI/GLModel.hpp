@@ -169,6 +169,17 @@ namespace GUI {
         GLModel(bool create_geometry_data = true);
         virtual ~GLModel() { reset(); }
 
+        // use the copy constructor to fix the [shallow copy of 'm_render_data']  problem when use  std::vector<GLModel> some_models;
+        GLModel(const GLModel& other)
+            : color(other.color)
+            , m_render_disabled(other.m_render_disabled)
+            , m_filename(other.m_filename)
+            , m_model_offsets(other.m_model_offsets)
+        {
+            if (other.m_render_data)
+                m_render_data = std::make_shared<RenderData>(*other.m_render_data);
+        }
+
         size_t vertices_count() const { return m_render_data->vertices_count > 0 ?
             m_render_data->vertices_count : m_render_data->geometry.vertices_count(); }
         size_t indices_count() const { return m_render_data->indices_count > 0 ?

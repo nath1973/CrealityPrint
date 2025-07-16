@@ -1,6 +1,65 @@
-#include "DataType.hpp"
+﻿#include "DataType.hpp"
+
+#include <sstream>
 namespace DM{
- 
+
+    template<typename T>
+    T safe_get_json_field(
+        const nlohmann::json& data, std::string field_name, nlohmann::json::value_t expect_type, const T& default_val, bool throwerr = false)
+    {
+        if (!data.contains(field_name))
+            return default_val;
+
+        // 如果类型匹配，直接返回
+        if (data[field_name].type() == expect_type) {
+            try {
+                return data[field_name].get<T>();
+            } catch (std::exception&) {
+                if (throwerr)
+                    throw;
+                return default_val;
+            }
+        }
+
+        // 处理数字类型互转（int ↔ float ↔ uint）
+        auto is_num = [](nlohmann::json::value_t type) {
+            return (type == nlohmann::json::value_t::number_integer || type == nlohmann::json::value_t::number_float ||
+                    type == nlohmann::json::value_t::number_unsigned);
+        };
+
+        if (is_num(expect_type) && is_num(data[field_name].type())) {
+            // 数字类型可以互转
+            return data[field_name].get<T>();
+        }
+
+        // 处理 string ↔ number 转换
+        if constexpr (std::is_same_v<T, std::string>) {
+            // T 是 string，但 JSON 可能是 number 或 bool
+            if (data[field_name].is_number()) {
+                return std::to_string(data[field_name].get<double>());
+            } else if (data[field_name].is_boolean()) {
+                return data[field_name].get<bool>() ? "true" : "false";
+            } else if (data[field_name].is_string()) {
+                return data[field_name].get<std::string>();
+            }
+        } else if constexpr (std::is_arithmetic_v<T>) { // T 是 int/double 等数字类型
+            // T 是数字，但 JSON 可能是 string 或 bool
+            if (data[field_name].is_string()) {
+                std::istringstream iss(data[field_name].get<std::string>());
+                T                  output;
+                if (iss >> output) {
+                    return output;
+                }
+            } else if (data[field_name].is_boolean()) {
+                return data[field_name].get<bool>() ? static_cast<T>(1) : static_cast<T>(0);
+            }
+        }
+
+        if (throwerr)
+            throw std::runtime_error("Failed to convert JSON field: " + field_name);
+        return default_val;
+    }
+
     bool DM::Material::operator==(const DM::Material& other) const
     {
         return  type == other.type && color == other.color;
@@ -24,42 +83,46 @@ namespace DM{
         return !(*this == other);
     }
 
-
     DM::Device Device::deserialize(nlohmann::json& device, bool need_update_box_info)
     {
+        using namespace nlohmann;
+        using jvalue = json::value_t;
         DM::Device data;
         try{
             if (!device.empty())
             {
                 data.valid = true;
 
-                data.mac = device.contains("mac") ? device["mac"].get<std::string>() : "";
-                data.address = device.contains("address") ? device["address"].get<std::string>() : "";
-                data.model = device.contains("model") ? device["model"].get<std::string>() : "";
-                data.online = device.contains("online") ? device["online"].get<bool>() : false;
-                data.deviceState = device.contains("deviceState") ? device["deviceState"].get<int>() : 0;
-                data.name = device.contains("name") ? device["name"].get<std::string>() : "";
-
-                data.deviceType = device.contains("deviceType") ? device["deviceType"].get<int>() : 0;
-                data.isCurrentDevice = device.contains("isCurrentDevice") ? device["isCurrentDevice"].get<bool>() : false;
-                data.webrtcSupport = device.contains("webrtcSupport") ? device["webrtcSupport"].get<int>() == 1 : false;
-                data.tbId = (device.contains("tbId") && !device["tbId"].is_null()) ? device["tbId"].get<std::string>() : "";
-                data.modelName = device.contains("modelName") ? device["modelName"].get<std::string>() : "";
-                data.isMultiColorDevice = device.contains("IsMultiColorDevice") ? device["IsMultiColorDevice"].get<bool>() : false;
+                data.mac = safe_get_json_field(device, "mac", jvalue::string, std::string(""));
+                data.address = safe_get_json_field(device, "address", jvalue::string, std::string(""));
+                data.model       = safe_get_json_field(device, "model", jvalue::string, std::string(""));
+                data.online      = safe_get_json_field(device, "online", jvalue::boolean, false);
+                data.deviceState = safe_get_json_field(device, "deviceState", jvalue::number_integer, 0);
+                data.name        = safe_get_json_field(device, "name", jvalue::string, std::string(""));
+                
+                data.deviceType         = safe_get_json_field(device, "deviceType", jvalue::number_integer, 0);
+                data.isCurrentDevice    = safe_get_json_field(device, "isCurrentDevice", jvalue::boolean, false);
+                data.webrtcSupport      = safe_get_json_field(device, "webrtcSupport", jvalue::number_integer, 0) == 1? true:false;
+                data.tbId               = safe_get_json_field(device, "tbId", jvalue::string, std::string(""));
+                data.modelName          = safe_get_json_field(device, "modelName", jvalue::string, std::string(""));
+                data.isMultiColorDevice = safe_get_json_field(device, "IsMultiColorDevice", jvalue::boolean, false);
+                data.oldPrinter         = safe_get_json_field(device, "oldPrinter", jvalue::boolean, false);
 
                 if (need_update_box_info)
                 {
                     if (device.contains("boxsInfo") && device["boxsInfo"].contains("boxColorInfo")) {
                         for (const auto& box_info : device["boxsInfo"]["boxColorInfo"]) {
                             DM::DeviceBoxColorInfo box_color_info;
-                            box_color_info.boxType      = box_info["boxType"].get<int>();
-                            box_color_info.color        = box_info["color"].get<std::string>();
-                            box_color_info.boxId        = box_info["boxId"].get<int>();
-                            box_color_info.materialId   = box_info["materialId"].get<int>();
-                            box_color_info.filamentType = box_info["filamentType"].get<std::string>();
-                            box_color_info.filamentName = box_info["filamentName"].get<std::string>();
+                            box_color_info.boxType      = safe_get_json_field((json) box_info, "boxType", jvalue::number_integer, 0, true);
+                            box_color_info.color        = safe_get_json_field((json) box_info, "color", jvalue::string, std::string(""), true);
+                            box_color_info.boxId        = safe_get_json_field((json) box_info, "boxId", jvalue::number_integer, 0, true);
+                            box_color_info.materialId   = safe_get_json_field((json) box_info, "materialId", jvalue::number_integer, 0, true);                            
+                            box_color_info.filamentType = safe_get_json_field((json) box_info, "filamentType", jvalue::string,
+                                                                              std::string(""), true);
+                            box_color_info.filamentName = safe_get_json_field((json) box_info, "filamentName", jvalue::string,
+                                                                              std::string(""), true);
                             if (box_info.contains("cId")) {
-                                box_color_info.cId = box_info["cId"].get<std::string>();
+                                box_color_info.cId = safe_get_json_field((json) box_info, "cId", jvalue::string, std::string(""), true);
                             }
                             data.boxColorInfos.push_back(box_color_info);
                         }
@@ -70,9 +133,9 @@ namespace DM{
 
                         for (const auto& box : materialBoxs) {
                             DM::MaterialBox materialBox;
-                            materialBox.box_id    = box.contains("id") ? box["id"].get<int>() : 0;
-                            materialBox.box_state = box.contains("state") ? box["state"].get<int>() : 0;
-                            materialBox.box_type  = box.contains("type") ? box["type"].get<int>() : 0;
+                            materialBox.box_id    = safe_get_json_field((json) box, "id", jvalue::number_integer, 0);
+                            materialBox.box_state = safe_get_json_field((json) box, "state", jvalue::number_integer, 0);
+                            materialBox.box_type  = safe_get_json_field((json) box, "type", jvalue::number_integer, 0);
                             if (box.contains("temp")) {
                                 materialBox.temp = box["temp"];
                             }
@@ -83,21 +146,22 @@ namespace DM{
                             if (box.contains("materials")) {
                                 for (const auto& material : box["materials"]) {
                                     DM::Material mat;
-                                    mat.material_id  = material.contains("id") ? material["id"].get<int>() : 0;
-                                    mat.vendor       = material.contains("vendor") ? material["vendor"].get<std::string>() : "";
-                                    mat.type         = material.contains("type") ? material["type"].get<std::string>() : "";
-                                    mat.name         = material.contains("name") ? material["name"].get<std::string>() : "";
-                                    mat.rfid         = material.contains("rfid") ? material["rfid"].get<std::string>() : "";
-                                    mat.color        = material.contains("color") ? material["color"].get<std::string>() : "";
-                                    mat.diameter     = material.contains("diameter") ? material["diameter"].get<double>() : 0.0;
-                                    mat.minTemp      = material.contains("minTemp") ? material["minTemp"].get<int>() : 0;
-                                    mat.maxTemp      = material.contains("maxTemp") ? material["maxTemp"].get<int>() : 0;
-                                    mat.pressure     = material.contains("pressure") ? material["pressure"].get<double>() : 0.0;
-                                    mat.percent      = material.contains("percent") ? material["percent"].get<int>() : 0;
-                                    mat.state        = material.contains("state") ? material["state"].get<int>() : 0;
-                                    mat.selected     = material.contains("selected") ? material["selected"].get<int>() : 0;
-                                    mat.editStatus   = material.contains("editStatus") ? material["editStatus"].get<int>() : 0;
-                                    mat.userMaterial = material.contains("userMaterial") ? material["userMaterial"].get<std::string>() : "";
+
+                                    mat.material_id = safe_get_json_field((json) material, "id", jvalue::number_integer, 0);
+                                    mat.vendor      = safe_get_json_field((json) material, "vendor", jvalue::string, std::string(""));
+                                    mat.type        = safe_get_json_field((json) material, "type", jvalue::string, std::string(""));
+                                    mat.name         = safe_get_json_field((json) material, "name", jvalue::string, std::string(""));
+                                    mat.rfid         = safe_get_json_field((json) material, "rfid", jvalue::string, std::string(""));
+                                    mat.color        = safe_get_json_field((json) material, "color", jvalue::string, std::string(""));
+                                    mat.diameter     = safe_get_json_field((json) material, "diameter", jvalue::number_float, (double) 0.0);
+                                    mat.minTemp      = safe_get_json_field((json) material, "minTemp", jvalue::number_integer, 0);
+                                    mat.maxTemp      = safe_get_json_field((json) material, "maxTemp", jvalue::number_integer, 0);
+                                    mat.pressure     = safe_get_json_field((json) material, "pressure", jvalue::number_float, (double) 0.0);
+                                    mat.percent      = safe_get_json_field((json) material, "percent", jvalue::number_integer, 0);
+                                    mat.state        = safe_get_json_field((json) material, "state", jvalue::number_integer, 0);
+                                    mat.selected     = safe_get_json_field((json) material, "selected", jvalue::number_integer, 0);
+                                    mat.editStatus   = safe_get_json_field((json) material, "editStatus", jvalue::number_integer, 0);
+                                    mat.userMaterial = safe_get_json_field((json) material, "userMaterial", jvalue::string, std::string(""));
                                     materialBox.materials.push_back(mat);
                                 }
                             }
