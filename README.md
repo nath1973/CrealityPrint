@@ -6,7 +6,9 @@ Creality Print 6.0 is an open source slicer for FDM printers.   [Offical Wiki](h
 <a href="https://discord.gg/agTqDNyJNY"><img src="https://img.shields.io/static/v1?message=Discord&logo=discord&label=&color=7289DA&logoColor=white&labelColor=&style=for-the-badge" height="35" alt="discord logo"/> </a>
 
 Welcome to join the Discord channel "creality-print-tester" and engage with us in discussions about everything related to Creality Print. Please follow the instructions below to help you find the "creality-print-tester" group.
+
 If you are an interested developer, please follow these steps to join the Discord CP-GitHub-Develop channel:
+
 - Click the "Join Creality 3D" button.
 ![alt text](Creality_doc/discord_step1.PNG)
 - At the 4th question select the “Invite by April” button.
