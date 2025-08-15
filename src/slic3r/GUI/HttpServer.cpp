@@ -9,9 +9,14 @@
 #include "video/WebRTCDecoder.h"
 #include <boost/asio/steady_timer.hpp>
 #endif
-namespace pt = boost::property_tree;
+
+#include "buildinfo.h"
+#if ENABLE_FFMPEG
+#include "video/RTSPDecoder.h"
+#endif
 namespace Slic3r {
 namespace GUI {
+namespace pt = boost::property_tree;
 
 int http_headers::content_length()
 {
@@ -146,16 +151,33 @@ void session::read_next_line()
                         this->handle_proxy_request(url_str);
                         return ;
                     }
-                    else if (url_str.find("/videostream") == 0) {
-                        #if defined(__linux__) || defined(__LINUX__)
+                    else if (url_str.find("/videostream") == 0 || url_str.find("/rtspvideostream") == 0) {
+                        
                         std::string   ip           = url_get_param(url_str, "ip");
                         std::string timestamp = url_get_param(url_str, "timestamp");
-                        std::string video_url = (boost::format("http://%1%:8000/call/webrtc_local") % ip).str();
+                        bool isRtsp = url_str.find("/rtspvideostream") == 0;
+                        std::string video_url = "";
                         HttpServer *pServer = wxGetApp().get_server();
                         std::cout << "start webrtc!"<<timestamp<<"\n";
-                        pServer->mjpeg_server_started = true;
-                        WebRTCDecoder::GetInstance()->startPlay(video_url); 
+                        //pServer->mjpeg_server_started = true;
                         
+                        if(isRtsp)
+                        {
+                            video_url = (boost::format("rtsp://%1%/ch0_0") % ip).str();
+                            std::cout << "start rtsp!\n";
+                            #if ENABLE_FFMPEG
+                            RTSPDecoder::GetInstance()->startPlay(video_url);
+                            #endif
+                        }
+                        else
+                        {
+                            video_url = (boost::format("http://%1%:8000/call/webrtc_local") % ip).str();
+                              #if defined(__linux__) || defined(__LINUX__)
+                                WebRTCDecoder::GetInstance()->startPlay(video_url); 
+                              #endif
+                        }
+                       
+                      
                         const std::string header =
                                     "HTTP/1.1 200 OK\r\n"
                                     "Content-Type: multipart/x-mixed-replace; boundary=boundarydonotcross\r\n"
@@ -163,7 +185,8 @@ void session::read_next_line()
                                     "pragma:no-cache\r\n"
                                     "Access-Control-Allow-Origin: *\r\n"
                                     "Connection: close\r\n\r\n";
-                        async_write(socket,  boost::asio::buffer(header),[this, self,pServer](const boost::beast::error_code& e, std::size_t s) {
+                        std::shared_ptr<std::string> frame_header_ptr = std::make_shared<std::string>(header);
+                        async_write(socket,  boost::asio::buffer(frame_header_ptr->data(), frame_header_ptr->size()),[this, self,pServer,isRtsp,frame_header_ptr](const boost::beast::error_code& e, std::size_t s) {
                             if(!e)
                             {
                                 if(!this->m_video_timer)
@@ -171,14 +194,14 @@ void session::read_next_line()
                                     this->m_video_timer = new boost::asio::deadline_timer(server.io_service, boost::posix_time::milliseconds(100));
                                 }
                                 std::cout << "start send!\r\n";
-                                this->sendFrame(e,socket);
+                                this->sendFrame(e,socket,isRtsp);
                             }else{
-                                pServer->mjpeg_server_started = false;
+                                //pServer->mjpeg_server_started = false;
                                 std::cout << "end send!\r\n";
                             }
                             
                         });
-                        #endif
+                        
                     }else{
                         const auto        resp    = server.server.m_request_handler(url_str);
                         std::stringstream ssOut;
@@ -201,28 +224,36 @@ void session::read_next_line()
         }
     });
 }
-#if defined(__linux__) || defined(__LINUX__)
-void session::sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp::socket &socket)
+
+void session::sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp::socket &socket, bool is_rtsp)
 {
-        //this->frame_mutex_.lock();
-        std::vector<unsigned char> copy_frame = WebRTCDecoder::GetInstance()->getFrameData();
+        std::vector<unsigned char> copy_frame;
+    
+        if(is_rtsp)
+        {
+            #if ENABLE_FFMPEG
+            RTSPDecoder::GetInstance()->getFrameData(copy_frame);
+            #endif
+        }else{
+            #if defined(__linux__) || defined(__LINUX__)
+            copy_frame = WebRTCDecoder::GetInstance()->getFrameData();
+            #endif
+        }
+        
         //this->frame_mutex_.unlock();
         if(copy_frame.size()==0)
         {
             this->m_video_timer->cancel();
             this->m_video_timer->expires_at(this->m_video_timer->expires_at()+boost::posix_time::milliseconds(150));
-            this->m_video_timer->async_wait([&](const auto& error) {
+            this->m_video_timer->async_wait([this, ec, &socket ,is_rtsp](const auto& error) {
                     if (!error) {
                         //std::cout << "start send frame!\r\n";
-                        this->sendFrame(ec,socket);
+                        this->sendFrame(ec,socket,is_rtsp);
                     }
                 });
             return;
         }
-        if(WebRTCDecoder::GetInstance()->isStop())
-        {
-            //break;
-        }
+       
         
         //std::cout << "send!\n"<<copy_frame.size();
         const std::string frame_header =
@@ -231,11 +262,13 @@ void session::sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp
                     "Content-Length: " + 
                     std::to_string(copy_frame.size()) + "\r\n\r\n";
         
+        std::shared_ptr<std::string> frame_header_ptr = std::make_shared<std::string>(frame_header);
+        std::shared_ptr<std::vector<unsigned char>> frame_ptr = std::make_shared<std::vector<unsigned char>>(copy_frame);
         std::vector<boost::asio::const_buffer> buffers;
-        buffers.emplace_back(boost::asio::buffer(frame_header));
-        buffers.emplace_back(boost::asio::buffer(copy_frame));
-        //std::cout << "start send!\r\n";
-        boost::asio::async_write(socket,  buffers,[this,&socket](const boost::beast::error_code& ec, std::size_t s) {
+        buffers.emplace_back(boost::asio::buffer(frame_header_ptr->data(), frame_header_ptr->size()));
+        buffers.emplace_back(boost::asio::buffer(frame_ptr->data(), frame_ptr->size()));
+        
+        boost::asio::async_write(socket,  buffers,[this,&socket,is_rtsp,frame_header_ptr,frame_ptr](const boost::beast::error_code& ec, std::size_t s) {
             
             if(!ec)
             {
@@ -244,20 +277,21 @@ void session::sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp
                 //this->sendFrame(ec,socket);
                 this->m_video_timer->cancel();
                 this->m_video_timer->expires_at(this->m_video_timer->expires_at()+boost::posix_time::milliseconds(150));
-                this->m_video_timer->async_wait([&](const auto& error) {
+                this->m_video_timer->async_wait([this, ec, &socket, is_rtsp](const auto& error) {
                     if (!error) {
                         //std::cout << "start send frame!\r\n";
-                        this->sendFrame(ec,socket);
+                        this->sendFrame(ec,socket,is_rtsp);
                     }
                 });
             }else{
                 //this->mjpeg_server_started = false;
-                std::cout << "end send!\r\n";
+                BOOST_LOG_TRIVIAL(error) << "send frame error: " << ec.message();
+                std::cout << "end send!"<<ec.message()<<"\r\n";
             }
             
         });
 }
-#endif
+
 void HttpServer::IOServer::do_accept()
 {
     acceptor.async_accept([this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket) {
@@ -363,6 +397,9 @@ void HttpServer::stop()
     if (m_http_server_thread.joinable())
         m_http_server_thread.join();
     server_.reset();
+#if ENABLE_FFMPEG
+    RTSPDecoder::GetInstance()->stopPlay();
+#endif
 }
 
 void HttpServer::set_request_handler(const std::function<std::shared_ptr<Response>(const std::string&)>& request_handler)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# scripts/build_package_macos.sh 6.0.0.100 CrealityPrint Alpha 0
+# scripts/build_package_macos.sh 6.0.0.100 CrealityPrint Alpha 0 F002
 
 set -e
 set -o pipefail
@@ -39,6 +39,7 @@ VERSION_TAG_NAME=$1
 APPNAME=$2
 VERSION_EXTRA=$3
 SLICER_HEADER=$4
+CUSTOM_TYPE=$5
 if  [ -z "$SLICER_HEADER" ]; then
     export SLICER_HEADER=1
 fi 
@@ -53,7 +54,9 @@ fi
 if [ -z "$VERSION_EXTRA" ]; then
     export APPNAME="Alpha"
 fi
-
+if [ -z "$CUSTOM_TYPE" ]; then
+    export CUSTOM_TYPE=""
+fi
 echo "Build params:"
 echo " - ARCH: $ARCH"
 echo " - BUILD_CONFIG: $BUILD_CONFIG"
@@ -130,14 +133,23 @@ function pack_slicer() {
     )
 }
 function build_slicer() {
-	echo "Verify localization with gettext..."
-	(
-		cd "$PROJECT_DIR"
-		./run_gettext.sh
-	)
+    echo "Verify localization with gettext..."
+    (
+        cd "$PROJECT_DIR"
+        # ./run_gettext.sh
+        if [ -z "$5" ]; then
+            bash run_gettext.sh || exit 1
+        else
+            echo "customum gettext"
+            # bash ./customized/$CUSTOM_TYPE/copy_resources.sh || exit 1
+            bash ./customized/$CUSTOM_TYPE/run_gettext.sh || exit 1
+        fi
+
+    )
+
     echo "Building slicer..."
     (
-        echo " - SLICER_HEADER=$SLICER_HEADER"
+        # echo " - SLICER_HEADER=$SLICER_HEADER"
         set -x
         mkdir -p "$PROJECT_BUILD_DIR"
         cd "$PROJECT_BUILD_DIR"
@@ -157,10 +169,12 @@ function build_slicer() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET="${OSX_DEPLOYMENT_TARGET}" \
                 -DPROCESS_NAME=$APPNAME \
                 -DCREALITYPRINT_VERSION=$VERSION_TAG_NAME \
-                -DPROJECT_VERSION_EXTRA=$VERSION_EXTRA
+                -DPROJECT_VERSION_EXTRA=$VERSION_EXTRA    \
+                -DCUSTOM_TYPE=$CUSTOM_TYPE
         fi
         cmake --build . --config "$BUILD_CONFIG" --target "$SLICER_BUILD_TARGET" || exit -2
     )
+
 
     # echo "Fix macOS app package..."
     # (
@@ -177,7 +191,7 @@ case "${BUILD_TARGET}" in
     all)
         build_deps
         build_slicer
-        pack_slicer
+        # pack_slicer
         ;;
     deps)
         build_deps

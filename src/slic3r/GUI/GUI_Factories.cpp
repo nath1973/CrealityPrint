@@ -676,7 +676,7 @@ wxMenu* MenuFactory::append_submenu_add_testing_model(wxMenu* menu, ModelVolumeT
     std::vector<const char*> names = {L("Block20XY"),  L("3DBenchy"),       L("Complex"),
                                       L("Overhang"), L("Square columns Z axis"), L("Square prism Z axis")};
 
-    std::vector<const char*> file_names = {"Block20XY.stl", "3DBenchy.stl", "ksr_fdmtest_v4.3mf",
+    std::vector<const char*> file_names = {"Block20XY.stl", "3DBenchy.stl", "ksr_fdmtest_v4.stl",
                                           "Overhang.stl", "Square columns Z axis.stl", "Square prism Z axis.stl"};
     
     std::vector<const char*> icon_names = {"Block20XY", "3DBenchy", "Complex",
@@ -1668,7 +1668,8 @@ void MenuFactory::create_svg_part_menu()
 void MenuFactory::create_bbl_part_menu()
 {
     wxMenu* menu = &m_part_menu;
-
+    append_menu_item_clone(menu);
+    menu->AppendSeparator();
     append_menu_item_delete(menu);
     // copy
     append_menu_item_copy(menu);
@@ -1984,6 +1985,8 @@ wxMenu* MenuFactory::multi_selection_menu()
             append_menu_item_merge_to_multipart_object(menu);
             index++;
         }
+        append_menu_item_clone(menu);
+        menu->AppendSeparator();
         append_menu_item_center(menu);
         append_menu_item_fix_through_netfabb(menu);
         //append_menu_item_simplify(menu);
@@ -2002,6 +2005,8 @@ wxMenu* MenuFactory::multi_selection_menu()
         append_menu_item_export_stl(menu, true);
     }
     else {
+        append_menu_item_clone(menu);
+        menu->AppendSeparator();
         append_menu_item_center(menu);
         append_menu_item_fix_through_netfabb(menu);
         //append_menu_item_simplify(menu);

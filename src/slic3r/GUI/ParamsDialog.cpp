@@ -31,17 +31,13 @@ ParamsDialog::ParamsDialog(wxWindow * parent)
 	Center();
     Bind(wxEVT_SHOW, [this](auto &event) {
         if (IsShown()) {
-            m_winDisabler = new wxWindowDisabler(this);
             wxPoint position = GetPosition();
-            if (position.y < 0)
+            if (position.y < 0 && abs(position.y)<20)
             {
                 wxSize newSize = wxSize(110 * em_unit(), 65 * em_unit() + position.y*2);
                 SetSize(newSize);
-                SetPosition(wxPoint(position.x, 0));
+                SetPosition(wxPoint(position.x, GetParent()->GetPosition().y));
             }
-        } else {
-            delete m_winDisabler;
-            m_winDisabler = nullptr;
         }
     });
 	Bind(wxEVT_CLOSE_WINDOW, [this](auto& event) {

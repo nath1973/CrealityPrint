@@ -36,19 +36,19 @@ const bool isEnabledCxCloud()
 #endif
 }
 const std::string getIconName_noTheme() {
-#if defined(CUSTOMIZED)
-    return std::string(CUSTOM_TYPE);
+#if defined(CUSTOMIZED) && defined(CUSTOM_ICON_NAME)
+    return std::string(CUSTOM_ICON_NAME);
 #endif //
     return std::string(SLIC3R_APP_NAME);
 }
 const std::string getIconName()
 {
-#if defined(CUSTOMIZED)
-    if ( g_is_dark && std::string(CUSTOM_TYPE) == "MorandiPrint") 
+#if defined(CUSTOMIZED) && defined(CUSTOM_ICON_NAME)
+    if ( g_is_dark && std::string(CUSTOM_ICON_NAME) == "MorandiPrint")
     {
-        return std::string(CUSTOM_TYPE) + "_light";
+        return std::string(CUSTOM_ICON_NAME) + "_light";
     }
-    return std::string(CUSTOM_TYPE);
+    return std::string(CUSTOM_ICON_NAME);
 #endif //
     return std::string(SLIC3R_APP_NAME);
 }

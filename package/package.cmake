@@ -11,7 +11,6 @@ macro(prepareNSIS_Link linkName appName params)
   LIST(APPEND CPACK_NSIS_DELETE_ICONS_EXTRA " Delete '$DESKTOP\\\\${linkName}.lnk'")
 
   SET(CPACK_SOFEWARE_PROCESS_NAME "${appName}.exe")
-  LIST(APPEND CPACK_ONINIT_DELETE_DESTOP_LINK "Delete '$DESKTOP\\\\${linkName}.lnk'")
 endmacro()
 
 if(${PROJECT_VERSION_EXTRA} STREQUAL "Release")

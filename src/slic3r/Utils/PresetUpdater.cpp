@@ -1128,7 +1128,33 @@ void PresetUpdater::priv::check_installed_vendor_profiles() const
     }
 
     if (bundles.size() > 0)
+    {
         install_bundles_rsrc(bundles, false);
+        //delete cache dir
+        
+        
+        #ifdef __WXMAC__
+            wxStandardPaths& stdPaths = wxStandardPaths::Get();
+            wxString cacheBase = stdPaths.GetUserDir(wxStandardPaths::Dir_Cache);
+            wxString appCacheDir = cacheBase + "/com.creality.crealityprint";
+            if (wxDirExists(appCacheDir)) {
+            if (!wxFileName::Rmdir(appCacheDir, wxPATH_RMDIR_RECURSIVE)) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to delete cache directory: " << appCacheDir;
+                }
+            }
+        #endif
+        #ifdef __linux__
+            wxStandardPaths& stdPaths = wxStandardPaths::Get();
+            wxString cacheBase = stdPaths.GetUserDir(wxStandardPaths::Dir_Cache);
+            wxString appCacheDir = cacheBase + "/"+SLIC3R_APP_NAME;
+            if (wxDirExists(appCacheDir)) {
+            if (!wxFileName::Rmdir(appCacheDir, wxPATH_RMDIR_RECURSIVE)) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to delete cache directory: " << appCacheDir;
+                }
+            }
+        #endif
+       
+        }   
 }
 
 Updates PresetUpdater::priv::get_printer_config_updates(bool update) const

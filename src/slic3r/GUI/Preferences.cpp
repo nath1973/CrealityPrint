@@ -1394,7 +1394,10 @@ wxWindow* PreferencesDialog::create_general_page()
                                         "sync_user_preset");
     auto item_user_exp    = create_item_checkbox(_L("User Experience Program"), page, _L("User Experience Program"), 50,
                                                   "user_exp");
-#endif 
+#endif
+
+    auto item_step_import_setting    = create_item_checkbox(_L("Display Step Import Setting Dialog"), page, _L("Display Step Import Setting Dialog"), 50,
+                                                  "enable_step_mesh_setting");
     
     //item_user_exp->
     auto item_save_presets = create_item_button(_L("Clear my choice on the unsaved presets."), _L("Clear"), page, L"", _L("Clear my choice on the unsaved presets."), []() {
@@ -1413,9 +1416,9 @@ wxWindow* PreferencesDialog::create_general_page()
 #endif
 
     auto item_zoom_to_mouse = create_item_zoom_to_mouse_checkbox(_L("Zoom to mouse position"), page,_L("Zoom to mouse position"), 50, "zoom_to_mouse");
-
+#if CUSTOM_CXCLOUD
     auto item_default_page = create_default_page_radiobutton(_L("Default Page"), page);
-
+#endif
     sizer_page->Add(item_language, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(20));
     sizer_page->Add(item_region, 0, wxTOP, FromDIP(3));
@@ -1438,15 +1441,19 @@ wxWindow* PreferencesDialog::create_general_page()
     sizer_page->AddSpacer(FromDIP(10));
     sizer_page->Add(sizer_radio, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(10));
+#if CUSTOM_CXCLOUD
     sizer_page->Add(item_default_page, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(10));
-#if CUSTOM_CXCLOUD
+
     sizer_page->Add(item_user_sync, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(10));
 
     sizer_page->Add(item_user_exp, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(5));
 #endif
+
+    sizer_page->Add(item_step_import_setting, 0, wxTOP, FromDIP(3));
+    sizer_page->AddSpacer(FromDIP(5));
 
     sizer_page->Add(item_save_presets, 0, wxTOP, FromDIP(3));
     sizer_page->AddSpacer(FromDIP(5));

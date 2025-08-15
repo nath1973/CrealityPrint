@@ -796,6 +796,7 @@ private:
 
 DECLARE_APP(GUI_App)
 wxDECLARE_EVENT(EVT_CONNECT_LAN_MODE_PRINT, wxCommandEvent);
+wxDECLARE_EVENT(EVT_TEST_HELPER_CMD, wxCommandEvent);
 
 bool is_support_filament(int extruder_id);
 } // namespace GUI

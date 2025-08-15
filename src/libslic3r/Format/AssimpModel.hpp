@@ -3,6 +3,7 @@
 
 //#include "../assimp/scene.h"
 #include "libslic3r/Model.hpp"
+#include "step_func_def.hpp"
 namespace Slic3r {
 
 class TriangleMesh;

@@ -164,6 +164,7 @@ set(lisbslic3r_sources
     Format/objparser.hpp
     Format/STEP.cpp
     Format/STEP.hpp
+    Format/step_func_def.hpp
     Format/STL.cpp
     Format/STL.hpp
     Format/SL1.hpp

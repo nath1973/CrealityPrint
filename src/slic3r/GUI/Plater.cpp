@@ -137,6 +137,7 @@
 #include "Gizmos/GLGizmoSVG.hpp"      // Drop SVG file
 #include "Gizmos/GizmoObjectManipulation.hpp"
 #include "AnalyticsDataUploadManager.hpp"
+#include "StepMeshDialog.hpp"
 
 // BBS
 #include "Widgets/ProgressDialog.hpp"
@@ -190,6 +191,7 @@
 #include "libslic3r/ModelArrange.hpp"
 #include "PrinterPresetConfig.hpp"
 #include "CommunicateWithCXCloud.hpp"
+#include "Check3mfVendor.hpp"
 
 #include "libslic3r/common_header/common_header.h"
 using boost::optional;
@@ -4163,7 +4165,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     const auto     loading = _L("Loading") + dots;
     ProgressDialog dlg(loading, "", 100, find_toplevel_parent(q), wxPD_AUTO_HIDE | wxPD_CAN_ABORT | wxPD_APP_MODAL);
-    wxBusyCursor   busy;
+    BusyCursor busy;
 
     auto*               new_model = (!load_model || one_by_one) ? nullptr : new Slic3r::Model();
     std::vector<size_t> obj_idxs;
@@ -4733,16 +4735,25 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         }
 
                         // always load config
+                        std::string printerSettingId = "";
                         {
+                            ConfigOptionString* opt = config.option<ConfigOptionString>("printer_settings_id", false);
+                            if (opt != nullptr) {
+                                printerSettingId = opt->value;
+                            }
                             // BBS: save the wipe tower pos in file here, will be used later
                             ConfigOptionFloats*               wipe_tower_x_opt = config.opt<ConfigOptionFloats>("wipe_tower_x");
                             ConfigOptionFloats*               wipe_tower_y_opt = config.opt<ConfigOptionFloats>("wipe_tower_y");
+                            ConfigOptionFloat*                wipe_tower_rotation_angle_opt = config.opt<ConfigOptionFloat>("wipe_tower_rotation_angle");
                             std::optional<ConfigOptionFloats> file_wipe_tower_x;
                             std::optional<ConfigOptionFloats> file_wipe_tower_y;
+                            std::optional<ConfigOptionFloat>  file_wipe_tower_rotation_angle;
                             if (wipe_tower_x_opt)
                                 file_wipe_tower_x = *wipe_tower_x_opt;
                             if (wipe_tower_y_opt)
                                 file_wipe_tower_y = *wipe_tower_y_opt;
+                            if (wipe_tower_rotation_angle_opt)
+                                file_wipe_tower_rotation_angle = *wipe_tower_rotation_angle_opt;
 
                             ConfigOptionStrings* filament_settings_id = config.opt<ConfigOptionStrings>("filament_settings_id");
                             ConfigOptionStrings* default_filament_profile = config.opt<ConfigOptionStrings>("default_filament_profile");
@@ -4842,15 +4853,22 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                 DynamicConfig&      proj_cfg     = wxGetApp().preset_bundle->project_config;
                                 ConfigOptionFloats* wipe_tower_x = proj_cfg.opt<ConfigOptionFloats>("wipe_tower_x");
                                 ConfigOptionFloats* wipe_tower_y = proj_cfg.opt<ConfigOptionFloats>("wipe_tower_y");
+                                ConfigOptionFloat*  wipe_tower_rotation_angle = proj_cfg.opt<ConfigOptionFloat>("wipe_tower_rotation_angle");
                                 if (file_wipe_tower_x)
                                     *wipe_tower_x = *file_wipe_tower_x;
                                 if (file_wipe_tower_y)
                                     *wipe_tower_y = *file_wipe_tower_y;
+                                if (wipe_tower_rotation_angle)
+                                    *wipe_tower_rotation_angle = *file_wipe_tower_rotation_angle;
                             }
                         }
 
                         // 判断3mf中的打印机是否为系统机型
                         check_printer_standard_status();
+                        // 判断是否为创想的软件生成的3mf文件
+                        if (model.objects.size() != 0) {
+                            Check3mfVendor::getInstance()->check(path.string(), printerSettingId, &busy);
+                        }
                     }
                     if (!silence)
                         wxGetApp().app_config->update_config_dir(path.parent_path().string());
@@ -4878,56 +4896,101 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 };
 
                 auto start = std::chrono::high_resolution_clock::now();
-                model      = Slic3r::Model::read_from_file(
-                    path.string(), nullptr, nullptr, strategy, &plate_data, &project_presets, &is_xxx, &file_version, nullptr,
-                    [this, &dlg, real_filename, &progress_percent, &file_percent, INPUT_FILES_RATIO, total_files, i, &designer_model_id,
-                     &designer_country_code](int current, int total, bool& cancel, std::string& mode_id, std::string& code) {
-                        designer_model_id     = mode_id;
-                        designer_country_code = code;
 
-                        bool  cont          = true;
-                        float percent_float = (100.0f * (float) i / (float) total_files) +
-                                              INPUT_FILES_RATIO * 100.0f * ((float) current / (float) total) / (float) total_files;
-                        BOOST_LOG_TRIVIAL(trace)
-                            << "load_stl_file: percent(float)=" << percent_float << ", curr = " << current << ", total = " << total;
-                        progress_percent = (int) percent_float;
-                        wxString msg     = wxString::Format(_L("Loading file: %s"), from_path(real_filename));
-                        cont             = dlg.Update(progress_percent, msg);
-                        cancel           = !cont;
-                    },
-                    [this, &dlg, real_filename, &progress_percent, &file_percent, step_percent, INPUT_FILES_RATIO, total_files,
-                     i](int load_stage, int current, int total, bool& cancel) {
-                        bool  cont          = true;
-                        float percent_float = (100.0f * (float) i / (float) total_files) +
-                                              INPUT_FILES_RATIO *
-                                                  ((float) step_percent[load_stage] +
-                                                   (float) current * (float) (step_percent[load_stage + 1] - step_percent[load_stage]) /
-                                                       (float) total) /
-                                                  (float) total_files;
-                        BOOST_LOG_TRIVIAL(trace) << "load_step_file: percent(float)=" << percent_float << ", stage = " << load_stage
-                                                 << ", curr = " << current << ", total = " << total;
-                        progress_percent = (int) percent_float;
-                        wxString msg     = wxString::Format(_L("Loading file: %s"), from_path(real_filename));
-                        cont             = dlg.Update(progress_percent, msg);
-                        cancel           = !cont;
-                    },
-                    [](int isUtf8StepFile) {
-                        if (!isUtf8StepFile) {
-                            const auto no_warn = wxGetApp().app_config->get_bool("step_not_utf8_no_warn");
-                            if (!no_warn) {
-                                MessageDialog dlg(nullptr,
-                                                       _L("Name of components inside step file is not UTF8 format!") + "\n\n" +
-                                                           _L("The name may show garbage characters!"),
-                                                       wxString(SLIC3R_APP_FULL_NAME " - ") + _L("Attention!"), wxOK | wxICON_INFORMATION);
-                                dlg.show_dsa_button(_L("Remember my choice."));
-                                dlg.ShowModal();
-                                if (dlg.get_checkbox_state()) {
-                                    wxGetApp().app_config->set_bool("step_not_utf8_no_warn", true);
+                if (boost::iends_with(path.string(), ".stp") ||
+                    boost::iends_with(path.string(), ".step")) {
+                        double linear = string_to_double_decimal_point(wxGetApp().app_config->get("linear_defletion"));
+                        if (linear <= 0) linear = 0.003;
+                        double angle = string_to_double_decimal_point(wxGetApp().app_config->get("angle_defletion"));
+                        if (angle <= 0) angle = 0.5;
+                        bool split_compound = wxGetApp().app_config->get_bool("is_split_compound");
+                        model = Slic3r::Model:: read_from_step(path.string(), strategy,
+                        [this, &dlg, real_filename, &progress_percent, &file_percent, step_percent, INPUT_FILES_RATIO, total_files, i](int load_stage, int current, int total, bool &cancel)
+                        {
+                                bool     cont = true;
+                                float percent_float = (100.0f * (float)i / (float)total_files) + INPUT_FILES_RATIO * ((float)step_percent[load_stage] + (float)current * (float)(step_percent[load_stage + 1] - step_percent[load_stage]) / (float)total) / (float)total_files;
+                                BOOST_LOG_TRIVIAL(trace) << "load_step_file: percent(float)=" << percent_float << ", stage = " << load_stage << ", curr = " << current << ", total = " << total;
+                                progress_percent = (int)percent_float;
+                                wxString msg  = wxString::Format(_L("Loading file: %s"), from_path(real_filename));
+                                cont          = dlg.Update(progress_percent, msg);
+                                cancel        = !cont;
+                        },
+                        [](int isUtf8StepFile) {
+                            if (!isUtf8StepFile)
+                                Slic3r::GUI::show_info(nullptr, _L("Name of components inside step file is not UTF8 format!") + "\n\n" + _L("The name may show garbage characters!"),
+                                                    _L("Attention!"));
+                        },
+                        [this, &path, &is_user_cancel, &linear, &angle, &split_compound](Slic3r::Step& file, double& linear_value, double& angle_value, bool& is_split)-> int {
+                            if (wxGetApp().app_config->get_bool("enable_step_mesh_setting")) {
+                                StepMeshDialog mesh_dlg(nullptr, file, linear, angle);
+                                if (mesh_dlg.ShowModal() == wxID_OK) {
+                                    linear_value = mesh_dlg.get_linear_defletion();
+                                    angle_value  = mesh_dlg.get_angle_defletion();
+                                    is_split     = mesh_dlg.get_split_compound_value();
+                                    return 1;
+                                }
+                            }else {
+                                linear_value = linear;
+                                angle_value = angle;
+                                is_split = split_compound;
+                                return 1;
+                            }
+                            is_user_cancel = true;
+                            return -1;
+                        }, linear, angle, split_compound);
+                }
+                else {
+                    model = Slic3r::Model::read_from_file(
+                        path.string(), nullptr, nullptr, strategy, &plate_data, &project_presets, &is_xxx, &file_version, nullptr,
+                        [this, &dlg, real_filename, &progress_percent, &file_percent, INPUT_FILES_RATIO, total_files, i, &designer_model_id,
+                        &designer_country_code](int current, int total, bool& cancel, std::string& mode_id, std::string& code) {
+                            designer_model_id = mode_id;
+                            designer_country_code = code;
+
+                            bool  cont = true;
+                            float percent_float = (100.0f * (float)i / (float)total_files) +
+                                INPUT_FILES_RATIO * 100.0f * ((float)current / (float)total) / (float)total_files;
+                            BOOST_LOG_TRIVIAL(trace)
+                                << "load_stl_file: percent(float)=" << percent_float << ", curr = " << current << ", total = " << total;
+                            progress_percent = (int)percent_float;
+                            wxString msg = wxString::Format(_L("Loading file: %s"), from_path(real_filename));
+                            cont = dlg.Update(progress_percent, msg);
+                            cancel = !cont;
+                        },
+                        [this, &dlg, real_filename, &progress_percent, &file_percent, step_percent, INPUT_FILES_RATIO, total_files,
+                        i](int load_stage, int current, int total, bool& cancel) {
+                            bool  cont = true;
+                            float percent_float = (100.0f * (float)i / (float)total_files) +
+                                INPUT_FILES_RATIO *
+                                ((float)step_percent[load_stage] +
+                                    (float)current * (float)(step_percent[load_stage + 1] - step_percent[load_stage]) /
+                                    (float)total) /
+                                (float)total_files;
+                            BOOST_LOG_TRIVIAL(trace) << "load_step_file: percent(float)=" << percent_float << ", stage = " << load_stage
+                                << ", curr = " << current << ", total = " << total;
+                            progress_percent = (int)percent_float;
+                            wxString msg = wxString::Format(_L("Loading file: %s"), from_path(real_filename));
+                            cont = dlg.Update(progress_percent, msg);
+                            cancel = !cont;
+                        },
+                        [](int isUtf8StepFile) {
+                            if (!isUtf8StepFile) {
+                                const auto no_warn = wxGetApp().app_config->get_bool("step_not_utf8_no_warn");
+                                if (!no_warn) {
+                                    MessageDialog dlg(nullptr,
+                                        _L("Name of components inside step file is not UTF8 format!") + "\n\n" +
+                                        _L("The name may show garbage characters!"),
+                                        wxString(SLIC3R_APP_FULL_NAME " - ") + _L("Attention!"), wxOK | wxICON_INFORMATION);
+                                    dlg.show_dsa_button(_L("Remember my choice."));
+                                    dlg.ShowModal();
+                                    if (dlg.get_checkbox_state()) {
+                                        wxGetApp().app_config->set_bool("step_not_utf8_no_warn", true);
+                                    }
                                 }
                             }
-                        }
-                    },
-                    nullptr, 0, obj_color_fun);
+                        },
+                        nullptr, 0, obj_color_fun);
+                }
                 auto end = std::chrono::high_resolution_clock::now();
                 // 计算耗时
                 auto duration   = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -6604,13 +6667,54 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
 
     Model new_model;
     try {
-        new_model = Model::read_from_file(path, nullptr, nullptr, LoadStrategy::AddDefaultInstances | LoadStrategy::LoadModel);
+        if (boost::iends_with(path, ".stp") ||
+            boost::iends_with(path, ".step")) {
+                double linear = string_to_double_decimal_point(wxGetApp().app_config->get("linear_defletion"));
+                if (linear <= 0) linear = 0.003;
+                double angle = string_to_double_decimal_point(wxGetApp().app_config->get("angle_defletion"));
+                if (angle <= 0) angle = 0.5;
+                bool split_compound = wxGetApp().app_config->get_bool("is_split_compound");
+                new_model = Slic3r::Model:: read_from_step(path, LoadStrategy::AddDefaultInstances | LoadStrategy::LoadModel,
+                nullptr,
+                [](int isUtf8StepFile) {
+                    if (!isUtf8StepFile)
+                        Slic3r::GUI::show_info(nullptr, _L("Name of components inside step file is not UTF8 format!") + "\n\n" + _L("The name may show garbage characters!"),
+                                            _L("Attention!"));
+                },
+                [this, &path, &linear, &angle, &split_compound](Slic3r::Step& file, double& linear_value, double& angle_value, bool& is_split)-> int {
+                    if (wxGetApp().app_config->get_bool("enable_step_mesh_setting")) {
+                        StepMeshDialog mesh_dlg(nullptr, file, linear, angle);
+                        if (mesh_dlg.ShowModal() == wxID_OK) {
+                            linear_value = mesh_dlg.get_linear_defletion();
+                            angle_value  = mesh_dlg.get_angle_defletion();
+                            is_split     = mesh_dlg.get_split_compound_value();
+                            return 1;
+                        }
+                    }else {
+                        linear_value = linear;
+                        angle_value = angle;
+                        is_split = split_compound;
+                        return 1;
+                    }
+                    return -1;
+                }, linear, angle, split_compound);
+        }else {
+            new_model = Model::read_from_file(path, nullptr, nullptr, LoadStrategy::AddDefaultInstances | LoadStrategy::LoadModel);
+        }
+        
         for (ModelObject* model_object : new_model.objects) {
             model_object->center_around_origin();
             model_object->ensure_on_bed();
         }
     } catch (std::exception&) {
         // error while loading
+        return false;
+    }
+
+    if (new_model.objects.empty()) {
+        MessageDialog dlg(q, _L("The selected file doesn't contain any object or Error during replace"), _L("Error during replace"),
+                          wxOK | wxOK_DEFAULT | wxICON_WARNING);
+        dlg.ShowModal();
         return false;
     }
 
@@ -7244,6 +7348,7 @@ void Plater::priv::set_current_panel(wxPanel* panel, bool no_slice)
             }
         } else if (only_has_gcode_need_preview) {
             this->m_slice_all = false;
+            this->q->set_only_gcode(true);
             this->q->reslice();
         }
         // BBS: process empty plate, reset previous toolpath
@@ -7919,6 +8024,8 @@ bool Plater::priv::warnings_dialog(int plate_index)
 
     std::string ssWarning = _u8L("has floating regions. Please re-orient the object or enable support generation.");
     std::string ssWarning2 = _u8L("appears to have floating areas, which may cause print failure.\nPlease reorient the model or enable supports.\n\n ");
+    std::string ssWarning3 = _u8L("has bridge overhangs. Please re-orient the object or enable support generation.");
+    std::string ssWarning4 = _u8L("appears to have bridge overhangs, which may cause print failure.\nPlease reorient the model or enable supports.\n\n ");
     if (text.find(ssWarning) != std::string::npos) {
         //bool bShow = wxGetApp().app_config->get_bool("show_floating_regions_warning");
         //int  showValue = atoi(wxGetApp().app_config->get("show_floating_regions_warning_value").c_str());
@@ -7934,6 +8041,11 @@ bool Plater::priv::warnings_dialog(int plate_index)
         //    wxGetApp().app_config->set_bool("show_floating_regions_warning", false);
         //    wxGetApp().app_config->set("show_floating_regions_warning_value", std::to_string(res));
         //}
+        return res == wxID_CANCEL;
+    } else if (text.find(ssWarning3) != std::string::npos) {
+        boost::replace_all(text, ssWarning3, ssWarning4);
+        ChangeBtnRichMsgDlg msg_window(this->q, from_u8(text), false, _L("warnings"), wxOK | wxCANCEL);
+        const auto res = msg_window.ShowModal();
         return res == wxID_CANCEL;
     }
 
@@ -8555,7 +8667,7 @@ void Plater::priv::on_action_send_to_local_net_printer(bool isall)
     wxGetApp().mainframe->get_printer_mgr_view()->request_close_detail_page();
 
     CxSentToPrinterDialog dlg(this->q,CxSentToPrinterDialog::SendType::Single,sidebar->get_filament_map_string().ToStdString());
-    
+
     dlg.ShowModal();
 }
 
@@ -10671,6 +10783,7 @@ void Plater::load_project(wxString const& filename2, wxString const& originfile)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "filename is: " << filename2 << "and originfile is: " << originfile;
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__;
+    ADD_TEST_RESPONE("FILES", "LOAD_PROJECT", 0, "");
     auto filename = filename2;
     auto check    = [&filename, this](bool yes_or_no) {
         if (!yes_or_no && !wxGetApp().check_and_save_current_preset_changes(_L("Load project"), _L("Some presets are modified.")))
@@ -10804,7 +10917,7 @@ void Plater::load_project(wxString const& filename2, wxString const& originfile)
 #endif // AUTOMATION_TOOL
     }
 #endif
-    ADD_TEST_RESPONE("FILES", "LOAD_PROJECT", 0, "");
+    ADD_TEST_RESPONE("FILES", "LOAD_PROJECT", 1, "");
 }
 
 // BBS: save logic
@@ -11853,6 +11966,10 @@ void Plater::calib_max_vol_speed(const Calib_Params& params)
     auto  print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
     auto  filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto  printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+    if(model().objects.empty())
+    {
+        return;
+    }
     auto  obj             = model().objects[0];
     auto& obj_cfg         = obj->config;
 
@@ -14622,12 +14739,14 @@ void Plater::export_gcode_3mf(bool export_all)
                 return;
             }
         } else {
-            export_3mf(output_path, SaveStrategy::Silence | SaveStrategy::SplitModel | SaveStrategy::WithGcode | SaveStrategy::SkipModel,
+            int ret = export_3mf(output_path, SaveStrategy::Silence | SaveStrategy::SplitModel | SaveStrategy::WithGcode | SaveStrategy::SkipModel,
                        plate_idx); // BBS: silence
-            RemovableDriveManager& removable_drive_manager = *wxGetApp().removable_drive_manager();
-            bool on_removable = removable_drive_manager.is_path_on_removable_drive(p->last_output_dir_path);
-            appconfig.update_last_output_dir(output_path.parent_path().string(), false);
-            p->notification_manager->push_exporting_finished_notification(output_path.string(), p->last_output_dir_path, on_removable);
+            if (ret == 0) {
+                RemovableDriveManager& removable_drive_manager = *wxGetApp().removable_drive_manager();
+                bool                   on_removable = removable_drive_manager.is_path_on_removable_drive(p->last_output_dir_path);
+                appconfig.update_last_output_dir(output_path.parent_path().string(), false);
+                p->notification_manager->push_exporting_finished_notification(output_path.string(), p->last_output_dir_path, on_removable);
+            }
         }
 
         //RemovableDriveManager& removable_drive_manager = *wxGetApp().removable_drive_manager();
@@ -14803,7 +14922,6 @@ void Plater::save_the_popup_successfully(const string& strPath)
 }
 
 // BBS export with/without boolean, however, stil merge mesh
-#define EXPORT_WITH_BOOLEAN 0
 void Plater::export_stl(bool extended, bool selection_only, bool multi_stls)
 {
     if (p->model.objects.empty()) {
@@ -14827,21 +14945,42 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls)
 
     wxBusyCursor wait;
     const auto&  selection = p->get_selection();
-    const auto   obj_idx   = selection.get_object_idx();
 
-#if EXPORT_WITH_BOOLEAN
-    if (selection_only && (obj_idx == -1 || selection.is_wipe_tower()))
-        return;
-#else
-    // BBS support selecting multiple objects
-    if (selection_only && selection.is_wipe_tower())
-        return;
+    bool  exist_negive_volume = false;
+    bool  export_with_boolean = false;
 
-    // BBS
-    if (selection_only) {
-        // only support selection single full object and mulitiple full object
-        if (!selection.is_single_full_object() && !selection.is_multiple_full_object())
+    if (selection_only && !selection.is_multiple_full_object()) {
+        const auto obj_idx = selection.get_object_idx();
+        if (obj_idx == -1 ||selection.is_wipe_tower())
             return;
+        // only support selection single full object
+        if (!selection.is_single_full_object())
+            return;
+        const ModelObject *cur_model_object = p->model.objects[obj_idx];
+        for (auto v : cur_model_object->volumes) {
+            if (v->type() == ModelVolumeType::NEGATIVE_VOLUME) {
+                exist_negive_volume = true;
+                break;
+            }
+        }
+    } else {//support mulitiple full object// from file mene to export
+        for (auto cur_model_object : p->model.objects) {
+            for (auto v : cur_model_object->volumes) {
+                if (v->type() == ModelVolumeType::NEGATIVE_VOLUME) {
+                    exist_negive_volume = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (exist_negive_volume) {
+        MessageDialog dlg(this, _L("Negative parts detected. Would you like to perform mesh boolean before exporting?"),  _L("Message"),
+                          wxICON_QUESTION | wxYES_NO);
+        int answer = dlg.ShowModal();
+        if (answer == wxID_YES) {
+            export_with_boolean = true;
+        }
     }
 
     // Following lambda generates a combined mesh for export with normals pointing outwards.
@@ -14865,7 +15004,8 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls)
             mesh.transform(mo.instances[instance_id]->get_matrix(), true);
         return mesh;
     };
-#endif
+
+
     auto mesh_to_export_sla = [&, this](const ModelObject& mo, int instance_id) {
         TriangleMesh mesh;
 
@@ -14937,18 +15077,22 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls)
 
     std::function<TriangleMesh(const ModelObject& mo, int instance_id)> mesh_to_export;
 
-    if (p->printer_technology == ptFFF)
-#if EXPORT_WITH_BOOLEAN
-        mesh_to_export = [this](const ModelObject& mo, int instance_id) {
-            return Plater::combine_mesh_fff(mo, instance_id, [this](const std::string& msg) {
-                return get_notification_manager()->push_plater_error_notification(msg);
-            });
-        };
-#else
-        mesh_to_export = mesh_to_export_fff_no_boolean;
-#endif
-    else
+    if (p->printer_technology == ptFFF) {
+        if(export_with_boolean) {
+            mesh_to_export = [this](const ModelObject& mo, int instance_id) {
+                return Plater::combine_mesh_fff(mo, instance_id, [this](const std::string& msg) {
+                    return get_notification_manager()->push_plater_error_notification(msg);
+                });
+            };
+        }
+        else {
+            mesh_to_export = mesh_to_export_fff_no_boolean;
+        }
+    }
+    else {
         mesh_to_export = mesh_to_export_sla;
+    }
+        
 
     auto get_save_file = [](std::string const& dir, std::string const& name) {
         auto path = dir + name + ".stl";
@@ -15015,15 +15159,16 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls)
             mesh.merge(mesh_to_export(*o, -1));
         }
     } else {
+        bool bRet = false;
         for (const ModelObject* o : p->model.objects) {
             auto mesh = mesh_to_export(*o, -1);
             mesh.translate(-o->origin_translation.cast<float>());
-            Slic3r::store_stl(get_save_file(path_u8, o->name).c_str(), &mesh, true);
+            bRet = Slic3r::store_stl(get_save_file(path_u8, o->name).c_str(), &mesh, true);
         }
 
         //save_the_popup_successfully(path_u8);
         fs::path output_path = path_u8;
-        if (!output_path.empty()) {
+        if (!output_path.empty() && bRet) {
             p->last_output_path                            = output_path.string();
             p->last_output_dir_path                        = output_path.parent_path().string();
             RemovableDriveManager& removable_drive_manager = *wxGetApp().removable_drive_manager();
@@ -15034,10 +15179,10 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls)
         return;
     }
 
-    Slic3r::store_stl(path_u8.c_str(), &mesh, true);
+    bool bRet = Slic3r::store_stl(path_u8.c_str(), &mesh, true);
     //save_the_popup_successfully(path_u8);
     fs::path output_path = path_u8;
-    if (!output_path.empty()) {
+    if (!output_path.empty() && bRet) {
         p->last_output_path                            = output_path.string();
         p->last_output_dir_path                        = output_path.parent_path().string();
         RemovableDriveManager& removable_drive_manager = *wxGetApp().removable_drive_manager();
@@ -15555,7 +15700,9 @@ void Plater::reslice()
     if (clean_gcode_toolpaths)
         reset_gcode_toolpaths();
 
-    p->preview->reload_print(!clean_gcode_toolpaths);
+    if(!m_only_gcode) {
+        p->preview->reload_print(!clean_gcode_toolpaths);
+    }
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__
                             << boost::format(": finished, started slicing for plate %1%") % p->partplate_list.get_curr_plate_index();

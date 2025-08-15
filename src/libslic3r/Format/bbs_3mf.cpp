@@ -14,6 +14,7 @@
 #include "../Time.hpp"
 
 #include "../I18N.hpp"
+#include "boost/date_time/posix_time/posix_time_duration.hpp"
 
 #include "bbs_3mf.hpp"
 
@@ -29,6 +30,9 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <ctime> 
 #include <boost/lexical_cast.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/nowide/cstdio.hpp>
@@ -8623,6 +8627,61 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
     }
 }
 
+// 更新单个文件的修改时间（兼容所有Boost版本）
+bool update_file_modification_time(const fs::path& file_path, const std::time_t& new_time) {
+    try {
+        if (fs::exists(file_path) && (fs::is_regular_file(file_path)|| fs::is_directory(file_path))) {
+            fs::last_write_time(file_path, new_time);
+            return true;
+        }
+
+        // 直接使用std::time_t作为时间类型（旧版本Boost兼容方式）
+        
+        return false;
+    }
+    catch (const fs::filesystem_error& e) {
+        std::cerr << "操作失败 (" << file_path << "): " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// 递归更新文件夹内所有文件
+void recursive_update_directory(const fs::path& dir_path, const std::time_t& new_time, 
+                               int& updated_count, int& error_count) {
+    try {
+        if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
+            std::cerr << "无效文件夹: " << dir_path << std::endl;
+            return;
+        }
+
+        // 兼容旧版本的目录迭代方式
+        fs::directory_iterator end_iter;
+        for (fs::directory_iterator iter(dir_path); iter != end_iter; ++iter) {
+            try {
+                if (fs::is_directory(iter->status())) {
+                    update_file_modification_time(iter->path(), new_time);
+                    recursive_update_directory(iter->path(), new_time, updated_count, error_count);
+                }
+                else if (fs::is_regular_file(iter->status())) {
+                    if (update_file_modification_time(iter->path(), new_time)) {
+                        updated_count++;
+                        std::cout << "已更新: " << iter->path() << std::endl;
+                    } else {
+                        error_count++;
+                    }
+                }
+            }
+            catch (const fs::filesystem_error& e) {
+                std::cerr << "处理失败 (" << iter->path() << "): " << e.what() << std::endl;
+                error_count++;
+            }
+        }
+    }
+    catch (const fs::filesystem_error& e) {
+        std::cerr << "文件夹操作失败: " << e.what() << std::endl;
+        error_count++;
+    }
+}
 // backup backgroud thread to dispatch tasks and coperate with ui thread
 class _BBS_Backup_Manager
 {
@@ -8670,6 +8729,8 @@ public:
 
         // clone object
         auto model = object.get_model();
+        m_backup_dir = model->get_backup_path();
+        m_next_flush_time = boost::get_system_time() + boost::posix_time::minutes(20);
         auto o = m_temp_model.add_object(object);
         int backup_id = model->get_object_backup_id(object);
         push_task({ AddObject, (size_t) backup_id, object.get_model()->get_backup_path(), o, 1 });
@@ -8711,6 +8772,7 @@ public:
         for (auto& t : canceled_tasks) {
             process_ui_task(t, true);
         }
+        m_backup_dir = "";
     }
 
     void set_interval(long n) {
@@ -8752,6 +8814,8 @@ private:
         RemoveBackup,
         Exit
     };
+    std::string m_backup_dir = "";
+    boost::system_time m_next_flush_time;
     struct Task {
         TaskType type;
         size_t id = 0;
@@ -8921,6 +8985,18 @@ public:
                     if (m_next_backup < boost::get_system_time())
                         m_next_backup = boost::get_system_time() + boost::posix_time::seconds(m_interval);
                 }
+                if (m_interval > 0 && boost::get_system_time() > m_next_flush_time)
+                {
+                    if(m_backup_dir!="")
+                    {
+                        int sucessed=0;
+                        int failed=0;
+                        std::time_t new_time = std::time(nullptr);
+                        recursive_update_directory(m_backup_dir,new_time,sucessed,failed);
+                    }
+                    m_next_flush_time = boost::get_system_time() + boost::posix_time::minutes(20);
+                }
+                
             }
             Task t = m_tasks.front();
             if (t.type == Exit) break;

@@ -193,14 +193,14 @@ private:
     EMode m_volume_selection_mode{ Instance };
     bool m_volume_selection_locked { false };
     
-    //used in the clone preview operation, the model object clone operation
-    std::vector<Vec3f> m_clone_offsets;
-
-    // used in volume clone operation, possible to have multiple volume selected at the same time;
-    // key -- the volume idx in m_list; value -- the offset of the volume in the clone operation
-    std::unordered_map<int, std::vector<Vec3f> > m_volume_clone_offsets;
+    //used in the clone preview operation, the model object or volume clone operation, possible to have multiple items selected at the same time
+    //  key -- the modelObject idx in "m_clipboard.m_model->objects"; value -- the offset of the modelObject in the clone operation
+    std::unordered_map<size_t, std::vector<Vec3f> > m_clone_offsets;
 
     std::unordered_map<size_t, unsigned int> m_clone_volume_id_to_selected_id;
+
+    //key -- the volume idx in m_list; value -- the modelObject index in "m_clipboard.m_model->objects"
+    std::unordered_map<size_t, size_t> m_volume_idx_to_object_idx;
 
     bool m_select_bbox_visible { true };
 

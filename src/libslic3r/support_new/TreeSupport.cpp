@@ -4176,25 +4176,20 @@ TreeSupportData::TreeSupportData(const PrintObject &object, coordf_t xy_distance
     branch_scale_factor = tan(object.config().tree_support_branch_angle.value * M_PI / 180.);
     clear_nodes();
     m_max_move_distances.resize(object.layers().size(), 0);
-    m_layer_outlines.resize(object.layers().size());
-    m_layer_outlines_below.resize(object.layer_count());
-    for (std::size_t layer_nr  = 0; layer_nr < object.layers().size(); ++layer_nr)
+    for (std::size_t layer_nr = 0; layer_nr < object.layers().size(); ++layer_nr)
     {
         const Layer* layer = object.get_layer(layer_nr);
         m_max_move_distances[layer_nr] = layer->height * branch_scale_factor;
-        ExPolygons& outline            = m_layer_outlines[layer_nr];
+        m_layer_outlines.push_back(ExPolygons());
+        ExPolygons& outline = m_layer_outlines.back();
         for (const ExPolygon& poly : layer->lslices) {
             poly.simplify(scale_(m_radius_sample_resolution), &outline);
         }
 
         if (layer_nr == 0)
-            m_layer_outlines_below[layer_nr] = outline;
-        else {
-            m_layer_outlines_below[layer_nr] = m_layer_outlines_below[layer_nr - 1];
-            m_layer_outlines_below[layer_nr].insert(m_layer_outlines_below[layer_nr].end(), outline.begin(), outline.end());
-            if (layer_nr % 10 == 0)
-                m_layer_outlines_below[layer_nr] = union_ex(m_layer_outlines_below[layer_nr]);
-        }
+            m_layer_outlines_below.push_back(outline);
+        else
+            m_layer_outlines_below.push_back(union_ex(m_layer_outlines_below.end()[-1], outline));
     }
 }
 

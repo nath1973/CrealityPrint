@@ -5091,6 +5091,11 @@ bool PartPlateList::is_all_slice_result_ready_for_export() const
 				return false;
 			}
         }
+		else if(i == m_current_plate) {
+			// if current selected plate is empty, return false
+			return false;
+		}
+
         if (m_plate_list[i]->is_slice_result_ready_for_print()) {
 			if (!m_plate_list[i]->has_printable_instances()) {
 				return false;

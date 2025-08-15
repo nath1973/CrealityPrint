@@ -84,6 +84,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Widgets/HoverBorderBox.cpp
     GUI/Widgets/NumberEntryDialog.hpp
     GUI/Widgets/NumberEntryDialog.cpp
+    GUI/Widgets/ColorSlider.hpp
+    GUI/Widgets/ColorSlider.cpp
     GUI/AboutDialog.cpp
     GUI/AboutDialog.hpp
     GUI/NetworkTestDialog.cpp
@@ -202,6 +204,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GUI_App.cpp
     GUI/FileDownloader.hpp
     GUI/FileDownloader.cpp
+    GUI/FileUploader.hpp
+    GUI/FileUploader.cpp
     GUI/GUI_App.hpp
     GUI/GUI_Utils.cpp
     GUI/GUI_Utils.hpp
@@ -673,12 +677,18 @@ set(SLIC3R_GUI_SOURCES
 	GUI/LoginTip.cpp
 	GUI/PrinterPresetConfig.hpp
 	GUI/PrinterPresetConfig.cpp
+	GUI/Check3mfVendor.hpp
+	GUI/Check3mfVendor.cpp
     Config/OptionConfig.h
     Config/OptionConfig.cpp
     GUI/AnalyticsDataUploadManager.hpp
     GUI/AnalyticsDataUploadManager.cpp
     Utils/ProfileFamilyLoader.hpp
     Utils/ProfileFamilyLoader.cpp
+    Utils/TestHelper.cpp
+    Utils/TestHelper.hpp
+    GUI/StepMeshDialog.hpp
+    GUI/StepMeshDialog.cpp
 )
 
 if (WIN32)
@@ -733,12 +743,19 @@ target_link_libraries(libslic3r_gui libslic3r cereal::cereal imgui imguizmo mini
 if(WIN32)
     target_link_libraries(libslic3r_gui iphlpapi)
 endif()
+
+
+find_package(FFmpeg)
+if(FFMPEG_VERSION)
+        target_link_libraries(libslic3r_gui webrtc_video)
+        add_definitions(-DENABLE_FFMPEG=1)
+endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_libraries(libslic3r_gui webrtc_video)
     if (FLATPAK)
         target_link_libraries(libslic3r_gui -lvdpau -lva -lva-drm -lva-x11)
     endif()
 endif()
+
 if (MSVC)
     target_link_libraries(libslic3r_gui Setupapi.lib)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")

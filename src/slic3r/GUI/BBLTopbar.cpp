@@ -259,6 +259,7 @@ enum CUSTOM_ID
     ID_TOOL_BAR = 3200,
     ID_AMS_NOTEBOOK,
     ID_UPLOAD3MF,
+    ID_MINBTN,
     //CX
     ID_3D = 4000,
     ID_PREVIEW,
@@ -675,7 +676,7 @@ void BBLTopbar::Init(wxFrame* parent)
 #endif
 #ifdef __WIN32__
     wxBitmap iconize_bitmap = create_scaled_bitmap(is_dark ? "topbar_min" : "topbar_min_light", this, (TOPBAR_ICON_SIZE));
-    wxAuiToolBarItem* iconize_btn = this->AddTool(wxID_ICONIZE_FRAME, "", iconize_bitmap);
+    wxAuiToolBarItem* iconize_btn    = this->AddTool(ID_MINBTN, "", iconize_bitmap);
 
     maximize_bitmap = create_scaled_bitmap(is_dark ? "topbar_max" : "topbar_max_light", this, (TOPBAR_ICON_SIZE));
     window_bitmap = create_scaled_bitmap(is_dark ? "topbar_win" : "topbar_win_light", this, (TOPBAR_ICON_SIZE));
@@ -705,9 +706,9 @@ void BBLTopbar::Init(wxFrame* parent)
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnDropdownToolItem, this, ID_TOP_DROPDOWN_MENU);
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCalibToolItem, this, ID_CALIB);
     this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnUpload3mf, this, ID_UPLOAD3MF);
-    //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnIconize, this, wxID_ICONIZE_FRAME);
-    //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnFullScreen, this, wxID_MAXIMIZE_FRAME);
-    //this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCloseFrame, this, wxID_CLOSE_FRAME);
+    this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnIconize, this, ID_MINBTN);
+    this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnFullScreen, this, wxID_MAXIMIZE_FRAME);
+    this->Bind(wxEVT_AUITOOLBAR_TOOL_DROPDOWN, &BBLTopbar::OnCloseFrame, this, wxID_CLOSE_FRAME);
     this->Bind(wxEVT_LEFT_DCLICK, &BBLTopbar::OnMouseLeftDClock, this);
     #ifdef WIN32
     this->Bind(wxEVT_LEFT_DOWN, &BBLTopbar::OnMouseLeftDown, this);
@@ -1140,7 +1141,7 @@ void BBLTopbar::Rescale(bool isResize) {
     */
     
 #ifdef __WIN32__
-    item = this->FindTool(wxID_ICONIZE_FRAME);
+    item = this->FindTool(ID_MINBTN);
     item->SetBitmap(create_scaled_bitmap(is_dark ? "topbar_min" : "topbar_min_light", this, (TOPBAR_ICON_SIZE)));
     item = this->FindTool(wxID_MAXIMIZE_FRAME);
     maximize_bitmap = create_scaled_bitmap(is_dark ? "topbar_max" : "topbar_max_light", this, (TOPBAR_ICON_SIZE));
@@ -1319,9 +1320,9 @@ void BBLTopbar::OnMouseLeftUp(wxMouseEvent& event)
     wxPoint           client_pos = this->ScreenToClient(mouse_pos);
     wxAuiToolBarItem* item       = this->FindToolByPosition(client_pos.x, client_pos.y);
     wxAuiToolBarItem* max_item   = this->FindTool(wxID_MAXIMIZE_FRAME);
-    wxAuiToolBarItem* min_item   = this->FindTool(wxID_ICONIZE_FRAME);
+    wxAuiToolBarItem* min_item   = this->FindTool(ID_MINBTN);
     wxAuiToolBarItem* close_item = this->FindTool(wxID_CLOSE_FRAME);
-    if (item == max_item) {
+    /*if (item == max_item) {
         wxAuiToolBarEvent evt;
         BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " OnFullScreen "
                                    << " mouse_pos.x=" << mouse_pos.x << " mouse_pos.y=" << mouse_pos.y;
@@ -1342,7 +1343,7 @@ void BBLTopbar::OnMouseLeftUp(wxMouseEvent& event)
         boost::log::core::get()->flush();
 
         OnCloseFrame(evt);
-    }
+    }*/
     event.Skip();
 }
 

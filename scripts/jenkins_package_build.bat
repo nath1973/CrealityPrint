@@ -108,8 +108,8 @@ if [%5] == [] (
     call run_gettext.bat || exit /b 1
 ) else (
     echo customum gettext
-    call ./customized/%APPNAME%/copy_resources.bat || exit /b 1
-    call ./customized/%APPNAME%/run_gettext.bat || exit /b 1
+    call ./customized/%CUSTOM_TYPE%/copy_resources.bat || exit /b 1
+    call ./customized/%CUSTOM_TYPE%/run_gettext.bat || exit /b 1
 )
 
 SET C3D_BUILD_DIR=%ROOT_C3D%\build_Release

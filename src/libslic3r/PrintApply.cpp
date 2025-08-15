@@ -778,7 +778,13 @@ bool verify_update_print_object_regions(
                         t_config_option_keys diff = region.region->config().diff(cfg);
                         callback_invalidate(region.region->config(), cfg, diff);
                         region.region->config_apply_only(cfg, diff, false);
-                    } else {
+                        if (std::find(diff.begin(), diff.end(), "wall_loops") != diff.end()) {
+                            // diff ÖÐ°üº¬ "wall_loops"
+                            return false;
+                        }
+
+                    } else 
+                    {
                         // Region is referenced multiple times, thus the region is being split. We need to reslice.
                         return false;
                     }

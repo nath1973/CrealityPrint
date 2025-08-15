@@ -80,6 +80,7 @@ option(SLIC3R_MSVC_PDB          "Generate PDB files on MSVC in Release mode" 1)
 option(SLIC3R_PERL_XS           "Compile XS Perl module and enable Perl unit and integration tests" 0)
 option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
 option(GENERATE_ORCA_HEADER "Enable generate header" 1)
+
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
 
@@ -451,6 +452,7 @@ list(REMOVE_DUPLICATES CMAKE_CXX_FLAGS_RELWITHDEBINFO)
 # Find and configure boost
 if(SLIC3R_STATIC)
     # Use static boost libraries.
+    MESSAGE(STATUS "Using static boost libraries")
     set(Boost_USE_STATIC_LIBS ON)
     # Use boost libraries linked statically to the C++ runtime.
     # set(Boost_USE_STATIC_RUNTIME ON)
@@ -459,6 +461,12 @@ endif()
 # set(Boost_COMPILER "-mgw81")
 # boost::process was introduced first in version 1.64.0,
 # boost::beast::detail::base64 was introduced first in version 1.66.0
+
+# if(APPLE)
+#     set(ZSTD_USE_STATIC_LIBS ON)  # 强制使用静态库
+#     find_package(zstd REQUIRED CONFIG)
+#     # add_library(zstd::libzstd_shared INTERFACE IMPORTED)
+# endif()
 find_package(Boost 1.66 REQUIRED COMPONENTS system filesystem thread log locale regex chrono atomic date_time iostreams program_options)
 
 add_library(boost_libs INTERFACE)
@@ -498,6 +506,10 @@ find_package(TBB REQUIRED)
 
 add_library(tbb_libs INTERFACE)
 target_link_libraries(tbb_libs INTERFACE TBB::tbb TBB::tbbmalloc)
+
+if (APPLE)
+    find_package(zstd REQUIRED CONFIG)
+endif()
 
 # include_directories(${TBB_INCLUDE_DIRS})
 # add_definitions(${TBB_DEFINITIONS})
@@ -755,7 +767,73 @@ function(crealityprint_copy_dlls target config postfix output_dlls)
             ${CMAKE_PREFIX_PATH}/bin/occt/TKXSBase.dll
             ${CMAKE_PREFIX_PATH}/bin/freetype.dll
          DESTINATION ${_out_dir})
-
+    set(FFMPEG_LIBRARIES_OUTPUT_LIBS "")
+    find_package(FFmpeg)
+    if(FFMPEG_FOUND)
+        set(FFMPEG_LIBRARIES_BIN
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/libspeex.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/avutil-57.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/avcodec-59.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/soxr.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/opus.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/openjp2.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/openh264-6.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/OpenCL.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/libxml2.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/webp.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/vorbisenc.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/vorbis.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/ogg.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/ssh.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/lzma.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/ilbc.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/pthreadVC3.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/iconv-2.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/zlib1.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/dav1d.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/bz2.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/aom.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/libmp3lame.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/modplug.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/swresample-4.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/theoradec.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/theoraenc.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/snappy.dll
+            ${CMAKE_PREFIX_PATH}/bin/ffmpeg/avformat-59.dll
+        )
+        file(COPY ${FFMPEG_LIBRARIES_BIN} DESTINATION ${_out_dir})
+        set(FFMPEG_LIBRARIES_OUTPUT_LIBS
+            ${_out_dir}/libspeex.dll
+            ${_out_dir}/avutil-57.dll
+            ${_out_dir}/avcodec-59.dll
+            ${_out_dir}/soxr.dll
+            ${_out_dir}/opus.dll
+            ${_out_dir}/openjp2.dll
+            ${_out_dir}/openh264-6.dll
+            ${_out_dir}/OpenCL.dll
+            ${_out_dir}/libxml2.dll
+            ${_out_dir}/webp.dll
+            ${_out_dir}/vorbisenc.dll
+            ${_out_dir}/vorbis.dll
+            ${_out_dir}/ogg.dll
+            ${_out_dir}/lzma.dll
+            ${_out_dir}/ssh.dll
+            ${_out_dir}/ilbc.dll
+            ${_out_dir}/iconv-2.dll
+            ${_out_dir}/zlib1.dll
+            ${_out_dir}/dav1d.dll
+            ${_out_dir}/bz2.dll
+            ${_out_dir}/aom.dll
+            ${_out_dir}/libmp3lame.dll
+            ${_out_dir}/modplug.dll
+            ${_out_dir}/theoradec.dll
+            ${_out_dir}/swresample-4.dll
+            ${_out_dir}/theoraenc.dll
+            ${_out_dir}/snappy.dll
+            ${_out_dir}/pthreadVC3.dll
+            ${_out_dir}/avformat-59.dll
+        )
+    endif()
     set(${output_dlls}
         ${_out_dir}/libgmp-10.dll
         ${_out_dir}/libmpfr-4.dll
@@ -787,8 +865,8 @@ function(crealityprint_copy_dlls target config postfix output_dlls)
         ${_out_dir}/TKXCAF.dll
         ${_out_dir}/TKXDESTEP.dll
         ${_out_dir}/TKXSBase.dll
-
         ${_out_dir}/freetype.dll
+        ${FFMPEG_LIBRARIES_OUTPUT_LIBS}
 
         PARENT_SCOPE
     )

@@ -98,9 +98,14 @@ macro(__build_info_slic3r_header)
   message("CMAKE_CURRENT_SOURCE_DIR1=${CMAKE_CURRENT_SOURCE_DIR}")
   message("CMAKE_CURRENT_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}")
   
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/buildinfo.h.in)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/buildinfo.h.in
-                   ${CMAKE_CURRENT_BINARY_DIR}/src/libslic3r/buildinfo.h)
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/buildinfo.h.in) 
+    if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/src/libslic3r/buildinfo.h")
+      if(GENERATE_ORCA_HEADER)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/buildinfo.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/libslic3r/buildinfo.h)
+      endif()
+    else()
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/buildinfo.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/libslic3r/buildinfo.h)
+    endif()
   endif()
 endmacro()
 

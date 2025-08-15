@@ -645,6 +645,10 @@ FunctionEnd
   LangString DESC_old_version ${LANG_SIMPCHINESE} "安装新的版本前是否需要卸载旧的版本？"
   LangString DESC_old_version ${LANG_TradChinese} "安裝新的版本前是否需要解除安裝舊的版本？"
 
+  LangString DESC_Version_Checked ${LANG_ENGLISH} "Your system is a bit outdated. We recommend upgrading to Windows 10 or higher  for the best experience. Do you still want to continue with the installation? What are the system requirements for installing Creality Print?"
+  LangString DESC_Version_Checked ${LANG_SIMPCHINESE} "您的操作系统版本过低，建议升级至Windows 10及以上版本以获得更佳体验。是否继续安装？"
+  LangString DESC_Version_Checked ${LANG_TradChinese} "您的作業系統版本過低，建議升級至 Windows 10 或更高版本以獲得更好的體驗。是否繼續安裝？"
+
   LicenseLangString LNG_License ${LANG_ENGLISH} "@CPACK_RESOURCE_FILE_LICENSE_EN@"
   LicenseLangString LNG_License ${LANG_SIMPCHINESE} "@CPACK_RESOURCE_FILE_LICENSE@"
   LicenseLangString LNG_License ${LANG_TRADCHINESE} "@CPACK_RESOURCE_FILE_LICENSE_TD@"
@@ -1039,9 +1043,6 @@ Jump_Del_Thumb:
 
   !insertmacro MUI_STARTMENU_GETFOLDER Application $MUI_TEMP
 
-  Delete "$SMPROGRAMS\$MUI_TEMP\Uninstall.lnk"
-@CPACK_NSIS_DELETE_ICONS@
-@CPACK_NSIS_DELETE_ICONS_EXTRA@
 
   ;Delete empty start menu parent directories
   StrCpy $MUI_TEMP "$SMPROGRAMS\$MUI_TEMP"
@@ -1059,8 +1060,15 @@ Jump_Del_Thumb:
   ; If the user changed the shortcut, then untinstall may not work. This should
   ; try to fix it.
   StrCpy $MUI_TEMP "$START_MENU"
+  SetShellVarContext current
   Delete "$SMPROGRAMS\$MUI_TEMP\Uninstall.lnk"
-@CPACK_NSIS_DELETE_ICONS_EXTRA@
+  @CPACK_NSIS_DELETE_ICONS@
+  @CPACK_NSIS_DELETE_ICONS_EXTRA@
+  
+  SetShellVarContext all
+  Delete "$SMPROGRAMS\$MUI_TEMP\Uninstall.lnk"
+  @CPACK_NSIS_DELETE_ICONS@
+  @CPACK_NSIS_DELETE_ICONS_EXTRA@
 
   ;Delete empty start menu parent directories
   StrCpy $MUI_TEMP "$SMPROGRAMS\$MUI_TEMP"
@@ -1120,13 +1128,25 @@ StrCpy $FIRST_INSTALL "1"
 StrCpy $INSTALL_MODE "fresh-install"
 
 Push $0
-  ${nsProcess::FindProcess} "${PROCESS_NAME}" $R0
-  IntCmp $R0 0 0 checkUninstall checkUninstall
-  MessageBox MB_YESNO  "$(DESC_Custom)"   IDYES delePro  IDNO 0
-  Abort
-  delePro:
-  ${nsProcess::KillProcess} "${PROCESS_NAME}" $R0
-  StrCmp $R0 0 checkUninstall
+  ; 替换原有的进程检查代码为系统版本检查
+${IfNot} ${AtLeastWin10}
+    MessageBox MB_OK|MB_OKCANCEL|MB_ICONEXCLAMATION "$(DESC_Version_Checked)" IDOK continue_install
+    Quit
+
+    continue_install:
+    ${nsProcess::FindProcess} "${PROCESS_NAME}" $R0
+    IntCmp $R0 0 0 checkUninstall checkUninstall
+    MessageBox MB_YESNO "$(DESC_Custom)" IDYES delePro IDNO 0
+    Abort
+    delePro:
+    ${nsProcess::KillProcess} "${PROCESS_NAME}" $R0
+    StrCmp $R0 0 checkUninstall
+${Else}
+    ${nsProcess::FindProcess} "${PROCESS_NAME}" $R0
+    IntCmp $R0 0 0 checkUninstall checkUninstall
+    MessageBox MB_YESNO "$(DESC_Custom)" IDYES delePro IDNO 0
+    Abort
+${EndIf}
 
 checkUninstall:
   ReadRegStr $0 HKLM "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@CPACK_PACKAGE_INSTALL_REGISTRY_KEY@" "UninstallString"

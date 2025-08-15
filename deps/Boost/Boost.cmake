@@ -8,6 +8,12 @@ if (APPLE AND CMAKE_OSX_ARCHITECTURES)
         set (_context_abi_line "-DBOOST_CONTEXT_ABI:STRING=aapcs")
     endif ()
     set(_context_arch_line "-DBOOST_CONTEXT_ARCHITECTURE:STRING=${CMAKE_OSX_ARCHITECTURES}")
+    list(APPEND _dep_zstd_static "-DBoost_IOSTREAMS_ZSTD_STATIC:BOOL=ON" 
+                "-DBOOST_IOSTREAMS_FORCE_ZSTD:BOOL=ON" 
+                "-DZSTD_ROOT=${DESTDIR}"
+                "-DZSTD_LIBRARY=${DESTDIR}/lib/libzstd.a"
+                "-DZSTD_INCLUDE_DIR=${DESTDIR}/include"
+                )
 endif ()
 
 orcaslicer_add_cmake_project(Boost
@@ -20,6 +26,7 @@ orcaslicer_add_cmake_project(Boost
         -DBUILD_TESTING:BOOL=OFF
         "${_context_abi_line}"
         "${_context_arch_line}"
+        "${_dep_zstd_static}"
 )
 
 if (MSVC)

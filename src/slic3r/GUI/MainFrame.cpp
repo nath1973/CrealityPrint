@@ -2398,7 +2398,7 @@ static wxMenu* generate_help_menu(MainFrame* mainframe)
     //    [](wxCommandEvent&) {
     //        //TODO
     //    });
-#if CUSTOM_CXCLOUD
+#if !defined(CUSTOMIZED) || defined(CUSTOM_CHECKUPDATE_ENABLED)
     // Check New Version
     append_menu_item(helpMenu, wxID_ANY, _L("Check for Update"), _L("Check for Update"),
         [](wxCommandEvent&) {
@@ -2414,6 +2414,7 @@ static wxMenu* generate_help_menu(MainFrame* mainframe)
     //    });
 
     helpMenu->AppendSeparator();
+#endif
 
     // use course
     append_menu_item(helpMenu, wxID_ANY, _L("Use Course"), _L("Use Course"), [](wxCommandEvent&) {
@@ -2432,11 +2433,13 @@ static wxMenu* generate_help_menu(MainFrame* mainframe)
 
     // About
 #ifndef __APPLE__
-    wxString about_title = _L("About Us");
-    append_menu_item(helpMenu, wxID_ANY, about_title, about_title,
-            [](wxCommandEvent&) { Slic3r::GUI::about(); });
+    #if !defined(CUSTOMIZED) || defined(CUSTOM_ABOUTUS_ENABLED)
+        wxString about_title = _L("About Us");
+        append_menu_item(helpMenu, wxID_ANY, about_title, about_title,
+                [](wxCommandEvent&) { Slic3r::GUI::about(); });
+    #endif
 #endif
-
+#if !defined(CUSTOMIZED) || defined(CUSTOM_FEEDBOOK_ENABLED)
     append_menu_item(helpMenu, wxID_ANY, _L("User Feedback"), _L("User Feedback"), [](wxCommandEvent&) {
         wxLaunchDefaultBrowser(user_feedback_website(), wxBROWSER_NEW_WINDOW);
     });
@@ -2756,9 +2759,10 @@ void MainFrame::init_menubar_as_editor()
             "menu_remove", nullptr, [this](){return can_delete_all(); }, this);
         editMenu->AppendSeparator();
         // BBS Clone Selected
-        append_menu_item(editMenu, wxID_ANY, _L("Clone selected") /*+ "\tCtrl+M"*/,
+        append_menu_item(editMenu, wxID_ANY, _L("Clone selected") + "\t" + ctrl + "K",
             _L("Clone copies of selections"),[this](wxCommandEvent&) {
-                m_plater->clone_selection();
+                //m_plater->clone_selection();
+                m_plater->get_current_canvas3D()->triger_extra_render_event(GLCanvas3D::ERenderEvent::ObjectCloneOptions);
             },
             "menu_remove", nullptr, [this](){return can_clone(); }, this);
         editMenu->AppendSeparator();

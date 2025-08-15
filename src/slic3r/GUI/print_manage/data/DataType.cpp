@@ -137,10 +137,10 @@ namespace DM{
                             materialBox.box_state = safe_get_json_field((json) box, "state", jvalue::number_integer, 0);
                             materialBox.box_type  = safe_get_json_field((json) box, "type", jvalue::number_integer, 0);
                             if (box.contains("temp")) {
-                                materialBox.temp = box["temp"];
+                                materialBox.temp = safe_get_json_field((json) box, "temp", jvalue::number_integer, 0);
                             }
                             if (box.contains("humidity")) {
-                                materialBox.humidity = box["humidity"];
+                                materialBox.humidity = safe_get_json_field((json) box, "humidity", jvalue::number_integer, 0);
                             }
 
                             if (box.contains("materials")) {

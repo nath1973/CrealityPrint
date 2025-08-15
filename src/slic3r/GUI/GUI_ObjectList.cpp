@@ -7429,7 +7429,7 @@ void ObjectList::render_printer_preset_by_ImGui()
                 wxString name_with_ellipsis = wxText + ellipsis;
                 const float sub_width          = ImGui::CalcTextSize(name_with_ellipsis.ToUTF8().data()).x;
                 if (sub_width <= device_label_max_width) {
-                    return name_with_ellipsis.ToStdString();
+                    return std::string(name_with_ellipsis.ToUTF8().data());
                 }
             }
         }

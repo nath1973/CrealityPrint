@@ -13299,6 +13299,10 @@ msgstr ""
 msgid "Old Value"
 msgstr ""
 
+msgid "We apologize for the inconvenience caused by this unexpected software issue. If it's convenient for you, please leave your "
+           "email or other contact information so we can promptly update you on the progress of resolving the issue."
+msgstr ""
+
 msgid "New Value"
 msgstr ""
 
@@ -15728,6 +15732,9 @@ msgstr ""
 msgid "Could not connect to PrusaLink"
 msgstr ""
 
+msgid "This project file is not from Creality Print. Please select the printer preset you want to use for slicing."
+msgstr ""
+
 msgid "Storages found"
 msgstr ""
 
@@ -15967,7 +15974,13 @@ msgstr ""
 msgid "has floating regions. Please re-orient the object or enable support generation."
 msgstr ""
 
+msgid "has bridge overhangs. Please re-orient the object or enable support generation."
+msgstr ""
+
 msgid "appears to have floating areas, which may cause print failure.\nPlease reorient the model or enable supports.\n\n "
+msgstr ""
+
+msgid "appears to have bridge overhangs, which may cause print failure.\nPlease reorient the model or enable supports.\n\n "
 msgstr ""
 
 msgid "Current version: %s"

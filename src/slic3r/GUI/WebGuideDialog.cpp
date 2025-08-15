@@ -195,11 +195,15 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     // Connect the idle events
     // Bind(wxEVT_IDLE, &GuideFrame::OnIdle, this);
     // Bind(wxEVT_CLOSE_WINDOW, &GuideFrame::OnClose, this);
-
+#if CUSTOM_CXCLOUD
+#if UPDATE_ONLINE_MACHINES
+    GUI::wxGetApp().check_machine_list();
+#endif
+#endif
     LoadProfile();
     
     // UI
-    SetStartPage(BBL_REGION);
+    //SetStartPage(BBL_REGION);
     
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",  finished");
     wxGetApp().UpdateDlgDarkUI(this);
@@ -263,11 +267,15 @@ wxString GuideFrame::SetStartPage(GuidePage startpage, bool load)
     }
 
     wxString strlang = wxGetApp().app_config->get("language");
-    bool     customized = 0;
+    int     customized = 0;
 #ifdef CUSTOMIZED
     customized = 1;
 #endif
     std::string customer_name = customized == 1 ? "Morandi" : "";
+#ifdef CUSTOM_PRINTER_TYPE_NAME
+    customer_name = std::string(CUSTOM_PRINTER_TYPE_NAME);
+#endif // CUSTOM_PRINTER_TYPE_NAME
+
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(", strlang=%1%") % into_u8(strlang);
     if (strlang != "")
         TargetUrl = wxString::Format("%s?lang=%s", TargetUrl, strlang);
@@ -281,14 +289,14 @@ wxString GuideFrame::SetStartPage(GuidePage startpage, bool load)
         wxString url = wxString::Format("http://localhost:%d/homepage/index.html?lang=%s&isScale=false#/Guide/createFilament", port, strlang);
          TargetUrl    = url;
         // 本地调试
-        // TargetUrl    = "http://localhost:9090/#/Guide/createFilament?lang=zh_CN&isScale=false";
+      //   TargetUrl    = "http://localhost:9090/#/Guide/createFilament?lang=zh_CN&isScale=false";
     } else if (startpage == BBL_MODELS_ONLY) {
         wxString url = wxString::Format(
             "http://localhost:%d/homepage/index.html?lang=%s&isScale=false&customized=%d&customer_name=%s#/Guide/addPrinter", port, strlang,
             customized, customer_name);
          TargetUrl    = url;
         // 本地调试
-         //TargetUrl    = "http://localhost:9090/index.html?lang=zh_CN&isScale=false&debug=false#/Guide/addPrinter";
+        // TargetUrl    = "http://localhost:9090/index.html?lang=zh_CN&isScale=false&debug=false&customized=1&customer_name=Creality#/Guide/addPrinter";
     }
     else {
         TargetUrl = "file://" + encodedUrl;

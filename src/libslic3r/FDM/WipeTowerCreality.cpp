@@ -510,6 +510,7 @@ WipeTowerCreality::WipeTowerCreality(const PrintConfig& config, const PrintRegio
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
     m_wipe_tower_brim_width(float(config.prime_tower_brim_width)),
     m_wipe_tower_cone_angle(float(config.wipe_tower_cone_angle)),
+    m_extra_flow(float(config.wipe_tower_extra_flow/100.)),
     m_extra_spacing(float(config.wipe_tower_extra_spacing/100.)),
     m_y_shift(0.f),
     m_z_pos(0.f), 
@@ -766,8 +767,8 @@ void WipeTowerCreality::toolchange_Change(
     writer.append("[change_filament_gcode]\n");
     //std::string z_up_for_firmware = "[z_up_for_firmware]"
  
-     //writer.z_hop(0.4f + m_z_offset, 1200.0f, "G0"); // �̼�bug,��ʱ̧��0.4,��ֹZ�߶ȴ����µ��ƶ���������ʱ�����в�
-     writer.relative_zhop(0.4f + m_z_offset, 1200.0f, "relative_zhop_up_for_firmware G0"); // �̼�bug,��ʱ̧��0.4,��ֹZ�߶ȴ����µ��ƶ���������ʱ�����в�
+     //writer.z_hop(0.4f + m_z_offset, 1200.0f, "G0"); // 固件bug,临时抬升0.4,防止Z高度错误导致的移动到擦拭塔时产生剐蹭
+     writer.relative_zhop(0.4f + m_z_offset, 1200.0f, "relative_zhop_up_for_firmware G0"); // 固件bug,临时抬升0.4,防止Z高度错误导致的移动到擦拭塔时产生剐蹭
     // Travel to where we assume we are. Custom toolchange or some special T code handling (parking extruder etc)
     // gcode could have left the extruder somewhere, we cannot just start extruding. We should also inform the
     // postprocessor that we absolutely want to have this in the gcode, even if it thought it is the same as before.
@@ -806,21 +807,29 @@ void WipeTowerCreality::toolchange_Wipe(
 	const float& xl = cleaning_box.ld.x();
 	const float& xr = cleaning_box.rd.x();
 
+    float line_width  = m_perimeter_width;
+    bool  first_layer = is_first_layer();
+    if (!first_layer) {
+        writer.set_extrusion_flow(m_extrusion_flow * m_extra_flow);
+        line_width = m_perimeter_width * m_extra_flow;
+        writer.change_analyzer_line_width(line_width);
+    }
+
 	// Variables x_to_wipe and traversed_x are here to be able to make sure it always wipes at least
     //   the ordered volume, even if it means violating the box. This can later be removed and simply
     // wipe until the end of the assigned area.
 
-	float x_to_wipe = volume_to_length(wipe_volume, m_perimeter_width, m_layer_height) * (is_first_layer() ? m_extra_spacing : 1.f);
-	float dy = (is_first_layer() ? 1.f : m_extra_spacing) * m_perimeter_width; // Don't use the extra spacing for the first layer.
+	float x_to_wipe = volume_to_length(wipe_volume, line_width, m_layer_height) * (first_layer ? m_extra_spacing : 1.f);
+	float dy = (first_layer ? 1.f : m_extra_flow * m_extra_spacing) * m_perimeter_width; // Don't use the extra spacing for the first layer.
     // All the calculations in all other places take the spacing into account for all the layers.
 
 	// If spare layers are excluded->if 1 or less toolchange has been done, it must be sill the first layer, too.So slow down.
-    const float target_speed = is_first_layer() || (m_num_tool_changes <= 1 && m_no_sparse_layers) ? m_first_layer_speed * 60.f : std::min(m_wipe_tower_max_purge_speed * 60.f, m_infill_speed * 60.f);
+    const float target_speed = first_layer || (m_num_tool_changes <= 1 && m_no_sparse_layers) ? m_first_layer_speed * 60.f : std::min(m_wipe_tower_max_purge_speed * 60.f, m_infill_speed * 60.f);
     float wipe_speed = 0.33f * target_speed;
 
-    // if there is less than 2.5*m_perimeter_width to the edge, advance straightaway (there is likely a blob anyway)
-    if ((m_left_to_right ? xr-writer.x() : writer.x()-xl) < 2.5f*m_perimeter_width) {
-        writer.travel((m_left_to_right ? xr-m_perimeter_width : xl+m_perimeter_width),writer.y()+dy);
+    // if there is less than 2.5*line_width to the edge, advance straightaway (there is likely a blob anyway)
+    if ((m_left_to_right ? xr-writer.x() : writer.x()-xl) < 2.5f*line_width) {
+        writer.travel((m_left_to_right ? xr - line_width : xl + line_width), writer.y() + dy);
         m_left_to_right = !m_left_to_right;
     }
     
@@ -835,11 +844,11 @@ void WipeTowerCreality::toolchange_Wipe(
 
 		float traversed_x = writer.x();
 		if (m_left_to_right)
-            writer.extrude(xr - 0.5f * m_perimeter_width, writer.y(), wipe_speed);
+            writer.extrude(xr - 0.5f * line_width, writer.y(), wipe_speed);
 		else
-            writer.extrude(xl + 0.5f * m_perimeter_width, writer.y(), wipe_speed);
+            writer.extrude(xl + 0.5f * line_width, writer.y(), wipe_speed);
 
-        if (writer.y()+float(EPSILON) > cleaning_box.lu.y()-0.5f*m_perimeter_width)
+        if (writer.y() + float(EPSILON) > cleaning_box.lu.y() - 0.5f * line_width)
             break;		// in case next line would not fit
 
 		traversed_x -= writer.x();
@@ -862,6 +871,9 @@ void WipeTowerCreality::toolchange_Wipe(
         m_left_to_right = !m_left_to_right;
 
     writer.set_extrusion_flow(m_extrusion_flow); // Reset the extrusion flow.
+    if (!first_layer) {
+        writer.change_analyzer_line_width(m_perimeter_width);
+    }
 }
 
 
@@ -1203,14 +1215,18 @@ void WipeTowerCreality::plan_toolchange(float z_par, float layer_height_par, uns
         return;
 
     float depth = 0.f;
-    float width = m_wipe_tower_width - 2 * m_perimeter_width;
+    // The first layer does not use wipe_tower_extra_flow.
+    float first_layer_z = m_plan[m_first_layer_idx].z;
+    bool  first_layer = first_layer_z - WT_EPSILON <= z_par && z_par <= first_layer_z + WT_EPSILON;
+    // The width of outer wall is not affected by wipe_tower_extra_flow.
+    float width = m_wipe_tower_width - m_perimeter_width - m_perimeter_width * (first_layer ? 1.0f : m_extra_flow);
 
     // BBS: if the wipe tower width is too small, the depth will be infinity
     if (width <= EPSILON)
         return;
 
-    float length_to_extrude = volume_to_length(wipe_volume, m_perimeter_width, layer_height_par);
-    depth += std::ceil(length_to_extrude / width) * m_perimeter_width;
+    float length_to_extrude = volume_to_length(wipe_volume, m_perimeter_width * m_extra_flow, layer_height_par);
+    depth += std::ceil(length_to_extrude / width) * m_perimeter_width * m_extra_flow;
 
 	m_plan.back().tool_changes.push_back(WipeTowerInfo::ToolChange(old_tool, new_tool, depth, 0.0f, 0.0f, wipe_volume));    
 }
@@ -1273,14 +1289,14 @@ void WipeTowerCreality::plan_tower()
                 // apply solid fill for the first layer
                 info.extra_spacing = 1.f;
                 for (auto& toolchange : info.tool_changes) {
-                    float x_to_wipe     = volume_to_length(toolchange.wipe_volume, m_perimeter_width, info.height);
+                    float x_to_wipe     = volume_to_length(toolchange.wipe_volume, m_perimeter_width * m_extra_flow, info.height);
                     float line_len      = m_wipe_tower_width - 2 * m_perimeter_width;
                     float x_to_wipe_new = x_to_wipe * m_extra_spacing;
                     x_to_wipe_new       = std::floor(x_to_wipe_new / line_len) * line_len;
                     x_to_wipe_new       = std::max(x_to_wipe_new, x_to_wipe);
 
                     int line_count            = std::ceil((x_to_wipe_new - WT_EPSILON) / line_len);
-                    toolchange.required_depth = line_count * m_perimeter_width;
+                    toolchange.required_depth = line_count * m_perimeter_width * m_extra_flow;
                     toolchange.wipe_volume    = x_to_wipe_new / x_to_wipe * toolchange.wipe_volume;
                     //toolchange.wipe_length    = x_to_wipe_new;
                 }

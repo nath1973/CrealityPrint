@@ -1091,6 +1091,13 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
 {
     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " start";
 
+    // avoid processing if called with the same gcode_result
+    if (m_last_result_id == gcode_result.id) {
+        //BBS: add logs
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": the same id %1%, return directly, result %2% ") % m_last_result_id % (&gcode_result);
+        return;
+    }
+
     ResGuard res([&]
         {
             m_bLoaded = false;
@@ -1110,14 +1117,6 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
             }
             m_bLoaded = true;
         });
-    
-    
-    // avoid processing if called with the same gcode_result
-    if (m_last_result_id == gcode_result.id) {
-        //BBS: add logs
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": the same id %1%, return directly, result %2% ") % m_last_result_id % (&gcode_result);
-        return;
-    }
 
     //BBS: add logs
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": gcode result %1%, new id %2%, gcode file %3% ") % (&gcode_result) % m_last_result_id % gcode_result.filename;
@@ -2636,7 +2635,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         if (i == 0)
             continue;
 
-        if (is_lite_mode && !(curr.type == EMoveType::Extrude || curr.type == EMoveType::Seam || curr.type == EMoveType::Unretract))
+        if (is_lite_mode && !(curr.type == EMoveType::Extrude || curr.type == EMoveType::Seam || curr.type == EMoveType::Unretract || curr.type == EMoveType::Pause_Print))
             continue;
 
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
@@ -3039,7 +3038,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
 
     for (size_t i = 0; i < m_buffers.size(); ++i) {
         
-        if (is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract)))
+        if (is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract) || i == buffer_id(EMoveType::Pause_Print)))
             continue;
         
         TBuffer& t_buffer = m_buffers[i];
@@ -3127,7 +3126,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         if (i == 0)
             continue;
 
-        if (is_lite_mode && !(curr.type == EMoveType::Extrude || curr.type == EMoveType::Seam || curr.type == EMoveType::Unretract))
+        if (is_lite_mode && !(curr.type == EMoveType::Extrude || curr.type == EMoveType::Seam || curr.type == EMoveType::Unretract || curr.type == EMoveType::Pause_Print))
             continue;
 
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
@@ -3217,7 +3216,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
     // toolpaths data -> send indices data to gpu
     for (size_t i = 0; i < m_buffers.size(); ++i) {
 
-        if (is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract)))
+        if (is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract) || i == buffer_id(EMoveType::Pause_Print)))
             continue;
 
         TBuffer& t_buffer = m_buffers[i];
@@ -4243,7 +4242,7 @@ void GCodeViewer::render_toolpaths()
 
     for (unsigned char i = begin_id; i < end_id; ++i) {
 
-        if (m_is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract)))
+        if (m_is_lite_mode && !(i == buffer_id(EMoveType::Extrude) || i == buffer_id(EMoveType::Seam) || i == buffer_id(EMoveType::Unretract) || i == buffer_id(EMoveType::Pause_Print)))
             continue;
 
         TBuffer& buffer = m_buffers[i];

@@ -190,10 +190,18 @@ AABBMesh::query_ray_hits(const Vec3d &s, const Vec3d &dir) const
 
     // Remove duplicates. They sometimes appear, for example when the ray is cast
     // along an axis of a cube due to floating-point approximations in igl (?)
-    hits.erase(std::unique(hits.begin(), hits.end(),
-                           [](const igl::Hit& a, const igl::Hit& b)
-                           { return a.t == b.t; }),
-               hits.end());
+    //hits.erase(std::unique(hits.begin(), hits.end(),
+    //                       [](const igl::Hit& a, const igl::Hit& b)
+    //                       { return a.t == b.t; }),
+    //           hits.end());
+
+    constexpr double EPSILON = 1e-5;
+    auto hit_equal = [EPSILON](const igl::Hit& a, const igl::Hit& b) {
+        return std::abs(a.t - b.t) < EPSILON && 
+               a.id == b.id; // Add face ID checking
+    };
+
+    hits.erase(std::unique(hits.begin(), hits.end(), hit_equal), hits.end());
 
     //  Convert the igl::Hit into hit_result
     outs.reserve(hits.size());

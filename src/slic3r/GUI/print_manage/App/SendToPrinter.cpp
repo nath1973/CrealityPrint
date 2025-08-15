@@ -44,6 +44,10 @@
 #if defined(__linux__) || defined(__LINUX__)
 #include "video/WebRTCDecoder.h"
 #endif
+#include "buildinfo.h"
+#if ENABLE_FFMPEG
+#include "video/RTSPDecoder.h"
+#endif
 #include "libslic3r/common_header/common_header.h"
 namespace Slic3r {
 namespace GUI {
@@ -74,11 +78,11 @@ CxSentToPrinterDialog::CxSentToPrinterDialog(Plater *plater,
     Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
         if (event.IsShown()) {
             wxPoint position = GetPosition();
-            if (position.y < 0)
+            if (position.y < 0 && abs(position.y)<20)
             {
                 wxSize newSize = wxSize(FromDIP(1170), FromDIP(650) + position.y);
                 SetSize(newSize);
-                SetPosition(wxPoint(position.x, 0));
+                SetPosition(wxPoint(position.x, GetParent()->GetPosition().y));
             }
                 
         }
@@ -325,11 +329,21 @@ void CxSentToPrinterDialog::OnScriptMessage(wxWebViewEvent& evt)
             wxPostEvent(this, wxCloseEvent(wxEVT_CLOSE_WINDOW));
         }else if(strCmd == "switch_webrtc_source")
         {
-#if defined(__linux__) || defined(__LINUX__)
-            std::string ip = j["ip"];
-            std::string video_url = (boost::format("http://%1%:8000/call/webrtc_local") % ip).str();
-            WebRTCDecoder::GetInstance()->startPlay(video_url); 
-#endif
+            bool isOrderPrinter = j["isOrderPrinter"].get<bool>();
+            if(isOrderPrinter)
+            {
+                // For order printer, we use the webrtc local url
+                #if ENABLE_FFMPEG
+                RTSPDecoder::GetInstance()->stopPlay(); 
+                #endif
+            }
+            else
+            {
+                #if defined(__linux__) || defined(__LINUX__)
+                    WebRTCDecoder::GetInstance()->stopPlay();
+                #endif
+            }
+
         } else if (strCmd == "common_openurl") {
             wxLaunchDefaultBrowser(j["url"]);
             wxPostEvent(this, wxCloseEvent(wxEVT_CLOSE_WINDOW));

@@ -9,11 +9,13 @@
     <!-- hehe hadess @ppd 
     ... seriously though, thanks -->
     <summary>Get even more perfect prints!</summary>
-    <developer_name>Creality</developer_name>
+    <developer id="io.github.crealityofficial">
+        <name>CrealityOfficial</name>
+        <email>hemiao@creality.com</email>
+    </developer>
     <url type="homepage">https://github.com/CrealityOfficial/CrealityPrint</url>
-    <url type="help">https://github.com/CrealityOfficial/CrealityPrint/wiki</url>
+    <url type="help">https://wiki.creality.com/en/software/6-0</url>
     <url type="bugtracker">https://github.com/CrealityOfficial/CrealityPrint/issues/</url>
-    <url type="donation"></url>
     <metadata_license>0BSD</metadata_license>
     <project_license>AGPL-3.0-only</project_license>
     <content_rating type="oars-1.1" />
@@ -26,12 +28,16 @@
     </recommends>
     <screenshots>
 	    <screenshot type="default">
-		    <image>https://pic2-cdn.creality.com/plug/imgs/f7c7444213f1c18da6017221d73b3bac.webp</image>
+		    <image>https://github.com/CrealityOfficial/CrealityPrint/raw/master/flatpak/images/1.png</image>
 		    <caption>A model ready to be sliced on a buildplate.</caption>
+	    </screenshot>
+	    <screenshot>
+		    <image>https://github.com/CrealityOfficial/CrealityPrint/raw/master/flatpak/images/1.png</image>
+	        <caption>Control and manage multiple devices</caption>
 	    </screenshot>
     </screenshots>
     <description>
-	    <p>A 3D printer slicer forked from Bambu Studio, PrusaSlicer, and SuperSlicer with many more printer profiles, helpful calibration prints, and many more features to get your 3D printer printing perfectly!</p>
+	    <p>Creality Print is a self-developed FDM slicing software produced by Shenzhen Creality 3D Technology Co., Ltd. It’s a practical and easy-to-use tool that can help you remote control and monitor your 3D printer and help print directly from your computer.</p>
     </description>
     <branding>
 	  <color type="primary" scheme_preference="light">#009688</color>

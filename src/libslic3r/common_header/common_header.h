@@ -12,6 +12,8 @@
 	#define CUSTOM_COMMUNITY_ENABLE true
 #endif
 
+
+
 #pragma execution_character_set("utf-8")
 namespace Slic3r {
 namespace CxBuildInfo {

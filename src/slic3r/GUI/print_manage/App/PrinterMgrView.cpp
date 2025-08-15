@@ -40,6 +40,7 @@
 #include "video/WebRTCDecoder.h"
 #endif
 #include <slic3r/GUI/print_manage/AppUtils.hpp>
+#include "video/RTSPDecoder.h"
 #include "buildinfo.h"
 
 namespace pt = boost::property_tree;
@@ -558,9 +559,22 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
         {
             std::string ip = j["ip"];
             std::string video_url = (boost::format("http://%1%:8000/call/webrtc_local") % ip).str();
-#if defined(__linux__) || defined(__LINUX__)
-            WebRTCDecoder::GetInstance()->startPlay(video_url); 
-#endif
+            bool isOrderPrinter = j["isOrderPrinter"].get<bool>();
+            if(isOrderPrinter)
+            {
+                #if ENABLE_FFMPEG
+                // For order printer, we use the webrtc local url
+                video_url = (boost::format("rtsp://%1%/ch0_0") % ip).str();
+                RTSPDecoder::GetInstance()->startPlay(video_url); 
+                #endif
+            }
+            else
+            {
+                #if defined(__linux__) || defined(__LINUX__)
+                    WebRTCDecoder::GetInstance()->startPlay(video_url); 
+                #endif
+            }
+
         }
         else if (strCmd == "get_file_List_from_lan_device")
         {

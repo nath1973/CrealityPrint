@@ -119,7 +119,7 @@ GLTexture* DispConfig::getTexture(TextureType tt, bool hover, bool sel) {
             {e_tt_collapse_item,{"collapse.svg",true,true,true}},
             {e_tt_bed_custom,{"custom.png",false,false,false}},
             {e_tt_bed_texture,{"texture.png",false,false,false}},
-            {e_tt_bed_smooth,{Slic3r::CxBuildInfo::isCusotmized() ? "smooth.png"  : "smooth.svg", false, false, false }},
+            {e_tt_bed_smooth,{ "smooth.png", false, false, false }},
             {e_tt_layer,{"layer.svg",false,true,false}},
             {e_tt_edit,{"edit.png",true,true,true}},
             {e_tt_close,{"close.png",true,true,true}},

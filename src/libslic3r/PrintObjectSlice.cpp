@@ -985,8 +985,7 @@ static inline void apply_mm_segmentation(PrintObject &print_object, ThrowOnCance
                                     continue;
                                 }
                                 // 尝试修复,切片在这里崩溃问题
-                                if(it_painted_region->region == nullptr)
-                                {
+                                if (it_painted_region == layer_range.painted_regions.end() || it_painted_region->region == nullptr) {
                                     continue;
                                 }
                                 // Steal from this region.

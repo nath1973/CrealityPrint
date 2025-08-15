@@ -735,12 +735,12 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 void GLModel::release_instance_data_from_gpu()
 {
     // release gpu memory
-    if (m_render_data->instance_vbo_id > 0) {
-        glsafe(::glDeleteBuffers(1, &m_render_data->instance_vbo_id));
-        m_render_data->instance_vbo_id = 0;
+    if (m_instance_data.instance_vbo_id > 0) {
+        glsafe(::glDeleteBuffers(1, &m_instance_data.instance_vbo_id));
+        m_instance_data.instance_vbo_id = 0;
     }
 
-    m_render_data->instance_count = 0;
+    m_instance_data.instance_count = 0;
 }
 
 void GLModel::render_instanced_ex()
@@ -749,7 +749,7 @@ void GLModel::render_instanced_ex()
     if (shader == nullptr)
         return;
 
-    if(0 == m_render_data->instance_vbo_id)
+    if(0 == m_instance_data.instance_vbo_id)
         return;
 
     // vertex attributes
@@ -767,7 +767,7 @@ void GLModel::render_instanced_ex()
             return;
     }
 
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data->instance_vbo_id));
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_instance_data.instance_vbo_id));
     const size_t instance_stride = 3 * sizeof(float);
     glsafe(::glVertexAttribPointer(offset_id, 3, GL_FLOAT, GL_FALSE, instance_stride, (const void*)0));
     glsafe(::glEnableVertexAttribArray(offset_id));
@@ -797,7 +797,7 @@ void GLModel::render_instanced_ex()
     //shader->set_uniform("uniform_color", data.color);
 
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data->ibo_id));
-    glsafe(::glDrawElementsInstanced(mode, m_render_data->indices_count, index_type, (const void*)0, m_render_data->instance_count));
+    glsafe(::glDrawElementsInstanced(mode, m_render_data->indices_count, index_type, (const void*)0, m_instance_data.instance_count));
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
     if (normal)
@@ -927,16 +927,16 @@ bool GLModel::send_to_gpu()
 
 bool GLModel::send_instance_data_to_gpu(const std::vector<Vec3f>& instances_offsets)
 {
-    if(m_render_data->instance_vbo_id == 0) {
-        glsafe(::glGenBuffers(1, &m_render_data->instance_vbo_id));
+    if(m_instance_data.instance_vbo_id == 0) {
+        glsafe(::glGenBuffers(1, &m_instance_data.instance_vbo_id));
     }
 
-    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_render_data->instance_vbo_id));
+    glsafe(::glBindBuffer(GL_ARRAY_BUFFER, m_instance_data.instance_vbo_id));
     glsafe(::glBufferData(GL_ARRAY_BUFFER, instances_offsets.size() * sizeof(Vec3f), instances_offsets.data(), GL_STATIC_DRAW));
 
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
 
-    m_render_data->instance_count = instances_offsets.size();
+    m_instance_data.instance_count = instances_offsets.size();
 
     return true;
 
@@ -1578,6 +1578,16 @@ void GLModel::RenderData::release() {
     this->geometry.indices           = std::vector<unsigned int>();
 
     this->geometry.m_bounding_box = BoundingBoxf3();
+}
+
+void GLModel::RenderInstanceData::release() 
+{
+    if (this->instance_vbo_id > 0) {
+        glsafe(::glDeleteBuffers(1, &this->instance_vbo_id));
+        this->instance_vbo_id = 0;
+    }
+
+    this->instance_count = 0;
 }
 
 } // namespace GUI

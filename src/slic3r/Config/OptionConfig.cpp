@@ -2,6 +2,7 @@
 #include "nlohmann/json.hpp"
 #include "libslic3r/Utils.hpp"
 #include "boost/filesystem/path.hpp"
+#include <boost/nowide/fstream.hpp>
 #include "slic3r/GUI/MainFrame.hpp"
 
 using json = nlohmann::json;
@@ -18,7 +19,11 @@ struct OptionConfig::priv
         boost::filesystem::path ph(config_path);
         if (boost::filesystem::exists(ph))
         {
-            std::ifstream file(config_path);
+            //std::ifstream file(config_path);
+
+            // fix for chinese path
+            boost::nowide::ifstream file(config_path);
+
             if (file.is_open())
             {
                 file >> m_jsonData;
@@ -30,6 +35,14 @@ struct OptionConfig::priv
                     return;
                 }
             }
+            else
+            {
+                BOOST_LOG_TRIVIAL(error) << "std::ifstream file(config_path), can not open file:  " << config_path.c_str();
+            }
+        }
+        else
+        {
+            BOOST_LOG_TRIVIAL(error) << "======== ProcessConfig.json not exist in chinese path !!! ";
         }
         
 //        assert(false);

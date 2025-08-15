@@ -728,6 +728,18 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
         value = get_config_value(config, opt_short_key, opt_index);
         }
 
+    // "sparse_infill_density" beyond or equal 100£¬force init value is 15
+    if ("sparse_infill_density" == opt_key) 
+    {
+        auto v = boost::any_cast<wxString>(value);
+        if (v.size() >= 3) 
+        {
+            bool is_hundreds = (v.at(0) != '.') && (v.at(1) != '.') && (v.at(2) != '.');
+            if (is_hundreds)
+                value = double_to_string(15);
+        }
+    }
+
     // BBS: restore all pages in preset
     if (set_value(opt_key, value))
 	    on_change_OG(opt_key, get_value(opt_key));

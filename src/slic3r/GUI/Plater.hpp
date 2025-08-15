@@ -256,6 +256,27 @@ public:
     GCodeLoadingGuard& operator=(const GCodeLoadingGuard&) = delete;
 };
 
+struct BusyCursor
+{
+    BusyCursor() { set(); }
+    ~BusyCursor() { reset(); }
+    void reset()
+    {
+        if (busy != nullptr) {
+            delete busy;
+            busy = nullptr;
+        }
+    }
+    void set()
+    {
+        reset();
+        busy = new wxBusyCursor();
+    }
+
+private:
+    wxBusyCursor* busy = nullptr;
+};
+
 class Plater: public wxPanel
 {
 public:

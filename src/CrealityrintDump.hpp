@@ -27,7 +27,7 @@ struct SystemInfo {
     wxString build;
     wxString uuid;
 };
-
+class TextInput;
 class ErrorReportDialog : public Slic3r::GUI::DPIDialog
 {
 public:
@@ -44,6 +44,7 @@ protected:
     void on_sys_color_changed() override {}
 
 private:
+    TextInput* m_InfoInput = nullptr;
     SystemInfo m_info;
     wxString m_dumpFilePath;
     wxString m_systemInfoFilePath;

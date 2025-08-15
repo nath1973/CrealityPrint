@@ -57,6 +57,7 @@ def downloadParamPack(working_path, build_type, engine_type, engine_version) -> 
             base_url = base_urls[idx]
         else:
             base_url = base_alpha_urls[idx]     
+        print("Base url:"+base_url)
         idx+=1        
         if sys.platform.startswith('win'):
             default_path = os.path.join(working_path, "build","resources", "sliceconfig", server_path_prefix, engine_type, "default")

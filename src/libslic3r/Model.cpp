@@ -4,6 +4,7 @@
 #include "Format/svg.hpp"
 #include "GCodeWriter.hpp"
 #include "Format/3mf.hpp"
+#include "Format/STEP.hpp"
 
 // Transtltion
 #include "I18N.hpp"
@@ -152,6 +153,61 @@ Model::~Model()
         Slic3r::remove_backup(*this, true);
 }
 
+// Load a STEP file, return a Model object.
+Model Model::read_from_step(const std::string&                                      input_file,
+                            LoadStrategy                                            options,
+                            ImportStepProgressFn                                    stepFn,
+                            StepIsUtf8Fn                                            stepIsUtf8Fn,
+                            std::function<int(Slic3r::Step&, double&, double&, bool&)>     step_mesh_fn,
+                            double                                                  linear_defletion,
+                            double                                                  angle_defletion,
+                            bool                                                   is_split_compound)
+{
+    Model model;
+    bool result = false;
+    bool is_cb_cancel = false;
+    Step::Step_Status status;
+    Step step_file(input_file, stepFn);
+    status = step_file.load();
+    if(status != Step::Step_Status::LOAD_SUCCESS) {
+        goto _finished;
+    }
+    if (step_mesh_fn) {
+        if (step_mesh_fn(step_file, linear_defletion, angle_defletion, is_split_compound) == -1) {
+            status = Step::Step_Status::CANCEL;
+            goto _finished;
+        }
+    }
+    
+    status = step_file.mesh(&model, is_cb_cancel, is_split_compound, linear_defletion, angle_defletion);
+
+_finished:
+
+    switch (status){
+        case Step::Step_Status::CANCEL: {
+            Model empty_model;
+            return empty_model;
+        }
+        case Step::Step_Status::LOAD_ERROR:
+            throw Slic3r::RuntimeError(_L("Loading of a model file failed."));
+        case Step::Step_Status::MESH_ERROR:
+            throw Slic3r::RuntimeError(_L("Meshing of a model file failed or no valid shape."));
+        default:
+            break;
+    }
+
+    if (model.objects.empty())
+        throw Slic3r::RuntimeError(_L("The supplied file couldn't be read because it's empty"));
+
+    for (ModelObject *o : model.objects)
+        o->input_file = input_file;
+
+    if (options & LoadStrategy::AddDefaultInstances)
+        model.add_default_instances();
+
+    return model;
+}
+
 // BBS: add part plate related logic
 // BBS: backup & restore
 // Loading model from a file, it may be a simple geometry file as STL or OBJ, however it may be a project file as well.
@@ -187,10 +243,10 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
     bool result = false;
     bool is_cb_cancel = false;
     std::string message;
-    if (boost::algorithm::iends_with(input_file, ".stp") ||
-        boost::algorithm::iends_with(input_file, ".step"))
-        result = load_step(input_file.c_str(), &model, is_cb_cancel, stepFn, stepIsUtf8Fn);
-    else if (boost::algorithm::iends_with(input_file, ".stl"))
+    //if (boost::algorithm::iends_with(input_file, ".stp") ||
+    //    boost::algorithm::iends_with(input_file, ".step"))
+    //    result = load_step(input_file.c_str(), &model, is_cb_cancel, stepFn, stepIsUtf8Fn);
+    if (boost::algorithm::iends_with(input_file, ".stl"))
         result = load_stl(input_file.c_str(), &model, nullptr, stlFn);
     else if (boost::algorithm::iends_with(input_file, ".oltp"))
         result = load_stl(input_file.c_str(), &model, nullptr, stlFn,256);

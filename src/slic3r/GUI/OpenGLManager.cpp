@@ -398,7 +398,7 @@ bool OpenGLManager::init_gl(bool popup_error)
                 if(wxGetApp().mainframe) {
                     wxCloseEvent close_evt(wxEVT_CLOSE_WINDOW);
                     close_evt.SetCanVeto(false);
-                    wxPostEvent(wxGetApp().mainframe, close_evt);
+                    wxQueueEvent(wxGetApp().mainframe, close_evt.Clone());
                 }
 
             }

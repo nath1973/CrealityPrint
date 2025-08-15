@@ -198,6 +198,7 @@ private:
 
 	float           m_depth_traversed = 0.f; // Current y position at the wipe tower.
     bool            m_current_layer_finished = false;
+    float           m_extra_flow             = 1.f;
 	bool 			m_left_to_right   = true;
 	float			m_extra_spacing   = 1.f;
 

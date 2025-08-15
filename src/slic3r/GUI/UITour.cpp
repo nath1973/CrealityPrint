@@ -203,7 +203,7 @@ void GuidePanel::UpdateUI(wxRect          pos,
     m_StepBitmap->Layout();
     // 更新步骤
     wxString stepText = wxString::Format("%d/%d", m_CurStep + 1, m_TotalStep);
-    m_CurStepStatic->SetLabelText(stepText.ToStdString());
+    m_CurStepStatic->SetLabelText(stepText);
     // 更新提示内容
     if (m_TipsBack.empty()) {
         m_TipBitMap->Hide();
@@ -215,26 +215,26 @@ void GuidePanel::UpdateUI(wxRect          pos,
         m_TipBitMap->Show();
     }
 
-    m_TipContent->SetLabelText(m_TipsFront.ToStdString());
+    m_TipContent->SetLabelText(m_TipsFront);
     std::string lang = wxGetApp().app_config->get("language");
 
     if (m_CurStep == 1) {
         wxString firstFive = lang == "zh_CN" ? m_TipsBack : m_TipsBack.SubString(0, m_TipsBack.Length() - 8);
         wxString remaining = lang == "zh_CN" ? "" : m_TipsBack.SubString(m_TipsBack.Length() - 7, m_TipsBack.Length());
-        m_TipContent_back->SetLabelText(firstFive.ToStdString());
-        m_TipContent_back_extension->SetLabelText(remaining.ToStdString());
+        m_TipContent_back->SetLabelText(firstFive);
+        m_TipContent_back_extension->SetLabelText(remaining);
     } else if (m_CurStep == 3) {
         wxString firstFive = lang == "zh_CN" ? m_TipsBack : m_TipsBack.SubString(0, 27);
         wxString remaining = lang == "zh_CN" ? "" : m_TipsBack.SubString(28, m_TipsBack.Length());
-        m_TipContent_back->SetLabelText(firstFive.ToStdString());
-        m_TipContent_back_extension->SetLabelText(remaining.ToStdString());
+        m_TipContent_back->SetLabelText(firstFive);
+        m_TipContent_back_extension->SetLabelText(remaining);
     } else if (m_CurStep == 5) {
         wxString firstFive = lang == "zh_CN" ? m_TipsFront : m_TipsFront.SubString(0, m_TipsFront.Length() - 15);
         wxString remaining = lang == "zh_CN" ? "" : m_TipsFront.SubString(m_TipsFront.Length() - 14, m_TipsFront.Length());
-        m_TipContent->SetLabelText(firstFive.ToStdString());
-        m_TipContent_back_extension->SetLabelText(remaining.ToStdString());
+        m_TipContent->SetLabelText(firstFive);
+        m_TipContent_back_extension->SetLabelText(remaining);
     } else {
-        m_TipContent_back->SetLabelText(m_TipsBack.ToStdString());
+        m_TipContent_back->SetLabelText(m_TipsBack);
         m_TipContent_back_extension->SetLabelText("");
     }
 

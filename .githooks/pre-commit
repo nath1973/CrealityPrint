@@ -4,8 +4,9 @@
 STYLE=$(git config --get hooks.clangformat.style)
 
 GIT_ROOT=$(git rev-parse --show-toplevel)
-# 定义 clang-format.exe 的路径（假设在根目录下）
+# 定义 clang-format.exe 和 clang-tidy.exe 的路径
 CLANG_FORMAT="${GIT_ROOT}/clang-format.exe"
+CLANG_TIDY="${GIT_ROOT}/clang-tidy/clang-tidy.exe"
 # 检测操作系统类型
 case "$(uname -s)" in
     Linux*)     OS=Linux;;
@@ -17,6 +18,7 @@ esac
 # 调用对应平台的子脚本
 if [ "$OS" = "Windows" ]; then
     CLANG_FORMAT="${GIT_ROOT}/clang-format.exe"
+    CLANG_TIDY="${GIT_ROOT}/clang-tidy/clang-tidy.exe"
 else
 	# 检查clang-format是否安装
 	if ! command -v clang-format >/dev/null 2>&1; then
@@ -26,12 +28,27 @@ else
 		echo "  Linux: sudo apt-get install clang-format" >&2
 		exit 1
 	fi
+	# 检查clang-tidy是否安装
+	if ! command -v clang-tidy >/dev/null 2>&1; then
+		echo "错误：未安装 clang-tidy" >&2
+		echo "安装方法：" >&2
+		echo "  macOS: brew install clang-tidy" >&2
+		echo "  Linux: sudo apt-get install clang-tidy" >&2
+		exit 1
+	fi
 	CLANG_FORMAT="clang-format"
+	CLANG_TIDY="clang-tidy"
 fi
 
-# 检查文件是否存在
+# 检查clang-format文件是否存在
 if [ ! -f "${CLANG_FORMAT}" ]; then
     echo "错误：未找到 ${CLANG_FORMAT}，请确保 clang-format.exe 在项目根目录下！" >&2
+    exit 1
+fi
+
+# 检查clang-tidy文件是否存在
+if [ ! -f "${CLANG_TIDY}" ]; then
+    echo "错误：未找到 ${CLANG_TIDY}，请确保 clang-tidy.exe 在项目根目录下！" >&2
     exit 1
 fi
 
@@ -46,18 +63,85 @@ else
   fi
 fi
 
+# 检查是否有.clang-tidy配置文件
+if [ -f "$(git rev-parse --show-toplevel)/clang-tidy/.clang-tidy" ]; then
+  TIDY_CONFIG="--config-file=$(git rev-parse --show-toplevel)/clang-tidy/.clang-tidy"
+else
+  TIDY_CONFIG=""
+fi
+
 # 格式化单个文件函数
 format_file() {
   file="${1}"
   if [ -f "${file}" ]; then
-     "${CLANG_FORMAT}" -i ${STYLEARG} "${file}"
+    "${CLANG_FORMAT}" -i ${STYLEARG} "${file}"
     echo "clang-format ${STYLEARG} -i ${file}"
     git add "${file}"
   fi
 }
 
-# 检查是否需要格式化
-is_need_format() {
+# 对单个文件运行clang-tidy检查
+tidy_file() {
+  file="${1}"
+  if [ -f "${file}" ]; then
+    # 定义日志文件路径
+    TIDY_LOG="${GIT_ROOT}/clang-tidy-report.log"
+    
+    echo "运行 clang-tidy ${TIDY_CONFIG} --header-filter=\"^$(realpath "${file}")$\" ${file}"
+    
+    # 在日志文件中添加分隔符和文件信息
+    echo "========================================" >> "${TIDY_LOG}"
+    echo "检查文件: ${file}" >> "${TIDY_LOG}"
+    echo "时间: $(date)" >> "${TIDY_LOG}"
+    echo "========================================" >> "${TIDY_LOG}"
+    
+    # 运行 clang-tidy 并将输出重定向到日志文件
+    # 使用 --header-filter 限制只检查目标文件，不检查包含的头文件
+    tidy_output=$("${CLANG_TIDY}" ${TIDY_CONFIG} --header-filter="^$(realpath "${file}")$" "${file}" 2>&1)
+    tidy_exit_code=$?
+    
+    # 将完整输出写入日志文件
+    echo "$tidy_output" >> "${TIDY_LOG}"
+    echo "" >> "${TIDY_LOG}"
+    
+    # 检查是否是编译数据库相关的错误
+    if echo "$tidy_output" | grep -q "compilation database"; then
+      echo "提示: ${file} 的 clang-tidy 检查跳过（缺少编译数据库）" >&2
+      echo "跳过: 缺少编译数据库" >> "${TIDY_LOG}"
+    elif echo "$tidy_output" | grep -q "unable to handle compilation"; then
+      echo "提示: ${file} 的 clang-tidy 检查跳过（无法处理编译）" >&2
+      echo "跳过: 无法处理编译" >> "${TIDY_LOG}"
+    elif [ $tidy_exit_code -ne 0 ]; then
+      # 统计警告数量
+      warning_count=$(echo "$tidy_output" | grep -c "warning:")
+      error_count=$(echo "$tidy_output" | grep -c "error:")
+      
+      if [ $warning_count -gt 0 ] || [ $error_count -gt 0 ]; then
+        echo "clang-tidy 检查完成: ${file} (发现 ${warning_count} 个警告, ${error_count} 个错误)"
+        echo "详细报告已保存到: ${TIDY_LOG}"
+      else
+        echo "clang-tidy 检查完成: ${file} (其他问题，详见日志)"
+        echo "详细报告已保存到: ${TIDY_LOG}"
+      fi
+    else
+      # 成功执行
+      if [ -n "$tidy_output" ]; then
+        warning_count=$(echo "$tidy_output" | grep -c "warning:")
+        if [ $warning_count -gt 0 ]; then
+          echo "clang-tidy 检查完成: ${file} (发现 ${warning_count} 个警告)"
+          echo "详细报告已保存到: ${TIDY_LOG}"
+        else
+          echo "clang-tidy 检查完成: ${file} (无问题)"
+        fi
+      else
+        echo "clang-tidy 检查完成: ${file} (无问题)"
+      fi
+    fi
+  fi
+}
+
+# 检查是否需要格式化和静态检查
+is_need_check() {
   file="${1}"
   need=1
   
@@ -78,14 +162,29 @@ is_need_format() {
 
 case "${1}" in
   --about )
-    echo "Runs clang-format on source files"
+    echo "Runs clang-format and clang-tidy on source files"
     ;;
   * )
+    # 初始化 clang-tidy 日志文件
+    TIDY_LOG="${GIT_ROOT}/clang-tidy-report.log"
+    echo "======================================== clang-tidy 检查报告 ========================================" > "${TIDY_LOG}"
+    echo "开始时间: $(date)" >> "${TIDY_LOG}"
+    echo "项目路径: ${GIT_ROOT}" >> "${TIDY_LOG}"
+    echo "=====================================================================================================" >> "${TIDY_LOG}"
+    echo "" >> "${TIDY_LOG}"
+    
     for file in $(git diff-index --cached --name-only HEAD); do
-      is_need_format "${file}"
+      is_need_check "${file}"
       if [[ $? -eq 1 ]]; then
         format_file "${file}"
+        tidy_file "${file}"
       fi
     done
+    
+    # 在日志文件末尾添加总结
+    echo "" >> "${TIDY_LOG}"
+    echo "=====================================================================================================" >> "${TIDY_LOG}"
+    echo "检查完成时间: $(date)" >> "${TIDY_LOG}"
+    echo "=====================================================================================================" >> "${TIDY_LOG}"
     ;;
 esac

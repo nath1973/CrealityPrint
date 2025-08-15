@@ -276,7 +276,11 @@ void fixSelfIntersections(const coord_t epsilon, Polygons &thiss)
                 const size_t line_next_idx = (line.point_idx + 1) % thiss[line.poly_idx].size();
                 if (poly_idx == line.poly_idx && (point_idx == line.point_idx || point_idx == line_next_idx))
                     continue;
-
+                if (line.poly_idx >= thiss.size() || thiss[line.poly_idx].empty()) {
+                    BOOST_LOG_TRIVIAL(warning) << "hzg_thiss.size(): " << thiss.size() << ";line.point_idx:" << line.point_idx;
+                    BOOST_LOG_TRIVIAL(warning) << "hzg_thiss[poly_idx].size(): " << thiss[poly_idx].size()
+                                               << ";line_next_idx:" << line_next_idx;
+                }
                 const Line segment(thiss[line.poly_idx][line.point_idx], thiss[line.poly_idx][line_next_idx]);
                 Point      segment_closest_point;
                 segment.distance_to_squared(pt, &segment_closest_point);

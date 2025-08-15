@@ -1,6 +1,6 @@
 app-id: io.github.crealityofficial.CrealityPrint
 runtime: org.gnome.Platform
-runtime-version: "46"
+runtime-version: "47"
 sdk: org.gnome.Sdk
 command: entrypoint
 separate-locales: true
@@ -15,6 +15,8 @@ finish-args:
   - --filesystem=/run/media
   - --filesystem=/media
   - --filesystem=/run/spnav.sock:ro
+  - --filesystem=xdg-config/gtk-3.0
+  - --filesystem=xdg-config/gtk-4.0
   # Allow OrcaSlicer to talk to other instances
   - --talk-name=io.github.crealityofficial.CrealityPrint.InstanceCheck.*
   - --system-talk-name=org.freedesktop.UDisks2
@@ -85,6 +87,16 @@ modules:
       - type: archive
         url: https://github.com/Esri/lerc/archive/refs/tags/v4.0.0.tar.gz
         sha256: 91431c2b16d0e3de6cbaea188603359f87caed08259a645fd5a3805784ee30a0
+
+  - name: libbz2
+    buildsystem: simple
+    sources:
+      - type: archive
+        url: https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+        sha256: ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
+    build-commands:
+      - |
+        make && make install PREFIX=/app
 
   - name: usrsctp
     buildsystem: cmake-ninja

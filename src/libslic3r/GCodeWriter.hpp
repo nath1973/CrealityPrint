@@ -16,16 +16,23 @@ public:
     GCodeConfig config;
     bool multiple_extruders;
     
-    GCodeWriter() : 
-        multiple_extruders(false), m_extruder(nullptr),
-        m_single_extruder_multi_material(false),
-        m_last_acceleration(0), m_max_acceleration(0),m_last_travel_acceleration(0), m_max_travel_acceleration(0),
-        m_last_jerk(0), m_max_jerk(0),
-        m_last_bed_temperature(0), m_last_bed_temperature_reached(true),
-        m_lifted(0),
-        m_to_lift(0),
-        m_to_lift_type(LiftType::NormalLift),
-        m_current_speed(3600), m_is_first_layer(true)
+    GCodeWriter()
+        : multiple_extruders(false)
+        , m_extruder(nullptr)
+        , m_single_extruder_multi_material(false)
+        , m_last_acceleration(0)
+        , m_max_acceleration(0)
+        , m_last_travel_acceleration(0)
+        , m_max_travel_acceleration(0)
+        , m_last_jerk(0)
+        , m_max_jerk(0)
+        , m_last_bed_temperature(0)
+        , m_last_bed_temperature_reached(true)
+        , m_lifted(0)
+        , m_to_lift(0)
+        , m_to_lift_type(LiftType::NormalLift)
+        , m_current_speed(3600)
+        , m_is_first_layer(true)
         {}
     Extruder*            extruder()             { return m_extruder; }
     const Extruder*      extruder()     const   { return m_extruder; }
@@ -84,6 +91,7 @@ public:
     std::string unlift(const double limitSpeed = 0.0f);
     Vec3d       get_position() const { return m_pos; }
     void       set_position(const Vec3d& in) { m_pos = in; }
+    void        set_position_for_wipe(const Vec3d& in);
     double      get_zhop() const { return m_lifted; }
 
     //BBS: set offset for gcode writer

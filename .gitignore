@@ -50,3 +50,4 @@ tagcmmid
 maxcmmid
 resources/i18n/*/*.*
 __pycache__
+/customized

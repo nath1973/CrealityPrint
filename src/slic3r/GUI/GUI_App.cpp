@@ -106,6 +106,7 @@
 #include "../Utils/Http.hpp"
 #include "../Utils/UndoRedo.hpp"
 #include "../Utils/ProfileFamilyLoader.hpp"
+#include "../Utils/TestHelper.hpp"
 #include "slic3r/Config/Snapshot.hpp"
 #include "Preferences.hpp"
 #include "ConfigRelateDialog.hpp"
@@ -184,6 +185,7 @@
 // Needed for forcing menu icons back under gtk2 and gtk3
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
     #include <gtk/gtk.h>
+    #include <gio/gio.h>
 #endif
 #include "print_manage/UploadGcodeToCloud.hpp"
 #include "print_manage/Upload3mfToCloud.hpp"
@@ -236,7 +238,13 @@ void start_ping_test()
         BOOST_LOG_TRIVIAL(info) << "ping 192.168.0.1:" << output_temp;
     }
 }
-
+#if __linux__
+// 检测是否在Flatpak环境中运行
+inline bool isRunningInFlatpak() {
+    const char* flatpakInfo = std::getenv("FLATPAK_ID");
+    return flatpakInfo != nullptr;
+}
+#endif
 VersionInfo::VersionInfo() 
 {
     for (int i = 0; i < VERSION_LEN; i++) {
@@ -508,10 +516,7 @@ public:
         // const wxColor  font_color(184, 188, 187);
         const wxColor  font_color(100, 100, 100);
 
-        if (Slic3r::CxBuildInfo::isCusotmized()) {
-            delete gc;
-            return ;
-        }
+#if !defined(CUSTOMIZED) || defined(CUSTOM_SPLASH_LOADING_TEXT_VISIBLE)
         // Official brief introduction
         wxString official_brief_introduction = m_loading_info + "\n\n" + _L("Official brief introduction");
 
@@ -528,7 +533,7 @@ public:
         gc->GetTextExtent(version_text, &text_width, &text_height);
         wxRect version_rect(FromDIP(32), height * 0.90, FromDIP(210), text_height);
         DrawCenteredWrappedText(gc, version_text, version_rect, Label::Body_13, font_color);
-
+#endif
         // Clean up the graphics context
         delete gc;
 
@@ -1248,6 +1253,9 @@ void GUI_App::post_init()
             wxGetApp().imgui()->set_display_size(static_cast<float>(canvas_size.get_width()), static_cast<float>(canvas_size.get_height()));
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", start to init opengl";
             wxGetApp().init_opengl();
+            if (!is_gl_version_greater_or_equal_to(2, 0)) {
+                return;
+            }
 
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", finished init opengl";
             plater_->canvas3D()->init();
@@ -1496,6 +1504,7 @@ wxDEFINE_EVENT(EVT_ENTER_FORCE_UPGRADE, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SHOW_NO_NEW_VERSION, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SHOW_DIALOG, wxCommandEvent);
 wxDEFINE_EVENT(EVT_CONNECT_LAN_MODE_PRINT, wxCommandEvent);
+wxDEFINE_EVENT(EVT_TEST_HELPER_CMD, wxCommandEvent);
 IMPLEMENT_APP(GUI_App)
 
 //BBS: remove GCodeViewer as seperate APP logic
@@ -1513,6 +1522,7 @@ GUI_App::GUI_App(bool enable_test /*= false*/)
 {
 	//app config initializes early becasuse it is used in instance checking in CrealityPrint.cpp
     this->init_app_config();
+    Test::Init(enable_test);
     this->init_download_path();
 #if wxUSE_WEBVIEW_EDGE
     this->init_webview_runtime();
@@ -2690,8 +2700,7 @@ std::string GUI_App::get_client_id()
 
 void GUI_App::startTour(int startIndex)
 {
-    if (!m_UITour)
-        m_UITour = new UITour(this->mainframe);
+    m_UITour = new UITour(this->mainframe);
     wxRect size = this->mainframe->GetRect();
 
     if (startIndex == 0)
@@ -2938,7 +2947,7 @@ int GUI_App::OnExit()
 
     if (m_device_manager) {
         delete m_device_manager;
-        m_device_manager = nullptr;
+        m_device_manager = nullptr; 
     }
 
     if (m_user_manager) {
@@ -3058,6 +3067,11 @@ bool GUI_App::on_init_inner(bool isdump_launcher)
             d->EndModal(wxID_ABORT);
     });
 
+    wxGetApp().Bind(EVT_TEST_HELPER_CMD, [this](wxCommandEvent& e) 
+    { 
+        Test::Visitor().call_cmd("handle_app_cmd", e.GetString().ToStdString());
+    });
+
     // Verify resources path
     const wxString resources_dir = from_u8(Slic3r::resources_dir());
     wxCHECK_MSG(wxDirExists(resources_dir), false,
@@ -3106,9 +3120,18 @@ bool GUI_App::on_init_inner(bool isdump_launcher)
 #ifdef _MSW_DARK_MODE
 
 #ifndef __WINDOWS__
-    wxSystemAppearance app = wxSystemSettings::GetAppearance();
-    GUI::wxGetApp().app_config->set("dark_color_mode", app.IsDark() ? "1" : "0");
-    GUI::wxGetApp().app_config->save();
+    #if __linux__
+        if(!isRunningInFlatpak())
+        {
+            wxSystemAppearance app = wxSystemSettings::GetAppearance();
+            GUI::wxGetApp().app_config->set("dark_color_mode", app.IsDark() ? "1" : "0");
+            GUI::wxGetApp().app_config->save();
+        }
+    #else
+        wxSystemAppearance app = wxSystemSettings::GetAppearance();
+        GUI::wxGetApp().app_config->set("dark_color_mode", app.IsDark() ? "1" : "0");
+        GUI::wxGetApp().app_config->save();
+    #endif
 #endif // __APPLE__
 
 
@@ -3199,7 +3222,8 @@ bool GUI_App::on_init_inner(bool isdump_launcher)
             evt.Skip();
         });   
         wxYield();
-#ifdef CUSTOMIZED
+
+#if defined(CUSTOMIZED) && !defined(CUSTOM_SPLASH_LOADING_TEXT_VISIBLE)
         scrn->SetText(_L(""));
 #else
         scrn->SetText(_L("Loading configuration") + dots);
@@ -3239,7 +3263,7 @@ bool GUI_App::on_init_inner(bool isdump_launcher)
         // start load profile family after preset updater finished
         ProfileFamilyLoader::init();
 
-#if CUSTOM_CXCLOUD
+#if !defined(CUSTOMIZED) || defined(CUSTOM_CHECKUPDATE_ENABLED)
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
             if (this->plater_ != nullptr) {
                 // this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable);
@@ -3797,7 +3821,14 @@ bool GUI_App::dark_mode()
         return wxPlatformInfo::Get().CheckOSVersion(10, 14) && mac_dark_mode();
     #elif __linux__
         // return false;
-        return check_dark_mode();
+        if(isRunningInFlatpak())
+        {
+           const unsigned luma = get_colour_approx_luma(wxSystemSettings::GetColour(wxSYS_COLOUR_ACTIVECAPTION));
+           return luma < 128;
+        }else{
+            return wxSystemSettings::GetAppearance().IsDark();
+        }
+        
         // return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : false;
     #else 
         return wxGetApp().app_config->get("dark_color_mode") == "1" ? true : check_dark_mode();

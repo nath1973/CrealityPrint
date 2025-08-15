@@ -339,9 +339,24 @@ if(NOT FREETYPE_FOUND)
     include(FREETYPE/FREETYPE.cmake)
     set(FREETYPE_PKG "dep_FREETYPE") 
 endif()
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    include(FFmpeg/ffmpeg.cmake)
-endif()
+
+execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --is-inside-work-tree
+    RESULT_VARIABLE REV_PARSE_RESULT
+    OUTPUT_VARIABLE REV_PARSE_OUTPUT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# Will output "true" and have a 0 return code if within a git repo
+if((REV_PARSE_RESULT EQUAL 0) AND (REV_PARSE_OUTPUT STREQUAL "true"))
+    set(IN_GIT_REPO TRUE)
+    # Find relative path from root to source used for adjusting patch command
+    file(RELATIVE_PATH BINARY_DIR_REL  ${CMAKE_SOURCE_DIR}/.. ${CMAKE_BINARY_DIR})
+endif ()
+
+
+include(FFmpeg/ffmpeg.cmake)
+
 include(OCCT/OCCT.cmake)
 include(OpenCV/OpenCV.cmake)
 include(aliyun-oss-cpp-sdk/aliyun-oss-cpp-sdk.cmake)
@@ -375,6 +390,7 @@ if(ENABLE_BREAKPAD)
         dep_OSS
         dep_BREAKPAD
         dep_Assimp
+        dep_FFmpeg
         )
 else()
     message(STATUS "Breakpad is disabled...")
@@ -409,11 +425,15 @@ if (MSVC)
     #list(APPEND _dep_list "dep_qhull")
 else()
     list(APPEND _dep_list "dep_Qhull")
+    # list(APPEND _dep_list "dep_x264")   #mac need build x264
     # Not working, static build has different Eigen
     #list(APPEND _dep_list "dep_libigl")
 endif()
-
-add_custom_target(deps ALL DEPENDS ${_dep_list})
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    include(ZSTD/ZSTD.cmake)
+    list(APPEND _dep_list_first "dep_zstd")
+endif()
+add_custom_target(deps ALL DEPENDS ${_dep_list_first} ${_dep_list} )
 
 # Note: I'm not using any of the LOG_xxx options in ExternalProject_Add() commands
 # because they seem to generate bogus build files (possibly a bug in ExternalProject).

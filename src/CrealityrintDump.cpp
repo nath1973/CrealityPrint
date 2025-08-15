@@ -68,6 +68,25 @@ ErrorReportDialog::ErrorReportDialog(wxWindow* parent, const wxString& title)
     //vtext->SetForegroundColour(is_dark ? *wxWHITE : *wxBLACK);
     contentSizer->Add(vtext, 0, wxALIGN_LEFT | wxALL, 10);
 
+    wxStaticText* tipsText = new wxStaticText(
+        this, wxID_ANY,
+        _L("We apologize for the inconvenience caused by this unexpected software issue. If it's convenient for you, please leave your "
+           "email or other contact information so we can promptly update you on the progress of resolving the issue."),
+        wxDefaultPosition, wxDefaultSize);
+    tipsText->Wrap(FromDIP(745));
+
+    m_InfoInput = new ::TextInput(this, "", wxEmptyString, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+                                   wxTE_PROCESS_ENTER);
+    StateColor input_bg(std::pair<wxColour, int>(wxColour("#F0F0F1"), StateColor::Disabled),
+                        std::pair<wxColour, int>(*wxWHITE, StateColor::Enabled));
+    m_InfoInput->SetBackgroundColor(input_bg);
+    m_InfoInput->SetCornerRadius(1);
+    m_InfoInput->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { });
+    m_InfoInput->SetMinSize(wxSize(FromDIP(360), FromDIP(24)));
+    m_InfoInput->SetMaxSize(wxSize(FromDIP(360), FromDIP(24)));
+    m_InfoInput->SetSize(wxSize(FromDIP(360), FromDIP(24)));
+    m_InfoInput->SetMaxLength(100);
+
     // 创建发送按钮
     // wxButton* sendButton = new wxButton(this, wxID_OK, "SendReport");
     StateColor btn_bg_green(std::pair<wxColour, int>(wxColour(21, 191, 89), StateColor::Pressed),
@@ -108,10 +127,12 @@ ErrorReportDialog::ErrorReportDialog(wxWindow* parent, const wxString& title)
     buttonSizer->Add(cancelButton, 0, wxALL, 5);
 
     // 将按钮布局管理器添加到主布局管理器
+    sizer->Add(tipsText, 0, wxLEFT, FromDIP(10));
+    sizer->Add(m_InfoInput, 0, wxLEFT | wxUP, FromDIP(10));
     sizer->Add(buttonSizer, 0, wxALIGN_CENTER | wxALL, 10);
 
-    SetMinSize(wxSize(FromDIP(600), FromDIP(350)));
-    SetMaxSize(wxSize(FromDIP(600), FromDIP(350)));
+    //SetMinSize(wxSize(FromDIP(600), FromDIP(350)));
+    //SetMaxSize(wxSize(FromDIP(600), FromDIP(350)));
     // 设置对话框的布局管理器
     SetSizer(sizer);
     // 调整对话框大小以适应内容
@@ -129,6 +150,8 @@ wxString ErrorReportDialog::getSystemInfo()
     j["openGLVersion"]      = m_info.openGLVersion.ToStdString();
     j["build"]              = m_info.build.ToStdString();
     j["uuid"]               = m_info.uuid.ToStdString();
+    j["uuid"]               = m_info.uuid.ToStdString();
+    j["userEmail"]          = m_InfoInput->GetTextCtrl()->GetValue().ToStdString();
     try {
         // 获取临时目录路径
         std::filesystem::path tempDir(wxFileName::GetTempDir().ToStdString());

@@ -137,9 +137,9 @@ class session : public std::enable_shared_from_this<session>
     void read_first_line();
     void read_next_line();
     void read_body();
-#if defined(__linux__) || defined(__LINUX__)
-    void sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp::socket &socket);
-#endif
+
+    void sendFrame(const boost::system::error_code &ec,boost::asio::ip::tcp::socket &socket,bool is_rtsp=false);
+
 private:
     boost::asio::deadline_timer *m_video_timer=nullptr;
     boost::asio::streambuf proxy_buff;

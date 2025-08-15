@@ -6,7 +6,8 @@
 //BBS: add bbs 3mf
 #include "Format/bbs_3mf.hpp"
 //BBS: add step
-#include "Format/STEP.hpp"
+//#include "Format/STEP.hpp"
+#include "Format/step_func_def.hpp"
 //BBS: add stl
 #include "Format/STL.hpp"
 #include "Format/OBJ.hpp"
@@ -33,6 +34,7 @@ class Preset;
 class BBLProject;
 
 class KeyStore;
+class Step;
 
 // The print bed content.
 // Description of a triangular model with multiple materials, multiple instances with various affine transformations
@@ -130,6 +132,15 @@ public:
         assert(this->id().valid() && this->id() != rhs.id());
 		return *this;
     }
+
+    static Model read_from_step(const std::string&                                      input_file,
+                        LoadStrategy                                            options,
+                        ImportStepProgressFn                                    stepFn,
+                        StepIsUtf8Fn                                            stepIsUtf8Fn,
+                        std::function<int(Slic3r::Step&, double&, double&, bool&)>     step_mesh_fn,
+                        double                                                  linear_defletion,
+                        double                                                  angle_defletion,
+                        bool                                                    is_split_compound);
 
     //BBS: add part plate related logic
     // BBS: backup

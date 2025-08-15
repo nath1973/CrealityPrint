@@ -5,7 +5,7 @@
 #include <functional>
 #include <string>
 #include "slic3r/Utils/Http.hpp"
-
+#include "slic3r/GUI/FileUploader.hpp"
 namespace RemotePrint {
 	class Klipper4408Interface {
 public:
@@ -19,6 +19,7 @@ public:
 private:
 	const std::string urlSuffixUpload = "/upload/";
     std::map<std::string, Slic3r::Http*> mapHttp; // ipAddress -> port
+	std::map<std::string, HttpFileUploader*> mapFileUploader; // ipAddress -> port
 	//Slic3r::Http*     m_pHttp         = nullptr;
     bool              m_bCancelSend   = false;
     };

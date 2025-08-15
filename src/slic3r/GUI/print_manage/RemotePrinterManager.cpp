@@ -59,10 +59,9 @@ void RemotePrinterManager::workerThread()
 RemotePrinterManager::~RemotePrinterManager()
 {
     m_bExit = true;
-     std::unique_lock<std::mutex> lock(queue_mutex);
-     stop_flag = true;
-     condition.notify_all();
-     for (int i = 0; i < 3; ++i) {
+    stop_flag = true;
+    condition.notify_all();
+    for (int i = 0; i < 3; ++i) {
             if (m_multUploadThreads[i].joinable()) {
                 m_multUploadThreads[i].join();
             }

@@ -612,9 +612,9 @@ void UpdateVersionDialog::update_version_info(wxString release_note, wxString ve
         auto        m_staticText_release_note = new ::Label(m_scrollwindows_release_note, release_note);
 
         wxSize      size                      = m_scrollwindows_release_note->GetSize();
-        m_staticText_release_note->SetMinSize(wxSize(size.GetWidth() - FromDIP(30), -1));
-        m_staticText_release_note->SetMaxSize(wxSize(size.GetWidth() - FromDIP(30), -1));
-        m_staticText_release_note->Wrap(size.GetWidth() - FromDIP(25));
+        m_staticText_release_note->SetMinSize(wxSize(size.GetWidth() - FromDIP(70), -1));
+        m_staticText_release_note->SetMaxSize(wxSize(size.GetWidth() - FromDIP(70), -1));
+        m_staticText_release_note->Wrap(size.GetWidth() - FromDIP(70));
 
         sizer_text_release_note->Add(m_staticText_release_note, 0, wxALL, 5); 
         m_scrollwindows_release_note->SetSizer(sizer_text_release_note);

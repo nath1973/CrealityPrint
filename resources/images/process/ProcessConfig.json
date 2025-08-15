@@ -24,6 +24,25 @@
                             ]
                         },
                         {
+                            "name":"Layer height",
+                            "icon":"param_layer_height",
+                            "options":
+                            [
+                                {
+                                    "key":"layer_height",
+                                    "tooltip":"",
+                                    "tooltip_img":"layer_height",
+                                    "url":""
+                                },
+                                {
+                                    "key":"initial_layer_print_height",
+                                    "tooltip":"",
+                                    "tooltip_img":"initial_layer_print_height",
+                                    "url":""
+                                }                        
+                            ]
+                        },
+                        {
                             "name":"Walls and surfaces",
                             "icon":"param_wall_surface",
                             "options":

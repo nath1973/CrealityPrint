@@ -21,6 +21,7 @@ find_path(FFMPEG_INCLUDE_DIR
         /opt/local/include
         "C:/msys64/mingw64/include"
         "C:/msys64/usr/include"
+        "$CMAKE_PREFIX_PATH/include"
     PATH_SUFFIXES ffmpeg
     DOC "FFmpeg 头文件目录"
 )
@@ -43,6 +44,7 @@ foreach(COMPONENT ${FFMPEG_COMPONENTS})
             /opt/local/lib
             "C:/msys64/mingw64/lib"
             "C:/msys64/usr/lib"
+            "$CMAKE_PREFIX_PATH/lib"
         PATH_SUFFIXES ffmpeg
         DOC "FFmpeg ${COMPONENT} 库路径"
     )
@@ -91,6 +93,7 @@ if(FFMPEG_FOUND AND NOT TARGET FFmpeg::FFmpeg)
         endif()
 
         add_library(FFmpeg::${COMPONENT} UNKNOWN IMPORTED)
+        message(STATUS "FFmpeg::${COMPONENT} library found: ${${UPPERCOMPONENT}_LIBRARY}")
         set_target_properties(FFmpeg::${COMPONENT} PROPERTIES
             IMPORTED_LOCATION "${${UPPERCOMPONENT}_LIBRARY}"
             INTERFACE_INCLUDE_DIRECTORIES "${FFMPEG_INCLUDE_DIR}"

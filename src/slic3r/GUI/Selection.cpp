@@ -2038,6 +2038,7 @@ void Selection::calculate_clone_preview_offsets(int numbers)
 // calculate the volume offset only in world space
 void Selection::calculate_model_object_clone_preview_offsets(int numbers)
 {
+    // [int] -- (volume_idx) in m_list;  [std::vector<Vec3f>] -- all clone offsets in world space 
     std::unordered_map<int, std::vector<Vec3f> > preview_offsets;
 
     // int -- (volume_idx) in m_list;  Vec3f -- volume start offset in world space 
@@ -2049,42 +2050,58 @@ void Selection::calculate_model_object_clone_preview_offsets(int numbers)
     }
 
     m_clone_offsets.clear();
-    m_clone_offsets.reserve(numbers);
 
     const ModelObjectPtrs& src_objects = m_clipboard.get_objects();
+    size_t src_objects_size = src_objects.size();
+    if (src_objects_size <= 0)
+        return;
+
+    m_clone_offsets.reserve(src_objects_size);
+
     PartPlateList&         partplate_list = wxGetApp().plater()->get_partplate_list();
     PartPlate*             plate          = partplate_list.get_curr_plate();
 
-    // in clone preview , usually only one ModelObject is selected
+    // if multiple objects are selected, move them as a whole after copy
+    BoundingBoxf3 bbox_all;
+    if (src_objects.size() > 1) {
+        for (const ModelObject *src_object : src_objects) {
+            BoundingBoxf3 bbox = src_object->instance_convex_hull_bounding_box(size_t(0));
+            bbox_all.merge(bbox);
+        }
+    } else {
+        bbox_all = src_objects[0]->instance_convex_hull_bounding_box(size_t(0));
+    }
+
+    auto start_point = bbox_all.center();
+
+    int object_plate_idx = partplate_list.find_instance(bbox_all);
+
+    // in clone preview , one ModelObject or multiple ModelObjects can be selected
     for (size_t k = 0; k < src_objects.size(); k++)
     {
         ModelObject* src_object = src_objects[k];
 
-        // BBS: find an empty cell to put the copied object
-        BoundingBoxf3 bbox = src_object->instance_convex_hull_bounding_box(size_t(0));
-
         // the src_objects are possiblly not intersecting any plate or not in the current plate
-        int object_plate_idx = partplate_list.find_instance(bbox);
         PartPlate* object_plate     = nullptr;
         if (object_plate_idx >= 0 && object_plate_idx < partplate_list.get_plate_count()) {
             object_plate = partplate_list.get_plate(object_plate_idx);
         }
 
-        auto start_point = bbox.center();
-
         for (unsigned int volume_idx : m_list) {
 
             GLVolume& volume = *(*m_volumes)[volume_idx];
 
+            // if the volume is not related with the src_object , skip it
+            if(m_volume_idx_to_object_idx[static_cast<size_t>(volume_idx)] != k)
+                continue;
+
             const Transform3d world_matrix = volume.world_matrix();
 
             auto tmp_volume_start_offset = world_matrix.translation();
-            //auto volume_start_point      = volume.transformed_bounding_box().center();
-            //auto tmp_volume_point_offset = tmp_volume_start_offset - volume_start_point;
             auto tmp_volume_point_offset = tmp_volume_start_offset - start_point;
 
             volume_start_offset.insert({ volume_idx, tmp_volume_start_offset.cast<float>() });
-            volume_point_offset.insert({volume_idx, tmp_volume_point_offset.cast<float>()});
+            volume_point_offset.insert({ volume_idx, tmp_volume_point_offset.cast<float>() });
         }
 
         // find empty cells
@@ -2092,21 +2109,24 @@ void Selection::calculate_model_object_clone_preview_offsets(int numbers)
             auto start_offset = src_object->instances.front()->get_offset();
             auto point_offset = start_offset - start_point;
 
-            float extra_offset = this->get_layout_extra_offset(src_object);
+            float extra_offset = 1.0f;
+            if(1 == src_objects.size()) {
+                extra_offset = this->get_layout_extra_offset(src_object);
+            }
 
-            Vec2f step = Vec2f(bbox.size()(0) + extra_offset, bbox.size()(1) + extra_offset);
+            Vec2f step = Vec2f(bbox_all.size()(0) + extra_offset, bbox_all.size()(1) + extra_offset);
 
             // only need to call "get_empty_cells" once
             std::vector<Vec2f> all_empty_cells;
             if (object_plate_idx >= 0) {
                 all_empty_cells = wxGetApp().plater()->canvas3D()->get_empty_cells({start_point(0), start_point(1)},
-                                                                                   {bbox.size()(0), bbox.size()(1)},
+                                                                                   {bbox_all.size()(0), bbox_all.size()(1)},
                                                                                    extra_offset,
                                                                                    object_plate_idx);
             } else {
                 all_empty_cells = wxGetApp().plater()->canvas3D()->get_expand_cells(Vec2f(start_point.x(), start_point.y()), 
                                                                                     100,
-                                                                                    {bbox.size()(0), bbox.size()(1)},
+                                                                                    {bbox_all.size()(0), bbox_all.size()(1)},
                                                                                     extra_offset);
             }
             
@@ -2116,7 +2136,7 @@ void Selection::calculate_model_object_clone_preview_offsets(int numbers)
                 BoundingBoxf3 object_plate_bbox = object_plate->get_build_volume();
                 auto expanded_cells = wxGetApp().plater()->canvas3D()->get_expand_cells(Vec2f(start_point.x(), start_point.y()),
                                                                                         numbers,
-                                                                                        {bbox.size()(0), bbox.size()(1)},
+                                                                                        {bbox_all.size()(0), bbox_all.size()(1)},
                                                                                         extra_offset,
                                                                                         &object_plate_bbox);
                 all_empty_cells.insert(all_empty_cells.end(), expanded_cells.begin(), expanded_cells.end());
@@ -2136,6 +2156,10 @@ void Selection::calculate_model_object_clone_preview_offsets(int numbers)
                         // note: calculate the volume offset only in world space
                         for (unsigned int volume_idx : m_list) {
                             GLVolume& volume = *(*m_volumes)[volume_idx];
+                            
+                            // if the volume is not related with the src_object , skip it
+                            if(m_volume_idx_to_object_idx[static_cast<size_t>(volume_idx)] != k)
+                                continue;
 
                             const Transform3d world_matrix = volume.world_matrix();
 
@@ -2152,7 +2176,7 @@ void Selection::calculate_model_object_clone_preview_offsets(int numbers)
                         }
                     }
 
-                    m_clone_offsets.emplace_back(a_displacement);
+                    m_clone_offsets[k].emplace_back(a_displacement);
                 }
             }
             else {
@@ -2179,16 +2203,16 @@ void Selection::calculate_volume_clone_preview_offsets(int numbers)
     std::unordered_map<int, Vec3f> volume_start_offsets;
     std::unordered_map<int, Vec3f> volume_point_offsets;
 
-    m_volume_clone_offsets.clear();
+    m_clone_offsets.clear();
 
     for (unsigned int volume_idx : m_list) {
         preview_offsets.insert({volume_idx, std::vector<Vec3f>()});
-        m_volume_clone_offsets.insert({volume_idx, std::vector<Vec3f>()});
+        m_clone_offsets.insert({volume_idx, std::vector<Vec3f>()});
     }
 
     const ModelObjectPtrs& src_objects = m_clipboard.get_objects();
 
-    // in clone preview , usually only one ModelObject is selected
+    // in clone volume preview , usually only one ModelObject is selected
     for (size_t k = 0; k < src_objects.size(); k++)
     {
         ModelObject* src_object = src_objects[k];
@@ -2234,7 +2258,7 @@ void Selection::calculate_volume_clone_preview_offsets(int numbers)
 
                         Vec3f one_volume_preview_offset = volume_displacement - Vec3f(volume_start_offsets[volume_idx].x(), volume_start_offsets[volume_idx].y(), volume_start_offsets[volume_idx].z());
 
-                        m_volume_clone_offsets[volume_idx].emplace_back(one_volume_preview_offset);
+                        m_clone_offsets[volume_idx].emplace_back(one_volume_preview_offset);
 
                         // reset to local model space, because when render the clone shell, use the volume world matrix in shader
                         one_volume_preview_offset = world_matrix.matrix().block(0, 0, 3, 3).inverse().cast<float>() * one_volume_preview_offset;
@@ -2265,6 +2289,7 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
     }
 
     m_clone_offsets.clear();
+    m_clone_offsets.reserve(1); // only one object is selected in checkerboard layout
 
     PartPlateList& plate_list = plater->get_partplate_list();
 
@@ -2475,7 +2500,7 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
 
             Vec3f a_displacement = { empty_cells[i].x(), empty_cells[i].y(), static_cast<float>(start_offset(2)) };
 
-            m_clone_offsets.emplace_back(a_displacement);
+            m_clone_offsets[0].emplace_back(a_displacement);
 
             if(1) {
                 // note: calculate the volume offset only in world space
@@ -2512,7 +2537,6 @@ void Selection::calculate_checkerboard_preview_offsets(float distance)
 void Selection::clear_clone_offsets()
 {
     m_clone_offsets.clear();
-    m_volume_clone_offsets.clear();
 }
 
 void Selection::toggle_selection_visible(bool visible) 
@@ -2547,6 +2571,10 @@ void Selection::paste_objects_from_checkerboard_layout()
     if (sel_object_idx == -1)
         return;
 
+    if (m_clone_offsets.empty() || m_clone_offsets[0].empty()) {
+        return;
+    }
+
     ModelObject* selected_object = wxGetApp().plater()->model().objects[sel_object_idx];
     if (selected_object->instances.empty()) return;
 
@@ -2554,14 +2582,14 @@ void Selection::paste_objects_from_checkerboard_layout()
 
     std::vector<size_t> object_idxs;
 
-    for (size_t k = 1; k < m_clone_offsets.size(); k++) {
+    for (size_t k = 1; k < m_clone_offsets[0].size(); k++) {
 
         //assume only one object is selected, and this object has only one volumn
         //const ModelObject* src_object = src_objects[i];
         ModelObject* dst_object = m_model->add_object(*selected_object);
 
         for (ModelInstance* inst : dst_object->instances) {
-            inst->set_offset(m_clone_offsets[k].cast<double>());
+            inst->set_offset(m_clone_offsets[0][k].cast<double>());
 
             //BBS init asssmble transformation
             Geometry::Transformation t = inst->get_transformation();
@@ -2577,7 +2605,7 @@ void Selection::paste_objects_from_checkerboard_layout()
     }
 
     for (ModelInstance* inst : selected_object->instances) {
-        inst->set_offset(m_clone_offsets[0].cast<double>());
+        inst->set_offset(m_clone_offsets[0][0].cast<double>());
 
         //BBS init asssmble transformation
         Geometry::Transformation t = inst->get_transformation();
@@ -2678,16 +2706,17 @@ void Selection::paste_objects_from_clipboard_and_set_offsets()
         src_object_ids.push_back(volume->object_idx());
     }
 
-    for(size_t k = 0; k < m_clone_offsets.size(); k++) {
+    //multiple modelObjects can be selected
+    for (size_t obj_idx = 0; obj_idx < src_objects.size(); obj_idx++)
+    {
+        const ModelObject* src_object = src_objects[obj_idx];
 
-        //assume only one object is selected, and this object has only one volumn
-        for (size_t i = 0; i < src_objects.size(); i++)
-        {
-            const ModelObject* src_object = src_objects[i];
+        for (size_t k = 0; k < m_clone_offsets[obj_idx].size(); k++) {
+
             ModelObject* dst_object = m_model->add_object(*src_object);
 
             for (ModelInstance* inst : dst_object->instances) {
-                inst->set_offset(m_clone_offsets[k].cast<double>());
+                inst->set_offset(m_clone_offsets[obj_idx][k].cast<double>());
 
                 //BBS init asssmble transformation
                 Geometry::Transformation t = inst->get_transformation();
@@ -2696,15 +2725,18 @@ void Selection::paste_objects_from_clipboard_and_set_offsets()
 
             object_idxs.push_back(m_model->objects.size() - 1);
 
-    #ifdef _DEBUG
-            check_model_ids_validity(*m_model);
-    #endif /* _DEBUG */
-
+            #ifdef _DEBUG
+                    check_model_ids_validity(*m_model);
+            #endif /* _DEBUG */
         }
 
     }
 
     wxGetApp().obj_list()->paste_objects_into_list(object_idxs);
+
+    for (const size_t object : object_idxs) {
+        wxGetApp().obj_list()->update_info_items(object);
+    }
 
     // append source selected model_object  after clone
     for (size_t obj_idx : src_object_ids) {
@@ -2720,7 +2752,7 @@ void Selection::paste_objects_from_clipboard_and_set_offsets()
 
 void Selection::paste_volumes_from_clipboard_and_set_offsets()
 {
-    if (m_volume_clone_offsets.empty()) {
+    if (m_clone_offsets.empty()) {
         return;
     }
 
@@ -2762,15 +2794,15 @@ void Selection::paste_volumes_from_clipboard_and_set_offsets()
             }
 
             unsigned int volume_idx = m_clone_volume_id_to_selected_id[volume_object_id];
-            if(m_volume_clone_offsets.find(volume_idx) == m_volume_clone_offsets.end()) {
+            if(m_clone_offsets.find(volume_idx) == m_clone_offsets.end()) {
                 continue;
             }
 
-            for(size_t k = 0; k < m_volume_clone_offsets[volume_idx].size(); k++) {
+            for(size_t k = 0; k < m_clone_offsets[volume_idx].size(); k++) {
                 ModelVolume* dst_volume = dst_object->add_volume(*src_volume);
                 dst_volume->set_new_unique_id();
 
-                dst_volume->translate(dst_matrix.inverse() * m_volume_clone_offsets[volume_idx][k].cast<double>());
+                dst_volume->translate(dst_matrix.inverse() * m_clone_offsets[volume_idx][k].cast<double>());
 
                 volumes.push_back(dst_volume);
     #ifdef _DEBUG
@@ -2907,8 +2939,8 @@ void Selection::copy_to_clipboard()
         return;
 
     m_clipboard.reset();
-
     m_clone_volume_id_to_selected_id.clear();
+    m_volume_idx_to_object_idx.clear();
 
     // sort as the object list order
     std::vector<unsigned int> selected_list;
@@ -2946,6 +2978,8 @@ void Selection::copy_to_clipboard()
 
                     //mark down the objectId value with the volume_idx in m_list
                     m_clone_volume_id_to_selected_id[dst_volume->id().id] = i;
+
+                    m_volume_idx_to_object_idx[i] = m_clipboard.get_objects().size() - 1;
                 }
                 else
                     assert(false);
@@ -4109,6 +4143,10 @@ void Selection::paste_objects_from_clipboard()
     }
 
     wxGetApp().obj_list()->paste_objects_into_list(object_idxs);
+
+    for (const size_t object : object_idxs) {
+        wxGetApp().obj_list()->update_info_items(object);
+    }
 
 #ifdef _DEBUG
     check_model_ids_validity(*m_model);

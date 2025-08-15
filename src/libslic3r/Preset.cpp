@@ -2423,7 +2423,9 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
             return;
         }
         // Overwriting an existing preset.
+        std::string inherits = preset.inherits();
         preset.config = std::move(curr_preset.config);
+        preset.config.set("inherits", inherits);
         // The newly saved preset will be activated -> make it visible.
         preset.is_visible = true;
         //TODO: remove the detach logic

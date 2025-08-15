@@ -8,6 +8,7 @@
 #ifdef _WIN32
 #include "libslic3r/UnittestFlow.hpp"
 #include "libslic3r/AutomationMgr.hpp"
+#include "slic3r/Utils/TestHelper.hpp"
 #endif
 #include <boost/optional.hpp>
 
@@ -246,7 +247,9 @@ public:
             return 0;
         }
 #endif // AUTOMATION_TOOL
- 
+        if (Test::enable_test) {
+            return 0;
+        }
 #endif
         dialogStack.push_front(this);
         int r = wxDialog::ShowModal();

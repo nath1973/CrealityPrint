@@ -680,6 +680,19 @@ void AppConfig::set_defaults()
         set("role_type", "0");
     }
 
+    if (get("enable_step_mesh_setting").empty()) {
+        set_bool("enable_step_mesh_setting", true);
+    }
+    if (get("linear_defletion").empty()) {
+        set("linear_defletion", "0.003");
+    }
+    if (get("angle_defletion").empty()) {
+        set("angle_defletion", "0.5");
+    }
+    if (get("is_split_compound").empty()) {
+        set_bool("is_split_compound", false);
+    }
+
     /*if (get("gcode_preview_lite_mode").empty()) {
         set("gcode_preview_lite_mode", "true");
     }*/

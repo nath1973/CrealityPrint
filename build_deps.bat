@@ -117,8 +117,8 @@ cd %ROOT_DEP%
 echo my=%ROOT_DEP%
 mkdir build_%build_type%
 cd build_%build_type%
-echo cmake ../ -G "%VS_Version%" -A x64 -DDESTDIR="%DEP_INSTALL_DIR%" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%Build_ON% -DORCA_INCLUDE_DEBUG_INFO=OFF
-cmake ../ -G "%VS_Version%" -A x64 -DDESTDIR="%DEP_INSTALL_DIR%" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%Build_ON% -DORCA_INCLUDE_DEBUG_INFO=OFF
+echo cmake ../ -G "%VS_Version%" -A x64 -DDESTDIR="%DEP_INSTALL_DIR%" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%Build_ON% -DORCA_INCLUDE_DEBUG_INFO=OFF -DDEPS_ARCH=x64
+cmake ../ -G "%VS_Version%" -A x64 -DDESTDIR="%DEP_INSTALL_DIR%" -DCMAKE_BUILD_TYPE=%build_type% -DDEP_DEBUG=%Build_ON% -DORCA_INCLUDE_DEBUG_INFO=OFF -DDEPS_ARCH=x64
 if %cache_dep_continue% == ON (
     echo cmake --build . --config %build_type% --target deps -- -m
     cmake --build . --config %build_type% --target deps -- -m

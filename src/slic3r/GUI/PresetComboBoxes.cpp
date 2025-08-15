@@ -1089,6 +1089,11 @@ void PlaterPresetComboBox::update()
     {
         set_label_marker(Append(separator(L("System presets")), wxNullBitmap));
         for (std::map<wxString, wxBitmap*>::iterator it = system_presets.begin(); it != system_presets.end(); ++it) {
+            if (m_type == Preset::TYPE_FILAMENT && it->first == "Default Filament" &&
+                (system_presets.size() != 1 || (system_presets.size() == 1 && !project_embedded_presets.empty()) ||
+                 (system_presets.size() == 1 && !nonsys_presets.empty()))) {
+                continue;
+            }
             SetItemTooltip(Append(it->first, *it->second), preset_descriptions[it->first]);
             validate_selection(it->first == selected_system_preset);
         }

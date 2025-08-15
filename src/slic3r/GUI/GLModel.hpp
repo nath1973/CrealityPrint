@@ -138,15 +138,23 @@ namespace GUI {
             size_t vertices_count{ 0 };
             size_t indices_count{ 0 };
             //unsigned int vao_id{ 0 };
-            unsigned int instance_vbo_id{ 0 };
-            unsigned int instance_count{ 0 };
             void release();
             ~RenderData() { 
                 release();
             }
-
-
         };
+
+        // instance data could not be stored in RenderData, because it is not shared between GLModel instances;
+        struct RenderInstanceData
+        {
+            unsigned int instance_vbo_id{ 0 };
+            unsigned int instance_count{ 0 };
+            void release();
+            ~RenderInstanceData() { 
+                release();
+            }
+        };
+
     private:
         //RenderData m_render_data;
         std::shared_ptr<RenderData> m_render_data;
@@ -164,6 +172,8 @@ namespace GUI {
 
         //for render clone preview, if "glDrawElementsInstanced" not supported, use normal render 
         std::vector<Vec3f> m_model_offsets;
+
+        RenderInstanceData m_instance_data;
 
     public:
         GLModel(bool create_geometry_data = true);

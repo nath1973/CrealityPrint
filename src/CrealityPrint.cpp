@@ -84,11 +84,7 @@ using namespace nlohmann;
     #endif
 #endif
 
-#ifdef TARGET_OS_MAC
-    #ifdef USE_BREAKPAD
-    #include "client/mac/handler/exception_handler.h"
-    #endif
-#endif
+
 #include "slic3r/GUI/PartPlate.hpp"
 #include "slic3r/GUI/BitmapCache.hpp"
 #include "slic3r/GUI/OpenGLManager.hpp"
@@ -6423,56 +6419,7 @@ int main(int argc, char **argv)
                 google_breakpad::ExceptionHandler eh(descriptor, NULL, dumpCallback, NULL, true, -1);
             #endif
         #endif
-        #ifdef TARGET_OS_MAC
-            auto dmpCallBack = [](const char* dump_dir,
-                                   const char* minidump_id,
-                                   void* context, bool succeeded) -> bool {
-            //wxMessageBox(dump_dir,wxT("Message box caption"),wxNO_DEFAULT|wxYES_NO|wxCANCEL|wxICON_INFORMATION,nullptr);
-                if (succeeded) {
-                    boost::filesystem::path oldPath(dump_dir);
-                    oldPath.append(minidump_id).replace_extension(".dmp");
-
-                    boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-                    // 创建一个 time_facet 对象，用于自定义时间格式
-                    boost::posix_time::time_facet* timeFacet = new boost::posix_time::time_facet();
-                    std::stringstream              ss;
-                    // 设置时间格式为 yyyyMMDD_hhmmss
-                    timeFacet->format("%Y%m%d_%H%M%S");
-                    ss.imbue(std::locale(std::locale::classic(), timeFacet));
-                    ss << now;
-
-                    std::string timeStr        = ss.str();
-                    std::string processNameStr = timeStr + std::string("_") + SLIC3R_PROCESS_NAME + std::string("_") + CREALITYPRINT_VERSION +
-                                                std::string("_") + PROJECT_VERSION_EXTRA;
-                    boost::filesystem::path newPath(dump_dir);
-                    newPath.append(processNameStr).replace_extension(".dmp");
-                    if (boost::filesystem::exists(oldPath)) {
-                        // MessageBox(NULL, newPath.wstring().c_str(), minidump_id, MB_OK | MB_ICONINFORMATION);
-                        boost::filesystem::rename(oldPath, newPath);
-                        #ifdef TARGET_OS_MAC
-                        // 获取当前可执行文件路径
-                        wxString exePath = wxStandardPaths::Get().GetExecutablePath();
-                        // 提取 .app 包路径
-                        wxString appBundlePath;
-                        size_t   pos = exePath.rfind(wxT("/Contents/MacOS/"));
-                        if (pos != wxString::npos) {
-                            appBundlePath = exePath.substr(0, pos);
-                        }
-                        wxString command = "open -a %s --args \"minidump://file=%s\"";
-                        command          = command.Format(command, appBundlePath, newPath.string().c_str());
-                        wxExecute(command, wxEXEC_ASYNC);
-                        //wxMessageBox(command,wxT("Message box caption"),wxNO_DEFAULT|wxYES_NO|wxCANCEL|wxICON_INFORMATION,nullptr);
-                        #endif
-                    }
-
-                    
-                } 
-                return true;
-            };
-            #ifdef USE_BREAKPAD
-            //google_breakpad::ExceptionHandler eh(tempPath.string(), NULL, dmpCallBack, NULL, true, NULL);
-            #endif
-        #endif
+       
     }
     return CLI().run(argc, argv);
 }

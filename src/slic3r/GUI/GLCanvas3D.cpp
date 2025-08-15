@@ -5778,31 +5778,59 @@ std::vector<Vec2f> GLCanvas3D::get_expand_cells(const Vec2f&         start_point
 {
     std::vector<Vec2f> all_empty_cells;
     int                expansion_step = 1;
+    constexpr float EPS = 1e-3f;  // Tolerance for floating-point comparison
+
+    struct Vec2fHash {
+        size_t operator()(const Vec2f& v) const {
+            // Discretize coordinates into integer grid
+            long x = static_cast<long>(std::round(v.x() / EPS));
+            long y = static_cast<long>(std::round(v.y() / EPS));
+            return std::hash<long>{}(x) ^ (std::hash<long>{}(y) << 1);
+        }
+    };
+
+    // Custom equality function for Vec2f to handle floating-point precision
+    struct Vec2fEqual {
+        bool operator()(const Vec2f& a, const Vec2f& b) const {
+            return std::abs(a.x() - b.x()) < EPS && 
+                   std::abs(a.y() - b.y()) < EPS;
+        }
+    };
+
+    // Set to track already added points and prevent duplicates
+    std::unordered_set<Vec2f, Vec2fHash, Vec2fEqual> added_set;
 
     auto make_bounding_box = [](const Vec2f& cell, const Vec2f& bbox_size) -> BoundingBox {
         return BoundingBox(Point(cell.x() - bbox_size.x() / 2, cell.y() - bbox_size.y() / 2),
                            Point(cell.x() + bbox_size.x() / 2, cell.y() + bbox_size.y() / 2));
     };
 
+    // Lambda to try adding a cell with duplicate checking
     auto try_add_cell = [&](std::vector<Vec2f>& cells, float x, float y) {
-        if (ignore_others) {
-            // NOT care whether there is other object in the cell
+
+        Vec2f cell(x, y);
+
+        // Skip if already added
+        if (added_set.find(cell) != added_set.end()) 
+            return;
+
+        if (ignore_others || !is_bbox_overlap_with_any_object(make_bounding_box({x, y}, bbox_size))) {
             cells.emplace_back(x, y);
-        } else if (!is_bbox_overlap_with_any_object(make_bounding_box({x, y}, bbox_size))) {
-            cells.emplace_back(x, y);
+            added_set.insert(cell);
         }
     };
 
     Vec2f step = Vec2f(bbox_size(0) + extra_offset, bbox_size(1) + extra_offset);
 
+    // Expand outward in rings until we reach max_cells or expansion limit
     while (all_empty_cells.size() < max_cells) {
-        // 获取当前扩展的边界
+        // Calculate current expansion boundaries
         float expanded_min_x = start_point.x() - expansion_step * step.x();
         float expanded_max_x = start_point.x() + expansion_step * step.x();
         float expanded_min_y = start_point.y() - expansion_step * step.y();
         float expanded_max_y = start_point.y() + expansion_step * step.y();
 
-        // 如果提供了 BoundingBoxf3，则使用其边界
+        // Use plate bounding box if provided
         if (plate_bbox) {
             expanded_min_x = plate_bbox->min.x() - expansion_step * step.x();
             expanded_max_x = plate_bbox->max.x() + expansion_step * step.x();
@@ -5810,44 +5838,53 @@ std::vector<Vec2f> GLCanvas3D::get_expand_cells(const Vec2f&         start_point
             expanded_max_y = plate_bbox->max.y() + expansion_step * step.y();
         }
 
-        // 按照环形扩展：先扩展上下边界，再扩展左右边界
         std::vector<Vec2f> expanded_cells;
 
-        // 下边界
-        for (float x = expanded_min_x; x <= expanded_max_x; x += step.x()) {
+        // Calculate range of current expansion ring
+        const float range_x = expanded_max_x - expanded_min_x;
+        const float range_y = expanded_max_y - expanded_min_y;
+
+        // Calculate number of steps in each direction (using ceiling to cover all points)
+        const int steps_x = (range_x > EPS) ? 
+            static_cast<int>(std::ceil(range_x / step.x())) : 0;
+        const int steps_y = (range_y > EPS) ? 
+            static_cast<int>(std::ceil(range_y / step.y())) : 0;
+
+        // Add cells in ring pattern: bottom, right, top, left
+        // 1. Bottom edge (y = min_y)
+        try_add_cell(expanded_cells, expanded_min_x, expanded_min_y);  // Bottom-left corner
+        for (int i = 1; i < steps_x; i++) {  // Skip corners
+            const float x = expanded_min_x + i * step.x();
             try_add_cell(expanded_cells, x, expanded_min_y);
+            if (all_empty_cells.size() + expanded_cells.size() >= max_cells) break;
         }
-        // 右边界
-        float expanded_max_y_limit = expanded_max_y;
-        if (plate_bbox) {
-            expanded_max_y_limit = expanded_max_y - step.y();
-        }
-        for (float y = expanded_min_y + step.y(); y < expanded_max_y_limit; y += step.y()) {
-            // expanded_cells.emplace_back(expanded_max_x, y);
+
+        try_add_cell(expanded_cells, expanded_max_x, expanded_min_y);  // Bottom-right corner
+        // 2. Right edge (x = max_x)
+        for (int j = 1; j < steps_y; j++) {  // Skip corners
+            const float y = expanded_min_y + j * step.y();
             try_add_cell(expanded_cells, expanded_max_x, y);
+            if (all_empty_cells.size() + expanded_cells.size() >= max_cells) break;
         }
-        // 上边界
-        for (float x = expanded_max_x; x >= expanded_min_x; x -= step.x()) {
-            // expanded_cells.emplace_back(x, expanded_max_y);
+
+        try_add_cell(expanded_cells, expanded_max_x, expanded_max_y);  // Top-right corner
+        // 3. Top edge (y = max_y)
+        for (int i = 1; i < steps_x; i++) {  // Skip corners
+            const float x = expanded_max_x - i * step.x();
             try_add_cell(expanded_cells, x, expanded_max_y);
+            if (all_empty_cells.size() + expanded_cells.size() >= max_cells) break;
         }
-        // 左边界
-        float expanded_min_y_limit = expanded_min_y;
-        if (plate_bbox) {
-            expanded_min_y_limit = expanded_min_y + step.y();
-        }
-        for (float y = expanded_max_y - step.y(); y > expanded_min_y_limit; y -= step.y()) {
-            // expanded_cells.emplace_back(expanded_min_x, y);
+
+        try_add_cell(expanded_cells, expanded_min_x, expanded_max_y);  // Top-left corner
+        // 4. Left edge (x = min_x)
+        for (int j = 1; j < steps_y; j++) {  // Skip corners
+            const float y = expanded_max_y - j * step.y();
             try_add_cell(expanded_cells, expanded_min_x, y);
+            if (all_empty_cells.size() + expanded_cells.size() >= max_cells) break;
         }
 
-        // 合并新找到的单元格
+        // Merge new cells into main collection
         all_empty_cells.insert(all_empty_cells.end(), expanded_cells.begin(), expanded_cells.end());
-
-        // 去重
-        all_empty_cells.erase(std::unique(all_empty_cells.begin(), all_empty_cells.end(),
-                                          [](const Vec2f& a, const Vec2f& b) { return a.x() == b.x() && a.y() == b.y(); }),
-                              all_empty_cells.end());
 
         expansion_step++;
     }
@@ -7046,7 +7083,7 @@ void GLCanvas3D::triger_extra_render_event(ERenderEvent render_event)
     }
 
     case ERenderEvent::ObjectCloneOptions: {
-        if (m_selection.get_object_idx() >= 0) {
+        if (m_selection.volumes_count() >= 1) {
             m_extra_render_callbacks[index] = [this]() { this->_render_object_clone_options(0, 0, 100, 100); };
             m_selection.copy_to_clipboard();
             m_clone_settings.clone_num = 1;

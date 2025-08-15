@@ -47,6 +47,7 @@ static std::map<wxColour, wxColour> gDarkColors{
     {"#6E6E73", "#6E6E73"}, //rgb(110, 110, 115) prompt tip yse/no button grey
     {"#96969B", "#96969B"}, //rgb(150, 150, 155)
     // rgb(110, 110, 115)  #736E6E
+    {"#010203", "#FEFEFE"},
 };
 
 std::tuple<double, double, double> StateColor::GetLAB(const wxColour& color) {

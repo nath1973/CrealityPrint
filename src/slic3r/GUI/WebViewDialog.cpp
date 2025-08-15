@@ -323,10 +323,12 @@ WebViewPanel::~WebViewPanel()
 }
 void WebViewPanel::Reload()
 {
+#if CUSTOM_COMMUNITY_ENABLE
     void* backend_before = m_browser->GetNativeBackend();
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
                                << ", Backend Ptr BEFORE: " << backend_before;
     m_browser->LoadURL(GetURL());
+#endif
     //m_browser->SetFocus();
     UpdateState();
     void* backend_after = m_browser->GetNativeBackend();

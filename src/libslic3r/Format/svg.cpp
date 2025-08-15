@@ -3,6 +3,7 @@
 #include "../ModelObject.hpp"
 #include "../ModelVolume.hpp"
 #include "../TriangleMesh.hpp"
+#include "STEP.hpp"
 
 #include "svg.hpp"
 #include "nanosvg/nanosvg.h"

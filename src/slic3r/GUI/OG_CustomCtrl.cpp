@@ -888,7 +888,7 @@ bool OG_CustomCtrl::update_visibility(ConfigOptionMode mode)
 
     //设置最小宽度
     int type = dynamic_cast<ConfigOptionsGroup*>(opt_group)->config_type();
-    h_pos = type == Preset::TYPE_PRINT ? h_pos : FromDIP(700);
+    h_pos    = (type == Preset::TYPE_PRINT || type == Preset::TYPE_PLATE || type == Preset::TYPE_MODEL) ? h_pos : FromDIP(700);
     this->SetMinSize(wxSize(h_pos, v_pos));
 
     return invisible_lines != ctrl_lines.size();
