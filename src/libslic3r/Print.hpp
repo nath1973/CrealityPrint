@@ -614,6 +614,7 @@ struct FakeWipeTower
     }
     void set_pos(Vec2f p) { pos = p; }
     void set_pos_and_rotation(const Vec2f& p, float rotation) { pos = p; rotation_angle = rotation; }
+    void update_angle(float _angle) { rotation_angle = _angle; }
 
     std::vector<ExtrusionPaths> getFakeExtrusionPathsFromWipeTower() const;
 

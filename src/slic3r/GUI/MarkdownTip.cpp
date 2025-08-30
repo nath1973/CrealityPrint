@@ -9,6 +9,7 @@
 
 #include <wx/display.h>
 #include <wx/string.h>
+#include <wx/tokenzr.h>
 
 namespace fs = boost::filesystem;
 
@@ -68,6 +69,291 @@ TODO:
 3. Fetch markdown content in javascript (*)
 4. Use scheme handler to support zip archive & make code tidy
 */
+static int panelWidth = 242;
+static int paddignWidth = 8;
+
+bool ProcessTip::ShowTip(wxString const& tip,
+                          wxString const& tooltip_title,
+                          wxString const& tooltip_content,
+                          wxString const& tooltip_img,
+                          wxString const& tooltip_url,
+                          wxPoint            pos)
+{ 
+        processTip()->m_Content.CS_Title    = tooltip_title;
+        processTip()->m_Content.CS_Content  = tooltip_content;
+        processTip()->m_Content.CS_URL      = tooltip_url;
+        processTip()->m_Content.CS_Image    = tooltip_img;
+        return processTip()->ShowTip(pos);
+}
+
+bool ProcessTip::ShowTip(wxPoint pos) 
+{ 
+    if (m_Content.CS_Title.empty()) {
+        if (pos.x) {
+            m_Hide = true;
+            this->Dismiss();
+        }
+        else if (!m_Hide) {
+            m_Hide = true;
+            m_Timer->StartOnce(300);
+            return true;
+        }
+    }
+
+    bool tipChanged = m_LastTip != m_Content.CS_Title;
+    if (tipChanged) 
+    {
+        if (m_Content.CS_Content.empty()) {
+            m_Hide = true;
+            //this->Hide();
+            return false;
+        }
+
+        m_LastTip = m_Content.CS_Title;
+    }
+
+    wxSize size = wxDisplay(this).GetClientArea().GetSize();
+    if (pos.y + this->GetSize().y > size.y)
+        pos.y = size.y - this->GetSize().y;
+    this->SetPosition(pos);
+
+    if (tipChanged || m_Hide) {
+        m_Hide = false;
+        this->Dismiss();
+        m_Timer->StartOnce(100);
+    }
+
+    return true;
+}
+
+void ProcessTip::OnTimer(wxTimerEvent& event)
+{
+    if (m_Hide) 
+    {
+        wxPoint pos = ScreenToClient(wxGetMousePosition());
+        if (GetClientRect().Contains(pos)) 
+        {
+            m_Timer->StartOnce();
+            return;
+        }
+        this->Dismiss();
+    } 
+    else 
+    {
+        updateUI();
+        m_Hide = false;
+        this->Popup();
+    }
+}
+
+ProcessTip* ProcessTip::processTip(bool create) 
+{
+    static ProcessTip * processTip = nullptr;
+    if (processTip == nullptr && create)
+        processTip = new ProcessTip;
+
+    //processTip->SetSize(242, -1);
+    return processTip;
+}
+void    ProcessTip::closeTip()
+{
+    m_Hide = true;
+    m_Timer->StartOnce(300);
+}
+ void ProcessTip::Recreate(wxWindow *parent)
+{
+    if (auto tip = processTip(false)) {
+        tip->Reparent(parent);
+    }
+}
+ // 重写鼠标事件处理
+void ProcessTip::OnMouseEvent(wxMouseEvent& event)
+    {
+        // 如果需要，可以将事件传递给父窗口
+        wxWindow* parent = GetParent();
+        if (parent)
+        {
+            wxMouseEvent newEvent(event);
+            newEvent.SetEventObject(parent);
+            parent->ProcessWindowEvent(newEvent);
+        }
+        event.Skip();
+    }
+ProcessTip::ProcessTip()
+: wxPopupTransientWindow(wxGetApp().mainframe, wxBORDER_NONE)
+{
+    m_bitmap_cache = new Slic3r::GUI::BitmapCache;
+    this->SetBackgroundStyle(wxBG_STYLE_TRANSPARENT);
+    m_Timer = new wxTimer;
+    m_Timer->Bind(wxEVT_TIMER, &ProcessTip::OnTimer, this);
+
+    wxSizer * mainSizer = new wxBoxSizer(wxVERTICAL);
+    //SetSizer(mainSizer);
+    SetSizerAndFit(mainSizer);
+
+    bool is_dark = wxGetApp().dark_mode();
+    SetBackgroundColour(is_dark ? wxColor("#222222") : wxColor("#F7F8FA"));
+
+    const wxColour fontColor = is_dark ? wxColour("#DBDBDB") : wxColour("#4E5969");
+
+    m_Title_text = new wxStaticText(this, wxID_ANY, m_Content.CS_Title, wxDefaultPosition, wxDefaultSize);
+    m_Title_text->SetFont(Label::Head_14);
+    m_Title_text->SetForegroundColour(fontColor);
+    mainSizer->AddSpacer(FromDIP(8));
+    mainSizer->Add(m_Title_text, 0, wxLEFT, FromDIP(8));
+    mainSizer->AddSpacer(FromDIP(8));
+
+    m_Content_text = new wxStaticText(this, wxID_ANY, m_Content.CS_Content, wxDefaultPosition, wxDefaultSize);
+    m_Content_text->SetSize({226, -1});
+    m_Content_text->SetMinSize({226, -1});
+    m_Content_text->SetMaxSize({226, -1});
+    m_Content_text->Wrap(FromDIP(226));
+    m_Content_text->SetFont(Label::Body_12);
+    m_Content_text->SetForegroundColour(fontColor);
+
+    wxFont font = m_Content_text->GetFont();
+    font.SetPointSize(font.GetPointSize() + 1);
+    m_Content_text->SetFont(font);
+
+    int hg = m_Content_text->GetBestHeight(226);
+    mainSizer->Add(m_Content_text, 1, wxLEFT | wxRIGHT | wxEXPAND, FromDIP(8));
+    mainSizer->AddSpacer(FromDIP(8));
+
+    m_ImgBox = new StaticBox(this, wxID_ANY, wxDefaultPosition);
+    m_ImgBox->SetBackgroundColour(is_dark ? wxColour("#313131"):wxColour("#313131"));
+    m_ImgBox->SetBorderWidth(1);
+    m_ImgBox->SetBorderColor(0x7A7A7F);
+    m_ImgBox->SetCornerFlags(0xF);
+    //m_ImgBox->SetSize(wxSize(226, 227));
+    //m_ImgBox->SetMaxSize(wxSize(226, 227));
+    //m_ImgBox->SetMinSize(wxSize(226, 227));
+    mainSizer->Add(m_ImgBox, 0, wxLEFT | wxRIGHT, FromDIP(8));
+    mainSizer->AddSpacer(FromDIP(8));
+
+    wxSizer * boxSizer = new wxBoxSizer(wxVERTICAL);
+    m_ImgBox->SetSizer(boxSizer);
+
+    ScalableBitmap sImg;
+    if(!m_Content.CS_Image.empty())
+        sImg = ScalableBitmap(m_ImgBox, m_Content.CS_Image.ToStdString(), 32);
+    m_ProcessImg = new wxStaticBitmap(m_ImgBox, wxID_ANY, sImg.bmp(), wxDefaultPosition,wxSize(FromDIP(242), FromDIP(334)), 0);
+    boxSizer->Add(m_ProcessImg);
+
+    m_Url_text = new wxHyperlinkCtrl(this, wxID_ANY, m_Content.CS_URL, m_Content.CS_URL);
+    m_Url_text->SetFont(Label::Body_12);
+    //m_Url_text->SetForegroundColour(fontColor);
+    m_Url_text->SetNormalColour(fontColor);    // ����״̬��ɫ
+    m_Url_text->SetVisitedColour(fontColor);   // ���ʺ���ɫ
+    m_Url_text->SetHoverColour(fontColor);     // ��ͣ״̬��ɫ
+    //m_Url_text->Wrap(FromDIP(226));
+
+    mainSizer->Add(m_Url_text, 0, wxLEFT | wxRIGHT, FromDIP(8));
+    mainSizer->AddSpacer(FromDIP(8));
+    SetSize(FromDIP(242), FromDIP(334));
+}
+
+ProcessTip::~ProcessTip()
+{
+    delete m_bitmap_cache;
+}
+
+void ProcessTip::updateUI()
+{
+    m_Title_text->SetLabelText(m_Content.CS_Title);
+    m_Content_text->SetLabelText(m_Content.CS_Content);
+    m_Url_text->SetLabelText(m_Content.CS_URL);
+    m_Url_text->SetURL(m_Content.CS_URL);
+
+    if(m_Content.CS_Image.empty())
+    {
+        m_ImgBox->SetSize(0, 0);
+        m_ImgBox->SetMaxSize(wxSize(0, 0));
+        m_ImgBox->SetMinSize(wxSize(0, 0));
+    }else
+    {
+        m_ImgBox->SetSize(FromDIP(226), FromDIP(227));
+        m_ImgBox->SetMaxSize(wxSize(FromDIP(226), FromDIP(227)));
+        m_ImgBox->SetMinSize(wxSize(FromDIP(226), FromDIP(227)));
+    }
+    m_ImgBox->Layout();
+    m_ImgBox->Refresh();
+    m_ImgBox->Update();
+
+    int textWidth, textHeight;
+    std::function calcLineCount = [this, &textWidth, &textHeight](int wrapWidth, wxControl* control)
+    {
+        wxClientDC dc(control);
+        dc.SetFont(control->GetFont());
+        wxString text = control->GetLabel();
+        dc.GetTextExtent(text, &textWidth, &textHeight);
+
+        int nCount = text.Freq('\n');
+        int lineCount = textWidth/wrapWidth + 1 + nCount;
+        return lineCount;
+    };
+    int lineCount = calcLineCount(FromDIP(226), m_Content_text);
+
+    m_Content_text->SetSize(FromDIP(226), textHeight*lineCount);
+    m_Content_text->SetMinSize({FromDIP(226), textHeight*lineCount});
+    m_Content_text->SetMaxSize({FromDIP(226), textHeight*lineCount});
+
+    lineCount = calcLineCount(FromDIP(226), m_Url_text);
+    m_Url_text->SetSize(FromDIP(226), textHeight * lineCount);
+    m_Url_text->SetMinSize({ FromDIP(226), textHeight * lineCount });
+    m_Url_text->SetMaxSize({ FromDIP(226), textHeight * lineCount });
+
+    std::function createBitMap = [](const wxString& bmp_name_in, wxWindow* win, const int px_cnt, const wxSize imgSize)
+    {
+        bool        is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+        std::string lang    = wxGetApp().app_config->get("language");
+        wxString    imgPath = bmp_name_in;
+        return create_scaled_bitmap3(imgPath.ToStdString(), win, 17, imgSize);
+    };
+
+    if(!m_Content.CS_Image.empty())
+    {
+        wxSize imgSize(FromDIP(150), FromDIP(120));
+        wxBitmap* bmp = m_bitmap_cache->find(m_Content.CS_Image.ToStdString());
+        if(bmp == nullptr)
+        {
+            wxBitmap bitMap = createBitMap(m_Content.CS_Image, this, 17, wxSize());
+            bmp = m_bitmap_cache->insert(m_Content.CS_Image.ToStdString(),bitMap);
+        }
+        
+
+        m_ProcessImg->SetBitmap(*bmp);
+        m_ProcessImg->Refresh();
+        m_ProcessImg->Update();
+        m_ProcessImg->Layout();
+    }
+
+    GetSizer()->Fit(this);
+    wxSize size = GetBestSize();
+    SetSize(wxSize(FromDIP(242), size.GetHeight()));
+
+    themeChanged();
+    Layout();
+    Update();
+    Refresh();
+
+}
+
+void ProcessTip::themeChanged()
+{
+    bool is_dark = wxGetApp().dark_mode();
+    SetBackgroundColour(is_dark ? wxColor("#222222") : wxColor("#F7F8FA"));
+
+    const wxColour fontColor = is_dark ? wxColour("#DBDBDB") : wxColour("#4E5969");
+    m_Title_text->SetForegroundColour(fontColor);
+    m_Content_text->SetForegroundColour(fontColor);
+    //m_Url_text->SetForegroundColour(fontColor);
+    m_ImgBox->SetBackgroundColour(is_dark ? wxColour("#313131"):wxColour("#e1e4e9"));
+
+    m_Url_text->SetNormalColour(fontColor);    // ����״̬��ɫ
+    m_Url_text->SetVisitedColour(fontColor);   // ���ʺ���ɫ
+    m_Url_text->SetHoverColour(fontColor);     // ��ͣ״̬��ɫ
+    m_Url_text->Refresh(); 
+}
 
 MarkdownTip::MarkdownTip()
     : wxPopupTransientWindow(wxGetApp().mainframe, wxBORDER_NONE)
@@ -146,6 +432,68 @@ bool MarkdownTip::ShowTip(wxPoint pos, std::string const& tip, std::string const
             _pendingScript = script;
         }
         else {
+            RunScript(script);
+        }
+        _lastTip = tip;
+        if (_tipView->GetParent() == this)
+            this->Hide();
+    }
+    if (_tipView->GetParent() == this) {
+        wxSize size = wxDisplay(this).GetClientArea().GetSize();
+        _requestPos = pos;
+        if (pos.y + this->GetSize().y > size.y)
+            pos.y = size.y - this->GetSize().y;
+        this->SetPosition(pos);
+        if (tipChanged || _hide) {
+            _hide = false;
+            BOOST_LOG_TRIVIAL(info) << "MarkdownTip::ShowTip: start show timer (500)...";
+            _timer->StartOnce(500);
+        }
+    }
+    return true;
+}
+
+bool MarkdownTip::ShowTip(wxPoint pos, std::string const& tip) 
+{
+    auto size = this->GetSize();
+    if (tip.empty()) {
+        if (_tipView->GetParent() != this)
+            return false;
+        if (pos.x) {
+            _hide = true;
+            BOOST_LOG_TRIVIAL(info) << "MarkdownTip::ShowTip: hide soon on empty tip.";
+            this->Hide();
+        } else if (!_hide) {
+            _hide = true;
+            BOOST_LOG_TRIVIAL(info) << "MarkdownTip::ShowTip: start hide timer (300)...";
+            _timer->StartOnce(300);
+        }
+        return false;
+    }
+    bool tipChanged = _lastTip != tip;
+    if (tipChanged) {
+        auto content = LoadTip(tip, m_Content.CS_Title + m_Content.CS_Content);
+        content += "\n";
+
+        if (!m_Content.CS_Image.empty()) {
+            std::string url = Slic3r::var(m_Content.CS_Image);
+            content += std::string("<div style=\"background-color:#313131; border-radius:0px; padding:0px; display:flex; justify-content:center; align-items:center; width:226px; height:227px;\">") +
+                       std::string("<img style=\"margin:0 auto; display:block;\" src=\"file:///") + url +
+                       std::string("\" width=\"150\" height=\"120\" /></div>");
+        }
+        content += "\n\n";
+        content += m_Content.CS_URL;
+
+        if (content.empty()) {
+            _hide = true;
+            this->Hide();
+            BOOST_LOG_TRIVIAL(info) << "MarkdownTip::ShowTip: hide soon on empty content.";
+            return false;
+        }
+        auto script = "window.showMarkdown('" + url_encode(content) + "', true);";
+        if (!_pendingScript.empty()) {
+            _pendingScript = script;
+        } else {
             RunScript(script);
         }
         _lastTip = tip;
@@ -272,7 +620,7 @@ void MarkdownTip::OnTitleChanged(wxWebViewEvent& event)
         wxPoint pos = _requestPos;
         if (pos.y + height > size.y)
             pos.y = size.y - height;
-        this->SetSize({ 400, (int)height });
+        this->SetSize({242, (int)height });
         this->SetPosition(pos);
     }
 }
@@ -313,6 +661,24 @@ bool MarkdownTip::ShowTip(std::string const& tip, std::string const& tooltip, wx
     return markdownTip()->ShowTip(pos, tip, tooltip, img);
 }
 
+bool MarkdownTip::ShowTip(std::string const& tip,
+             std::string const& tooltip_title,
+             std::string const& tooltip_content,
+             std::string const& tooltip_img,
+             std::string const& tooltip_url,
+             wxPoint            pos)
+{
+    markdownTip()->m_Content.CS_Title = tooltip_title;
+    markdownTip()->m_Content.CS_Content = tooltip_content;
+    markdownTip()->m_Content.CS_URL   = tooltip_url;
+    markdownTip()->m_Content.CS_Image = tooltip_img;
+
+#ifdef NDEBUG
+    return false;
+#endif
+    return markdownTip()->ShowTip(pos, tip);
+}
+
 void MarkdownTip::ExitTip()
 {
     //if (auto tip = markdownTip(false))
@@ -350,5 +716,7 @@ wxWindow* MarkdownTip::DetachFrom(wxWindow* parent)
     return NULL;
 }
 
+MarkdownTip* MarkdownTip::instance() 
+{ return markdownTip(); }
 }
 }

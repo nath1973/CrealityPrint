@@ -1272,6 +1272,15 @@ void PresetCollection::load_presets(
                     ++m_errors;
                     BOOST_LOG_TRIVIAL(error) << boost::format("Failed loading the user-config file: %1%. Reason: %2%")%preset.file %err.what();
                     //throw Slic3r::RuntimeError(std::string("Failed loading the preset file: ") + preset.file + "\n\tReason: " + err.what());
+#ifdef _WIN32
+                    std::string path = fs::path(preset.file).parent_path().string();
+                    std::string cmd1 = "takeown /f \"" + path + "\" /r /d y";
+                    std::string cmd2 = "icacls \"" + preset.file + "\" /grant administrators:F /t";
+                    std::string cmd3 = "del /f /q \"" + preset.file + "\"";
+                    std::string cmd  = cmd1 + " && " + cmd2 + " && " + cmd3;
+                    int ret  = system(cmd.c_str());
+                    BOOST_LOG_TRIVIAL(warning) << boost::format("Failed loading the user-config file: %1%. system cmd:%2%, ret=%3%")%preset.file %cmd %ret;
+#endif // _WIN32
                     fs::path file_path(preset.file);
                     if (fs::exists(file_path))
                         fs::remove(file_path);

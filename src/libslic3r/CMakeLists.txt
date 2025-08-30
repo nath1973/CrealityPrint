@@ -5,6 +5,12 @@ include(PrecompiledHeader)
 
 string(TIMESTAMP COMPILE_TIME %Y%m%d-%H%M%S)
 set(SLIC3R_BUILD_TIME ${COMPILE_TIME})
+
+set(AUTOMATION_TOOL OFF)
+#if(${PROJECT_VERSION_EXTRA} STREQUAL "Alpha")
+#    set(AUTOMATION_TOOL ON)
+#endif()
+
 message("aaaa SLIC3R_APP_NAME=${SLIC3R_APP_NAME}")
 if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h")
     if(GENERATE_ORCA_HEADER)
@@ -26,10 +32,6 @@ endif ()
 
 set(OpenVDBUtils_SOURCES "")
 
-set(AUTOMATION_TOOL OFF)
-#if(${PROJECT_VERSION_EXTRA} STREQUAL "Alpha")
-#    set(AUTOMATION_TOOL ON)
-#endif()
 
 if (TARGET openvdb_libs)
     set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp)

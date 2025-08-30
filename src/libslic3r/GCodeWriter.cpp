@@ -926,12 +926,6 @@ std::string GCodeWriter::unlift(const double limitSpeed)
     m_to_lift = 0.;
     return gcode;
 }
-void GCodeWriter::set_position_for_wipe(const Vec3d& in)
-{
-    if (std::abs(m_to_lift) > EPSILON) {
-        m_pos = in;
-    }
-}
 
 std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, unsigned int speed)
 {

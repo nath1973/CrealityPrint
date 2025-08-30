@@ -3,7 +3,7 @@
     "name": "Creality K1 SE",
     "nozzle_diameter": "0.8;0.6;0.4",
     "bed_model": "Creality K1 SE_buildplate_model.stl",
-    "default_bed_type": "High Temp Plate",
+    "default_bed_type": "Epoxy Resin Plate",
     "bed_texture": "Creality K1 SE_buildplate_texture.png",
     "family": "Creality",
     "hotend_model": "",

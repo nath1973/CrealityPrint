@@ -379,10 +379,12 @@ void show_substitutions_info(const ConfigSubstitutions& config_substitutions, co
 	wxString changes = "\n";
 	add_config_substitutions(config_substitutions, changes);
 
+#if !AUTOMATION_TOOL
 	InfoDialog msg(nullptr,
 		format_wxstr(_L("Configuration file \"%1%\" was loaded, but some values were not recognized."), from_u8(filename)),
 		substitution_message(changes), true);
 	msg.ShowModal();
+#endif
 }
 
 void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, const std::string& items)

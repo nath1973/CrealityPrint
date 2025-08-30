@@ -830,22 +830,22 @@ void ParamsPanel::create_layout_printerAndFilament()
         //m_btn_system->SetValue(StateHandler::Hovered);
         m_btn_system->SetMinSize({FromDIP(100), FromDIP(30)});
         m_btn_system->SetCornerRadius(0);
-        m_btn_system->SetSize({FromDIP(100), FromDIP(30)});
+        m_btn_system->SetSize(wxSize(FromDIP(100), FromDIP(30)));
         m_btn_system->SetBackgroundColor(bg_checkedColor);
         m_btn_system->SetTextColor(text_color);
         m_btn_system->SetClientData(new bool(true));
-        m_btn_system->SetFont(font);
+        m_btn_system->SetFont(::Label::Body_14);
 
         Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_system);
 
         m_btn_user = new Button(m_btnsPanel, _L("User"), "", wxNO_BORDER, 0, 0);
         m_btn_user->SetMinSize({FromDIP(100), FromDIP(30)});
         m_btn_user->SetCornerRadius(0);
-        m_btn_user->SetSize({FromDIP(100), FromDIP(30)});
+        m_btn_user->SetSize(wxSize(FromDIP(100), FromDIP(30)));
         m_btn_user->SetBackgroundColor(bg_color);
         m_btn_user->SetTextColor(text_color);
         m_btn_user->SetClientData(new bool(true));
-        m_btn_user->SetFont(font);
+        m_btn_user->SetFont(::Label::Body_14);
         Slic3r::GUI::wxGetApp().UpdateDarkUI(m_btn_user);
         m_btn_user->Bind(wxEVT_BUTTON, [this, bg_color, bg_checkedColor](wxCommandEvent& event) {
             m_ps          = ParamsPanel::PS_USER;

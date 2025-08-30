@@ -548,6 +548,9 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     }
 
     ImGui::SameLine();
+    //The ‘Remove All’ function is always available.
+    const bool page_disabled = !m_IsSupport;
+    if (page_disabled) ImGui::PopItemFlag(); 
 
     if (m_imgui->button(m_desc.at("remove_all"))) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), "Reset selection", UndoRedo::SnapshotType::GizmoAction);
@@ -563,6 +566,7 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
         update_model_object();
         m_parent.set_as_dirty();
     }
+    if (page_disabled) ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
     ImGui::PopStyleVar(2);
 
     GizmoImguiEnd();

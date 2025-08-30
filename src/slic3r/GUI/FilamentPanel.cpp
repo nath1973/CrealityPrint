@@ -466,14 +466,14 @@ void FilamentButton::doRender(wxDC& dc)
 */
 
  FilamentPopPanel::FilamentPopPanel(wxWindow* parent, int index)
-	: PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS)
+	: PopupWindow(parent, wxBORDER_SIMPLE  | wxPU_CONTAINS_CONTROLS)
 {
     Freeze();
 
 	int em = 1;
     m_index = index;
 	
-	m_bg_color = wxColour(61, 223, 86);
+    m_bg_color = wxColour(255, 255, 255); // 背景色统一
 	this->SetBackgroundColour(m_bg_color);
 
 	this->SetSize(wxSize(400 * em, 28 * em));
@@ -507,9 +507,12 @@ void FilamentButton::doRender(wxDC& dc)
         #endif
 		});
 		// filament combox
-        wxSizerItem* item = m_sizer_main->Add(m_filamentCombox, 1, wxUP | wxDOWN | wxRIGHT, 1);
+        wxSizerItem* item = m_sizer_main->Add(m_filamentCombox, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 1);
+
         item->SetProportion(wxEXPAND);
         bool is_dark = Slic3r::GUI::wxGetApp().dark_mode();
+
+        m_sizer_main->Add(new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL), 0, wxEXPAND | wxALL, 5);
 
 		//
 		{
@@ -555,7 +558,9 @@ void FilamentButton::doRender(wxDC& dc)
                 }
             });
 		}
-        
+
+        m_sizer_main->Add(new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL), 0, wxEXPAND | wxALL, 5);
+
 		//
 		{
             wxPanel* box = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);
@@ -608,7 +613,8 @@ void FilamentButton::doRender(wxDC& dc)
                     }
                 }
             });
-		}
+        }
+        m_sizer_main->Add(new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL), 0, wxEXPAND | wxALL, 5);
 		
 		//
 		{
@@ -625,8 +631,7 @@ void FilamentButton::doRender(wxDC& dc)
                     Slic3r::GUI::wxGetApp().sidebar().set_edit_filament(m_index);
                 }
             });
-
-            m_sizer_main->Add(m_edit_btn, wxSizerFlags().Border(wxUP | wxDOWN | wxRIGHT | wxLEFT, 1));
+            m_sizer_main->Add(m_edit_btn, wxSizerFlags().Border(wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, 1));
 		}
 	}
 #if __APPLE__
@@ -829,7 +834,16 @@ FilamentItem::FilamentItem(wxWindow* parent, const Data& data, const wxSize& siz
 			wxSize sz = m_popPanel->GetSize();
 			wxSize psz = this->GetParent()->GetSize();
 			sz.SetWidth(psz.GetWidth() - 2);
-		 
+
+            // 添加DPI感知的高度调整
+            int       default_height = 35;
+            wxDisplay display(wxDisplay::GetFromWindow(this));
+            double    scale     = display.GetScaleFactor();
+            int       minHeight = static_cast<int>(default_height  * scale);
+            if (sz.GetHeight() < minHeight) {
+                sz.SetHeight(minHeight);
+            }
+
 			m_popPanel->SetSize(sz);
  			m_popPanel->Layout();
             m_popPanel->Dismiss();

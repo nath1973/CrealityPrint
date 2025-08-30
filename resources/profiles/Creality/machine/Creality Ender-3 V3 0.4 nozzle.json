@@ -46,9 +46,9 @@
     "machine_max_jerk_y": "12",
     "machine_max_jerk_z": "2",
     "machine_max_speed_e": "100",
-    "machine_max_speed_x": "800",
-    "machine_max_speed_y": "800",
-    "machine_max_speed_z": "30",
+    "machine_max_speed_x": "600",
+    "machine_max_speed_y": "600",
+    "machine_max_speed_z": "500",
     "machine_min_extruding_rate": "0,0",
     "machine_min_travel_rate": "0,0",
     "machine_pause_gcode": "PAUSE\n",
@@ -110,5 +110,5 @@
     "z_hop": "0.2",
     "z_hop_types": "Slope Lift",
     "name": "Creality Ender-3 V3 0.4 nozzle",
-    "setting_id": "85778"
+    "setting_id": "67528"
 }

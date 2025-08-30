@@ -222,6 +222,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     // BBS
     m_recent_projects.SetMenuPathStyle(wxFH_PATH_SHOW_ALWAYS);
     MarkdownTip::Recreate(this);
+    ProcessTip::Recreate(this);
 
     // Fonts were created by the DPIFrame constructor for the monitor, on which the window opened.
     wxGetApp().update_fonts(this);
@@ -517,6 +518,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
 
         wxGetApp().remove_mall_system_dialog();
         event.Skip();
+        wxGetApp().OnExit(); 
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< ": mainframe finished process close_widow event";
     });
 
@@ -656,6 +658,12 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     // bind events from DiffDlg
 
     bind_diff_dialog();
+
+    // 在程序启动时添加
+  /*  boost::log::core::get()->set_logging_enabled(false);
+    AllocConsole();
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);*/
 }
 
 void MainFrame::bind_diff_dialog()
@@ -1105,7 +1113,7 @@ void MainFrame::init_tabpanel() {
         });
         m_tabpanel->AddPage(m_webview, "", "tab_home_active", "tab_home_active", false);
         m_param_panel = new ProcessParamsPanel(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
-        m_param_panel->create_image_tooltip_panel();
+        //m_param_panel->create_image_tooltip_panel();
         m_param_panel->set_border_panel_color(wxColour(49, 139, 86));
     }
 
@@ -2859,6 +2867,11 @@ void MainFrame::init_menubar_as_editor()
                 if (handle_key_event(e)) {
                     return;
                 }
+
+                // （MAC）清理ctrl键的状态，避免从菜单点击过来的，被系统认为ctrl是按下的
+                ImGuiIO& io = ImGui::GetIO();
+                io.KeyCtrl  = false;
+
                 //m_plater->clone_selection();
                 m_plater->get_current_canvas3D()->triger_extra_render_event(GLCanvas3D::ERenderEvent::ObjectCloneOptions);
             },

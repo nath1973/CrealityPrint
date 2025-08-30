@@ -142,7 +142,7 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",  set start page to welcome ");
 
     // Create the webview
-    m_browser = WebView::CreateWebView(this, TargetUrl);
+    m_browser = WebView::CreateWebView(this, "");
     if (m_browser == nullptr) {
         wxLogError("Could not init m_browser");
         return;
@@ -208,8 +208,15 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",  finished");
     wxGetApp().UpdateDlgDarkUI(this);
     m_browser->EnableAccessToDevTools(); // for debug:
+    Bind(wxEVT_SHOW, &GuideFrame::OnShow, this);
 }
-
+void GuideFrame::OnShow(wxShowEvent& event)
+{
+        if (event.IsShown()) {
+           SetStartPage(m_page,true);
+        }
+        event.Skip(); // 不要忘记调用 Skip，以允许其他处理程序运行
+    }
 GuideFrame::~GuideFrame()
 {
     if (m_browser) {

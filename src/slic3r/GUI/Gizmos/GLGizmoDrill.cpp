@@ -277,6 +277,19 @@ bool GLGizmoDrill::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     //temp_tool_mesh.transform(feature_matrix);
     temp_tool_mesh.transform(feature_matrix_local);
 
+    //如果不把网格清理干净，下面的cgal布尔运算会崩溃
+    //修复bug 11108
+    {
+        //合并重复的顶点
+        its_merge_vertices(temp_src_mesh.its);
+
+        //删除退化的面
+        its_remove_degenerate_faces(temp_src_mesh.its);
+
+        //删除没有被某个面引用的顶点
+        its_compactify_vertices(temp_src_mesh.its);
+    }
+
     auto ret = sla::hollow_mesh_and_drill(temp_src_mesh, temp_tool_mesh, temp_mesh_resuls);
 #ifdef HAS_WIN10SDK
     // fix_non_manifold_edges

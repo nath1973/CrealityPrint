@@ -1265,7 +1265,7 @@ void TabPresetComboBox::update()
     for (size_t i = presets.front().is_visible ? 0 : m_collection->num_default_presets(); i < presets.size(); ++i)
     {
         const Preset& preset = presets[i];
-        if (!preset.is_visible || (!show_incompatible && !preset.is_compatible && i != idx_selected))
+        if (!preset.is_visible || (!show_incompatible && !preset.is_compatible && i != idx_selected && !preset.is_project_embedded))
             continue;
 
         // marker used for disable incompatible printer models for the selected physical printer

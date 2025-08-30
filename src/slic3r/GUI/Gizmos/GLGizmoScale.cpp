@@ -105,6 +105,9 @@ bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
                 // set into on_start_dragging() with the call to selection.setup_cache()
                 m_parent.get_selection().scale_and_translate(m_scale, m_starting.pivots[m_hover_id] - constraint_position, transformation_type);
             }
+
+            // fix bug: when scale model higher, the top mesh will render error(disappear)
+            m_parent.set_use_clipping_planes(false);
         }
     }
     return use_grabbers(mouse_event);

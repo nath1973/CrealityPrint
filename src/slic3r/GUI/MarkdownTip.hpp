@@ -6,12 +6,74 @@
 #include <wx/webview.h>
 
 
+class StaticBox;
+class wxHyperlinkCtrl;
 namespace Slic3r { namespace GUI {
+    class BitmapCache;
+    class ProcessTip : public wxPopupTransientWindow
+    {
+        public:
+        struct ContentS
+        {
+            wxString CS_Title;
+            wxString CS_Content;
+            wxString CS_Image;
+            wxString CS_URL;
+        };
 
-class MarkdownTip : public wxPopupTransientWindow
+        
+        static bool ShowTip(wxString const& tip,
+                     wxString const& tooltip_title,
+                     wxString const& tooltip_content,
+                     wxString const& tooltip_img,
+                     wxString const& tooltip_url,
+                     wxPoint            pos);
+
+        bool        ShowTip(wxPoint pos);
+        void        closeTip();
+        static ProcessTip* processTip(bool create = true);
+
+        static void Recreate(wxWindow *parent);
+        void OnMouseEvent(wxMouseEvent& event);
+
+    protected:
+        ~ProcessTip();
+        void OnTimer(wxTimerEvent& event);
+
+    private:
+        ProcessTip();
+        void updateUI();
+        void themeChanged();
+        wxString m_LastTip;
+        ContentS m_Content;
+        wxTimer* m_Timer = nullptr;
+        bool m_Hide = false;
+        wxStaticText* m_Title_text = nullptr;
+        wxStaticText* m_Content_text = nullptr;
+        wxHyperlinkCtrl* m_Url_text = nullptr;
+        wxStaticBitmap* m_ProcessImg = nullptr;
+        StaticBox* m_ImgBox = nullptr;
+        BitmapCache* m_bitmap_cache = nullptr;
+    };
+
+    class MarkdownTip : public wxPopupTransientWindow
 {
 public:
+    struct ContentS
+    {
+        std::string CS_Title;
+        std::string CS_Content;
+        std::string CS_Image;
+        std::string CS_URL;
+    };
     static bool ShowTip(std::string const& tip, std::string const& tooltip, wxPoint pos, std::string img = "");
+
+    static bool ShowTip(std::string const& tip,
+                        std::string const& tooltip_title,
+                        std::string const& tooltip_content,
+                        std::string const& tooltip_img,
+                        std::string const& tooltip_url, 
+                         wxPoint pos);
 
     static void ExitTip();
 
@@ -22,6 +84,8 @@ public:
     static wxWindow* AttachTo(wxWindow * parent);
 
     static wxWindow* DetachFrom(wxWindow * parent);
+
+    static MarkdownTip* instance();
 
 protected:
     MarkdownTip();
@@ -35,6 +99,7 @@ private:
     void LoadStyle();
 
     bool ShowTip(wxPoint pos, std::string const& tip, std::string const& tooltip, std::string img="");
+    bool ShowTip(wxPoint pos, std::string const& tip);
 
     std::string LoadTip(std::string const &tip, std::string const &tooltip);
 
@@ -52,6 +117,7 @@ protected:
     void OnTimer(wxTimerEvent& event);
     
 protected:
+    ContentS    m_Content;
     wxWebView * _tipView = nullptr;
     std::string _lastTip;
     std::string _pendingScript = " ";

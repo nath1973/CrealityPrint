@@ -728,7 +728,7 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
         value = get_config_value(config, opt_short_key, opt_index);
         }
 
-    // "sparse_infill_density" beyond or equal 100£¬force init value is 15
+    // "sparse_infill_density" beyond or equal 100ï¿½ï¿½force init value is 15
     if ("sparse_infill_density" == opt_key) 
     {
         auto v = boost::any_cast<wxString>(value);

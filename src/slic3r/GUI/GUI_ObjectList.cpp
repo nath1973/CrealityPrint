@@ -6661,6 +6661,7 @@ void ObjectList::render_generic_columns(ObjectDataViewModelNode* node)
             // The button size is based on the window size.
             left_clicked = ImGui::Button((node_name + node_label + "name_button").c_str(),
                                           ImVec2(ImGui::GetWindowSize().x, 0));
+            ImGui::PopStyleVar(1);
         }
 
         if (ImGui::IsItemHovered()) {

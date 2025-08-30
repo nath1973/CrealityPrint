@@ -25,18 +25,28 @@ bool Check3mfVendor::check(const std::string& fileName, const std::string& print
     bRet = isCreality3mf(fileName);
     m_isCreality3mf = bRet;
     if (!bRet) {
+        m_bNeedSelectPrinterPreset = false;
         if (busy != nullptr)
             busy->reset();
         ChoosePresetDlg dlg((wxWindow*)wxGetApp().mainframe, printerSettingId);
         dlg.ShowModal();
         if (busy != nullptr)
             busy->set();
-
-        if (dlg.m_printerPresetIdx != wxGetApp().plater()->sidebar_printer().get_selection_combo_printer()) {
-            wxGetApp().plater()->sidebar_printer().select_printer_preset(dlg.m_printerPresetName, dlg.m_printerPresetIdx);
-        }
+        m_bNeedSelectPrinterPreset = true;
+        m_printerPresetName = dlg.m_printerPresetName;
+        m_printerPresetIdx = dlg.m_printerPresetIdx;
     }
     return bRet;
+}
+
+void Check3mfVendor::doSelectPrinterPreset()
+{
+    if (m_bNeedSelectPrinterPreset) {
+        if (m_printerPresetIdx != wxGetApp().plater()->sidebar_printer().get_selection_combo_printer()) {
+            wxGetApp().plater()->sidebar_printer().select_printer_preset(m_printerPresetName, m_printerPresetIdx);
+        }
+    }
+    m_bNeedSelectPrinterPreset = false;
 }
 
 bool Check3mfVendor::isCreality3mf() {

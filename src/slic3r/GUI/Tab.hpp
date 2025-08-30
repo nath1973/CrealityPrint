@@ -307,6 +307,7 @@ public:
     int                 m_update_cnt = 0;
 
 	SwitchButton *		m_mode_view = nullptr;
+	int m_nPrintUnsavedChanges = -1;
 
 public:
 	// BBS
@@ -329,7 +330,7 @@ public:
 	void        add_border_hover_icon(wxWindow* parent, HoverBorderIcon** btn, const std::string& icon_name, const wxSize& icon_size);
     void        add_scaled_bitmap(wxWindow* parent, ScalableBitmap& btn, const std::string& icon_name);
 	void		update_ui_items_related_on_parent_preset(const Preset* selected_preset_parent);
-    void		load_current_preset();
+    void         load_current_preset(Preset::Type trigger = Preset::Type::TYPE_INVALID);
     //BBS: reactive preset combo box
     void        reactive_preset_combo_box();
 	void        rebuild_page_tree();

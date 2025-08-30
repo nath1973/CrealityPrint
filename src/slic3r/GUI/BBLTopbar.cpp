@@ -1178,16 +1178,16 @@ void BBLTopbar::Rescale(bool isResize) {
 
 void BBLTopbar::OnIconize(wxAuiToolBarEvent& event)
 {
-    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";   
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";  
     m_frame->Iconize();
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
+
+    boost::log::core::get()->flush();
 }
 
 void BBLTopbar::OnUpload3mf(wxAuiToolBarEvent& event)
 {
     wxGetApp().open_upload_3mf();
-  //wxGetApp().mainframe->print_plate(MainFrame::eUpload3mf);
- 
 }
 
 
@@ -1203,6 +1203,8 @@ void BBLTopbar::OnFullScreen(wxAuiToolBarEvent& event)
         m_normalRect = m_frame->GetRect();
         m_frame->Maximize();
     }
+
+    boost::log::core::get()->flush();
 }
 
 void BBLTopbar::OnCloseFrame(wxAuiToolBarEvent& event)
@@ -1210,6 +1212,8 @@ void BBLTopbar::OnCloseFrame(wxAuiToolBarEvent& event)
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";   
     m_frame->Close();
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " end";
+
+    boost::log::core::get()->flush();
 }
 
 void BBLTopbar::OnMouseLeftDClock(wxMouseEvent& mouse)

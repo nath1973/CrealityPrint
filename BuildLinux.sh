@@ -95,7 +95,10 @@ if [ "${DISTRIBUTION}" == "ubuntu" ]
 then
     DISTRIBUTION="debian"
     VERSION_ID=$(awk -F= '/^VERSION_ID=/ {print $2}' /etc/os-release)
-    if [ ${VERSION_ID} == "\"24.04\"" ]
+     # Extract numeric version for comparison (remove quotes)
+    NUMERIC_VERSION=$(echo ${VERSION_ID} | tr -d '"')
+    # Use debian2 for Ubuntu 24.04 and later versions
+    if [[ $(echo "${NUMERIC_VERSION} >= 24.04" | bc -l) -eq 1 ]]
     then
         DISTRIBUTION="debian2"
     fi

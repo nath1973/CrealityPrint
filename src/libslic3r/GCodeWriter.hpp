@@ -91,7 +91,6 @@ public:
     std::string unlift(const double limitSpeed = 0.0f);
     Vec3d       get_position() const { return m_pos; }
     void       set_position(const Vec3d& in) { m_pos = in; }
-    void        set_position_for_wipe(const Vec3d& in);
     double      get_zhop() const { return m_lifted; }
 
     //BBS: set offset for gcode writer

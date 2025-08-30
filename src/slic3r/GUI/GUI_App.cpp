@@ -2942,6 +2942,8 @@ bool GUI_App::OnInit()
 
 int GUI_App::OnExit()
 {
+    BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
+
     //stop_sync_user_preset();
     SyncUserPresets::getInstance().shutdown();
 
@@ -5497,6 +5499,26 @@ void  GUI_App::init_user_profile()
 
 
 }
+
+std::string escapeForJS(const std::string& input)
+{
+    std::string output;
+    output.reserve(input.size() * 2); // 预留空间，减少扩容
+
+    for (char c : input) {
+        switch (c) {
+        case '\"': output += "\\\""; break; // 双引号
+        case '\'': output += "\\\'"; break; // 单引号
+        case '\\': output += "\\\\"; break; // 反斜杠
+        case '\n': output += "\\n"; break;  // 换行
+        case '\r': output += "\\r"; break;  // 回车
+        case '\t': output += "\\t"; break;  // Tab
+        default: output += c; break;
+        }
+    }
+    return output;
+}
+
 std::string GUI_App::handle_web_request(std::string cmd)
 {
     try {
@@ -6075,7 +6097,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     json j               = json::parse(body);
                     json_res["error"]    = "";
                     json_res["response"] = j;
-                    auto response_js     = wxString::Format("window.handleStudioCmd('%s')", wxString::FromUTF8(json_res.dump()));
+                    auto response_js = wxString::Format("window.handleStudioCmd(\"%s\")", wxString::FromUTF8(escapeForJS(json_res.dump())));
                     run_script(response_js);
                 };
 
@@ -6083,7 +6105,7 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     json j               = json::parse(body);
                     json_res["error"]    = error;
                     json_res["response"] = body;
-                    auto response_js     = wxString::Format("window.handleStudioCmd('%s')", wxString::FromUTF8(json_res.dump()));
+                    auto response_js     = wxString::Format("window.handleStudioCmd(\"%s\")", wxString::FromUTF8(escapeForJS(json_res.dump())));
                     run_script(response_js);
                 };
 
@@ -10147,7 +10169,7 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
                 start_page == ConfigWizard::SP_FILAMENTS ? GuideFrame::BBL_FILAMENT_ONLY :
                 start_page == ConfigWizard::SP_PRINTERS ? GuideFrame::BBL_MODELS_ONLY :
                 GuideFrame::BBL_MODELS_ONLY;
-    wizard.SetStartPage(page);
+    wizard.SetStartPage(page,false);
     bool       res = wizard.run();
 
     if (res) {

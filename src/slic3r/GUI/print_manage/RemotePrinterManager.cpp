@@ -60,7 +60,9 @@ RemotePrinterManager::~RemotePrinterManager()
 {
     m_bExit = true;
     stop_flag = true;
+    m_cvUpload.notify_all();
     condition.notify_all();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     for (int i = 0; i < 3; ++i) {
             if (m_multUploadThreads[i].joinable()) {
                 m_multUploadThreads[i].join();

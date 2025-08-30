@@ -577,6 +577,7 @@ public:
 	// used to update preset_choice from Tab
 	const std::deque<Preset>&	get_presets() const	{ return m_presets; }
     size_t                      get_idx_selected()	{ return m_idx_selected; }
+    void                        set_idx_selected(size_t idx) { m_idx_selected = idx; }
 	static const std::string&	get_suffix_modified();
 
     // Return a preset possibly with modifications.

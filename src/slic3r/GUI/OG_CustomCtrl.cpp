@@ -694,6 +694,8 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
     std::string tooltip_img;
     std::string markdowntip;
     wxString	tooltip_title;
+    wxString      tooltip_url;
+    wxString      tooltip_content;
 
     // BBS: markdown tip
     CtrlLine* focusedLine = nullptr;
@@ -703,23 +705,48 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
         if (!line.is_visible) continue;
         line.is_focused = is_point_in_rect(pos, line.rect_label);
         if (line.is_focused) {
-            if (!line.og_line.label_hyperlink.empty())
+            if (!line.og_line.label_hyperlink.empty()) {
                 tooltip = line.og_line.label_hyperlink + "\n\n";
+                tooltip_url = line.og_line.label_hyperlink;
+            }
             tooltip += line.og_line.label_tooltip;
+            tooltip_content = line.og_line.label_tooltip;
 
             tooltip_title = line.og_line.label;
+            //tooltip_title = line.og_line.get_options()[0].opt_id;
 
             if(line.og_line.get_options().size() > 0)
             {
                 wxString img = line.og_line.label_tooltip_img;
-                tooltip_img  = "process/";
-                tooltip_img += wxGetApp().dark_mode() ? "dark/" : "light/";
+          /*      tooltip_img  = "process/";
+                tooltip_img += wxGetApp().dark_mode() ? "dark/" : "light/";*/
                 tooltip_img += img.ToStdString();
-                tooltip_img += ".svg";
+                //tooltip_img += ".svg";
+                tooltip_img += wxGetApp().dark_mode() ? "" : "_light";
+                std::string url_svg = Slic3r::var(tooltip_img + ".svg");
+                std::string url_png = Slic3r::var(tooltip_img + ".png");
+                fs::path    phSvg(url_svg);
+                fs::path    phPng(url_png);
+                if(line.og_line.label_tooltip_img=="detect_narrow_internal_solid_infill")
+                {
+                    Field* field = opt_group->get_field(line.og_line.label_tooltip_img);
+                    if(field)
+                    {
+                        try{
+                            auto value =  boost::any_cast<bool>(field->get_value());
+                            if(!value)
+                            {
+                                tooltip_img = tooltip_img + "_unchecked";
+                                std::string url_png = Slic3r::var(tooltip_img + "_unchecked.png");
+                                phPng = url_png;
+                            }
+                        } catch(const boost::bad_any_cast &e) {
+      
+                        }
 
-                std::string url = Slic3r::var(tooltip_img);
-                fs::path    ph(url);
-                if (!fs::exists(ph))
+                    }
+                }
+                if (!fs::exists(phSvg) && !fs::exists(phPng))
                     tooltip_img  = "";
             }
                 
@@ -760,15 +787,36 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
         if (!tooltip.IsEmpty())
             break;
     }
-
+    
+    ProcessTip* mdt = ProcessTip::processTip();
+    if(!focusedLine)
+    {
+        mdt->closeTip();
+        return;
+    }
+    int posW = mdt->GetSize().GetWidth();
+    wxPoint      pos2 = {mdt->GetSize().GetWidth() * (-1), focusedLine->rect_label.y};
+    pos2 = ClientToScreen(pos2);
     // Set tooltips with information for each icon
     // BBS: markdown tip
     if (!markdowntip.empty()) {
         assert(focusedLine);
-        wxPoint pos2 = { 250, focusedLine->rect_label.y };
-        pos2 = ClientToScreen(pos2);
-        //if (MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2, tooltip_img)) {
-        if (MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2)) {
+        
+
+        int type = dynamic_cast<ConfigOptionsGroup*>(opt_group)->config_type();
+        bool isShow = false;
+        if(type == Preset::TYPE_PRINT || type == Preset::TYPE_PLATE || type == Preset::TYPE_MODEL)
+        {
+#ifdef WIN32
+            isShow = ProcessTip::ShowTip(markdowntip, (tooltip_title), (tooltip_content), (tooltip_img), (tooltip_url), pos2);
+#else
+            isShow = MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2);
+#endif
+        }else{
+            isShow = MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2);
+        }
+
+        if (isShow) {
             try {
                     ParamsPanel* params_panel = dynamic_cast<ParamsPanel*>(focusedLine->ctrl->GetGrandParent()->GetParent());
                     if (params_panel && params_panel->get_image_tooltip_panel()) {
@@ -783,8 +831,18 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
         }
     }
     else {
-        MarkdownTip::ShowTip(markdowntip, "", {tooltip.empty() ? 0 : 1, 0});
-
+        int type = dynamic_cast<ConfigOptionsGroup*>(opt_group)->config_type();
+        bool isShow = false;
+        if(type == Preset::TYPE_PRINT || type == Preset::TYPE_PLATE || type == Preset::TYPE_MODEL)
+        {
+    #ifdef WIN32
+            isShow = ProcessTip::ShowTip(markdowntip, (tooltip_title), (tooltip_content), (tooltip_img), (tooltip_url), {tooltip.empty() ? 0 : 1, 0});
+    #else
+            isShow = MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2);
+    #endif
+        }else{
+            isShow = MarkdownTip::ShowTip(markdowntip, "", {tooltip.empty() ? 0 : 1, 0});
+        }
     }
 
     if (GetToolTipText() != tooltip)
@@ -1449,7 +1507,13 @@ void OG_CustomCtrl::CtrlLine::on_ctrl_widget_enter(wxMouseEvent& event)
 
             wxPoint pos2 = { this->rect_label.x, this->rect_label.y + 25 };
             pos2 = this->ctrl->get_client_rect_point(pos2);
-            MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2);
+
+            int type = dynamic_cast<ConfigOptionsGroup*>(this->ctrl->opt_group)->config_type();
+            if(!(type == Preset::TYPE_PRINT || type == Preset::TYPE_PLATE || type == Preset::TYPE_MODEL))
+            {
+                MarkdownTip::ShowTip(markdowntip, into_u8(tooltip), pos2);
+            }
+            
         }
 
         wxString img = this->og_line.label_tooltip_img;

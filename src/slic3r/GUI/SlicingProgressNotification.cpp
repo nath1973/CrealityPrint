@@ -292,25 +292,46 @@ void NotificationManager::SlicingProgressNotification::render(
 	ImGui::PopStyleColor(1);
 
 	if (m_sp_state == SlicingProgressState::SP_PROGRESS) {
-        std::string child_name = "##SlicingProgressPanel";
+		//float progress_panel_width = 444.0f, progress_panel_height = 58.0f * scale;
+        //float  margin_x   = 30.0f * scale;
+        ImGuiViewport* vp              = ImGui::GetMainViewport();
+        float          viewport_width  = vp->Size.x;
+        float          viewport_height = vp->Size.y;
+
+		float  panel_ratio           = 0.3f; 
+        float  progress_panel_width  = viewport_width * panel_ratio;
+        float  progress_panel_height = 58.0f * scale;
+
+		ImVec2 button_size   = ImVec2(38.f, 38.f) * scale;
+        float  min_bar_width = 240.0f * scale;
+        float  text_gap      = 8.0f;
+        float button_gap    = 50.0f * scale;
+
+        float right_reserve = button_size.x + button_gap + text_gap;
+        float required_panel_width = min_bar_width + right_reserve;
+
+        progress_panel_width = ImMax(progress_panel_width, required_panel_width);
+		float max_panel_width = viewport_width * 0.95f;
+        progress_panel_width  = ImMin(progress_panel_width, max_panel_width);
+
+		ImVec2 window_pos = ImVec2(vp->Pos.x + (viewport_width - progress_panel_width) * 0.5f,
+                                   vp->Pos.y + viewport_height - progress_panel_height - 20.0f * scale);
+
+        ImGui::SetNextWindowPos(window_pos);
+        ImGui::SetNextWindowSize(ImVec2(progress_panel_width, progress_panel_height));
+
+		std::string child_name = "##SlicingProgressPanel";
         ImGui::Begin(child_name.c_str(), nullptr, window_flags | ImGuiWindowFlags_NoBackground);
 
-		float progress_panel_width = 444.0f, progress_panel_height = 58.0f * scale;
-        float  margin_x   = 30.0f * scale;
-
-		ImVec2 window_pos = ImVec2((cnv_size.get_width() - progress_panel_width) / 2.0f,
-                                         cnv_size.get_height() - progress_panel_height - 20.0f);
-        ImGui::SetWindowPos(window_pos);
-        ImGui::SetWindowSize(ImVec2(progress_panel_width, progress_panel_height));
-        
 		ImVec2 child_window_pos = ImGui::GetWindowPos();
-        ImVec2 button_size      = ImVec2(38.f, 38.f) * scale;
         ImVec2 button_pos = child_window_pos + ImVec2(progress_panel_width - button_size.x, (progress_panel_height - button_size.y) / 2.0f);
-        
-		ImVec2 progress_bar_pos  = child_window_pos + ImVec2(0, (progress_panel_height - 6.0f * scale )/ 2.0f);
-        ImVec2 progress_bar_size = ImVec2(progress_panel_width - button_size.x - margin_x, 6.0f * scale);
+        button_pos.y -= 7.0f * scale;
+		ImVec2 progress_bar_pos = child_window_pos + ImVec2(30.0f * scale, (progress_panel_height - 6.0f * scale) / 2.0f);
+        float  bar_width        = progress_panel_width  - right_reserve;
+        bar_width               = ImMax(bar_width, min_bar_width);
 
-		ImVec2 text_pos = ImVec2(progress_bar_pos.x + 3.0f, progress_bar_pos.y - m_line_height * 1.1f);
+        ImVec2 progress_bar_size = ImVec2(bar_width, 6.0f * scale);
+		ImVec2 text_pos = ImVec2(progress_bar_pos.x + 2.0f, progress_bar_pos.y - m_line_height * 1.1f);
 
 		render_bar(progress_bar_pos, progress_bar_size);
         render_cancel_button(button_pos, button_size);
@@ -457,7 +478,25 @@ void Slic3r::GUI::NotificationManager::SlicingProgressNotification::render_cance
 		ImVec2 button_pos = pos;
 		ImGui::SetCursorScreenPos(button_pos);
 
-		std::wstring button_text;
+	    bool hovered = ImGui::IsMouseHoveringRect(button_pos, button_pos + button_size, /*clip*/ false);
+        if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            on_cancel_button();
+
+		wchar_t      ch = hovered ? ImGui::CancelHoverButton : ImGui::CancelButton;
+        char         u8[2] = {(char) ch, 0};
+
+		ImDrawList*  dl      = ImGui::GetForegroundDrawList();
+        ImFont*      font    = ImGui::GetFont();
+        float        font_px = ImGui::GetFontSize();
+
+		ImVec2       ts = font->CalcTextSizeA(font_px, FLT_MAX, 0.0f, u8, u8 + 1);
+        ImVec2       tp = ImVec2(button_pos.x + (button_size.x - ts.x) * 0.5f, button_pos.y + (button_size.y - ts.y) * 0.5f);
+        tp.x            = ImFloor(tp.x);
+        tp.y            = ImFloor(tp.y);
+        ImU32 col_text  = ImGui::GetColorU32(ImGuiCol_Text);
+        dl->AddText(font, font_px, tp, col_text, u8, u8 + 1);
+
+		/*std::wstring button_text;
 		button_text = ImGui::CancelButton;
 		if (ImGui::IsMouseHoveringRect(button_pos, button_pos + button_size, true))
 		{
@@ -465,7 +504,7 @@ void Slic3r::GUI::NotificationManager::SlicingProgressNotification::render_cance
 			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 				on_cancel_button();
 		}
-		imgui.button(button_text.c_str());
+		imgui.button(button_text.c_str());*/
 
 		ImGui::PopStyleColor(5);
 	}

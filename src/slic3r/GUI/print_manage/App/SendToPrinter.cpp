@@ -1237,6 +1237,11 @@ std::string CxSentToPrinterDialog::get_onlygcode_plate_data_on_show()
             json_data["total_weight"] = total_weight_str.ToStdString();
             json_data["print_time"]   = print_time_str.ToStdString();
 
+            nlohmann::json   filamentJsonArray = nlohmann::json::array();
+            std::vector<int> extruders_vec = extruders_json.get<std::vector<int>>();
+            get_filament_length_info(extruders_vec, plate, filamentJsonArray);
+            json_data["filament_length"] = filamentJsonArray;
+
             json_array.push_back(json_data);
         }else if (!current_result->filename.empty()){
             if (plate && plate->thumbnail_data.is_valid()) {
@@ -1473,6 +1478,10 @@ std::string CxSentToPrinterDialog::get_plate_data_on_show()
             json_data["print_time"] = print_time_str.ToStdString();
             m_is_only_gcode_mode = false;
 
+            nlohmann::json filamentJsonArray = nlohmann::json::array();
+            get_filament_length_info(plate_extruders,plate,filamentJsonArray);
+            json_data["filament_length"] = filamentJsonArray;
+
             json_array.push_back(json_data);
         }
     }
@@ -1676,6 +1685,52 @@ void CxSentToPrinterDialog::get_gcode_display_info(wxString& total_weight_str, w
 
     total_weight_str = wxString(weight);
 
+}
+
+void CxSentToPrinterDialog::get_filament_length_info(std::vector<int> plate_extruders, Slic3r::GUI::PartPlate* plate, nlohmann::json& jsonArray)
+{
+    if(!plate) 
+        return;
+	Slic3r::Print* print = nullptr;
+	plate->get_print((Slic3r::PrintBase **)&print, nullptr, nullptr);
+    if(!print) return;
+
+    GCodeProcessorResult* gcode_process_result = plate->get_slice_result();
+    if (!gcode_process_result) 
+    {
+        return ;
+    } 
+    PrintEstimatedStatistics ps = gcode_process_result->print_statistics;
+
+    for (size_t i = 0; i < plate_extruders.size(); i++) 
+    {
+        int idx = plate_extruders[i] - 1;
+        if (idx < 0) 
+            continue;
+
+        std::vector<float> filaments  = gcode_process_result->filament_diameters;
+        std::map<size_t, double> total_volumes = ps.total_volumes_per_extruder;
+        std::map<size_t, double> flush_volumes = ps.flush_per_filament;
+        if (idx >= filaments.size()|| total_volumes.find(idx) == total_volumes.end()) 
+        {
+            continue;
+        }
+
+        double diameter = filaments[idx];
+        double totalVolume = total_volumes[idx];
+        double filamentVolume = flush_volumes[idx];
+        double allVolume = totalVolume + filamentVolume;
+        double s = PI * sqr(0.5 * diameter);
+
+        double length = allVolume / s;
+
+        json jsonObj;
+        jsonObj["length"] = length;
+        jsonObj["extruderIndex"] = idx+1;
+        jsonArray.push_back(jsonObj);
+    }
+
+    return ;
 }
 
 bool CxSentToPrinterDialog::LoadFile(std::string jPath, std::string &sContent)

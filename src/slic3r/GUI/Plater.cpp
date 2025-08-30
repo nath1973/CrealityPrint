@@ -4328,8 +4328,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     if (en_3mf_file_type == En3mfType::From_Prusa) {
                         // do not reset the model config
                         load_config = false;
+#if !AUTOMATION_TOOL
                         if (load_type != LoadType::LoadGeometry)
                             show_info(q, _L("The 3mf is not supported by CrealityPrint, load geometry data only."), _L("Load 3mf"));
+#endif
                     }
                     // else if (load_config && (file_version.maj() != app_version.maj())) {
                     //     // version mismatch, only load geometries
@@ -4713,6 +4715,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                     wxGetApp().app_config->set("no_warn_when_modified_gcodes", "true");
                             } else if ((validated == VALIDATE_PRESETS_PRINTER_NOT_FOUND) ||
                                        (validated == VALIDATE_PRESETS_FILAMENTS_NOT_FOUND)) {
+#if AUTOMATION_TOOL
+                                wxGetApp().app_config->set("no_warn_when_modified_gcodes", "true");
+#endif                            
+#if !AUTOMATION_TOOL                                
                                 std::string warning_message;
                                 warning_message += "\n";
                                 for (std::set<std::string>::iterator it = modified_gcodes.begin(); it != modified_gcodes.end(); ++it)
@@ -4731,7 +4737,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                 auto res = dlg.ShowModal();
                                 if (dlg.get_checkbox_state())
                                     wxGetApp().app_config->set("no_warn_when_modified_gcodes", "true");
+#endif
                             }
+
                         }
 
                         // always load config
@@ -4867,7 +4875,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         check_printer_standard_status();
                         // 判断是否为创想的软件生成的3mf文件
                         if (model.objects.size() != 0) {
+#if !AUTOMATION_TOOL
                             Check3mfVendor::getInstance()->check(path.string(), printerSettingId, &busy);
+#endif
                         }
                     }
                     if (!silence)
@@ -5369,6 +5379,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             if (msg.ShowModal() == wxID_YES) {}
         }
     }
+    Check3mfVendor::getInstance()->doSelectPrinterPreset();
 
     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end";
 
@@ -5474,7 +5485,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
                 int answer = dlg.ShowModal();
                 // the size of the object is too big -> this could lead to overflow when moving to clipper coordinates,
                 // so scale down the mesh
-                object->scale_mesh_after_creation(1. / max_ratio);
+                object->scale_mesh_after_creation(1.0 / max(max_ratio, ratio2));
                 object->origin_translation = Vec3d::Zero();
                 object->center_around_origin();
                 scaled_down = true;
@@ -5485,19 +5496,11 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
                         _L("Object too large"), wxICON_QUESTION | wxYES_NO);
                 int answer = dlg.ShowModal();
                 if (answer == wxID_YES) {
-                    if (size.z() > bed_size.z()) {
-                        instance->set_scaling_factor(instance->get_scaling_factor() / ratio2);
-                        object->scale_mesh_after_creation(0.98);
-                        object->origin_translation = Vec3d::Zero();
-                        object->center_around_origin();
-                        scaled_down = true;
-                    } else {
-                        instance->set_scaling_factor(instance->get_scaling_factor() / max_ratio);
-                        object->scale_mesh_after_creation(0.98);
-                        object->origin_translation = Vec3d::Zero();
-                        object->center_around_origin();
-                        scaled_down = true;
-                    }
+                    instance->set_scaling_factor(instance->get_scaling_factor() / max(max_ratio, ratio2));
+                    object->scale_mesh_after_creation(0.98);
+                    object->origin_translation = Vec3d::Zero();
+                    object->center_around_origin();
+                    scaled_down = true;
                 }
             } else if (size.z() > bed_size.z() && !m_is_calib_model) {
                 MessageDialog

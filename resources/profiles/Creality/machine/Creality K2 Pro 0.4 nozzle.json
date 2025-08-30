@@ -14,7 +14,7 @@
     "bed_mesh_probe_distance": "50,50",
     "before_layer_change_gcode": ";BEFORE_LAYER_CHANGE\n;[layer_z]\nG92 E0\n",
     "best_object_pos": "0.5,0.5",
-    "change_filament_gcode": "G2 Z{z_after_toolchange + 0.4} I0.86 J0.86 P1 F10000 ; spiral lift a little from second lift\nG1 X0 Y160 F30000\nG1 Z{z_after_toolchange} F600",
+    "change_filament_gcode": "G2 Z{z_after_toolchange + 0.4} I0.86 J0.86 P1 F10000 ; spiral lift a little from second lift\nG1 X205 Y295 F30000\nG1 Z{z_after_toolchange} F600",
     "cooling_tube_length": "0",
     "cooling_tube_retraction": "0",
     "creality_flush_time": "86",
@@ -111,11 +111,11 @@
     "retraction_length": "0.8",
     "retraction_minimum_travel": "1",
     "retraction_speed": "40",
-    "travel_slope": "1",
+    "travel_slope": "3",
     "wipe": "1",
     "wipe_distance": "2",
     "z_hop": "0.4",
     "z_hop_types": "Auto Lift",
     "name": "Creality K2 Pro 0.4 nozzle",
-    "setting_id": "80355"
+    "setting_id": "96796"
 }

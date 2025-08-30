@@ -21,11 +21,11 @@ using namespace Slic3r::GUI;
 static int _scale(const int val) { return val * Slic3r::GUI::wxGetApp().em_unit() / 10; }
 static int _ITEM_WIDTH() { return _scale(30); }
 #define MIN_DIALOG_WIDTH        FromDIP(400)
-#define SLIDER_WIDTH            FromDIP(200)
+#define SLIDER_WIDTH            FromDIP(320)
 #define SLIDER_HEIGHT           FromDIP(25)
 #define TEXT_CTRL_WIDTH         FromDIP(70)
-#define BUTTON_SIZE             wxSize(FromDIP(58), FromDIP(24))
-#define BUTTON_BORDER           FromDIP(int(400 - 58 * 2) / 8)
+#define BUTTON_SIZE             wxSize(FromDIP(104), FromDIP(32))
+#define BUTTON_BORDER           FromDIP(8)
 #define SLIDER_SCALE(val)       ((val) / 0.001)
 #define SLIDER_UNSCALE(val)     ((val) * 0.001)
 #define SLIDER_SCALE_10(val)    ((val) / 0.01)
@@ -131,7 +131,7 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
     //tips->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& e) {
     //    wxLaunchDefaultBrowser("https://wiki.creality.com/en/software/creality/step");
     //});
-    info->Wrap(FromDIP(400));
+    info->Wrap(FromDIP(744));
     tips_sizer->Add(info, 0, wxALIGN_LEFT);
     //tips_sizer->Add(tips, 0, wxALIGN_LEFT);
     bSizer->Add(tips_sizer, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, LEFT_RIGHT_PADING);
@@ -289,13 +289,13 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
                             std::pair<wxColour, int>(wxColour(0, 174, 66), StateColor::Normal));
     m_button_ok = new Button(this, _L("OK"));
     m_button_ok->SetBackgroundColor(btn_bg_green);
-    m_button_ok->SetBorderColor(*wxWHITE);
+    m_button_ok->SetBorderColor(btn_bg_green);
     m_button_ok->SetTextColor(wxColour(0xFFFFFE));
-    m_button_ok->SetFont(Label::Body_12);
+    m_button_ok->SetFont(Label::Body_13);
     m_button_ok->SetSize(BUTTON_SIZE);
     m_button_ok->SetMinSize(BUTTON_SIZE);
-    m_button_ok->SetCornerRadius(FromDIP(12));
-    bSizer_button->Add(m_button_ok, 0, wxALIGN_RIGHT, BUTTON_BORDER);
+    m_button_ok->SetCornerRadius(FromDIP(4));
+   
     Bind(wxEVT_THREAD_DONE, &StepMeshDialog::OnMeshNumberUpdated, this);
     m_button_ok->Bind(wxEVT_LEFT_DOWN, [this, angle_input, linear_input](wxMouseEvent& e) {
         stop_task();
@@ -319,11 +319,13 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
     m_button_cancel = new Button(this, _L("Cancel"));
     m_button_cancel->SetBackgroundColor(btn_bg_white);
     m_button_cancel->SetBorderColor(wxColour(38, 46, 48));
-    m_button_cancel->SetFont(Label::Body_12);
+    m_button_cancel->SetFont(Label::Body_13);
     m_button_cancel->SetSize(BUTTON_SIZE);
     m_button_cancel->SetMinSize(BUTTON_SIZE);
-    m_button_cancel->SetCornerRadius(FromDIP(12));
-    bSizer_button->Add(m_button_cancel, 0, wxALIGN_RIGHT | wxLEFT, BUTTON_BORDER);
+    m_button_cancel->SetMaxSize(BUTTON_SIZE);
+    m_button_cancel->SetCornerRadius(FromDIP(4)); 
+    bSizer_button->Add(m_button_cancel, 0, wxALIGN_RIGHT | wxRIGHT, BUTTON_BORDER);
+    bSizer_button->Add(m_button_ok, 0, wxALIGN_RIGHT | wxLEFT, BUTTON_BORDER);
 
     m_button_cancel->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& e) {
         stop_task();
@@ -335,7 +337,12 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
     this->SetSizer(bSizer);
     update_mesh_number_text();
     this->Layout();
-    bSizer->Fit(this);
+    //bSizer->Fit(this);
+    const wxWindow* dpiRef = parent ? parent : static_cast<wxWindow*>(wxGetApp().mainframe);
+    wxSize dlg_size(FromDIP(744, dpiRef), FromDIP(440, dpiRef));
+    SetMinSize(dlg_size);
+    SetMaxSize(dlg_size);
+    SetSize(dlg_size);
 
     this->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {
         SetFocusIgnoringChildren();
@@ -418,7 +425,8 @@ void StepMeshDialog::OnMeshNumberUpdated(wxCommandEvent& event)
     StateColor btn_bg_green(std::pair<wxColour, int>(wxColour(27, 136, 68), StateColor::Pressed),
                             std::pair<wxColour, int>(wxColour(61, 203, 115), StateColor::Hovered),
                             std::pair<wxColour, int>(wxColour(0, 174, 66), StateColor::Normal));
-    if (m_button_ok)
+    if (m_button_ok) {
         m_button_ok->SetBackgroundColor(btn_bg_green);
         m_button_ok->Enable(true);
+    }
 }

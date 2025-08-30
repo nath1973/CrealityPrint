@@ -76,7 +76,8 @@ struct OptionConfig::priv
                                     data.tooltip     = option.contains("tooltip") ? option["tooltip"] : "";
                                     data.tooltip_img = option.contains("tooltip_img") ? option["tooltip_img"] : "";
                                     data.url         = url;
-                                    data.url        += option.contains("url") ? option["url"] : "";
+                                    //data.url        = option.contains("url") ? option["url"] : "";
+                                    option["url"] != "" ? data.url += option["url"] : data.url = "";
 
                                     return data;
                                 }

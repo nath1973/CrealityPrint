@@ -3,7 +3,7 @@
     "name": "Creality Hi",
     "nozzle_diameter": "0.8;0.6;0.4;0.2",
     "bed_model": "creality_k1_buildplate_model.stl",
-    "default_bed_type": "Cool Plate",
+    "default_bed_type": "Epoxy Resin Plate",
     "bed_texture": "",
     "family": "Creality",
     "hotend_model": "",

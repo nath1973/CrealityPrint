@@ -19,6 +19,7 @@ public:
     static Check3mfVendor* getInstance();
     // 返回值：true为创想的3mf,false为其它厂商的3mf
     bool check(const std::string& fileName, const std::string& printerSettingId, BusyCursor* busy);
+    void doSelectPrinterPreset();
     bool isCreality3mf();
     void setCreality3mf(bool isCreality3mf);
 
@@ -29,6 +30,9 @@ private:
 
 private:
     bool m_isCreality3mf = false;
+    bool m_bNeedSelectPrinterPreset = false;
+    std::string m_printerPresetName = "";
+    int m_printerPresetIdx = -1;
 };
 
 class ChoosePresetDlg : public DPIDialog

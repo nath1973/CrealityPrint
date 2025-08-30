@@ -3160,8 +3160,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             // Prusa Multi-Material wipe tower.
             if (has_wipe_tower && ! layers_to_print.empty()) {
                 m_wipe_tower.reset(new WipeTowerIntegration(&print, print.config(), print.get_plate_index(), print.get_plate_origin(), * print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get()));
-                //BBS
-                file.write(m_writer.travel_to_z(initial_layer_print_height + m_config.z_offset.value, "Move to the first layer height"));
+                
                 if (!is_bbl_printers && print.config().single_extruder_multi_material_priming) {
                     file.write(m_wipe_tower->prime(*this));
                     // Verify, whether the print overaps the priming extrusions.
@@ -3199,6 +3198,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                     }
                 }
                 print.throw_if_canceled();
+            }
+            if (!layers_to_print.empty()) {
+                // BBS
+                file.write(m_writer.travel_to_z(initial_layer_print_height + m_config.z_offset.value, "Move to the first layer height"));
             }
             // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
             // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
@@ -4654,7 +4657,7 @@ LayerResult GCode::process_layer(
                             continue;
 
                         //BBS: now we don't consider interface filament used in other object
-                        if (extruder_id == interface_extruder)
+                        if (extruder_id == interface_extruder && object.config().support_interface_not_for_body)
                             continue;
 
                         dontcare_extruder = extruder_id;
@@ -4702,7 +4705,7 @@ LayerResult GCode::process_layer(
                     obj_interface.support = &support_layer.support_fills;
                     obj_interface.support_extrusion_role = erSupportMaterialInterface;
 
-                    if (object.config().ironing_support_layer)
+                    if (object.config().ironing_support_layer && !object.config().support_interface_not_for_body)
                         obj_interface.support_extrusion_role = erMixed;
                 }
             }
@@ -5396,11 +5399,7 @@ std::string GCode::change_layer(coordf_t print_z)
     }
 
     m_nominal_z = z;
-   // if(m_layer_index == 0)
-   // {
-       // m_writer.set_position(Vec3d{m_writer.get_position().x(), m_writer.get_position().y(), z});
-   // }
-    
+
     // forget last wiping path as wiping after raising Z is pointless
     // BBS. Dont forget wiping path to reduce stringing.
     //m_wipe.reset_path();

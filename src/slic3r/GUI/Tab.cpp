@@ -1552,6 +1552,13 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         update_wiping_button_visibility();
     }
 
+    if (opt_key == "wipe_tower_rotation_angle") {
+        DynamicConfig& global_cfg = wxGetApp().preset_bundle->project_config;
+        if (global_cfg.has("wipe_tower_rotation_angle")) {
+            global_cfg.set_key_value("wipe_tower_rotation_angle", new ConfigOptionFloat(boost::any_cast<double>(value)));
+        }
+    }
+
     // reload scene to update timelapse wipe tower
     if (opt_key == "timelapse_type") {
         bool wipe_tower_enabled = m_config->option<ConfigOptionBool>("enable_prime_tower")->value;
@@ -1944,7 +1951,7 @@ void Tab::on_presets_changed()
         // refresh the print or filament/sla_material tab page.
         // But if there are options, moved from the previously selected preset, update them to edited preset
         tab->apply_config_from_cache();
-        tab->load_current_preset();
+        tab->load_current_preset(m_type);
     }
     // clear m_dependent_tabs after first update from select_preset()
     // to avoid needless preset loading from update() function
@@ -5438,7 +5445,7 @@ void Tab::reactive_preset_combo_box()
 }
 
 // Initialize the UI from the current preset
-void Tab::load_current_preset()
+void Tab::load_current_preset(Preset::Type trigger/* = Preset::Type::TYPE_INVALID*/)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__<<boost::format(": enter");
     const Preset& preset = m_presets->get_edited_preset();
@@ -5456,6 +5463,80 @@ void Tab::load_current_preset()
         }
         else
             wxGetApp().obj_list()->update_objects_list_filament_column(1);
+    } else if (m_type == Slic3r::Preset::TYPE_PRINT && trigger == Slic3r::Preset::TYPE_PRINTER) {
+        if (preset.name == "Default Setting") {
+            auto        presets = m_presets->get_presets();
+            for (auto idx = 0; idx < presets.size(); idx++) {
+                if (presets[idx].is_project_embedded) {
+                    m_presets->set_idx_selected(idx);
+                    m_presets->get_edited_preset() = presets[idx];
+                }
+            }
+        } else if (preset.is_project_embedded) {
+            auto presets = m_presets->get_presets();
+            std::string printerName = wxGetApp().preset_bundle->printers.get_selected_preset_name();
+            Preset* preset = wxGetApp().preset_bundle->printers.find_preset(printerName);
+            std::string processName = "";
+            if (preset != nullptr) {
+                ConfigOptionString* opt = preset->config.opt<ConfigOptionString>("default_print_profile");
+                if (opt != nullptr && opt->value != "Default Setting") {
+                    processName = opt->value;
+                }
+            }
+            int firstSystemIdx = -1;
+            int processIdx = -1;
+            int projectIdx = -1;
+            for (auto idx = 0; idx < presets.size(); idx++) {
+                if (presets[idx].is_visible && presets[idx].is_compatible) {
+                    if (presets[idx].is_system) {
+                        if (firstSystemIdx == -1) {
+                            firstSystemIdx = idx;
+                        }
+                        if (!processName.empty() && processIdx == -1 && processName == presets[idx].name) {
+                            processIdx = idx;
+                        }
+                    } else if (presets[idx].is_project_embedded) {
+                        if (projectIdx == -1) {
+                            projectIdx = idx;
+                        }
+                    }
+                }
+            }
+            if (processIdx != -1) {
+                Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
+                if (tab != nullptr) {
+                    if (tab->m_nPrintUnsavedChanges == 0 || tab->m_nPrintUnsavedChanges == -1) {
+                        m_presets->set_idx_selected(processIdx);
+                        m_presets->get_edited_preset() = presets[processIdx];
+                    } else if (tab->m_nPrintUnsavedChanges == 2) {
+                        wxGetApp().preset_bundle->prints.get_selected_preset().set_dirty(false);
+                        m_presets->set_idx_selected(processIdx);
+                        std::vector<std::string> dirty_options = presets[processIdx].config.diff(m_presets->get_edited_preset().config);
+                        if (dirty_options.size() > 0) {
+                            wxGetApp().preset_bundle->prints.get_selected_preset().set_dirty();
+                        }
+                    }
+                }
+            } else if (firstSystemIdx != -1) {
+                m_presets->set_idx_selected(firstSystemIdx);
+                m_presets->get_edited_preset() = presets[firstSystemIdx];
+            } /* else if (projectIdx != -1) {
+                Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
+                if (tab != nullptr) {
+                    if (tab->m_nPrintUnsavedChanges == 0) {
+                        m_presets->set_idx_selected(projectIdx);
+                        m_presets->get_edited_preset() = presets[projectIdx];
+                    } else if (tab->m_nPrintUnsavedChanges == 2) {
+                        wxGetApp().preset_bundle->prints.get_selected_preset().set_dirty(false);
+                        m_presets->set_idx_selected(projectIdx);
+                        std::vector<std::string> dirty_options = presets[projectIdx].config.diff(m_presets->get_edited_preset().config);
+                        if (dirty_options.size() > 0) {
+                            wxGetApp().preset_bundle->prints.get_selected_preset().set_dirty();
+                        }
+                    }
+                }
+            }*/
+        }
     }
 
     // Reload preset pages with the new configuration values.
@@ -5638,6 +5719,7 @@ bool Tab::isCurrent_reset_system()
 // If the current profile is modified, user is asked to save the changes.
 bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/, const std::string& last_selected_ph_printer_name/* =""*/, bool force_select)
 {
+    m_nPrintUnsavedChanges = -1;
     BOOST_LOG_TRIVIAL(info) << boost::format("select preset, name %1%, delete_current %2%")
         %preset_name %delete_current;
     if (preset_name.empty()) {
@@ -5957,6 +6039,9 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
 
     if (dlg.save_preset())  // save selected changes
     {
+        if (presets->get_edited_preset().type == Preset::TYPE_PRINT) {
+            m_nPrintUnsavedChanges = 0;
+        }
         const std::vector<std::string>& unselected_options = dlg.get_unselected_options(presets->type());
         const std::string& name = dlg.get_preset_name();
         //BBS: add project embedded preset relate logic
@@ -5985,6 +6070,9 @@ bool Tab::may_discard_current_dirty_preset(PresetCollection* presets /*= nullptr
     }
     else if (dlg.transfer_changes()) // move selected changes
     {
+        if (presets->get_edited_preset().type == Preset::TYPE_PRINT) {
+            m_nPrintUnsavedChanges = 2;
+        }
         std::vector<std::string> selected_options = dlg.get_selected_options();
         if (m_type == presets->type()) // move changes for the current preset from this tab
         {

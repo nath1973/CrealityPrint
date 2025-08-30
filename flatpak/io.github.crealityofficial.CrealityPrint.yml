@@ -8,6 +8,7 @@ rename-icon: CrealityPrint
 finish-args:
   - --share=ipc
   - --socket=x11
+  - --socket=wayland
   - --share=network
   - --device=all
   - --filesystem=home
@@ -17,6 +18,7 @@ finish-args:
   - --filesystem=/run/spnav.sock:ro
   - --filesystem=xdg-config/gtk-3.0
   - --filesystem=xdg-config/gtk-4.0
+  - --filesystem=xdg-config/fontconfig:ro
   # Allow OrcaSlicer to talk to other instances
   - --talk-name=io.github.crealityofficial.CrealityPrint.InstanceCheck.*
   - --system-talk-name=org.freedesktop.UDisks2

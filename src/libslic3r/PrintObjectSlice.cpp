@@ -842,6 +842,8 @@ void PrintObject::slice()
      Transform3d trafo   = this->trafo_centered();
     this->update_layer_height_profile(*this->model_object(), m_slicing_params, layer_temp_height);
      double out_wall_width = it->region->config().outer_wall_line_width;
+    if (it->region->config().outer_wall_line_width.percent)
+        out_wall_width = 0.42 * out_wall_width / 100.f;
     if (m_config.overhang_optimization.value)
      {
          this->update_layer_height_profile(*this->model_object(), m_slicing_params, layer_height_profile);

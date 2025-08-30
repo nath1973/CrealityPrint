@@ -2522,6 +2522,9 @@ public:
             m_treeCtrl = new _TreeView(parent);
             m_treeCtrl->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxCommandEvent& e) { _sync(); });
 
+            m_treeCtrl->SetMinSize(wxSize(200, 800)); // 最小尺寸，防止被压缩
+            m_treeCtrl->SetMaxSize(wxSize(300, 1000)); // 最大尺寸，防止被拉伸
+
             ConfigRelateGUI::_Panel* tabView  = new ConfigRelateGUI::_Panel(parent, wxID_ANY, wxDefaultPosition, rightTabSize);
             ConfigRelateGUI::_Book*  notebook = new ConfigRelateGUI::_Book(tabView, wxID_ANY);
             m_toolbook              = notebook;
@@ -3308,7 +3311,12 @@ void ConfigRelateDialog::create()
     Refresh();
     //Update();
 
-    Bind(wxEVT_SIZE, [=](wxSizeEvent& evt) { Refresh(); });
+    this->SetMinSize(wxSize(900, 600));
+
+    Bind(wxEVT_SIZE, [=](wxSizeEvent& evt) {
+        Layout();
+        Refresh();
+    });
 
 }
 

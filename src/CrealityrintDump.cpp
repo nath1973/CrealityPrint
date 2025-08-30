@@ -144,6 +144,11 @@ ErrorReportDialog::ErrorReportDialog(wxWindow* parent, const wxString& title)
 
 wxString ErrorReportDialog::getSystemInfo()
 {
+    std::function intoU8 = [](const wxString& str) {
+        auto buffer_utf8 = str.utf8_str();
+        return std::string(buffer_utf8.data());
+    };
+
     nlohmann::json j;
     j["osDescription"]      = m_info.osDescription.ToStdString();
     j["graphicsCardVendor"] = m_info.graphicsCardVendor.ToStdString();
@@ -151,7 +156,7 @@ wxString ErrorReportDialog::getSystemInfo()
     j["build"]              = m_info.build.ToStdString();
     j["uuid"]               = m_info.uuid.ToStdString();
     j["uuid"]               = m_info.uuid.ToStdString();
-    j["userEmail"]          = m_InfoInput->GetTextCtrl()->GetValue().ToStdString();
+    j["userEmail"]              = intoU8(m_InfoInput->GetTextCtrl()->GetValue()); // m_InfoInput->GetTextCtrl()->GetValue().ToStdString();
     try {
         // 获取临时目录路径
         std::filesystem::path tempDir(wxFileName::GetTempDir().ToStdString());

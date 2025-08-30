@@ -56,7 +56,7 @@ public:
     void UpdateState();
     void OnIdle(wxIdleEvent &evt);
     // void OnClose(wxCloseEvent &evt);
-
+    void OnShow(wxShowEvent& event);
     void OnNavigationRequest(wxWebViewEvent &evt);
     void OnNavigationComplete(wxWebViewEvent &evt);
     void OnDocumentLoaded(wxWebViewEvent &evt);

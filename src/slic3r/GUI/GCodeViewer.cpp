@@ -3412,6 +3412,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result, const
         progress_dialog->Destroy();
 
     BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " end memory info " << log_memory_info();
+    boost::log::core::get()->flush();
 }
 
 void GCodeViewer::load_shells(const Print& print, bool initialized, bool force_previewing)

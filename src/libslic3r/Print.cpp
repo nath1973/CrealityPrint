@@ -2233,6 +2233,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
         std::optional<const FakeWipeTower *> wipe_tower_opt = {};
         if (this->has_wipe_tower()) {
             m_fake_wipe_tower.set_pos({m_config.wipe_tower_x.get_at(m_plate_index), m_config.wipe_tower_y.get_at(m_plate_index)});
+            m_fake_wipe_tower.update_angle(m_config.wipe_tower_rotation_angle.value);
             wipe_tower_opt = std::make_optional<const FakeWipeTower *>(&m_fake_wipe_tower);
         }
         auto            conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, wipe_tower_opt);
@@ -4565,13 +4566,16 @@ std::vector<ExtrusionPaths> FakeWipeTower::getFakeExtrusionPathsFromWipeTower2()
         
         if (hh != 0.f) {
             // The wipe tower may be getting smaller. Find the depth for this layer.
-            size_t i = 0;
-            for (i=0; i<z_and_depth_pairs.size()-1; ++i)
-                if (hh >= z_and_depth_pairs[i].first && hh < z_and_depth_pairs[i+1].first)
-                    break;
-            d = scale_(z_and_depth_pairs[i].second);
-            minCorner = {0.f, -d/2 + scale_(z_and_depth_pairs.front().second/2.f)};
-            maxCorner = { minCorner.x() + w, minCorner.y() + d };
+            int i = 0;
+            int    len = z_and_depth_pairs.size();
+            if (len > 0) {
+                for (i = 0; i < len - 1; ++i)
+                    if (hh >= z_and_depth_pairs[i].first && hh < z_and_depth_pairs[i + 1].first)
+                        break;
+                d         = scale_(z_and_depth_pairs[i].second);
+                minCorner = {0.f, -d / 2 + scale_(z_and_depth_pairs.front().second / 2.f)};
+                maxCorner = {minCorner.x() + w, minCorner.y() + d};
+            }
         }
 
 
